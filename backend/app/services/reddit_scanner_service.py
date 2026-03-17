@@ -30,16 +30,18 @@ _HEADERS = {"User-Agent": "ClarityAI/2.0 (opportunity scanner; contact@clarityai
 # NO generic subreddits (AskReddit, worldnews, etc.) — those produce irrelevant results.
 
 _INDUSTRY_MAP: dict[str, list[str]] = {
-    # Healthcare — VOC / breath-based early detection (most specific first)
+    # Healthcare — VOC / breath-based early detection
+    # Active general subs first (more posts to score), then niche ones
     "voc_detection": [
-        "Breathtest", "BreathAnalysis", "volatileorganiccompounds",
-        "ExhalBreath", "breathomics",
+        "cancer", "oncology", "CancerResearch",
+        "Breathtest", "BreathAnalysis", "breathomics",
+        "volatileorganiccompounds", "ExhalBreath",
     ],
-    # Oncology / early cancer detection — support + research communities
+    # Oncology / early cancer detection — active communities first
     "oncology": [
-        "cancer", "oncology", "CancerSupport", "CancerResearch",
+        "cancer", "oncology", "CancerResearch", "CancerSupport",
         "earlydetection", "CancerScreening",
-        "lungcancer", "colorectalcancer", "pancreaticcancer",
+        "lungcancer", "colorectalcancer",
     ],
     "diagnostics": [
         "medicalresearch", "clinicalresearch", "medicaldevices",
@@ -230,15 +232,61 @@ _STOP = frozenset(
 
 
 _PERSONAL_STORY_SIGNALS = frozenset([
-    "i graduated", "my last radiation", "my chemo", "my diagnosis", "i was diagnosed",
-    "my treatment", "i finished treatment", "my oncologist", "my surgery",
-    "feel like they lie", "my journey", "rang the bell", "i am cancer free",
-    "my battle with cancer", "just got my results",
+    "i graduated", "graduated today", "i rang the bell", "rang the bell",
+    "my last radiation", "last chemo", "my chemo", "my diagnosis", "i was diagnosed",
+    "my treatment", "i finished treatment", "i completed treatment", "finished chemo",
+    "my oncologist", "my surgery", "my scan results", "my results came back",
+    "feel like they lie", "my journey", "i am cancer free", "cancer free",
+    "my battle with cancer", "just got my results", "my biopsy", "update on my",
+    "i beat cancer", "survivor here", "nec free", "no evidence of disease",
+    "thank you all for", "wanted to share my", "sharing my story",
+    "have cancer", "has cancer", "my mom", "my dad", "my wife", "my husband",
+    "my partner", "my sister", "my brother", "my child", "my son", "my daughter",
+    "feeling tired", "side effects", "on chemo", "going through", "i need advice",
+    "new member", "new in the club", "officially hit", "one year on",
+    "close to my end", "i feel i may", "stage iv", "stage 4",
+    "venting", "vent", "advice please", "don't know how to cope",
+    "how to live", "how do i cope", "i'm scared", "terrified",
+    "abusing my", "abusing prescriptions", "abusing medication",
+    "financial", "without insurance", "care package",
+    "transplantation", "transplant", "mental health",
+    "middle east", "flee", "conflict or stay", "surgery or",
+    "hair loss", "nausea", "fatigue", "pain management",
+    "emotional support", "crying", "praying", "prayers",
 ])
+
+# Titles that are almost always personal celebration/update/support posts
+_PERSONAL_TITLE_RE = re.compile(
+    r"\b(graduated|rang the bell|cancer free|nec free|no evidence of disease|"
+    r"i beat|i survived|my update|update on me|my results|my diagnosis|"
+    r"my story|sharing my|thank you all|new member|new in the club|"
+    r"feel(ing)? (tired|scared|lost|helpless|hopeless|overwhelmed)|"
+    r"stage (iv|4|iii|3|ii|2)|vent(ing)?|advice (please|needed)|"
+    r"close to (my |the )?end|i may be|how to (cope|live|navigate)|"
+    r"financial(ly)?|without insurance|care package|i have cancer|"
+    r"has cancer|diagnosed with|abusing (my |prescriptions|medication)|"
+    r"drug(s)? (abuse|use)|relapse|suicidal|self.harm)\b",
+    re.IGNORECASE,
+)
+
+# Titles that look like discussions, questions, or research posts we WANT
+_DISCUSSION_TITLE_RE = re.compile(
+    r"\b(why|how does|what is|can |could |should |study|research|trial|"
+    r"technology|detection|screening|test|biomarker|clinical|approved|"
+    r"vs\.|versus|compare|review|analysis|data|results?|evidence|"
+    r"ai (can|detect|diagnose)|machine learning|algorithm)\b",
+    re.IGNORECASE,
+)
 
 
 def _is_personal_story(title: str, body: str) -> bool:
-    """Return True if this looks like a personal treatment story with no information value."""
+    """Return True if this looks like a personal treatment/support story with no reply opportunity."""
+    # Discussion posts we always want — skip personal story check
+    if _DISCUSSION_TITLE_RE.search(title):
+        return False
+    # A single strong signal in the title is enough
+    if _PERSONAL_TITLE_RE.search(title):
+        return True
     combined_lower = (title + " " + body[:300]).lower()
     return sum(1 for sig in _PERSONAL_STORY_SIGNALS if sig in combined_lower) >= 2
 
@@ -420,17 +468,17 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             existing_urls = {r[0] for r in existing_row.all()}
 
         new_count = 0
-        week_ago_ts = datetime.now(timezone.utc).timestamp() - 7 * 86400
+        month_ago_ts = datetime.now(timezone.utc).timestamp() - 30 * 86400
 
         for prompt in prompts[:5]:
             q = urllib.parse.quote(prompt.text)
 
-            # Search only within topically relevant subreddits — no global search
+            # Search within topically relevant subreddits — no global search
             sub_posts: list[dict] = []
-            for sub in subreddits[:4]:
+            for sub in subreddits[:6]:
                 sub_url = (
                     f"{_REDDIT_BASE}/r/{sub}/search.json"
-                    f"?q={q}&restrict_sr=1&sort=new&t=week&limit=10"
+                    f"?q={q}&restrict_sr=1&sort=new&t=month&limit=15"
                 )
                 sub_posts.extend(_extract_posts(await _fetch(sub_url)))
                 await asyncio.sleep(0.8)
@@ -446,7 +494,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                     continue
 
                 created_utc = float(post.get("created_utc", 0))
-                if created_utc < week_ago_ts:
+                if created_utc < month_ago_ts:
                     continue
 
                 title = post.get("title", "")
@@ -458,7 +506,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                     continue
 
                 score = _score_thread(title, body, prompt.text, created_utc, upvotes)
-                if score < 40.0:
+                if score < 25.0:
                     continue
 
                 posted_dt = (

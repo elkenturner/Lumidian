@@ -1,0 +1,307 @@
+"""
+Tracking router — trigger and monitor tracking runs.
+
+Routes
+------
+POST /api/tracking/run/{brand_id}          — trigger a manual run (fire-and-forget)
+GET  /api/tracking/runs/{brand_id}         — list last 30 runs for a brand
+GET  /api/tracking/run/{run_id}/status     — poll a specific run's status
+"""
+
+import asyncio
+import logging
+from typing import Annotated
+
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.models import Brand, TrackingRun
+from app.schemas import ManualRunResponse, TrackingRunStatus, TrackingRunSummary
+from app.services.tracking_service import run_tracking
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/tracking", tags=["tracking"])
+
+DbDep = Annotated[AsyncSession, Depends(get_db)]
+
+
+async def _background_run(brand_id: int) -> None:
+    """Wraps run_tracking for use as a fire-and-forget task."""
+    try:
+        await run_tracking(brand_id=brand_id, run_type="manual")
+    except Exception:
+        logger.exception("Background tracking run failed for brand %d", brand_id)
+
+
+# ── Trigger manual run ────────────────────────────────────────────────────────
+
+@router.post(
+    "/run/{brand_id}",
+    response_model=ManualRunResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDep):
+    # Verify brand exists
+    result = await db.execute(select(Brand).where(Brand.id == brand_id))
+    brand = result.scalar_one_or_none()
+    if brand is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Brand {brand_id} not found",
+        )
+
+    # Pre-create the TrackingRun record so we can return its ID immediately.
+    tracking_run = TrackingRun(
+        brand_id=brand_id,
+        status="pending",
+        run_type="manual",
+    )
+    db.add(tracking_run)
+    await db.commit()
+    await db.refresh(tracking_run)
+    run_id = tracking_run.id
+
+    # Fire-and-forget: the actual work happens in the background.
+    # We use asyncio.create_task rather than BackgroundTasks so it runs
+    # concurrently within the same event loop (BackgroundTasks runs after
+    # the response is sent but is still tied to the request lifecycle in
+    # some ASGI implementations).
+    asyncio.create_task(
+        _background_run_with_id(run_id, brand_id),
+        name=f"manual-tracking-{brand_id}-{run_id}",
+    )
+
+    return ManualRunResponse(
+        run_id=run_id,
+        brand_id=brand_id,
+        status="pending",
+        message="Tracking run queued. Poll /api/tracking/run/{run_id}/status for updates.",
+    )
+
+
+async def _background_run_with_id(run_id: int, brand_id: int) -> None:
+    """
+    Runs run_tracking but reuses the pre-created TrackingRun row.
+    We update its status to 'running' immediately, then delegate to the service.
+    """
+    from app.database import AsyncSessionLocal
+    from app.services.tracking_service import run_tracking as _run_tracking
+
+    # Mark as running
+    async with AsyncSessionLocal() as db:
+        run = await db.get(TrackingRun, run_id)
+        if run:
+            from datetime import datetime, timezone
+            run.status = "running"
+            run.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            await db.commit()
+
+    try:
+        # run_tracking creates its own TrackingRun; here we use the service
+        # directly but skip the internal record creation by calling the internal
+        # steps manually with the existing run_id.
+        await _execute_run_with_id(run_id=run_id, brand_id=brand_id)
+    except Exception:
+        logger.exception(
+            "Manual tracking run %d failed for brand %d", run_id, brand_id
+        )
+
+
+async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
+    """
+    Mirrors tracking_service.run_tracking but uses the pre-created run_id
+    instead of inserting a new TrackingRun row.
+    """
+    import asyncio
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt, TrackingRun, QueryResult, RunModelScore
+    from app.services.llm_service import query_model, SUPPORTED_MODELS, TIER_RUNS
+    from sqlalchemy import select
+    from datetime import datetime, timezone
+
+    def utcnow():
+        return datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Extract all values we need as plain Python types before the session closes,
+    # so we never access SQLAlchemy-managed attributes on detached objects.
+    brand_name: str = ""
+    brand_tier: str = "basic"
+    prompt_data: list[tuple[int, str]] = []  # (prompt_id, prompt_text)
+
+    async with AsyncSessionLocal() as db:
+        brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
+        brand = brand_result.scalar_one_or_none()
+        if brand is None:
+            async with AsyncSessionLocal() as err_db:
+                run = await err_db.get(TrackingRun, run_id)
+                if run:
+                    run.status = "failed"
+                    run.error_message = f"Brand {brand_id} not found"
+                    run.completed_at = utcnow()
+                    await err_db.commit()
+            return
+
+        brand_name = str(brand.name)
+        brand_tier = str(brand.tier)
+
+        prompts_result = await db.execute(
+            select(Prompt).where(Prompt.brand_id == brand_id)
+        )
+        prompt_data = [(p.id, p.text) for p in prompts_result.scalars().all()]
+
+    logger.info(
+        "Manual run %d — brand=%r tier=%s prompts=%d",
+        run_id, brand_name, brand_tier, len(prompt_data),
+    )
+
+    if not prompt_data:
+        async with AsyncSessionLocal() as err_db:
+            run = await err_db.get(TrackingRun, run_id)
+            if run:
+                run.status = "failed"
+                run.error_message = "No prompts configured for this brand"
+                run.completed_at = utcnow()
+                await err_db.commit()
+        return
+
+    runs_per_prompt = TIER_RUNS.get(brand_tier, TIER_RUNS["basic"])
+    semaphore = asyncio.Semaphore(10)
+
+    async def _bounded_query(prompt_id: int, prompt_text: str, model: str, run_number: int):
+        async with semaphore:
+            result = await query_model(model, prompt_text, brand_name)
+        return QueryResult(
+            tracking_run_id=run_id,
+            prompt_id=prompt_id,
+            model=model,
+            run_number=run_number,
+            response_text=result.get("response_text"),
+            mentioned=result.get("mentioned", False),
+            latency_ms=result.get("latency_ms"),
+            error=result.get("error"),
+        )
+
+    tasks = [
+        _bounded_query(pid, ptext, model, rn)
+        for pid, ptext in prompt_data
+        for model in SUPPORTED_MODELS
+        for rn in range(1, runs_per_prompt + 1)
+    ]
+
+    try:
+        query_results = await asyncio.gather(*tasks)
+    except Exception as exc:
+        async with AsyncSessionLocal() as err_db:
+            run = await err_db.get(TrackingRun, run_id)
+            if run:
+                run.status = "failed"
+                run.error_message = str(exc)
+                run.completed_at = utcnow()
+                await err_db.commit()
+        return
+
+    async with AsyncSessionLocal() as db:
+        try:
+            for qr in query_results:
+                db.add(qr)
+            await db.flush()
+
+            model_stats = {
+                m: {"total_queries": 0, "total_mentions": 0} for m in SUPPORTED_MODELS
+            }
+            for qr in query_results:
+                if qr.error == "api_key_not_configured":
+                    continue
+                model_stats[qr.model]["total_queries"] += 1
+                if qr.mentioned:
+                    model_stats[qr.model]["total_mentions"] += 1
+
+            overall_queries = 0
+            overall_mentions = 0
+            for model_name, stats in model_stats.items():
+                tq = stats["total_queries"]
+                tm = stats["total_mentions"]
+                score = (tm / tq * 100.0) if tq > 0 else 0.0
+                db.add(RunModelScore(
+                    tracking_run_id=run_id,
+                    model=model_name,
+                    total_queries=tq,
+                    total_mentions=tm,
+                    score=round(score, 2),
+                ))
+                overall_queries += tq
+                overall_mentions += tm
+
+            overall_score = (
+                (overall_mentions / overall_queries * 100.0)
+                if overall_queries > 0
+                else 0.0
+            )
+
+            run = await db.get(TrackingRun, run_id)
+            if run:
+                run.status = "completed"
+                run.completed_at = utcnow()
+                run.overall_score = round(overall_score, 2)
+                run.total_queries = overall_queries
+                run.total_mentions = overall_mentions
+
+            await db.commit()
+        except Exception as exc:
+            await db.rollback()
+            async with AsyncSessionLocal() as err_db:
+                run = await err_db.get(TrackingRun, run_id)
+                if run:
+                    run.status = "failed"
+                    run.error_message = f"DB error: {exc}"
+                    run.completed_at = utcnow()
+                    await err_db.commit()
+            return
+
+    # Classify sentiment after the main commit (non-fatal)
+    logger.info("Manual run %d complete — starting sentiment classification", run_id)
+    try:
+        from app.services.sentiment_service import classify_sentiments_for_run
+
+        await classify_sentiments_for_run(list(query_results), brand_name)
+    except Exception as exc:
+        logger.warning(
+            "Sentiment classification failed for manual run %d (non-fatal): %s", run_id, exc
+        )
+
+
+# ── List runs for brand ───────────────────────────────────────────────────────
+
+@router.get("/runs/{brand_id}", response_model=list[TrackingRunSummary])
+async def list_runs(brand_id: int, db: DbDep):
+    result = await db.execute(select(Brand).where(Brand.id == brand_id))
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Brand {brand_id} not found",
+        )
+
+    runs_result = await db.execute(
+        select(TrackingRun)
+        .where(TrackingRun.brand_id == brand_id)
+        .order_by(TrackingRun.created_at.desc())
+        .limit(30)
+    )
+    runs = runs_result.scalars().all()
+    return [TrackingRunSummary.model_validate(r) for r in runs]
+
+
+# ── Get run status ────────────────────────────────────────────────────────────
+
+@router.get("/run/{run_id}/status", response_model=TrackingRunStatus)
+async def get_run_status(run_id: int, db: DbDep):
+    run = await db.get(TrackingRun, run_id)
+    if run is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Tracking run {run_id} not found",
+        )
+    return TrackingRunStatus.model_validate(run)

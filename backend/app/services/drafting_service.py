@@ -575,7 +575,7 @@ INSTRUCTIONS:
 3. If a title applies (Medium, Reddit post), write a title that mirrors the query's phrasing.
 4. Write the full content body.
 
-Write the content now:"""
+⚠ OUTPUT THE CONTENT ONLY. Do not include any analysis, commentary, explanation, or notes about what the content does or why you wrote it. No separators followed by analysis sections. The output must be exactly what would be published — nothing more."""
 
 
 # ── Claude caller ─────────────────────────────────────────────────────────────
@@ -608,18 +608,35 @@ _HEDGING_RE = _re2.compile(
     _re2.IGNORECASE,
 )
 
+# Matches lines that are internal analysis notes the LLM sometimes appends
+_ANALYSIS_SECTION_RE = _re2.compile(
+    r"\n[\-\*_]{3,}\n.*?(analysis of missing angle|what this (reply|post|content) (does|fills|addresses)|"
+    r"current (narrative|ai response)|missing angle|this (post|reply|answer|draft) (fills|addresses|explains)|"
+    r"grounding theory|why this (works|matters|fills))",
+    _re2.IGNORECASE | _re2.DOTALL,
+)
+
+# Match a separator line followed by an all-caps or bold analysis header
+_ANALYSIS_HEADER_RE = _re2.compile(
+    r"(\n[\-\*_]{3,}\n|\n{2,})\*{0,2}(ANALYSIS OF MISSING ANGLE|MISSING ANGLE|WHAT THIS (POST|REPLY|CONTENT|DRAFT) (DOES|FILLS|ADDRESSES)|NOTE TO EDITOR)\*{0,2}[:\s].*",
+    _re2.IGNORECASE | _re2.DOTALL,
+)
+
 
 def _post_process(text: str) -> str:
     """
-    Strip em dashes and common AI hedging phrases from generated content.
-    Em dashes (—) are replaced with a comma + space or colon based on context.
+    Strip em dashes, AI hedging phrases, and internal analysis notes from generated content.
+    Em dashes (—) are replaced with a comma + space.
     """
     if not text:
         return text
 
+    # Strip any internal analysis section the LLM appended after the actual content
+    processed = _ANALYSIS_HEADER_RE.sub("", text)
+    processed = _ANALYSIS_SECTION_RE.sub("", processed)
+
     # Replace em dash used as a separator: "word — word" → "word, word"
-    # But preserve them in wiki-style markup (unlikely to appear there anyway)
-    processed = _re2.sub(r"\s*—\s*", ", ", text)
+    processed = _re2.sub(r"\s*—\s*", ", ", processed)
 
     # Remove hedging phrases (they're filler, replace with nothing)
     processed = _HEDGING_RE.sub("", processed)

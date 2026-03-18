@@ -387,6 +387,18 @@ async def generate_draft(
         prompt.id,
         visibility_score,
     )
+
+    from app.services.analytics_service import log_event
+    await log_event(
+        "draft_created",
+        {
+            "platform": platform,
+            "target_prompt_id": prompt.id,
+            "visibility_score_at_creation": round(visibility_score, 2),
+        },
+        brand_id=brand_id,
+    )
+
     return draft
 
 
@@ -419,6 +431,7 @@ async def post_draft(
 
     # Update draft status
     draft.status = "posted"
+    draft.posted_at = now
     draft.updated_at = now
 
     # Create ContentPost record
@@ -438,6 +451,18 @@ async def post_draft(
         content_post.id,
         draft.platform,
     )
+
+    from app.services.analytics_service import log_event
+    await log_event(
+        "draft_posted",
+        {
+            "draft_id": draft_id,
+            "platform": draft.platform,
+            "target_prompt_id": draft.prompt_id,
+        },
+        brand_id=draft.brand_id,
+    )
+
     return content_post
 
 

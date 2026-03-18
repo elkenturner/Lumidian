@@ -17,6 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import CurrentUser, get_brand_for_user
 from app.models import Brand, ContentOpportunity, Prompt, utcnow
 from app.schemas import ContentDraftSchema, ContentOpportunitySchema
 
@@ -52,11 +53,12 @@ def _enrich_opportunity(opp: ContentOpportunity, prompt_text_map: dict[int, str]
 async def list_opportunities(
     brand_id: int,
     db: DbDep,
+    user: CurrentUser,
     opp_status: Optional[str] = Query(None, alias="status", description="Filter by status: new, drafted, dismissed"),
     limit: int = Query(50, ge=1, le=200),
 ):
     """List content opportunities (Reddit/Quora threads) for a brand."""
-    await _get_brand_or_404(db, brand_id)
+    await get_brand_for_user(brand_id, db, user)
 
     stmt = (
         select(ContentOpportunity)
@@ -88,9 +90,10 @@ async def list_opportunities(
 
 
 @router.delete("/{opportunity_id}/dismiss", status_code=status.HTTP_204_NO_CONTENT)
-async def dismiss_opportunity(opportunity_id: int, db: DbDep):
+async def dismiss_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     """Mark an opportunity as dismissed so it no longer appears in the queue."""
     opp = await _get_opportunity_or_404(db, opportunity_id)
+    await get_brand_for_user(opp.brand_id, db, user)
     opp.status = "dismissed"
     await db.commit()
 
@@ -100,14 +103,15 @@ async def dismiss_opportunity(opportunity_id: int, db: DbDep):
     response_model=ContentDraftSchema,
     status_code=status.HTTP_201_CREATED,
 )
-async def draft_opportunity(opportunity_id: int, db: DbDep):
+async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     """
     Generate a reply draft for a specific Reddit/Quora thread opportunity.
     Uses the dynamic drafting engine with full BrandProfile context.
     """
     from app.services.drafting_service import generate_opportunity_draft
 
-    await _get_opportunity_or_404(db, opportunity_id)
+    opp = await _get_opportunity_or_404(db, opportunity_id)
+    await get_brand_for_user(opp.brand_id, db, user)
 
     try:
         draft = await generate_opportunity_draft(db=db, opportunity_id=opportunity_id)
@@ -119,22 +123,61 @@ async def draft_opportunity(opportunity_id: int, db: DbDep):
             detail=f"Draft generation failed: {exc}",
         )
 
+    from app.services.analytics_service import log_event
+    await log_event(
+        "opportunity_draft_created",
+        {"opportunity_id": opportunity_id, "subreddit": opp.subreddit},
+        brand_id=opp.brand_id,
+    )
+
     return ContentDraftSchema.model_validate(draft)
 
 
+async def _scan_and_log(brand_id: int) -> None:
+    """Run scan_brand_opportunities and log the reddit_scan_completed event."""
+    from app.services.reddit_scanner_service import scan_brand_opportunities
+    from app.services.analytics_service import log_event
+    from app.database import AsyncSessionLocal
+    from sqlalchemy import select as _select
+
+    try:
+        await scan_brand_opportunities(brand_id, clear_existing=True)
+    finally:
+        # Count opportunities found for this brand in the last few minutes
+        try:
+            from datetime import datetime, timezone, timedelta
+            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
+            async with AsyncSessionLocal() as db:
+                from app.models import ContentOpportunity
+                result = await db.execute(
+                    _select(ContentOpportunity).where(
+                        ContentOpportunity.brand_id == brand_id,
+                        ContentOpportunity.created_at >= cutoff,
+                    )
+                )
+                new_opps = list(result.scalars().all())
+                subreddits = list({o.subreddit for o in new_opps if o.subreddit})
+            await log_event(
+                "reddit_scan_completed",
+                {"opportunities_found": len(new_opps), "subreddits_scanned": subreddits},
+                brand_id=brand_id,
+            )
+        except Exception:
+            pass
+
+
 @router.post("/{brand_id}/scan", status_code=status.HTTP_202_ACCEPTED)
-async def trigger_scan(brand_id: int, db: DbDep):
+async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     """
     Trigger an on-demand Reddit scan for a brand (fire-and-forget).
     Returns immediately; scan runs in the background.
     """
     import asyncio
-    from app.services.reddit_scanner_service import scan_brand_opportunities
 
-    await _get_brand_or_404(db, brand_id)
+    await get_brand_for_user(brand_id, db, user)
 
     asyncio.create_task(
-        scan_brand_opportunities(brand_id, clear_existing=True),
+        _scan_and_log(brand_id),
         name=f"reddit-scan-{brand_id}",
     )
     return {"message": f"Reddit scan started for brand {brand_id}", "brand_id": brand_id}

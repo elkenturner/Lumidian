@@ -25,6 +25,7 @@ class RunStatusEnum(str, enum.Enum):
 class RunTypeEnum(str, enum.Enum):
     manual = "manual"
     scheduled = "scheduled"
+    prompt = "prompt"  # single-prompt mini run
 
 
 class ScheduleSlotEnum(str, enum.Enum):
@@ -41,6 +42,23 @@ class ModelEnum(str, enum.Enum):
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    google_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True)
+    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    subscription_tier: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 'starter' | 'pro' | None
+    subscription_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 'active' | 'canceled' | None
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
 
 # ── System-wide key-value settings ───────────────────────────────────────────
@@ -60,11 +78,13 @@ class Brand(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     tier: Mapped[str] = mapped_column(
         SAEnum(TierEnum, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
         default=TierEnum.basic.value,
     )
+    website_url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -255,6 +275,12 @@ class ContentDraft(Base):
     platform_guidelines_applied: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     visibility_score_at_draft: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     estimated_impact: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # ── Lifecycle tracking ────────────────────────────────────────────────────
+    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    dismissed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    edited_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    time_to_approve_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -333,6 +359,8 @@ class BrandProfile(Base):
     target_audience: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     approved_language: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # JSON array of strings
     publications: Mapped[Optional[str]] = mapped_column(Text, nullable=True)     # JSON array of {url,title,publisher,date}
+    internal_brand_context: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # fetched from website via Jina
+    website_context_last_fetched: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -400,3 +428,21 @@ class ContentGap(Base):
     brand: Mapped["Brand"] = relationship("Brand")
     prompt: Mapped["Prompt"] = relationship("Prompt")
     tracking_run: Mapped["TrackingRun"] = relationship("TrackingRun")
+
+
+# ── Analytics event log ───────────────────────────────────────────────────────
+
+class AnalyticsEvent(Base):
+    """Immutable append-only event log for internal analytics."""
+    __tablename__ = "analytics_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    brand_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("brands.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON blob
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)

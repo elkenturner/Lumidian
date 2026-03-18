@@ -27,6 +27,7 @@ class BrandCreate(BaseModel):
     name: str
     tier: str = "basic"
     prompts: list[str] = []
+    website_url: Optional[str] = None
 
     @field_validator("tier")
     @classmethod
@@ -48,6 +49,7 @@ class BrandCreate(BaseModel):
 class BrandUpdate(BaseModel):
     name: Optional[str] = None
     tier: Optional[str] = None
+    website_url: Optional[str] = None
 
     @field_validator("tier")
     @classmethod
@@ -65,6 +67,7 @@ class BrandSummary(BaseModel):
     slug: str
     tier: str
     prompt_count: int
+    website_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -76,6 +79,7 @@ class BrandDetail(BaseModel):
     name: str
     slug: str
     tier: str
+    website_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     prompts: list[PromptResponse] = []
@@ -239,6 +243,11 @@ class ContentDraftSchema(BaseModel):
     platform_guidelines_applied: Optional[str] = None
     visibility_score_at_draft: Optional[float] = None
     estimated_impact: Optional[float] = None
+    approved_at: Optional[datetime] = None
+    dismissed_at: Optional[datetime] = None
+    posted_at: Optional[datetime] = None
+    edited_count: int = 0
+    time_to_approve_seconds: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -308,6 +317,7 @@ class UpdateDraftRequest(BaseModel):
     title: Optional[str] = None
     content_text: Optional[str] = None
     status: Optional[str] = None
+    platform_guidelines_applied: Optional[str] = None
 
 
 class PostDraftRequest(BaseModel):
@@ -454,6 +464,8 @@ class BrandProfileResponse(BaseModel):
     approved_language: list[str] = []
     publications: list[Publication] = []
     completion_pct: float = 0.0
+    internal_brand_context: Optional[str] = None
+    website_context_last_fetched: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

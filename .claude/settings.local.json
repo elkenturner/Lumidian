@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(lsof -ti :8000 | xargs kill -9 2>/dev/null; sleep 1 && source .venv/bin/activate && uvicorn app.main:app --reload --port 8000)",
+      "Bash(source .venv/bin/activate && pip install greenlet 2>&1 | tail -3)",
+      "Bash(curl -s http://localhost:8000/api/brands 2>&1)",
+      "Bash(curl -s http://localhost:8000/api/content/1/drafts 2>&1)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/api/brands 2>&1)",
+      "Bash(curl -s -I http://localhost:8000/api/brands -H \"Origin: http://localhost:3000\" 2>&1 | grep -i \"access-control\\\\|cors\")",
+      "Bash(curl -s http://localhost:8000/api/content/drafts 2>&1\ncurl -s \"http://localhost:8000/api/content/1/drafts\" 2>&1)",
+      "Bash(curl -s http://localhost:8000/api/brands && echo \"\" && curl -s \"http://localhost:8000/openapi.json\" | python3 -c \"import sys,json; paths=json.load\\(sys.stdin\\)['paths']; [print\\(p\\) for p in paths if 'content' in p]\")",
+      "Bash(curl -s \"http://localhost:8000/openapi.json\" | python3 -m json.tool 2>&1 | head -5)",
+      "Bash(curl -s \"http://localhost:8000/api/openapi.json\" | python3 -c \"import sys,json; paths=json.load\\(sys.stdin\\)['paths']; [print\\(p\\) for p in sorted\\(paths\\) if 'content' in p]\")",
+      "Bash(find /Users/ken/Desktop/clarity-ai/backend/app -type f \\\\\\( -name \"*.py\" -o -name \"*.sql\" \\\\\\) 2>/dev/null | sort)",
+      "Bash(grep -n \"router = APIRouter\" /Users/ken/Desktop/clarity-ai/backend/app/routers/*.py)",
+      "Bash(cd /Users/ken/Desktop/clarity-ai/backend && python -c \"\nimport ast, sys\nfiles = [\n    'app/routers/dashboard.py',\n    'app/routers/tracking.py', \n    'app/services/tracking_service.py',\n    'app/services/sentiment_service.py',\n]\nfor f in files:\n    try:\n        with open\\(f\\) as fh:\n            ast.parse\\(fh.read\\(\\)\\)\n        print\\(f'OK  {f}'\\)\n    except SyntaxError as e:\n        print\\(f'ERR {f}: {e}'\\)\n        sys.exit\\(1\\)\n\")",
+      "Bash(cd /Users/ken/Desktop/clarity-ai/backend && python3 -c \"\nimport ast, sys\nfiles = ['app/routers/dashboard.py','app/routers/tracking.py','app/services/tracking_service.py','app/services/sentiment_service.py']\nfor f in files:\n    try:\n        ast.parse\\(open\\(f\\).read\\(\\)\\)\n        print\\('OK ', f\\)\n    except SyntaxError as e:\n        print\\('ERR', f, e\\)\n        sys.exit\\(1\\)\n\")"
+    ]
+  }
+}

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
+from app.dependencies import CurrentUser, get_brand_for_user
 from app.models import Brand, TrackingRun, QueryResult, RunModelScore, Prompt, ContentAttribution
 from app.schemas import (
     OverviewResponse,
@@ -49,8 +50,8 @@ async def _get_brand_or_404(db: AsyncSession, brand_id: int) -> Brand:
 # ── Overview ──────────────────────────────────────────────────────────────────
 
 @router.get("/{brand_id}/overview", response_model=OverviewResponse)
-async def get_overview(brand_id: int, db: DbDep):
-    brand = await _get_brand_or_404(db, brand_id)
+async def get_overview(brand_id: int, db: DbDep, user: CurrentUser):
+    brand = await get_brand_for_user(brand_id, db, user)
 
     # Latest completed run
     run_result = await db.execute(
@@ -109,8 +110,8 @@ async def get_overview(brand_id: int, db: DbDep):
 # ── Trends ────────────────────────────────────────────────────────────────────
 
 @router.get("/{brand_id}/trends", response_model=TrendsResponse)
-async def get_trends(brand_id: int, db: DbDep):
-    brand = await _get_brand_or_404(db, brand_id)
+async def get_trends(brand_id: int, db: DbDep, user: CurrentUser):
+    brand = await get_brand_for_user(brand_id, db, user)
 
     runs_result = await db.execute(
         select(TrackingRun)
@@ -150,11 +151,12 @@ async def get_trends(brand_id: int, db: DbDep):
 async def get_responses(
     brand_id: int,
     db: DbDep,
+    user: CurrentUser,
     run_id: Optional[int] = Query(None, description="Filter by specific tracking run ID"),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(20, ge=1, le=500, description="Results per page"),
 ):
-    brand = await _get_brand_or_404(db, brand_id)
+    brand = await get_brand_for_user(brand_id, db, user)
 
     # Build base query joining through tracking_runs to scope by brand
     base_query = (

@@ -16,6 +16,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import CurrentUser, get_brand_for_user
 from app.models import Brand, ContentGap, Prompt, TrackingRun
 from app.schemas import ContentGapResponse
 
@@ -54,10 +55,8 @@ def _gap_to_response(gap: ContentGap, prompt_text: Optional[str] = None) -> Cont
 
 
 @router.get("/{brand_id}", response_model=list[ContentGapResponse])
-async def list_gaps(brand_id: int, db: DbDep):
-    brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-    if brand_result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Brand {brand_id} not found")
+async def list_gaps(brand_id: int, db: DbDep, user: CurrentUser):
+    await get_brand_for_user(brand_id, db, user)
 
     gaps_result = await db.execute(
         select(ContentGap)
@@ -79,10 +78,8 @@ async def list_gaps(brand_id: int, db: DbDep):
 
 
 @router.get("/{brand_id}/summary")
-async def gap_summary(brand_id: int, db: DbDep):
-    brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-    if brand_result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Brand {brand_id} not found")
+async def gap_summary(brand_id: int, db: DbDep, user: CurrentUser):
+    await get_brand_for_user(brand_id, db, user)
 
     result = await db.execute(
         select(
@@ -119,11 +116,9 @@ async def gap_summary(brand_id: int, db: DbDep):
 
 
 @router.post("/{brand_id}/refresh", status_code=status.HTTP_202_ACCEPTED)
-async def refresh_gaps(brand_id: int, db: DbDep):
+async def refresh_gaps(brand_id: int, db: DbDep, user: CurrentUser):
     """Trigger gap analysis on the latest completed run for this brand."""
-    brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-    if brand_result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Brand {brand_id} not found")
+    await get_brand_for_user(brand_id, db, user)
 
     run_result = await db.execute(
         select(TrackingRun)

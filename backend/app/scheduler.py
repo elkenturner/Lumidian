@@ -6,6 +6,7 @@ Jobs:
   • 20:00 UTC  — Evening tracking sweep
   • 02:00 UTC  — Reddit opportunity scanner (daily)
   • 03:00 UTC  — Auto-draft scheduler (daily, respects per-brand frequency settings)
+  • 04:00 UTC, day 1 — Monthly website context refresh via Jina Reader
 """
 
 import asyncio
@@ -185,16 +186,52 @@ async def _auto_draft_sweep() -> None:
     logger.info("Scheduler: auto-draft sweep dispatched")
 
 
+async def _website_context_refresh_sweep() -> None:
+    """
+    Monthly website context refresh (04:00 UTC, day 1 of month).
+    Fetches fresh Jina Reader content for every brand that has a website_url.
+    """
+    if await _is_scheduler_paused():
+        logger.info("Scheduler paused — skipping website context refresh sweep")
+        return
+
+    from app.database import AsyncSessionLocal
+    from app.models import Brand
+    from app.services.jina_service import refresh_brand_website_context
+    from sqlalchemy import select
+
+    logger.info("Scheduler: starting monthly website context refresh sweep")
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Brand).where(Brand.website_url.isnot(None)))
+        brands = result.scalars().all()
+
+    for brand in brands:
+        try:
+            ok = await refresh_brand_website_context(brand.id)
+            if ok:
+                logger.info("Website context refreshed for brand %d (%s)", brand.id, brand.name)
+        except Exception:
+            logger.exception("Website context refresh failed for brand %d", brand.id)
+
+    logger.info("Scheduler: website context refresh sweep complete")
+
+
 async def _safe_auto_draft(brand_id: int) -> None:
-    """Wrapper that catches errors so auto-draft tasks don't die silently."""
+    """
+    Weekly auto-draft wrapper. Deletes all existing 'draft' status drafts for
+    the brand before generating new ones (weekly refresh). Drafts in 'approved'
+    or 'posted' status are never touched.
+    """
     from app.database import AsyncSessionLocal
     from app.services.drafting_service import auto_draft_top_gaps
 
     try:
         async with AsyncSessionLocal() as db:
-            drafts = await auto_draft_top_gaps(db=db, brand_id=brand_id, max_gaps=3)
+            # clear_existing=True: weekly scheduler replaces pending drafts with fresh ones
+            drafts = await auto_draft_top_gaps(db=db, brand_id=brand_id, max_gaps=3, clear_existing=True)
         logger.info(
-            "Scheduler: auto-draft created %d drafts for brand_id=%d",
+            "Scheduler: auto-draft created %d drafts for brand_id=%d (weekly refresh)",
             len(drafts), brand_id,
         )
     except Exception:
@@ -239,6 +276,15 @@ def start_scheduler() -> None:
         name="Auto-draft scheduler (03:00 UTC)",
         replace_existing=True,
         misfire_grace_time=600,
+    )
+
+    scheduler.add_job(
+        _website_context_refresh_sweep,
+        trigger=CronTrigger(hour=4, minute=0, day=1, timezone="UTC"),
+        id="website_context_refresh",
+        name="Monthly website context refresh (04:00 UTC, day 1)",
+        replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     scheduler.start()

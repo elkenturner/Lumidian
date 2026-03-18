@@ -21,6 +21,7 @@ from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import CurrentUser, get_brand_for_user
 from app.models import Brand, Competitor, TrackingRun, QueryResult, Prompt
 from app.schemas import (
     DashboardAnalytics,
@@ -154,15 +155,9 @@ def _classify_domain(domain: str) -> str:
 # ── Main endpoint ─────────────────────────────────────────────────────────────
 
 @router.get("/{brand_id}/analytics", response_model=DashboardAnalytics)
-async def get_analytics(brand_id: int, db: DbDep):
+async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
     # 1. Brand
-    brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-    brand = brand_result.scalar_one_or_none()
-    if brand is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Brand {brand_id} not found",
-        )
+    brand = await get_brand_for_user(brand_id, db, user)
 
     # 2. Competitors
     comp_result = await db.execute(

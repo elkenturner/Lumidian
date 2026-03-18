@@ -51,14 +51,15 @@ PLATFORM_SPECS: dict[str, dict] = {
     "reddit": {
         "format": "standalone_post",
         "word_range": (150, 400),
-        "tone": "conversational, community member voice",
+        "tone": "conversational, genuine community member voice — like a person talking, not an article being written",
         "rules": [
-            "Write as a community member, not a marketer",
-            "Add genuine value — answer a question, share an insight, contribute to a discussion",
-            "Mention the brand only if it fits naturally; never force it",
-            "No promotional language, no calls to action, no links unless essential",
-            "Match the conversational, direct tone of Reddit",
+            "Write as a genuine community member, not a marketer — conversational and first-person where natural",
+            "NO formal headers or markdown formatting — at most 1 to 2 bullet points maximum, only if a short list genuinely helps",
+            "Add genuine value — answer a question, share a personal experience, contribute a real insight",
+            "Mention the brand only if it fits naturally into the conversation; never force it",
+            "No promotional language, no calls to action, no links unless absolutely essential",
             "Disclose brand affiliation if the brand is mentioned",
+            "Sound like a real person talking — not an article, not a press release, not a structured essay",
         ],
         "disclaimer": "Always disclose brand affiliation per Reddit's rules.",
         "posting_tip": "Choose the most relevant subreddit for your brand's niche.",
@@ -79,12 +80,13 @@ PLATFORM_SPECS: dict[str, dict] = {
     "quora": {
         "format": "answer",
         "word_range": (200, 500),
-        "tone": "expert but accessible, clear answer up front",
+        "tone": "expert but accessible — the very first sentence delivers the direct answer",
         "rules": [
+            "The FIRST SENTENCE must directly and concretely answer the question — absolutely no preamble, no context-setting, no 'great question'",
             "Write a standalone expert answer — do NOT write, invent, or reference any question in your response",
-            "Lead with the core insight or answer in the first sentence",
-            "Write from genuine expertise or first-hand knowledge",
-            "Cite sources or reference data where relevant",
+            "Expert but accessible tone — explain clearly without jargon, unless the audience is clearly technical",
+            "Zero corporate language, buzzwords, or marketing-speak — write as an informed human being, not a brand representative",
+            "Expand on the direct answer with context, evidence, or real examples after the opening sentence",
             "Brand mentions must arise naturally from the answer — not be tacked on",
             "Focus entirely on delivering value to the reader",
         ],
@@ -94,13 +96,15 @@ PLATFORM_SPECS: dict[str, dict] = {
     "medium": {
         "format": "article",
         "word_range": (800, 2000),
-        "tone": "thought leadership, editorial, includes analysis",
+        "tone": "thought leadership, editorial, analytical — structured like a quality article with a clear arc",
         "rules": [
-            "Develop a clear thesis or central argument",
-            "Include data, examples, or cited evidence",
+            "Open with a strong hook in the first 1-2 sentences — a surprising fact, a provocative question, or a bold statement that earns the reader's attention",
+            "Structure the article clearly: hook → context/problem → main argument with subheadings → strong conclusion",
+            "Use subheadings (##) to organize each major section — readers must be able to skim and understand the full structure",
+            "Where the Brand Profile includes peer-reviewed publications, cite them naturally in the body (e.g. 'A study published in...' or 'Research from...')",
+            "Include concrete data, examples, or evidence to support every major claim — never make unsupported assertions",
+            "End with a strong, specific conclusion that delivers an actionable insight — not a generic 'in conclusion' paragraph",
             "Brand references must be contextual and earned — not promotional",
-            "Use subheadings to structure longer content",
-            "End with a concrete takeaway for the reader",
         ],
         "disclaimer": None,
         "posting_tip": "Publish to your personal Medium profile or a relevant publication.",
@@ -123,38 +127,18 @@ PLATFORM_SPECS: dict[str, dict] = {
         ),
         "posting_tip": "Post as a requested edit on the article's Talk page.",
     },
-    "linkedin": {
-        "format": "post",
-        "word_range": (150, 300),
-        "tone": "professional thought leadership, conversational but authoritative",
-        "rules": [
-            "Open with a strong observation or data point — not a question",
-            "Share a genuine professional insight or lesson",
-            "Brand mention should emerge naturally from the insight",
-            "Keep paragraphs to 1 to 2 sentences for mobile readability",
-            "No excessive hashtags — 2 to 3 maximum",
-        ],
-        "disclaimer": None,
-        "posting_tip": "Post from your personal LinkedIn profile for best reach.",
-    },
-    "twitter": {
-        "format": "tweet_or_thread",
-        "word_range": (20, 280),
-        "tone": "punchy, direct, relevant",
-        "rules": [
-            "Single tweet: under 280 characters, sharp and specific",
-            "Thread (3 to 7 tweets): each tweet must stand alone and add new information",
-            "Include 1 to 2 relevant hashtags only if they add discoverability",
-            "No vague statements — every word must earn its place",
-            "A data point, contrarian take, or specific example works best",
-        ],
-        "disclaimer": None,
-        "posting_tip": "Threads perform better with a clear numbered structure (1/ 2/ 3/).",
-    },
 }
 
 ALL_PLATFORMS = list(PLATFORM_SPECS.keys())
 CONTENT_PLATFORMS = [p for p in ALL_PLATFORMS if p != "reddit_reply"]
+
+# Per-platform max_tokens for gap drafts (opportunity reply uses its own limit)
+PLATFORM_MAX_TOKENS: dict[str, int] = {
+    "reddit": 1200,
+    "quora": 1500,
+    "medium": 3500,
+    "wikipedia": 900,  # handled in separate branch, kept here for reference
+}
 
 
 # ── Brand profile loader ──────────────────────────────────────────────────────
@@ -211,6 +195,13 @@ async def _load_profile_context(db: AsyncSession, brand_id: int) -> str:
             pub_lines.append("  - " + " | ".join(parts))
         lines.append("Peer-reviewed publications (use for citations):\n" + "\n".join(pub_lines))
 
+    if profile.internal_brand_context:
+        lines.append(
+            "SUPPLEMENTARY context from company website — use ONLY to fill gaps not covered by the Brand Profile fields above. "
+            "Brand Profile always takes priority over this section. Never invent or paraphrase facts from this section "
+            "that contradict the Brand Profile:\n" + profile.internal_brand_context[:3000]
+        )
+
     return "\n\n".join(lines) if lines else "No brand profile details available."
 
 
@@ -221,6 +212,41 @@ async def _load_publications(db: AsyncSession, brand_id: int) -> list[dict]:
     )
     profile: Optional[BrandProfile] = result.scalar_one_or_none()
     return _extract_publications(profile) if profile else []
+
+
+DRAFT_CAP = 20
+SCHEDULED_CAP = 20
+
+
+async def _get_existing_drafts_for_prompt(
+    db: AsyncSession, brand_id: int, prompt_id: int, platform: str
+) -> list[ContentDraft]:
+    """Load existing non-dismissed drafts for a prompt/platform combination."""
+    result = await db.execute(
+        select(ContentDraft)
+        .where(
+            ContentDraft.brand_id == brand_id,
+            ContentDraft.prompt_id == prompt_id,
+            ContentDraft.platform == platform,
+            ContentDraft.status.in_(["draft", "approved"]),
+        )
+        .order_by(ContentDraft.created_at.desc())
+        .limit(5)
+    )
+    return list(result.scalars().all())
+
+
+async def _count_drafts_by_status(
+    db: AsyncSession, brand_id: int, status: str
+) -> int:
+    """Count drafts in a given status for a brand."""
+    result = await db.execute(
+        select(sqlfunc.count(ContentDraft.id)).where(
+            ContentDraft.brand_id == brand_id,
+            ContentDraft.status == status,
+        )
+    )
+    return result.scalar_one_or_none() or 0
 
 
 # ── Response analysis ─────────────────────────────────────────────────────────
@@ -448,21 +474,24 @@ ARTICLE SELECTION — choose the article whose topic most directly matches the k
   - A science/method article (e.g. "Gas chromatography", "Mass spectrometry")
   Never target: brand articles, disambiguation pages, or articles you are inventing.
 
-WIKI TEXT RULES (strict Wikipedia policy):
-  - Encyclopedic, neutral language only — no superlatives or marketing language
-  - Only verifiable, citable facts — nothing invented
+WIKI TEXT RULES (absolute — every rule is mandatory):
+  - Neutral encyclopedic tone only — no promotional language, no superlatives, no brand advocacy of any kind
+  - NEVER use first person ("we", "our", "I", "us") — third person only
+  - No marketing language whatsoever — if a sentence sounds like it belongs in a press release, rewrite it completely
+  - Every factual claim must be attributable to the citation provided — do not state facts that cannot be sourced to it
+  - Only verifiable, citable facts — nothing invented, nothing approximated
   - Use [[wikilinks]] around key terms that have Wikipedia articles
   - The wikitext must naturally use key noun phrases from the target query (e.g. if the query is "breath test for cancer detection", the sentence must use those exact terms)
+  - Structure: 1 to 3 sentences maximum, written as a natural addition to an existing article section — not a standalone paragraph
   - End with the citation ref provided above — copy it exactly, do not modify it
-  - 1 to 2 sentences only
-  - The text must read as encyclopedia prose, not an advertisement
+  - The text must read as encyclopedia prose; if it sounds like an advertisement or press release at any point, it is wrong
 
 ⚠ OUTPUT ONLY THE FIVE FIELDS BELOW. No analysis. No explanation. No preamble. No other text.
 
 ARTICLE_TITLE: [exact title of the existing Wikipedia article, e.g. Cancer screening]
 ARTICLE_URL: https://en.wikipedia.org/wiki/[Title_With_Underscores]
-SECTION: [section name where this fits, e.g. Blood-based screening]
-INSERT_LOCATION: [specific placement, e.g. "After the first paragraph in the Emerging technologies section" or "At the end of the Methods section"]
+SECTION: [exact section heading where the text belongs, e.g. Emerging technologies]
+INSERT_LOCATION: [One complete sentence telling the user exactly where to paste — include the article name, section name, and precise position. Example: "In the 'Cancer screening' article, find the 'Emerging technologies' section and add this text after the first paragraph." or "In the 'Breath test' article, add this text at the end of the 'Medical applications' section, before the References."]
 WIKI_TEXT:
 [the wikitext to insert — 1 to 2 sentences, nothing else]"""
 
@@ -512,6 +541,7 @@ def _build_prompt(
     response_analysis: str,
     platform_spec: dict,
     opportunity_context: Optional[str] = None,
+    existing_drafts_context: Optional[str] = None,
 ) -> str:
     spec = platform_spec
     word_min, word_max = spec["word_range"]
@@ -526,9 +556,21 @@ THREAD/QUESTION TO RESPOND TO:
 Your task is to write a reply to this specific thread that naturally adds value.
 """
 
+    existing_section = ""
+    if existing_drafts_context:
+        existing_section = f"""
+{existing_drafts_context}
+"""
+
     return f"""You are a senior content strategist writing on behalf of a brand. Your goal is to create content that will cause AI systems (ChatGPT, Claude, Perplexity, Gemini) to mention "{brand_name}" when answering the exact query below.
 
 AI systems retrieve content that directly addresses the specific words someone searches. The content you write must be written as a direct, substantive answer to the target query — using the query's exact phrasing and key terms naturally throughout, so the content is unambiguously about that topic.
+
+INFORMATION HIERARCHY — follow this strictly:
+  1. Brand Profile fields below (company description, key stats, approved language, what not to say, publications) are your PRIMARY source. Use them first.
+  2. The "SUPPLEMENTARY context from company website" section (if present in the Brand Profile) is secondary — use it only to fill gaps the primary fields don't cover.
+  3. NEVER invent facts, statistics, or claims not present in either source.
+  4. NEVER approximate or paraphrase statistics — use the EXACT figures as written. If a stat says "94% accuracy in a study of 1,400 participants", write exactly that — not "nearly 95%", not "over 90%", not "about 1,400".
 
 BRAND PROFILE:
 {profile_context}
@@ -541,7 +583,7 @@ CURRENT VISIBILITY:
 
 WHAT AI SYSTEMS ARE CURRENTLY SAYING:
 {response_analysis}
-{opportunity_section}
+{opportunity_section}{existing_section}
 PLATFORM: {platform}
 FORMAT: {spec['format']}
 TONE: {spec['tone']}
@@ -550,11 +592,12 @@ TARGET LENGTH: {word_min} to {word_max} words
 PLATFORM RULES (follow all of these):
 {rules_text}
 
-UNIVERSAL STYLE RULES (non-negotiable):
-  - NEVER use em dashes (—). Replace with commas, colons, or rewrite the sentence.
-  - NEVER use these filler phrases: "it's worth noting", "it's important to mention", "notably", "importantly", "it should be noted", "it's important to note", "one thing to note", "it bears mentioning", "needless to say", "of course"
-  - NEVER use triple parallel structures (three items listed in the same syntactic pattern back-to-back)
-  - NEVER start a sentence with "Additionally," or "Furthermore," or "Moreover,"
+UNIVERSAL STYLE RULES (absolute — no exceptions):
+  - NEVER use em dashes (—) or en dashes used as separators. Replace with commas, colons, or rewrite the sentence.
+  - NEVER use these words or phrases: "honestly", "straightforward", "genuinely", "notably", "importantly", "it's worth noting", "it's important to mention", "it should be noted", "it's important to note", "one thing to note", "it bears mentioning", "needless to say", "of course", "delve", "dive into", "unpack", "let's explore", "the bottom line"
+  - NEVER use triple parallel structures ("not only X, but also Y, and even Z")
+  - NEVER start a sentence with "Additionally," or "Furthermore," or "Moreover," or "This is"
+  - NEVER use hedging language of any kind ("may", "might", "could potentially", "perhaps", "it seems")
   - Vary sentence length — mix short punchy sentences with longer analytical ones
   - Use contractions naturally (it's, we're, you'll, don't)
   - Only reference facts and statistics that appear in the Brand Profile above — never invent data or statistics
@@ -564,8 +607,9 @@ UNIVERSAL STYLE RULES (non-negotiable):
   - Do not include meta-commentary about what the content does ("This post addresses...", "This answer explains...")
 
 QUERY MIRRORING RULES (critical for AI retrieval — these are checked):
+  - The FIRST SENTENCE of the content body must directly address, answer, or engage with the target query using its specific subject matter — not with generic background. If the query is "Can cancer be detected through breath analysis?", the first sentence must talk specifically about breath analysis and cancer detection — NOT start with "Cancer affects millions of people worldwide."
   - The title or opening sentence must contain the core topic of the query using its exact words or a close restatement
-  - Key noun phrases from the query must appear naturally in the body (e.g. if the query is "breath test for cancer detection", use "breath test", "cancer detection", and related terms throughout)
+  - Key noun phrases from the query must appear naturally in the body throughout
   - The content must read as a direct, authoritative answer to someone who typed that exact query — not as a general brand article
   - Do not substitute query terms with synonyms only — use the actual words from the query
 
@@ -604,7 +648,9 @@ import re as _re2
 _HEDGING_RE = _re2.compile(
     r"\b(it['']s worth noting|it['']s important to (note|mention)|notably,?|importantly,?|"
     r"it should be noted|it['']s important to note|one thing to note|it bears mentioning|"
-    r"needless to say|of course,?|additionally,|furthermore,|moreover,)\s*",
+    r"needless to say|of course,?|additionally,|furthermore,|moreover,|"
+    r"honestly,?|straightforward(ly)?,?|genuinely,?|delve into|dive into|unpack,?|"
+    r"let['']s explore|the bottom line is|the bottom line:|at the end of the day,?)\s*",
     _re2.IGNORECASE,
 )
 
@@ -653,7 +699,7 @@ def _post_process(text: str) -> str:
 
 def _split_title_body(raw_text: str, platform: str) -> tuple[Optional[str], str]:
     """Extract title from first line for platforms where it makes sense."""
-    title_platforms = {"reddit", "medium", "linkedin"}
+    title_platforms = {"reddit", "medium"}
     text = raw_text.strip()
     if platform not in title_platforms:
         return None, text
@@ -749,10 +795,38 @@ async def generate_gap_draft(
     if prompt is None:
         raise ValueError(f"Prompt {prompt_id} not found for brand {brand_id}")
 
+    # Check draft cap before generating
+    current_draft_count = await _count_drafts_by_status(db, brand_id, "draft")
+    if current_draft_count >= DRAFT_CAP:
+        raise ValueError(
+            f"Draft queue is full ({DRAFT_CAP}/{DRAFT_CAP}). "
+            f"Approve or dismiss existing drafts before generating new ones."
+        )
+
+    # Check for repetition: if 3+ drafts already exist for this prompt/platform, skip
+    existing_drafts = await _get_existing_drafts_for_prompt(db, brand_id, prompt_id, platform)
+    if len(existing_drafts) >= 3:
+        raise ValueError(
+            f"3 or more drafts already exist for this prompt on {platform}. "
+            f"Approve or dismiss existing drafts before generating another."
+        )
+
     profile_context = await _load_profile_context(db, brand_id)
     response_analysis = await _analyze_responses_for_prompt(db, brand_id, prompt_id)
     visibility_pct = await _get_prompt_visibility(db, prompt_id)
     estimated_impact = await _estimate_impact(db, brand_id, prompt_id, platform)
+
+    # Build context about existing drafts so Claude takes a different angle
+    existing_drafts_context: Optional[str] = None
+    if existing_drafts:
+        ctx_lines = [
+            "EXISTING DRAFTS FOR THIS PROMPT/PLATFORM — your draft MUST take a distinctly different angle:"
+        ]
+        for d in existing_drafts:
+            snippet = d.title or (d.content_text[:100].replace("\n", " ") + "…")
+            ctx_lines.append(f"  - {snippet}")
+        ctx_lines.append("Write from a completely different perspective, structure, or angle than the above.")
+        existing_drafts_context = "\n".join(ctx_lines)
 
     # ── Wikipedia: completely separate workflow ────────────────────────────────
     if platform == "wikipedia":
@@ -839,9 +913,10 @@ async def generate_gap_draft(
         response_analysis=response_analysis,
         platform_spec=spec,
         opportunity_context=custom_brief,
+        existing_drafts_context=existing_drafts_context,
     )
 
-    raw_text = await _call_claude(claude_prompt)
+    raw_text = await _call_claude(claude_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform, 2500))
     raw_text = _post_process(raw_text)
     title, body = _split_title_body(raw_text, platform)
 
@@ -931,7 +1006,7 @@ async def generate_opportunity_draft(
         opportunity_context=opportunity_context,
     )
 
-    raw_text = await _call_claude(claude_prompt, max_tokens=400)
+    raw_text = await _call_claude(claude_prompt, max_tokens=600)
     raw_text = _post_process(raw_text)
     _, body = _split_title_body(raw_text, platform_key)
 
@@ -968,22 +1043,58 @@ async def auto_draft_top_gaps(
     db: AsyncSession,
     brand_id: int,
     max_gaps: int = 3,
+    clear_existing: bool = False,
 ) -> list[ContentDraft]:
     """
     Identify the highest-impact gaps for a brand and generate drafts across
     all enabled platforms. Returns all newly created drafts.
+
+    When clear_existing=True (weekly scheduler), all existing "draft" status
+    drafts for this brand are deleted before generating. This is the weekly
+    refresh behavior — it replaces pending drafts with fresh ones targeting
+    current gaps. Drafts in "approved" or "posted" status are never touched.
     """
-    # Load top gaps
+    # Weekly refresh: clear all pending drafts before generating new ones
+    if clear_existing:
+        from sqlalchemy import delete as sql_delete
+        await db.execute(
+            sql_delete(ContentDraft).where(
+                ContentDraft.brand_id == brand_id,
+                ContentDraft.status == "draft",
+            )
+        )
+        await db.commit()
+        logger.info(
+            "auto_draft_top_gaps: cleared existing draft-status drafts for brand_id=%d (weekly refresh)",
+            brand_id,
+        )
+
+    # Load more gaps than needed to allow deduplication by prompt
     gaps_result = await db.execute(
         select(ContentGap)
         .where(ContentGap.brand_id == brand_id)
         .order_by(ContentGap.gap_score.desc())
-        .limit(max_gaps)
+        .limit(max_gaps * 4)
     )
-    gaps = list(gaps_result.scalars().all())
+    all_gaps = list(gaps_result.scalars().all())
+
+    if not all_gaps:
+        logger.info("auto_draft_top_gaps: no gaps found for brand_id=%d", brand_id)
+        return []
+
+    # Deduplicate: take the highest-scoring gap per prompt_id so the top N
+    # gaps always come from different prompts — ensures content diversity
+    seen_prompts: set[int] = set()
+    gaps: list[ContentGap] = []
+    for gap in all_gaps:
+        if gap.prompt_id not in seen_prompts:
+            seen_prompts.add(gap.prompt_id)
+            gaps.append(gap)
+            if len(gaps) >= max_gaps:
+                break
 
     if not gaps:
-        logger.info("auto_draft_top_gaps: no gaps found for brand_id=%d", brand_id)
+        logger.info("auto_draft_top_gaps: no unique prompt gaps found for brand_id=%d", brand_id)
         return []
 
     # Load enabled platform settings

@@ -1,7 +1,16 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+
+// Redirect to unified Settings page — brand settings are now managed there
+export default function BrandSettingsRedirect() {
+  const router = useRouter();
+  useEffect(() => { router.replace('/settings'); }, [router]);
+  return null;
+}
+
+// Keep original code below (unused — preserved for reference)
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -20,6 +29,10 @@ import {
   BarChart2,
   X,
   BookOpen,
+  ToggleLeft,
+  ToggleRight,
+  Radio,
+  Sparkles,
 } from 'lucide-react';
 import {
   getBrand,
@@ -33,10 +46,16 @@ import {
   removeCompetitor,
   getBrandProfile,
   updateBrandProfile,
+  refreshWebsiteContext,
+  normaliseWebsiteUrl,
+  getContentSettings,
+  updateContentSettings,
+  getSuggestedPrompts,
   BrandDetail,
   Prompt,
   Competitor,
   BrandProfile,
+  BrandContentSettings,
   Publication,
 } from '@/lib/api';
 import clsx from 'clsx';
@@ -250,11 +269,18 @@ export default function BrandSettingsPage() {
   // General tab state
   const [editName, setEditName] = useState('');
   const [editTier, setEditTier] = useState('basic');
+  const [editWebsiteUrl, setEditWebsiteUrl] = useState('');
+  const [refreshingContext, setRefreshingContext] = useState(false);
+  const [contextRefreshed, setContextRefreshed] = useState(false);
+  const [contextFailed, setContextFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [newPromptText, setNewPromptText] = useState('');
   const [addingPrompt, setAddingPrompt] = useState(false);
   const [deletingPromptId, setDeletingPromptId] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const [running, setRunning] = useState(false);
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [newCompetitorName, setNewCompetitorName] = useState('');
@@ -262,6 +288,9 @@ export default function BrandSettingsPage() {
   const [deletingCompetitorId, setDeletingCompetitorId] = useState<number | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Drafting settings state
+  const [draftSettings, setDraftSettings] = useState<BrandContentSettings[]>([]);
 
   // Profile tab state
   const [profile, setProfile] = useState<BrandProfile | null>(null);
@@ -278,16 +307,19 @@ export default function BrandSettingsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [data, comps, prof] = await Promise.all([
+        const [data, comps, prof, settings] = await Promise.all([
           getBrand(brandId),
           getCompetitors(brandId),
           getBrandProfile(brandId),
+          getContentSettings(brandId),
         ]);
         setBrand(data);
         setEditName(data.name);
         setEditTier(data.tier);
+        setEditWebsiteUrl(data.website_url ?? '');
         setCompetitors(comps);
         setProfile(prof);
+        setDraftSettings(settings);
         setCompanyDescription(prof.company_description ?? '');
         setKeyStats(prof.key_stats ?? []);
         setToneOfVoice(prof.tone_of_voice ?? '');
@@ -308,13 +340,48 @@ export default function BrandSettingsPage() {
     if (!editName.trim()) return;
     setSaving(true);
     try {
-      const updated = await updateBrand(brandId, { name: editName.trim(), tier: editTier });
+      const updated = await updateBrand(brandId, { name: editName.trim(), tier: editTier, website_url: normaliseWebsiteUrl(editWebsiteUrl) });
       setBrand((prev) => prev ? { ...prev, ...updated } : null);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleRefreshContext() {
+    setRefreshingContext(true);
+    setContextFailed(false);
+    const prevFetched = profile?.website_context_last_fetched ?? null;
+    try {
+      await refreshWebsiteContext(brandId);
+    } catch (err) {
+      console.warn('[Settings] Jina refresh request failed:', err);
+      setContextFailed(true);
+      setRefreshingContext(false);
+      return;
+    }
+    // Poll profile until website_context_last_fetched updates (max 45s)
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      try {
+        const updated = await getBrandProfile(brandId);
+        if (updated.website_context_last_fetched !== prevFetched) {
+          clearInterval(poll);
+          setProfile(updated);
+          setContextRefreshed(true);
+          setRefreshingContext(false);
+          setTimeout(() => setContextRefreshed(false), 4000);
+          return;
+        }
+      } catch { /* ignore poll errors */ }
+      if (attempts >= 15) {
+        clearInterval(poll);
+        setContextFailed(true);
+        setRefreshingContext(false);
+      }
+    }, 3000);
   }
 
   async function handleAddPrompt() {
@@ -340,6 +407,36 @@ export default function BrandSettingsPage() {
     } finally {
       setDeletingPromptId(null);
     }
+  }
+
+  async function handleSuggestPrompts() {
+    if (!brand) return;
+    setLoadingSuggestions(true);
+    setShowSuggestions(true);
+    try {
+      const s = await getSuggestedPrompts(brand.id);
+      setSuggestions(s);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }
+
+  async function handleAddSuggestion(text: string) {
+    setBrand((prev) => {
+      if (!prev) return prev;
+      return { ...prev, prompts: [...prev.prompts, { id: Date.now(), brand_id: prev.id, text }], prompt_count: prev.prompt_count + 1 };
+    });
+    setSuggestions((prev) => prev.filter((s) => s !== text));
+    try {
+      const newPrompt = await addPrompt(brand!.id, text);
+      setBrand((prev) => {
+        if (!prev) return prev;
+        const filtered = prev.prompts.filter((p) => p.text !== text || p.id !== Date.now());
+        return { ...prev, prompts: [...filtered, newPrompt] };
+      });
+    } catch { /* ignore */ }
   }
 
   async function handleRunReport() {
@@ -403,6 +500,22 @@ export default function BrandSettingsPage() {
     } finally {
       setProfileSaving(false);
     }
+  }
+
+  async function handleToggleDraftPlatform(platform: string, enabled: boolean) {
+    const updated = await updateContentSettings(brandId, platform, { enabled });
+    setDraftSettings((prev) =>
+      prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))
+    );
+  }
+
+  async function handleDraftFreqChange(platform: string, freq: string) {
+    const updated = await updateContentSettings(brandId, platform, {
+      drafting_frequency: freq as BrandContentSettings['drafting_frequency'],
+    });
+    setDraftSettings((prev) =>
+      prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))
+    );
   }
 
   if (loading) {
@@ -517,6 +630,58 @@ export default function BrandSettingsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-[#94a3b8] mb-2">
+                  Company Website
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={editWebsiteUrl}
+                    onChange={(e) => setEditWebsiteUrl(e.target.value)}
+                    placeholder="https://yourcompany.com"
+                    className="flex-1 bg-[#1a1a24] border border-[#1e1e2e] text-[#e2e8f0] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569]"
+                  />
+                  <button
+                    onClick={handleRefreshContext}
+                    disabled={refreshingContext || !editWebsiteUrl.trim()}
+                    title="Fetch website content to improve draft quality"
+                    className={`flex items-center gap-1.5 border disabled:opacity-50 rounded-lg px-3 py-2.5 text-xs font-medium transition-colors whitespace-nowrap ${
+                      contextFailed
+                        ? 'bg-[#7f1d1d]/20 border-[#991b1b]/40 text-[#f87171]'
+                        : 'bg-[#1a1a24] hover:bg-[#2a2a3a] border-[#2a2a3a] text-[#94a3b8]'
+                    }`}
+                  >
+                    {refreshingContext ? (
+                      <><Loader2 size={13} className="animate-spin" />Fetching…</>
+                    ) : contextRefreshed ? (
+                      '✓ Content fetched'
+                    ) : contextFailed ? (
+                      '✕ Fetch failed — retry'
+                    ) : (
+                      'Fetch Content'
+                    )}
+                  </button>
+                </div>
+                {/* Persistent last-fetched status */}
+                {profile?.website_context_last_fetched ? (
+                  <p className="text-xs text-[#475569] mt-1">
+                    Last fetched:{' '}
+                    <span className="text-[#64748b]">
+                      {new Date(profile.website_context_last_fetched + 'Z').toLocaleString()}
+                    </span>
+                    {' · '}
+                    <span className="text-[#334155]">Refreshed monthly automatically</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-[#475569] mt-1">
+                    {contextFailed
+                      ? 'Fetch failed. Check the URL is publicly accessible and try again.'
+                      : 'No content fetched yet. Click "Fetch Content" to import your website.'}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#94a3b8] mb-2">
                   Plan Tier
                 </label>
                 <div className="flex gap-2">
@@ -568,6 +733,14 @@ export default function BrandSettingsPage() {
                   {brand.prompts.length} prompt{brand.prompts.length !== 1 ? 's' : ''} configured
                 </p>
               </div>
+              <button
+                onClick={handleSuggestPrompts}
+                disabled={loadingSuggestions}
+                className="flex items-center gap-1.5 text-xs bg-[#1a1a24] hover:bg-[#2a2a3a] border border-[#2a2a3a] text-[#94a3b8] hover:text-[#818cf8] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+              >
+                {loadingSuggestions ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                Suggest
+              </button>
             </div>
 
             <div className="flex gap-2 mb-4">
@@ -617,6 +790,48 @@ export default function BrandSettingsPage() {
                     </button>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Prompt suggestions panel */}
+            {showSuggestions && (
+              <div className="mt-4 border border-[#2a2a3a] rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-[#1a1a24] border-b border-[#2a2a3a]">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={13} className="text-[#818cf8]" />
+                    <span className="text-xs font-semibold text-[#e2e8f0]">Suggested Prompts</span>
+                    <span className="text-xs text-[#475569]">click to add</span>
+                  </div>
+                  <button
+                    onClick={() => { setShowSuggestions(false); setSuggestions([]); }}
+                    className="text-[#475569] hover:text-[#94a3b8] transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                {loadingSuggestions ? (
+                  <div className="flex items-center justify-center py-8 gap-2 text-[#64748b] text-xs">
+                    <Loader2 size={14} className="animate-spin text-[#6366f1]" />
+                    Generating suggestions with Claude…
+                  </div>
+                ) : suggestions.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-xs text-[#475569]">
+                    No suggestions available. Try adding more brand profile info.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-[#1e1e2e] max-h-72 overflow-y-auto">
+                    {suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleAddSuggestion(s)}
+                        className="w-full text-left px-4 py-2.5 flex items-start gap-2.5 hover:bg-[#1a1a24] transition-colors group"
+                      >
+                        <Plus size={13} className="text-[#6366f1] flex-shrink-0 mt-0.5 group-hover:scale-110 transition-transform" />
+                        <span className="text-xs text-[#94a3b8] group-hover:text-[#e2e8f0] leading-relaxed transition-colors">{s}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -677,6 +892,62 @@ export default function BrandSettingsPage() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Drafting Settings */}
+          <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <Radio size={16} className="text-[#6366f1]" />
+              <div>
+                <h2 className="text-base font-semibold text-[#e2e8f0]">Drafting</h2>
+                <p className="text-xs text-[#64748b] mt-0.5">
+                  Platform toggles and auto-draft frequency. Changes save immediately.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((platform) => {
+                const setting = draftSettings.find((s) => s.platform === platform);
+                const enabled = setting?.enabled ?? true;
+                const freq = setting?.drafting_frequency ?? 'weekly';
+                const FREQ_OPTIONS = [
+                  { value: 'daily', label: 'Daily' },
+                  { value: 'every_3_days', label: 'Every 3 days' },
+                  { value: 'weekly', label: 'Weekly' },
+                  { value: 'manual', label: 'Manual only' },
+                ];
+                return (
+                  <div key={platform} className="flex items-center gap-3 py-2 border-b border-[#1e1e2e] last:border-0">
+                    <button
+                      onClick={() => handleToggleDraftPlatform(platform, !enabled)}
+                      className="text-[#475569] hover:text-[#94a3b8] transition-colors shrink-0"
+                      title={enabled ? 'Disable platform' : 'Enable platform'}
+                    >
+                      {enabled ? (
+                        <ToggleRight size={20} className="text-[#6366f1]" />
+                      ) : (
+                        <ToggleLeft size={20} />
+                      )}
+                    </button>
+                    <span className="text-sm text-[#94a3b8] capitalize w-24 shrink-0">{platform}</span>
+                    {enabled ? (
+                      <select
+                        value={freq}
+                        onChange={(e) => handleDraftFreqChange(platform, e.target.value)}
+                        className="flex-1 appearance-none bg-[#1a1a24] border border-[#1e1e2e] text-[#94a3b8] text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#6366f1]"
+                      >
+                        {FREQ_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="flex-1 text-xs text-[#475569]">Disabled</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Danger Zone */}

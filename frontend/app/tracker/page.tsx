@@ -70,10 +70,14 @@ export default function TrackerPage() {
   async function loadBrands() {
     try {
       const brands = await getBrands();
-      const cards: BrandCard[] = brands.map((b) => ({ brand: b, overview: null }));
-      setBrandCards(cards);
+      // Single-brand app: redirect directly to brand settings if one exists
+      if (brands.length > 0) {
+        router.replace('/settings');
+        return;
+      }
+      setBrandCards([]);
       setLoading(false);
-      if (brands.length === 0) setShowModal(true);
+      setShowModal(true);
 
       const overviews = await Promise.allSettled(brands.map((b) => getOverview(b.id)));
       setBrandCards(

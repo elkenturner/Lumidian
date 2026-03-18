@@ -1,10 +1,11 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:3001/api',
+  baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
 export interface Brand {
@@ -13,6 +14,7 @@ export interface Brand {
   slug: string;
   tier: 'basic' | 'standard' | 'premium';
   prompt_count: number;
+  website_url?: string | null;
   created_at: string;
 }
 
@@ -89,16 +91,6 @@ export interface PlatformGuidelines {
   workflow: string;
 }
 
-export interface AccountConnection {
-  id: number;
-  platform: 'reddit' | 'quora' | 'medium' | 'wikipedia';
-  status: 'connected' | 'disconnected' | 'error';
-  display_name: string | null;
-  connected_at: string | null;
-  last_verified_at: string | null;
-  error_message: string | null;
-}
-
 export interface BrandContentSettings {
   id: number;
   brand_id: number;
@@ -121,6 +113,11 @@ export interface ContentDraft {
   platform_guidelines_applied: string | null;
   visibility_score_at_draft: number | null;
   estimated_impact: number | null;
+  approved_at: string | null;
+  dismissed_at: string | null;
+  posted_at: string | null;
+  edited_count: number;
+  time_to_approve_seconds: number | null;
   created_at: string;
   updated_at: string;
   prompt_text?: string;
@@ -180,6 +177,7 @@ export async function createBrand(data: {
   name: string;
   tier: string;
   prompts: string[];
+  website_url?: string;
 }): Promise<BrandDetail> {
   const res = await api.post<BrandDetail>('/brands', data);
   return res.data;
@@ -187,10 +185,26 @@ export async function createBrand(data: {
 
 export async function updateBrand(
   id: number,
-  data: Partial<{ name: string; tier: string }>
+  data: Partial<{ name: string; tier: string; website_url: string | null }>
 ): Promise<BrandDetail> {
   const res = await api.put<BrandDetail>(`/brands/${id}`, data);
   return res.data;
+}
+
+export async function refreshWebsiteContext(brandId: number): Promise<void> {
+  await api.post(`/brands/${brandId}/refresh-website-context`);
+}
+
+/**
+ * Normalise a website URL entered by the user.
+ * Prepends "https://" if no protocol is present.
+ * Returns null if the input is empty, or the normalised URL string.
+ */
+export function normaliseWebsiteUrl(raw: string): string | null {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (!/^https?:\/\//i.test(trimmed)) return 'https://' + trimmed;
+  return trimmed;
 }
 
 export async function deleteBrand(id: number): Promise<void> {
@@ -208,6 +222,11 @@ export async function deletePrompt(brandId: number, promptId: number): Promise<v
 
 export async function triggerRun(brandId: number): Promise<{ run_id: number }> {
   const res = await api.post<{ run_id: number }>(`/tracking/run/${brandId}`);
+  return res.data;
+}
+
+export async function triggerPromptRun(brandId: number, promptId: number): Promise<{ run_id: number }> {
+  const res = await api.post<{ run_id: number }>(`/tracking/run-prompt/${brandId}/${promptId}`);
   return res.data;
 }
 
@@ -342,6 +361,21 @@ export async function generateNow(brandId: number, maxGaps = 3): Promise<Content
   return res.data;
 }
 
+export interface DraftQueueStatus {
+  draft_count: number;
+  draft_cap: number;
+  draft_queue_full: boolean;
+  scheduled_count: number;
+  scheduled_cap: number;
+  scheduled_queue_full: boolean;
+  last_scan_at: string | null;
+}
+
+export async function getDraftStatus(brandId: number): Promise<DraftQueueStatus> {
+  const res = await api.get<DraftQueueStatus>(`/content/${brandId}/draft-status`);
+  return res.data;
+}
+
 // ── Opportunity functions ────────────────────────────────────────────────────
 
 export async function getOpportunities(brandId: number): Promise<ContentOpportunity[]> {
@@ -361,25 +395,6 @@ export async function draftOpportunity(opportunityId: number): Promise<ContentDr
 export async function triggerScan(brandId: number): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>(`/opportunities/${brandId}/scan`);
   return res.data;
-}
-
-// ── Account functions ────────────────────────────────────────────────────────
-
-export async function getAccounts(): Promise<AccountConnection[]> {
-  const res = await api.get<AccountConnection[]>('/accounts');
-  return res.data;
-}
-
-export async function connectAccount(data: {
-  platform: string;
-  credentials: Record<string, string>;
-}): Promise<AccountConnection> {
-  const res = await api.post<AccountConnection>('/accounts/connect', data);
-  return res.data;
-}
-
-export async function disconnectAccount(platform: string): Promise<void> {
-  await api.delete(`/accounts/${platform}`);
 }
 
 export async function getApiKeyStatus(): Promise<ApiKeyStatus> {
@@ -423,6 +438,11 @@ export async function addCompetitor(brandId: number, name: string): Promise<Comp
 
 export async function removeCompetitor(brandId: number, competitorId: number): Promise<void> {
   await api.delete(`/brands/${brandId}/competitors/${competitorId}`);
+}
+
+export async function getSuggestedPrompts(brandId: number): Promise<string[]> {
+  const res = await api.post<string[]>(`/brands/${brandId}/suggest-prompts`);
+  return res.data;
 }
 
 // ── Dashboard analytics types & functions ────────────────────────────────────
@@ -528,6 +548,8 @@ export interface BrandProfile {
   approved_language: string[];
   publications: Publication[];
   completion_pct: number;
+  internal_brand_context: string | null;
+  website_context_last_fetched: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -594,5 +616,71 @@ export async function getGapSummary(brandId: number): Promise<GapSummary> {
 
 export async function refreshGaps(brandId: number): Promise<{ message: string; run_id: number }> {
   const res = await api.post(`/gaps/${brandId}/refresh`);
+  return res.data;
+}
+
+// ── Auth types & functions ────────────────────────────────────────────────────
+
+export interface AuthUser {
+  id: number;
+  email: string;
+  name: string | null;
+  subscription_tier: 'starter' | 'pro' | null;
+  subscription_status: string | null;
+  is_admin: boolean;
+  prompt_limit: number;
+  created_at: string;
+}
+
+export async function authRegister(data: {
+  email: string;
+  password: string;
+  name?: string;
+}): Promise<AuthUser> {
+  const res = await api.post<AuthUser>('/auth/register', data);
+  return res.data;
+}
+
+export async function authLogin(email: string, password: string): Promise<AuthUser> {
+  const res = await api.post<AuthUser>('/auth/login', { email, password });
+  return res.data;
+}
+
+export async function authLogout(): Promise<void> {
+  await api.post('/auth/logout');
+}
+
+export async function authMe(): Promise<AuthUser> {
+  const res = await api.get<AuthUser>('/auth/me');
+  return res.data;
+}
+
+export async function authGoogle(idToken: string): Promise<AuthUser> {
+  const res = await api.post<AuthUser>('/auth/google', { id_token: idToken });
+  return res.data;
+}
+
+// ── Billing types & functions ─────────────────────────────────────────────────
+
+export interface BillingStatus {
+  subscription_tier: 'starter' | 'pro' | null;
+  subscription_status: string | null;
+  prompt_limit: number;
+  is_admin: boolean;
+  stripe_customer_id: string | null;
+}
+
+export async function getBillingStatus(): Promise<BillingStatus> {
+  const res = await api.get<BillingStatus>('/billing/status');
+  return res.data;
+}
+
+export async function createCheckoutSession(tier: string): Promise<{ checkout_url: string }> {
+  const res = await api.post<{ checkout_url: string }>('/billing/create-checkout', { tier });
+  return res.data;
+}
+
+export async function createPortalSession(): Promise<{ portal_url: string }> {
+  const res = await api.post<{ portal_url: string }>('/billing/portal');
   return res.data;
 }

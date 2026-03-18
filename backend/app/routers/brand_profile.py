@@ -15,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import CurrentUser, get_brand_for_user
 from app.models import Brand, BrandProfile
 from app.schemas import BrandProfileResponse, BrandProfileUpdate, Publication
 
@@ -131,15 +132,15 @@ async def _get_or_create_profile(db: AsyncSession, brand_id: int) -> BrandProfil
 
 
 @router.get("/{brand_id}/profile", response_model=BrandProfileResponse)
-async def get_brand_profile(brand_id: int, db: DbDep):
-    await _get_brand_or_404(db, brand_id)
+async def get_brand_profile(brand_id: int, db: DbDep, user: CurrentUser):
+    await get_brand_for_user(brand_id, db, user)
     profile = await _get_or_create_profile(db, brand_id)
     return _profile_to_response(profile)
 
 
 @router.put("/{brand_id}/profile", response_model=BrandProfileResponse)
-async def update_brand_profile(brand_id: int, payload: BrandProfileUpdate, db: DbDep):
-    await _get_brand_or_404(db, brand_id)
+async def update_brand_profile(brand_id: int, payload: BrandProfileUpdate, db: DbDep, user: CurrentUser):
+    await get_brand_for_user(brand_id, db, user)
     profile = await _get_or_create_profile(db, brand_id)
 
     if payload.company_description is not None:

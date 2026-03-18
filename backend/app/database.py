@@ -110,6 +110,47 @@ async def run_migrations():
             identified_at DATETIME,
             created_at DATETIME
         )""",
+        # Auth: users table
+        """CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT,
+            google_id TEXT UNIQUE,
+            name TEXT,
+            subscription_tier TEXT,
+            subscription_status TEXT,
+            stripe_customer_id TEXT,
+            stripe_subscription_id TEXT,
+            is_admin INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME
+        )""",
+        # Auth: user_id on brands
+        "ALTER TABLE brands ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+        # Analytics event log
+        """CREATE TABLE IF NOT EXISTS analytics_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            brand_id INTEGER REFERENCES brands(id) ON DELETE SET NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            data TEXT,
+            created_at DATETIME
+        )""",
+        # Draft lifecycle tracking columns
+        "ALTER TABLE content_drafts ADD COLUMN approved_at DATETIME",
+        "ALTER TABLE content_drafts ADD COLUMN dismissed_at DATETIME",
+        "ALTER TABLE content_drafts ADD COLUMN posted_at DATETIME",
+        "ALTER TABLE content_drafts ADD COLUMN edited_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE content_drafts ADD COLUMN time_to_approve_seconds INTEGER",
+        # Multi-user isolation: assign orphaned brands to the admin user
+        """UPDATE brands SET user_id = (
+            SELECT id FROM users WHERE email = 'ken@clarityai.com' LIMIT 1
+        ) WHERE user_id IS NULL""",
+        # Website scraping: website_url on brands
+        "ALTER TABLE brands ADD COLUMN website_url TEXT",
+        # Website scraping: Jina-fetched context on brand_profiles
+        "ALTER TABLE brand_profiles ADD COLUMN internal_brand_context TEXT",
+        "ALTER TABLE brand_profiles ADD COLUMN website_context_last_fetched DATETIME",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

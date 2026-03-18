@@ -18,8 +18,16 @@ Routers:
 """
 
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+# Load .env before any module reads os.getenv().
+# Resolve relative to this file so it works regardless of cwd.
+load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,6 +36,8 @@ from app.database import create_tables, run_migrations
 from app.scheduler import start_scheduler, stop_scheduler
 from app.routers import brands, tracking, results, content, accounts, dashboard
 from app.routers import brand_profile, gaps, opportunities, settings
+from app.routers import auth as auth_router, billing as billing_router
+from app.routers import analytics as analytics_router
 from app.schemas import HealthResponse
 
 logging.basicConfig(
@@ -40,10 +50,20 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── Startup ───────────────────────────────────────────────────────────────
+    google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+    if google_client_id:
+        logger.info("Google OAuth: GOOGLE_CLIENT_ID loaded (%s…)", google_client_id[:20])
+    else:
+        logger.warning("Google OAuth: GOOGLE_CLIENT_ID is NOT set — /api/auth/google will be unavailable")
+
     logger.info("ClarityAI startup: creating database tables...")
     await create_tables()
     await run_migrations()
     logger.info("Database tables ready.")
+
+    # Seed admin user
+    from app.services.auth_seeder import seed_admin_user
+    await seed_admin_user()
 
     logger.info("Starting background scheduler...")
     start_scheduler()
@@ -72,7 +92,7 @@ app = FastAPI(
 # ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -89,6 +109,9 @@ app.include_router(dashboard.router, prefix="/api")
 app.include_router(gaps.router, prefix="/api")
 app.include_router(opportunities.router, prefix="/api")
 app.include_router(settings.router, prefix="/api")
+app.include_router(auth_router.router, prefix="/api")
+app.include_router(billing_router.router, prefix="/api")
+app.include_router(analytics_router.router, prefix="/api")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

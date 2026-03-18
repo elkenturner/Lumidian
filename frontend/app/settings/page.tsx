@@ -1,73 +1,604 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   User,
-  Clock,
-  BarChart2,
-  Globe,
-  Trash2,
   Save,
-  ChevronRight,
   AlertTriangle,
   Calendar,
   Pause,
   Play,
   Loader2,
+  Plus,
+  Trash2,
+  ChevronRight,
+  X,
+  CheckCircle,
+  Building2,
+  MessageSquare,
+  Users,
+  Shield,
+  BarChart2,
+  BookOpen,
+  ToggleLeft,
+  ToggleRight,
+  Radio,
+  Sparkles,
 } from 'lucide-react';
-import { getSchedulerStatus, setSchedulerStatus } from '@/lib/api';
+import clsx from 'clsx';
+import {
+  getBrands,
+  getBrand,
+  updateBrand,
+  deleteBrand,
+  addPrompt,
+  deletePrompt,
+  getCompetitors,
+  addCompetitor,
+  removeCompetitor,
+  getBrandProfile,
+  updateBrandProfile,
+  refreshWebsiteContext,
+  normaliseWebsiteUrl,
+  getContentSettings,
+  updateContentSettings,
+  getSuggestedPrompts,
+  getSchedulerStatus,
+  setSchedulerStatus,
+  triggerPromptRun,
+  BrandDetail,
+  Prompt,
+  Competitor,
+  BrandProfile,
+  BrandContentSettings,
+  Publication,
+} from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
-const TIMEZONES = [
-  'UTC',
-  'America/New_York',
-  'America/Chicago',
-  'America/Denver',
-  'America/Los_Angeles',
-  'America/Sao_Paulo',
-  'Europe/London',
-  'Europe/Paris',
-  'Europe/Berlin',
-  'Asia/Dubai',
-  'Asia/Kolkata',
-  'Asia/Singapore',
-  'Asia/Tokyo',
-  'Australia/Sydney',
-];
+type SettingsTab = 'general' | 'profile' | 'account';
 
-const FREQUENCY_OPTIONS = [
-  { value: 'daily', label: 'Daily', description: 'Run reports every day' },
-  { value: 'every_3_days', label: 'Every 3 days', description: 'Run every 3 days' },
-  { value: 'weekly', label: 'Weekly', description: 'Run reports once a week' },
-  { value: 'manual', label: 'Manual only', description: 'Only run when I trigger it' },
-];
+// ── Auto-growing textarea ─────────────────────────────────────────────────────
 
-const QUERIES_OPTIONS = [
-  { value: 5, label: '5 queries', description: 'Basic — faster, lower cost' },
-  { value: 10, label: '10 queries', description: 'Standard — balanced accuracy' },
-  { value: 20, label: '20 queries', description: 'Premium — highest confidence' },
-];
+function AutoTextarea({ value, onChange, placeholder, className }: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.style.height = 'auto';
+      ref.current.style.height = ref.current.scrollHeight + 'px';
+    }
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={4}
+      className={className}
+      style={{ overflow: 'hidden' }}
+    />
+  );
+}
+
+// ── Editable list ─────────────────────────────────────────────────────────────
+
+function EditableList({
+  items,
+  onChange,
+  placeholder,
+}: {
+  items: string[];
+  onChange: (items: string[]) => void;
+  placeholder: string;
+}) {
+  const [inputVal, setInputVal] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const addItem = () => {
+    const trimmed = inputVal.trim();
+    if (!trimmed) return;
+    onChange([...items, trimmed]);
+    setInputVal('');
+    inputRef.current?.focus();
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="flex flex-wrap gap-2 min-h-[36px]">
+        {items.map((item, idx) => (
+          <span
+            key={idx}
+            className="flex items-center gap-1.5 px-3 py-1 bg-[#6366f1]/10 border border-[#6366f1]/30 rounded-full text-sm text-[#6366f1]"
+          >
+            {item}
+            <button
+              onClick={() => onChange(items.filter((_, i) => i !== idx))}
+              className="text-[#6366f1]/60 hover:text-[#6366f1] transition-colors"
+            >
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          ref={inputRef}
+          value={inputVal}
+          onChange={(e) => setInputVal(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }}
+          placeholder={placeholder}
+          className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1]/15 transition-colors"
+        />
+        <button
+          onClick={addItem}
+          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg text-[#64748B] hover:text-[#6366f1] hover:border-[#6366f1]/40 hover:bg-[rgba(255,255,255,0.08)] transition-all duration-150"
+        >
+          <Plus size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Completion bar ─────────────────────────────────────────────────────────────
+
+function CompletionBar({ pct }: { pct: number }) {
+  const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#6366f1';
+  return (
+    <div className="flex items-center gap-3">
+      <div className="flex-1 bg-[rgba(255,255,255,0.08)] rounded-full h-2">
+        <div
+          className="h-2 rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, backgroundColor: color }}
+        />
+      </div>
+      <span className="text-sm font-semibold" style={{ color }}>
+        {Math.round(pct)}%
+      </span>
+    </div>
+  );
+}
+
+// ── Section card ──────────────────────────────────────────────────────────────
+
+function SectionCard({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+      <div className="flex items-start gap-3 mb-4">
+        <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] flex items-center justify-center shrink-0 mt-0.5">
+          <Icon size={15} className="text-[#6366f1]" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-[#F0F4F8]">{title}</h3>
+          <p className="text-xs text-[#64748B] mt-0.5">{description}</p>
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ── Publications editor ───────────────────────────────────────────────────────
+
+function PublicationsEditor({
+  items,
+  onChange,
+}: {
+  items: Publication[];
+  onChange: (pubs: Publication[]) => void;
+}) {
+  function update(idx: number, field: keyof Publication, value: string) {
+    const next = items.map((p, i) => (i === idx ? { ...p, [field]: value } : p));
+    onChange(next);
+  }
+
+  function add() {
+    onChange([...items, { url: '', title: '', publisher: '', date: '' }]);
+  }
+
+  function remove(idx: number) {
+    onChange(items.filter((_, i) => i !== idx));
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((pub, idx) => (
+        <div key={idx} className="bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.12)] rounded-lg p-3 space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-[#64748B] font-medium">Publication {idx + 1}</span>
+            <button onClick={() => remove(idx)} className="text-[#475569] hover:text-[#f87171] transition-colors">
+              <X size={13} />
+            </button>
+          </div>
+          <input
+            type="url"
+            placeholder="DOI / URL"
+            value={pub.url}
+            onChange={(e) => update(idx, 'url', e.target.value)}
+            className="w-full px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1]"
+          />
+          <input
+            type="text"
+            placeholder="Title"
+            value={pub.title}
+            onChange={(e) => update(idx, 'title', e.target.value)}
+            className="w-full px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1]"
+          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Publisher / journal"
+              value={pub.publisher}
+              onChange={(e) => update(idx, 'publisher', e.target.value)}
+              className="flex-1 px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1]"
+            />
+            <input
+              type="text"
+              placeholder="Year"
+              value={pub.date}
+              onChange={(e) => update(idx, 'date', e.target.value)}
+              className="w-20 px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1]"
+            />
+          </div>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={add}
+        className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#6366f1] border border-dashed border-[rgba(255,255,255,0.12)] hover:border-[#6366f1]/40 rounded-lg px-3 py-2 transition-colors w-full justify-center"
+      >
+        <Plus size={13} />
+        Add publication
+      </button>
+    </div>
+  );
+}
+
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
-  const [displayName, setDisplayName] = useState('');
-  const [defaultFrequency, setDefaultFrequency] = useState('weekly');
-  const [defaultQueries, setDefaultQueries] = useState(10);
-  const [timezone, setTimezone] = useState('UTC');
-  const [saved, setSaved] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteInput, setDeleteInput] = useState('');
+  const router = useRouter();
+  const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [loading, setLoading] = useState(true);
+  const [brandId, setBrandId] = useState<number | null>(null);
+  const [brand, setBrand] = useState<BrandDetail | null>(null);
 
-  // Scheduler state — fetched from backend, saved immediately on toggle
+  // General tab state
+  const [editName, setEditName] = useState('');
+  const [editWebsiteUrl, setEditWebsiteUrl] = useState('');
+  const [refreshingContext, setRefreshingContext] = useState(false);
+  const [contextRefreshed, setContextRefreshed] = useState(false);
+  const [contextFailed, setContextFailed] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [newPromptText, setNewPromptText] = useState('');
+  const [addingPrompt, setAddingPrompt] = useState(false);
+  const [deletingPromptId, setDeletingPromptId] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [competitors, setCompetitors] = useState<Competitor[]>([]);
+  const [newCompetitorName, setNewCompetitorName] = useState('');
+  const [addingCompetitor, setAddingCompetitor] = useState(false);
+  const [deletingCompetitorId, setDeletingCompetitorId] = useState<number | null>(null);
+  const [draftSettings, setDraftSettings] = useState<BrandContentSettings[]>([]);
+  const [showDeleteBrandConfirm, setShowDeleteBrandConfirm] = useState(false);
+  const [deletingBrand, setDeletingBrand] = useState(false);
+
+  // Profile tab state
+  const [profile, setProfile] = useState<BrandProfile | null>(null);
+  const [companyDescription, setCompanyDescription] = useState('');
+  const [keyStats, setKeyStats] = useState<string[]>([]);
+  const [toneOfVoice, setToneOfVoice] = useState('');
+  const [whatNotToSay, setWhatNotToSay] = useState<string[]>([]);
+  const [targetAudience, setTargetAudience] = useState('');
+  const [approvedLanguage, setApprovedLanguage] = useState<string[]>([]);
+  const [publications, setPublications] = useState<Publication[]>([]);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+
+  // Account tab state
+  const [displayName, setDisplayName] = useState('');
+  const [accountSaved, setAccountSaved] = useState(false);
   const [schedulerPaused, setSchedulerPaused] = useState(false);
   const [schedulerLoading, setSchedulerLoading] = useState(true);
   const [schedulerError, setSchedulerError] = useState<string | null>(null);
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+  const [deleteAccountInput, setDeleteAccountInput] = useState('');
 
   useEffect(() => {
-    getSchedulerStatus()
-      .then((s) => setSchedulerPaused(s.paused))
-      .catch(() => setSchedulerError('Could not load scheduler status.'))
-      .finally(() => setSchedulerLoading(false));
+    async function load() {
+      try {
+        const [brands, schedulerStatus] = await Promise.all([
+          getBrands(),
+          getSchedulerStatus().catch(() => null),
+        ]);
+
+        if (schedulerStatus) {
+          setSchedulerPaused(schedulerStatus.paused);
+        }
+        setSchedulerLoading(false);
+
+        if (brands.length === 0) {
+          setLoading(false);
+          return;
+        }
+
+        const firstBrand = brands[0];
+        setBrandId(firstBrand.id);
+
+        const [brandDetail, comps, prof, settings] = await Promise.all([
+          getBrand(firstBrand.id),
+          getCompetitors(firstBrand.id),
+          getBrandProfile(firstBrand.id).catch(() => null),
+          getContentSettings(firstBrand.id).catch(() => [] as BrandContentSettings[]),
+        ]);
+
+        setBrand(brandDetail);
+        setEditName(brandDetail.name);
+        setEditWebsiteUrl(brandDetail.website_url ?? '');
+        setCompetitors(comps);
+        setDraftSettings(settings);
+
+        if (prof) {
+          setProfile(prof);
+          setCompanyDescription(prof.company_description ?? '');
+          setKeyStats(prof.key_stats ?? []);
+          setToneOfVoice(prof.tone_of_voice ?? '');
+          setWhatNotToSay(prof.what_not_to_say ?? []);
+          setTargetAudience(prof.target_audience ?? '');
+          setApprovedLanguage(prof.approved_language ?? []);
+          setPublications(prof.publications ?? []);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    // Load display name from localStorage
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('clarity_settings');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed.displayName) setDisplayName(parsed.displayName);
+        } catch { /* ignore */ }
+      }
+    }
+
+    load();
   }, []);
+
+  // ── General handlers ────────────────────────────────────────────────────────
+
+  async function handleSave() {
+    if (!brandId || !editName.trim()) return;
+    setSaving(true);
+    try {
+      const updated = await updateBrand(brandId, {
+        name: editName.trim(),
+        website_url: normaliseWebsiteUrl(editWebsiteUrl),
+      });
+      setBrand((prev) => prev ? { ...prev, ...updated } : null);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRefreshContext() {
+    if (!brandId) return;
+    setRefreshingContext(true);
+    setContextFailed(false);
+    const prevFetched = profile?.website_context_last_fetched ?? null;
+    try {
+      await refreshWebsiteContext(brandId);
+    } catch (err) {
+      console.warn('[Settings] Jina refresh request failed:', err);
+      setContextFailed(true);
+      setRefreshingContext(false);
+      return;
+    }
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      try {
+        const updated = await getBrandProfile(brandId);
+        if (updated.website_context_last_fetched !== prevFetched) {
+          clearInterval(poll);
+          setProfile(updated);
+          setContextRefreshed(true);
+          setRefreshingContext(false);
+          setTimeout(() => setContextRefreshed(false), 4000);
+          return;
+        }
+      } catch { /* ignore */ }
+      if (attempts >= 15) {
+        clearInterval(poll);
+        setContextFailed(true);
+        setRefreshingContext(false);
+      }
+    }, 3000);
+  }
+
+  async function handleAddPrompt() {
+    if (!brandId) return;
+    const trimmed = newPromptText.trim();
+    if (!trimmed) return;
+    setAddingPrompt(true);
+    try {
+      const prompt = await addPrompt(brandId, trimmed);
+      setBrand((prev) => prev ? { ...prev, prompts: [...prev.prompts, prompt], prompt_count: prev.prompt_count + 1 } : null);
+      setNewPromptText('');
+      // Fire single-prompt run in background — does not block UI
+      triggerPromptRun(brandId, prompt.id)
+        .then(({ run_id }) => {
+          // Store in localStorage so dashboard can pick up the badge state
+          if (typeof window !== 'undefined') {
+            const key = 'pendingPromptRuns';
+            const existing: Array<{ promptId: number; runId: number }> = JSON.parse(
+              localStorage.getItem(key) ?? '[]'
+            );
+            existing.push({ promptId: prompt.id, runId: run_id });
+            localStorage.setItem(key, JSON.stringify(existing));
+          }
+        })
+        .catch((err) => console.warn('[Settings] Prompt mini-run failed to start:', err));
+    } finally {
+      setAddingPrompt(false);
+    }
+  }
+
+  async function handleDeletePrompt(promptId: number) {
+    if (!brandId) return;
+    setDeletingPromptId(promptId);
+    try {
+      await deletePrompt(brandId, promptId);
+      setBrand((prev) =>
+        prev ? { ...prev, prompts: prev.prompts.filter((p: Prompt) => p.id !== promptId), prompt_count: prev.prompt_count - 1 } : null
+      );
+    } finally {
+      setDeletingPromptId(null);
+    }
+  }
+
+  async function handleSuggestPrompts() {
+    if (!brand) return;
+    setLoadingSuggestions(true);
+    setShowSuggestions(true);
+    try {
+      const s = await getSuggestedPrompts(brand.id);
+      setSuggestions(s);
+    } catch {
+      setSuggestions([]);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  }
+
+  async function handleAddSuggestion(text: string) {
+    if (!brandId) return;
+    setBrand((prev) => {
+      if (!prev) return prev;
+      return { ...prev, prompts: [...prev.prompts, { id: Date.now(), brand_id: prev.id, text }], prompt_count: prev.prompt_count + 1 };
+    });
+    setSuggestions((prev) => prev.filter((s) => s !== text));
+    try {
+      const newPrompt = await addPrompt(brandId, text);
+      setBrand((prev) => {
+        if (!prev) return prev;
+        const filtered = prev.prompts.filter((p) => p.text !== text || p.id !== Date.now());
+        return { ...prev, prompts: [...filtered, newPrompt] };
+      });
+    } catch { /* ignore */ }
+  }
+
+  async function handleAddCompetitor() {
+    if (!brandId) return;
+    const trimmed = newCompetitorName.trim();
+    if (!trimmed) return;
+    setAddingCompetitor(true);
+    try {
+      const comp = await addCompetitor(brandId, trimmed);
+      setCompetitors((prev) => [...prev, comp]);
+      setNewCompetitorName('');
+    } finally {
+      setAddingCompetitor(false);
+    }
+  }
+
+  async function handleRemoveCompetitor(competitorId: number) {
+    if (!brandId) return;
+    setDeletingCompetitorId(competitorId);
+    try {
+      await removeCompetitor(brandId, competitorId);
+      setCompetitors((prev) => prev.filter((c) => c.id !== competitorId));
+    } finally {
+      setDeletingCompetitorId(null);
+    }
+  }
+
+  async function handleToggleDraftPlatform(platform: string, enabled: boolean) {
+    if (!brandId) return;
+    const updated = await updateContentSettings(brandId, platform, { enabled });
+    setDraftSettings((prev) =>
+      prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))
+    );
+  }
+
+  async function handleDraftFreqChange(platform: string, freq: string) {
+    if (!brandId) return;
+    const updated = await updateContentSettings(brandId, platform, {
+      drafting_frequency: freq as BrandContentSettings['drafting_frequency'],
+    });
+    setDraftSettings((prev) =>
+      prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))
+    );
+  }
+
+  async function handleDeleteBrand() {
+    if (!brandId) return;
+    setDeletingBrand(true);
+    try {
+      await deleteBrand(brandId);
+      router.push('/onboarding');
+    } catch {
+      setDeletingBrand(false);
+    }
+  }
+
+  // ── Profile handlers ────────────────────────────────────────────────────────
+
+  async function handleProfileSave() {
+    if (!brandId) return;
+    setProfileSaving(true);
+    try {
+      const updated = await updateBrandProfile(brandId, {
+        company_description: companyDescription,
+        key_stats: keyStats,
+        tone_of_voice: toneOfVoice,
+        what_not_to_say: whatNotToSay,
+        target_audience: targetAudience,
+        approved_language: approvedLanguage,
+        publications,
+      });
+      setProfile(updated);
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 2500);
+    } finally {
+      setProfileSaving(false);
+    }
+  }
+
+  // ── Account handlers ─────────────────────────────────────────────────────────
+
+  function handleAccountSave() {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('clarity_settings', JSON.stringify({ displayName }));
+    }
+    setAccountSaved(true);
+    setTimeout(() => setAccountSaved(false), 2500);
+  }
 
   async function handleToggleScheduler() {
     setSchedulerLoading(true);
@@ -82,286 +613,715 @@ export default function SettingsPage() {
     }
   }
 
-  function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(
-        'clarity_settings',
-        JSON.stringify({ displayName, defaultFrequency, defaultQueries, timezone })
-      );
-    }
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  if (loading) {
+    return (
+      <div className="p-8 max-w-3xl">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-32" />
+          <div className="h-10 bg-[rgba(255,255,255,0.06)] rounded w-64" />
+          <div className="h-48 bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.12)] rounded-xl" />
+        </div>
+      </div>
+    );
   }
 
+  const completionPct = profile?.completion_pct ?? 0;
+
   return (
-    <div className="p-8 max-w-2xl mx-auto space-y-10">
+    <div className="px-8 py-8 max-w-3xl">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-[#e2e8f0]">Settings</h1>
-        <p className="text-sm text-[#64748b] mt-1">Manage your account preferences</p>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-[#F0F4F8]">Settings</h1>
+        <p className="text-sm text-[#64748B] mt-1">
+          {brand ? `Managing settings for ${brand.name}` : 'Manage your account preferences'}
+        </p>
       </div>
 
-      <form onSubmit={handleSave} className="space-y-8">
-        {/* Profile */}
-        <section className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6 space-y-5">
-          <div className="flex items-center gap-2 mb-1">
-            <User className="w-4 h-4 text-[#6366f1]" />
-            <h2 className="text-sm font-semibold text-[#e2e8f0]">Profile</h2>
-          </div>
-
-          <div>
-            <label className="block text-xs text-[#64748b] uppercase tracking-wide mb-1.5">
-              Display Name
-            </label>
-            <input
-              type="text"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="e.g. Acme Corp"
-              className="w-full bg-[#1a1a24] border border-[#1e1e2e] text-[#e2e8f0] text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#6366f1] placeholder-[#475569]"
-            />
-            <p className="text-xs text-[#475569] mt-1.5">
-              Used as the default name in reports and exports.
-            </p>
-          </div>
-        </section>
-
-        {/* Tracking defaults */}
-        <section className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6 space-y-5">
-          <div className="flex items-center gap-2 mb-1">
-            <BarChart2 className="w-4 h-4 text-[#6366f1]" />
-            <h2 className="text-sm font-semibold text-[#e2e8f0]">Tracking Defaults</h2>
-          </div>
-          <p className="text-xs text-[#475569] -mt-3">
-            Applied to new brands unless overridden per brand.
-          </p>
-
-          <div>
-            <div className="flex items-center gap-1.5 mb-2">
-              <Clock className="w-3.5 h-3.5 text-[#475569]" />
-              <label className="text-xs text-[#64748b] uppercase tracking-wide">
-                Default Tracking Frequency
-              </label>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {FREQUENCY_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setDefaultFrequency(opt.value)}
-                  className={`text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
-                    defaultFrequency === opt.value
-                      ? 'border-[#6366f1] bg-[#6366f1]/10 text-[#818cf8]'
-                      : 'border-[#1e1e2e] text-[#64748b] hover:border-[#6366f1]/30 hover:text-[#94a3b8]'
-                  }`}
-                >
-                  <span className="font-medium block">{opt.label}</span>
-                  <span className="text-xs opacity-70">{opt.description}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-xs text-[#64748b] uppercase tracking-wide mb-2 block">
-              Default Queries per Prompt
-            </label>
-            <div className="flex gap-2">
-              {QUERIES_OPTIONS.map((opt) => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setDefaultQueries(opt.value)}
-                  className={`flex-1 text-center px-3 py-2.5 rounded-lg border text-sm transition-colors ${
-                    defaultQueries === opt.value
-                      ? 'border-[#6366f1] bg-[#6366f1]/10 text-[#818cf8]'
-                      : 'border-[#1e1e2e] text-[#64748b] hover:border-[#6366f1]/30 hover:text-[#94a3b8]'
-                  }`}
-                >
-                  <span className="font-medium block">{opt.label}</span>
-                  <span className="text-xs opacity-70">{opt.description}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* Timezone */}
-        <section className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Globe className="w-4 h-4 text-[#6366f1]" />
-            <h2 className="text-sm font-semibold text-[#e2e8f0]">Timezone</h2>
-          </div>
-          <select
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-            className="w-full bg-[#1a1a24] border border-[#1e1e2e] text-[#e2e8f0] text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#6366f1]"
-          >
-            {TIMEZONES.map((tz) => (
-              <option key={tz} value={tz}>
-                {tz.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-[#475569] mt-2">
-            Scheduled tracking runs fire at 8:00 AM and 8:00 PM in this timezone.
-          </p>
-        </section>
-
-        {/* Save button */}
-        <div className="flex items-center justify-between">
-          <Link
-            href="/settings/accounts"
-            className="flex items-center gap-1.5 text-sm text-[#818cf8] hover:text-[#6366f1] transition-colors"
-          >
-            Manage connected accounts
-            <ChevronRight className="w-4 h-4" />
-          </Link>
+      {/* Tab navigation */}
+      <div className="flex gap-1 border-b border-[rgba(255,255,255,0.12)] mb-6">
+        {(['general', 'profile', 'account'] as SettingsTab[]).map((tab) => (
           <button
-            type="submit"
-            className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
-          >
-            <Save className="w-4 h-4" />
-            {saved ? 'Saved!' : 'Save Changes'}
-          </button>
-        </div>
-      </form>
-
-      {/* Scheduler — outside the form, saves immediately on toggle */}
-      <section className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6">
-        <div className="flex items-center gap-2 mb-1">
-          <Calendar className="w-4 h-4 text-[#6366f1]" />
-          <h2 className="text-sm font-semibold text-[#e2e8f0]">Automatic Scheduler</h2>
-        </div>
-        <p className="text-xs text-[#475569] mb-5">
-          Controls the 8:00 AM and 8:00 PM UTC tracking sweeps, the nightly Reddit scan, and
-          auto-drafting. Manual &ldquo;Run Report Now&rdquo; always works regardless of this setting.
-        </p>
-
-        <div className="flex items-center justify-between">
-          {/* Status indicator + label */}
-          <div className="flex items-center gap-3">
-            {schedulerLoading ? (
-              <div className="w-[4.5rem] h-6 bg-[#1a1a24] rounded-full animate-pulse" />
-            ) : (
-              <span
-                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${
-                  schedulerPaused
-                    ? 'bg-[#451a03]/40 text-[#fb923c] border-[#78350f]/60'
-                    : 'bg-[#052e16]/40 text-[#34d399] border-[#065f46]/60'
-                }`}
-              >
-                <span
-                  className={`w-1.5 h-1.5 rounded-full ${
-                    schedulerPaused ? 'bg-[#fb923c]' : 'bg-[#34d399] animate-pulse'
-                  }`}
-                />
-                {schedulerPaused ? 'Paused' : 'Active'}
-              </span>
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={clsx(
+              'px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors',
+              activeTab === tab
+                ? 'text-[#818CF8] border-[#6366f1] bg-[rgba(255,255,255,0.06)]'
+                : 'text-[#64748B] border-transparent hover:text-[#94A3B8]'
             )}
-            <p className="text-sm text-[#94a3b8]">
-              {schedulerPaused ? 'Scheduled runs will not fire' : 'Running at 8:00 AM and 8:00 PM UTC'}
-            </p>
-          </div>
-
-          {/* Toggle button */}
-          <button
-            type="button"
-            onClick={handleToggleScheduler}
-            disabled={schedulerLoading}
-            className={`flex items-center gap-2 text-sm font-medium rounded-lg px-4 py-2 border transition-colors disabled:opacity-50 ${
-              schedulerPaused
-                ? 'bg-[#052e16]/40 hover:bg-[#052e16]/70 border-[#065f46]/60 text-[#34d399]'
-                : 'bg-[#451a03]/30 hover:bg-[#451a03]/50 border-[#78350f]/50 text-[#fb923c]'
-            }`}
           >
-            {schedulerLoading ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : schedulerPaused ? (
-              <Play className="w-4 h-4" />
-            ) : (
-              <Pause className="w-4 h-4" />
-            )}
-            {schedulerLoading ? 'Updating…' : schedulerPaused ? 'Resume Scheduler' : 'Pause Scheduler'}
+            {tab === 'general' ? 'General' : tab === 'profile' ? 'Brand Profile' : 'Account'}
           </button>
-        </div>
+        ))}
+      </div>
 
-        {/* Warning banner when paused */}
-        {schedulerPaused && !schedulerLoading && (
-          <div className="mt-4 flex items-start gap-2 text-xs text-[#fb923c] bg-[#451a03]/20 border border-[#78350f]/30 rounded-lg px-3 py-2.5">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            <span>
-              Automatic tracking, Reddit scanning, and auto-drafting are paused.
-              Use &ldquo;Run Report Now&rdquo; on any brand to trigger a manual run.
-            </span>
-          </div>
-        )}
-
-        {schedulerError && (
-          <p className="mt-3 text-xs text-[#f87171]">{schedulerError}</p>
-        )}
-      </section>
-
-      {/* Danger zone */}
-      <section className="border border-red-900/40 rounded-xl overflow-hidden">
-        <div className="px-6 py-4 bg-red-900/10">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-[#ef4444]" />
-            <h2 className="text-sm font-semibold text-[#ef4444]">Danger Zone</h2>
-          </div>
-        </div>
-        <div className="px-6 py-5 bg-[#111118]">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <p className="text-sm font-medium text-[#e2e8f0]">Delete account</p>
-              <p className="text-xs text-[#64748b] mt-0.5">
-                Permanently delete all brands, prompts, tracking history, and content drafts. This
-                cannot be undone.
-              </p>
-            </div>
-            {!showDeleteConfirm ? (
-              <button
-                type="button"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="flex-shrink-0 flex items-center gap-1.5 text-sm text-[#ef4444] border border-red-900/40 hover:border-red-700 hover:bg-red-900/10 rounded-lg px-4 py-2 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-                Delete account
-              </button>
-            ) : (
-              <div className="flex-shrink-0 w-64">
-                <p className="text-xs text-[#64748b] mb-2">
-                  Type <span className="text-[#ef4444] font-mono">DELETE</span> to confirm
-                </p>
+      {/* ── GENERAL TAB ──────────────────────────────────────────────────────── */}
+      {activeTab === 'general' && brand && (
+        <div className="space-y-5">
+          {/* Brand Settings */}
+          <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <h2 className="text-base font-semibold text-[#F0F4F8] mb-5">Brand Settings</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#94A3B8] mb-2">Brand Name</label>
                 <input
                   type="text"
-                  value={deleteInput}
-                  onChange={(e) => setDeleteInput(e.target.value)}
-                  placeholder="DELETE"
-                  className="w-full bg-[#1a1a24] border border-red-900/40 text-[#e2e8f0] text-sm rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-red-700 placeholder-[#475569]"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1]"
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[#94A3B8] mb-2">Company Website</label>
                 <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={editWebsiteUrl}
+                    onChange={(e) => setEditWebsiteUrl(e.target.value)}
+                    placeholder="https://yourcompany.com"
+                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569]"
+                  />
                   <button
-                    type="button"
-                    onClick={() => { setShowDeleteConfirm(false); setDeleteInput(''); }}
-                    className="flex-1 py-1.5 text-xs text-[#64748b] border border-[#1e1e2e] rounded-lg hover:text-[#94a3b8] transition-colors"
+                    onClick={handleRefreshContext}
+                    disabled={refreshingContext || !editWebsiteUrl.trim()}
+                    title="Fetch website content to improve draft quality"
+                    className={`flex items-center gap-1.5 border disabled:opacity-50 rounded-lg px-3 py-2.5 text-xs font-medium transition-colors whitespace-nowrap ${
+                      contextFailed
+                        ? 'bg-[#7f1d1d]/20 border-[#991b1b]/40 text-[#f87171]'
+                        : 'bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border-[rgba(255,255,255,0.10)] text-[#94A3B8]'
+                    }`}
+                  >
+                    {refreshingContext ? (
+                      <><Loader2 size={13} className="animate-spin" />Fetching…</>
+                    ) : contextRefreshed ? (
+                      '✓ Content fetched'
+                    ) : contextFailed ? (
+                      '✕ Fetch failed — retry'
+                    ) : (
+                      'Fetch Content'
+                    )}
+                  </button>
+                </div>
+                {profile?.website_context_last_fetched ? (
+                  <p className="text-xs text-[#475569] mt-1">
+                    Last fetched:{' '}
+                    <span className="text-[#64748B]">
+                      {new Date(profile.website_context_last_fetched + 'Z').toLocaleString()}
+                    </span>
+                    {' · '}
+                    <span className="text-[#94A3B8]">Refreshed monthly automatically</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-[#475569] mt-1">
+                    {contextFailed
+                      ? 'Fetch failed. Check the URL is publicly accessible and try again.'
+                      : 'No content fetched yet. Click "Fetch Content" to import your website.'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-5 pt-5 border-t border-[rgba(255,255,255,0.12)]">
+              <button
+                onClick={handleSave}
+                disabled={saving || saveSuccess}
+                className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+              >
+                {saving ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : saveSuccess ? (
+                  '✓ Saved'
+                ) : (
+                  <><Save size={14} />Save Changes</>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Tracking Prompts */}
+          <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-base font-semibold text-[#F0F4F8]">Tracking Prompts</h2>
+                <p className="text-xs text-[#64748B] mt-0.5">
+                  {brand.prompts.length} prompt{brand.prompts.length !== 1 ? 's' : ''} configured
+                </p>
+              </div>
+              <button
+                onClick={handleSuggestPrompts}
+                disabled={loadingSuggestions}
+                className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#6366f1] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+              >
+                {loadingSuggestions ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                Suggest
+              </button>
+            </div>
+
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newPromptText}
+                onChange={(e) => setNewPromptText(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddPrompt()}
+                placeholder="Enter a new prompt question..."
+                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569]"
+              />
+              <button
+                onClick={handleAddPrompt}
+                disabled={addingPrompt || !newPromptText.trim()}
+                className="flex items-center gap-1.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-40 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+              >
+                {addingPrompt ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                Add
+              </button>
+            </div>
+
+            {brand.prompts.length === 0 ? (
+              <div className="text-center py-8 text-[#64748B] text-sm border border-dashed border-[rgba(255,255,255,0.12)] rounded-lg bg-[rgba(255,255,255,0.03)]">
+                No prompts yet. Add one above.
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-80 overflow-y-auto">
+                {brand.prompts.map((prompt: Prompt) => (
+                  <div
+                    key={prompt.id}
+                    className="flex items-start gap-3 bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg px-4 py-3 group hover:border-[rgba(255,255,255,0.14)] transition-colors"
+                  >
+                    <ChevronRight size={14} className="text-[#6366f1] flex-shrink-0 mt-0.5" />
+                    <span className="text-sm text-[#94A3B8] flex-1 leading-relaxed">{prompt.text}</span>
+                    <button
+                      onClick={() => handleDeletePrompt(prompt.id)}
+                      disabled={deletingPromptId === prompt.id}
+                      className="text-[rgba(255,255,255,0.15)] hover:text-[#f87171] opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                    >
+                      {deletingPromptId === prompt.id ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {showSuggestions && (
+              <div className="mt-4 border border-[rgba(255,255,255,0.10)] rounded-xl overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-[rgba(255,255,255,0.06)] border-b border-[rgba(255,255,255,0.12)]">
+                  <div className="flex items-center gap-2">
+                    <Sparkles size={13} className="text-[#6366f1]" />
+                    <span className="text-xs font-semibold text-[#F0F4F8]">Suggested Prompts</span>
+                    <span className="text-xs text-[#475569]">click to add</span>
+                  </div>
+                  <button
+                    onClick={() => { setShowSuggestions(false); setSuggestions([]); }}
+                    className="text-[#475569] hover:text-[#94A3B8] transition-colors"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+                {loadingSuggestions ? (
+                  <div className="flex items-center justify-center py-8 gap-2 text-[#64748B] text-xs">
+                    <Loader2 size={14} className="animate-spin text-[#6366f1]" />
+                    Generating suggestions with Claude…
+                  </div>
+                ) : suggestions.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-xs text-[#475569]">
+                    No suggestions available. Try adding more brand profile info.
+                  </div>
+                ) : (
+                  <div className="divide-y divide-[rgba(255,255,255,0.08)] max-h-72 overflow-y-auto">
+                    {suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={() => handleAddSuggestion(s)}
+                        className="w-full text-left px-4 py-2.5 flex items-start gap-2.5 hover:bg-[rgba(255,255,255,0.06)] transition-colors group"
+                      >
+                        <Plus size={13} className="text-[#6366f1] flex-shrink-0 mt-0.5" />
+                        <span className="text-xs text-[#94A3B8] group-hover:text-[#F0F4F8] leading-relaxed transition-colors">{s}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Competitors */}
+          <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="mb-5">
+              <h2 className="text-base font-semibold text-[#F0F4F8]">Competitors</h2>
+              <p className="text-xs text-[#64748B] mt-0.5">Track competitor mention rates alongside your brand</p>
+            </div>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newCompetitorName}
+                onChange={(e) => setNewCompetitorName(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddCompetitor()}
+                placeholder="Enter competitor name..."
+                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569]"
+              />
+              <button
+                onClick={handleAddCompetitor}
+                disabled={addingCompetitor || !newCompetitorName.trim()}
+                className="flex items-center gap-1.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-40 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+              >
+                {addingCompetitor ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                Add
+              </button>
+            </div>
+            {competitors.length === 0 ? (
+              <div className="text-center py-8 text-[#64748B] text-sm border border-dashed border-[rgba(255,255,255,0.12)] rounded-lg bg-[rgba(255,255,255,0.03)]">
+                No competitors tracked. Add one above.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {competitors.map((comp) => (
+                  <div
+                    key={comp.id}
+                    className="flex items-center gap-3 bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg px-4 py-3 group hover:border-[rgba(255,255,255,0.14)] transition-colors"
+                  >
+                    <ChevronRight size={14} className="text-[#475569] flex-shrink-0" />
+                    <span className="text-sm text-[#94A3B8] flex-1">{comp.name}</span>
+                    <button
+                      onClick={() => handleRemoveCompetitor(comp.id)}
+                      disabled={deletingCompetitorId === comp.id}
+                      className="text-[rgba(255,255,255,0.15)] hover:text-[#f87171] opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                    >
+                      {deletingCompetitorId === comp.id ? (
+                        <Loader2 size={14} className="animate-spin" />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Drafting / Platform Toggles */}
+          <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="flex items-center gap-2 mb-5">
+              <Radio size={16} className="text-[#6366f1]" />
+              <div>
+                <h2 className="text-base font-semibold text-[#F0F4F8]">Drafting Platforms</h2>
+                <p className="text-xs text-[#64748B] mt-0.5">
+                  Toggle platforms on/off and set auto-draft frequency. Changes save immediately.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((platform) => {
+                const setting = draftSettings.find((s) => s.platform === platform);
+                const enabled = setting?.enabled ?? true;
+                const freq = setting?.drafting_frequency ?? 'weekly';
+                const FREQ_OPTIONS = [
+                  { value: 'daily', label: 'Daily' },
+                  { value: 'every_3_days', label: 'Every 3 days' },
+                  { value: 'weekly', label: 'Weekly' },
+                  { value: 'manual', label: 'Manual only' },
+                ];
+                return (
+                  <div key={platform} className="flex items-center gap-3 py-2 border-b border-[rgba(255,255,255,0.12)] last:border-0">
+                    <button
+                      onClick={() => handleToggleDraftPlatform(platform, !enabled)}
+                      className="text-[#475569] hover:text-[#94A3B8] transition-colors shrink-0"
+                      title={enabled ? 'Disable platform' : 'Enable platform'}
+                    >
+                      {enabled ? (
+                        <ToggleRight size={20} className="text-[#6366f1]" />
+                      ) : (
+                        <ToggleLeft size={20} />
+                      )}
+                    </button>
+                    <span className="text-sm text-[#94A3B8] capitalize w-24 shrink-0">{platform}</span>
+                    {enabled ? (
+                      <select
+                        value={freq}
+                        onChange={(e) => handleDraftFreqChange(platform, e.target.value)}
+                        className="flex-1 appearance-none bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#6366f1]"
+                      >
+                        {FREQ_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="flex-1 text-xs text-[#475569]">Disabled</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Delete Brand */}
+          <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-red-900/40 rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <h2 className="text-base font-semibold text-red-400 mb-2 flex items-center gap-2">
+              <AlertTriangle size={16} />
+              Delete Brand
+            </h2>
+            <p className="text-sm text-[#64748B] mb-5">
+              Permanently removes all tracking data, runs, and results for this brand. Cannot be undone.
+            </p>
+            {!showDeleteBrandConfirm ? (
+              <button
+                onClick={() => setShowDeleteBrandConfirm(true)}
+                className="flex items-center gap-2 bg-red-900/20 hover:bg-red-900/30 border border-red-900/50 text-red-400 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+              >
+                <Trash2 size={14} />
+                Delete Brand
+              </button>
+            ) : (
+              <div className="bg-red-900/10 border border-red-900/40 rounded-lg p-4">
+                <p className="text-sm font-medium text-[#F0F4F8] mb-3">
+                  Are you sure you want to delete &quot;{brand.name}&quot;?
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDeleteBrandConfirm(false)}
+                    disabled={deletingBrand}
+                    className="bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.12)] text-[#94A3B8] rounded-lg px-4 py-2 text-sm font-medium hover:bg-[rgba(255,255,255,0.10)] transition-colors"
                   >
                     Cancel
                   </button>
                   <button
-                    type="button"
-                    disabled={deleteInput !== 'DELETE'}
-                    className="flex-1 py-1.5 text-xs text-white bg-red-500 hover:bg-red-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    onClick={handleDeleteBrand}
+                    disabled={deletingBrand}
+                    className="flex items-center gap-2 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
                   >
-                    Confirm delete
+                    {deletingBrand ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    Yes, Delete Brand
                   </button>
                 </div>
               </div>
             )}
           </div>
         </div>
-      </section>
+      )}
+
+      {activeTab === 'general' && !brand && (
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-11 h-11 rounded-xl bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] flex items-center justify-center mb-4">
+            <Building2 size={18} className="text-[#475569]" />
+          </div>
+          <p className="text-sm font-medium text-[#F0F4F8] mb-1">No brand yet</p>
+          <p className="text-xs text-[#64748B] mb-4">Add your first brand to start tracking AI visibility.</p>
+          <a href="/onboarding" className="inline-flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-3 py-2 font-medium transition-colors">
+            Create a brand
+          </a>
+        </div>
+      )}
+
+      {/* ── PROFILE TAB ──────────────────────────────────────────────────────── */}
+      {activeTab === 'profile' && (
+        <div>
+          {profile && (
+            <div className="mb-5 p-4 bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-[#94A3B8]">Profile Completion</span>
+                <span className="text-xs text-[#64748B]">
+                  {completionPct >= 100 ? 'Complete — ready for drafting' : `${Math.round(100 - completionPct)}% remaining`}
+                </span>
+              </div>
+              <CompletionBar pct={completionPct} />
+            </div>
+          )}
+
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={handleProfileSave}
+              disabled={profileSaving}
+              className={clsx(
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                profileSaved
+                  ? 'bg-[#064e3b]/30 text-[#10b981] border border-[#065f46]/40'
+                  : 'bg-[#6366f1] text-white hover:bg-[#4f46e5] disabled:opacity-50'
+              )}
+            >
+              {profileSaved ? (
+                <><CheckCircle size={16} />Saved</>
+              ) : (
+                <><Save size={16} />{profileSaving ? 'Saving…' : 'Save Profile'}</>
+              )}
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            <SectionCard
+              icon={Building2}
+              title="Company Description"
+              description="What the company does — used as context for all content drafts"
+            >
+              <AutoTextarea
+                value={companyDescription}
+                onChange={setCompanyDescription}
+                placeholder="Describe the company, its products, mission, and what makes it unique…"
+                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] resize-none"
+              />
+            </SectionCard>
+
+            <SectionCard
+              icon={BarChart2}
+              title="Key Stats & Approved Claims"
+              description="Specific data points and statistics that can be cited in content"
+            >
+              <EditableList
+                items={keyStats}
+                onChange={setKeyStats}
+                placeholder="Add a stat or claim, then press Enter…"
+              />
+            </SectionCard>
+
+            <SectionCard
+              icon={MessageSquare}
+              title="Tone of Voice"
+              description="How the brand should sound — guides the style of all drafted content"
+            >
+              <textarea
+                value={toneOfVoice}
+                onChange={(e) => setToneOfVoice(e.target.value)}
+                placeholder="e.g. Professional but approachable. Confident without being arrogant…"
+                rows={3}
+                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] resize-none"
+              />
+            </SectionCard>
+
+            <SectionCard
+              icon={AlertTriangle}
+              title="What NOT to Say"
+              description="Phrases, claims, or topics to avoid — legal or brand restrictions"
+            >
+              <EditableList
+                items={whatNotToSay}
+                onChange={setWhatNotToSay}
+                placeholder="Add a phrase or claim to avoid…"
+              />
+            </SectionCard>
+
+            <SectionCard
+              icon={Users}
+              title="Target Audience"
+              description="Who the brand is trying to reach — informs framing in drafts"
+            >
+              <textarea
+                value={targetAudience}
+                onChange={(e) => setTargetAudience(e.target.value)}
+                placeholder="e.g. Healthcare professionals and clinical researchers…"
+                rows={3}
+                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] resize-none"
+              />
+            </SectionCard>
+
+            <SectionCard
+              icon={Shield}
+              title="Clinical / Legal Approved Language"
+              description="Pre-approved phrases, disclaimers, and citations for regulated claims"
+            >
+              <EditableList
+                items={approvedLanguage}
+                onChange={setApprovedLanguage}
+                placeholder="Add an approved phrase or disclaimer…"
+              />
+            </SectionCard>
+
+            <SectionCard
+              icon={BookOpen}
+              title="Publications"
+              description="Peer-reviewed papers — used to populate Wikipedia citation refs automatically"
+            >
+              <PublicationsEditor items={publications} onChange={setPublications} />
+            </SectionCard>
+          </div>
+
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={handleProfileSave}
+              disabled={profileSaving}
+              className={clsx(
+                'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all',
+                profileSaved
+                  ? 'bg-[#064e3b]/30 text-[#10b981] border border-[#065f46]/40'
+                  : 'bg-[#6366f1] text-white hover:bg-[#4f46e5] disabled:opacity-50'
+              )}
+            >
+              {profileSaved ? (
+                <><CheckCircle size={16} />Saved</>
+              ) : (
+                <><Save size={16} />{profileSaving ? 'Saving…' : 'Save Profile'}</>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ACCOUNT TAB ──────────────────────────────────────────────────────── */}
+      {activeTab === 'account' && (
+        <div className="space-y-6">
+          {/* Profile */}
+          <section className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 space-y-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="flex items-center gap-2 mb-1">
+              <User className="w-4 h-4 text-[#6366f1]" />
+              <h2 className="text-sm font-semibold text-[#F0F4F8]">Profile</h2>
+            </div>
+
+            {user && (
+              <div className="space-y-1">
+                <p className="text-xs text-[#64748B] uppercase tracking-wide">Email</p>
+                <p className="text-sm text-[#94A3B8]">{user.email}</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs text-[#64748B] uppercase tracking-wide mb-1.5">Display Name</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="e.g. Acme Corp"
+                className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#6366f1] placeholder-[#475569]"
+              />
+            </div>
+
+            <button
+              onClick={handleAccountSave}
+              className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            >
+              <Save className="w-4 h-4" />
+              {accountSaved ? 'Saved!' : 'Save Changes'}
+            </button>
+          </section>
+
+          {/* Scheduler */}
+          <section className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="flex items-center gap-2 mb-1">
+              <Calendar className="w-4 h-4 text-[#6366f1]" />
+              <h2 className="text-sm font-semibold text-[#F0F4F8]">Automatic Scheduler</h2>
+            </div>
+            <p className="text-xs text-[#475569] mb-5">
+              Controls the 8:00 AM and 8:00 PM UTC tracking sweeps, the nightly Reddit scan, and
+              auto-drafting. Manual &ldquo;Run Report Now&rdquo; always works regardless of this setting.
+            </p>
+
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {schedulerLoading ? (
+                  <div className="w-[4.5rem] h-6 bg-[rgba(255,255,255,0.06)] rounded-full animate-pulse" />
+                ) : (
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${
+                      schedulerPaused
+                        ? 'bg-[#451a03]/40 text-[#fb923c] border-[#78350f]/60'
+                        : 'bg-[#052e16]/40 text-[#34d399] border-[#065f46]/60'
+                    }`}
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full ${schedulerPaused ? 'bg-[#fb923c]' : 'bg-[#34d399] animate-pulse'}`} />
+                    {schedulerPaused ? 'Paused' : 'Active'}
+                  </span>
+                )}
+                <p className="text-sm text-[#94A3B8]">
+                  {schedulerPaused ? 'Scheduled runs will not fire' : 'Running at 8:00 AM and 8:00 PM UTC'}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleToggleScheduler}
+                disabled={schedulerLoading}
+                className={`flex items-center gap-2 text-sm font-medium rounded-lg px-4 py-2 border transition-colors disabled:opacity-50 ${
+                  schedulerPaused
+                    ? 'bg-[#052e16]/40 hover:bg-[#052e16]/70 border-[#065f46]/60 text-[#34d399]'
+                    : 'bg-[#451a03]/30 hover:bg-[#451a03]/50 border-[#78350f]/50 text-[#fb923c]'
+                }`}
+              >
+                {schedulerLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : schedulerPaused ? (
+                  <Play className="w-4 h-4" />
+                ) : (
+                  <Pause className="w-4 h-4" />
+                )}
+                {schedulerLoading ? 'Updating…' : schedulerPaused ? 'Resume Scheduler' : 'Pause Scheduler'}
+              </button>
+            </div>
+
+            {schedulerPaused && !schedulerLoading && (
+              <div className="mt-4 flex items-start gap-2 text-xs text-[#fb923c] bg-[#451a03]/20 border border-[#78350f]/30 rounded-lg px-3 py-2.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>
+                  Automatic tracking, Reddit scanning, and auto-drafting are paused.
+                  Use &ldquo;Run Report Now&rdquo; on the Dashboard to trigger a manual run.
+                </span>
+              </div>
+            )}
+
+            {schedulerError && (
+              <p className="mt-3 text-xs text-[#f87171]">{schedulerError}</p>
+            )}
+          </section>
+
+          {/* Danger Zone — Delete Account */}
+          <section className="border border-red-900/40 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 bg-red-900/10">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-[#ef4444]" />
+                <h2 className="text-sm font-semibold text-[#ef4444]">Danger Zone</h2>
+              </div>
+            </div>
+            <div className="px-6 py-5 bg-[rgba(255,255,255,0.02)]">
+              <div className="flex items-start justify-between gap-6">
+                <div>
+                  <p className="text-sm font-medium text-[#F0F4F8]">Delete account</p>
+                  <p className="text-xs text-[#64748B] mt-0.5">
+                    Permanently delete all brands, prompts, tracking history, and content drafts. This cannot be undone.
+                  </p>
+                </div>
+                {!showDeleteAccountConfirm ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteAccountConfirm(true)}
+                    className="flex-shrink-0 flex items-center gap-1.5 text-sm text-[#ef4444] border border-red-900/40 hover:border-red-700 hover:bg-red-900/10 rounded-lg px-4 py-2 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Delete account
+                  </button>
+                ) : (
+                  <div className="flex-shrink-0 w-64">
+                    <p className="text-xs text-[#64748B] mb-2">
+                      Type <span className="text-[#ef4444] font-mono">DELETE</span> to confirm
+                    </p>
+                    <input
+                      type="text"
+                      value={deleteAccountInput}
+                      onChange={(e) => setDeleteAccountInput(e.target.value)}
+                      placeholder="DELETE"
+                      className="w-full bg-[rgba(255,255,255,0.08)] border border-red-900/40 text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-red-700 placeholder-[#475569]"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountInput(''); }}
+                        className="flex-1 py-1.5 text-xs text-[#64748B] border border-[rgba(255,255,255,0.12)] rounded-lg hover:text-[#94A3B8] transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deleteAccountInput !== 'DELETE'}
+                        className="flex-1 py-1.5 text-xs text-white bg-red-500 hover:bg-red-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        Confirm delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

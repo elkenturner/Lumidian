@@ -4,6 +4,7 @@ Shared FastAPI dependencies.
 from __future__ import annotations
 
 import os
+from time import monotonic
 from typing import Annotated, Optional
 
 import jwt
@@ -14,8 +15,33 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models import User
 
-JWT_SECRET = os.getenv("JWT_SECRET", "clarity-dev-secret-change-in-prod")
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+if not JWT_SECRET:
+    raise RuntimeError(
+        "JWT_SECRET environment variable is not set. "
+        "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
+    )
 JWT_ALGORITHM = "HS256"
+
+# ── Per-user in-memory rate limiting ─────────────────────────────────────────
+# {user_id: (call_count, window_start_monotonic)}
+_rate_store: dict[int, tuple[int, float]] = {}
+_RATE_WINDOW = 60.0  # seconds
+
+
+def check_rate_limit(user_id: int, limit: int) -> None:
+    """Raise HTTP 429 if user has exceeded `limit` calls within the last minute."""
+    count, start = _rate_store.get(user_id, (0, 0.0))
+    now = monotonic()
+    if now - start > _RATE_WINDOW:
+        _rate_store[user_id] = (1, now)
+    elif count >= limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Rate limit exceeded — max {limit} requests per minute for this endpoint.",
+        )
+    else:
+        _rate_store[user_id] = (count + 1, start)
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 

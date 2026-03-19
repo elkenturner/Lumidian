@@ -11,11 +11,12 @@ import json
 import logging
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import CurrentUser
 from app.models import TrackingRun, ContentDraft, AnalyticsEvent, Prompt
 
 logger = logging.getLogger(__name__)
@@ -26,11 +27,10 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 
 @router.get("/summary")
-async def get_analytics_summary(db: DbDep):
-    """
-    Internal analytics summary. No auth required — deploy behind firewall or
-    add auth dependency before exposing publicly.
-    """
+async def get_analytics_summary(db: DbDep, user: CurrentUser):
+    """Internal analytics summary — admin only."""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
     # ── Tracking ──────────────────────────────────────────────────────────────
 

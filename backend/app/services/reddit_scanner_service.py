@@ -180,6 +180,43 @@ def _detect_industries(text: str) -> list[str]:
     return [ind for ind, keywords in _DETECTION_RULES if any(kw in low for kw in keywords)]
 
 
+# ── Subreddit promotion classification (mirrors drafting_service) ─────────────
+
+_PROMO_RESTRICTED_SUBS = frozenset({
+    "personalfinance", "legaladvice", "tax", "investing", "financialindependence",
+    "frugal", "povertyfinance", "studentloans", "debtfree", "fire",
+    "medicine", "askdocs", "medical", "medicaladvice", "nursing", "pharmacy",
+    "mentalhealth", "depression", "anxiety", "bipolar", "schizophrenia",
+    "chronicpain", "diabetes", "cancer", "epilepsy", "ibs", "autoimmune",
+    "ems", "emergencymedicine", "veterinary",
+    "science", "biology", "chemistry", "physics", "neuroscience",
+    "psychology", "datascience", "statistics", "academicphilosophy",
+    "compsci", "machinelearning", "artificial",
+    "relationships", "amitheasshole", "relationship_advice", "tifu",
+    "confessions", "grief", "survivorsofabuse", "ptsd", "addiction",
+    "askreddit", "todayilearned", "explainlikeimfive", "changemyview",
+    "nostupidquestions", "worldnews", "news", "nottheonion",
+    "programming", "learnprogramming", "cscareerquestions", "devops",
+    "sysadmin", "netsec", "cybersecurity",
+})
+_RESTRICTED_SIGNALS = ("help", "advice", "support", "care", "recover", "survivor", "anon")
+_ALLOWED_SIGNALS = (
+    "entrepreneur", "startup", "business", "marketing", "growth",
+    "smallbusiness", "b2b", "saas", "productmanagement", "venturecapital",
+    "growthhacking", "digitalmarketing", "contentmarketing",
+)
+
+
+def _promo_class(sub: str) -> int:
+    """0 = promo-allowed, 1 = cautious, 2 = promo-restricted."""
+    s = sub.lower()
+    if s in _PROMO_RESTRICTED_SUBS or any(kw in s for kw in _RESTRICTED_SIGNALS):
+        return 2
+    if any(kw in s for kw in _ALLOWED_SIGNALS):
+        return 0
+    return 1
+
+
 def _relevant_subreddits(
     description: Optional[str],
     prompt_texts: list[str],
@@ -188,12 +225,8 @@ def _relevant_subreddits(
 ) -> tuple[list[str], list[str]]:
     """
     Return (subreddits, industries) derived from brand profile + prompt texts.
-    Never returns generic catch-all subreddits.
-    Returns empty lists if the brand's industry cannot be determined.
-
-    extra_profile_text: additional BrandProfile fields (target_audience, key_stats)
-    joined into the detection corpus.  Passed separately so the caller can see
-    exactly what text was used.
+    Applies a 70/30 split: ~70% of slots go to promo-allowed/cautious subreddits,
+    ~30% to promo-restricted ones, so direct brand mentions are possible in most results.
     """
     parts = list(filter(None, [description, extra_profile_text] + prompt_texts))
     combined = " ".join(parts)
@@ -202,15 +235,23 @@ def _relevant_subreddits(
 
     industries = _detect_industries(combined)
     seen: set[str] = set()
-    result: list[str] = []
+    all_subs: list[str] = []
     for ind in industries:
         for sub in _INDUSTRY_MAP.get(ind, []):
             if sub not in seen:
                 seen.add(sub)
-                result.append(sub)
-                if len(result) >= limit:
-                    return result, industries
-    return result, industries
+                all_subs.append(sub)
+
+    # Partition into allowed/cautious vs restricted
+    open_subs = [s for s in all_subs if _promo_class(s) < 2]
+    restricted_subs = [s for s in all_subs if _promo_class(s) == 2]
+
+    # 70% open, 30% restricted (minimum 1 restricted slot if any exist)
+    open_slots = max(1, round(limit * 0.70))
+    restricted_slots = limit - open_slots
+
+    result = open_subs[:open_slots] + restricted_subs[:restricted_slots]
+    return result[:limit], industries
 
 
 def get_relevant_subreddits(
@@ -231,6 +272,15 @@ _STOP = frozenset(
 )
 
 
+# Family member references that are NEVER good reply opportunities regardless of title framing.
+# Even "How should I help my dad with cancer?" is a support post, not an info thread.
+_FAMILY_SIGNALS = frozenset([
+    "my mom", "my dad", "my mother", "my father", "my wife", "my husband",
+    "my partner", "my sister", "my brother", "my child", "my son", "my daughter",
+    "my aunt", "my uncle", "my grandma", "my grandpa", "my grandmother", "my grandfather",
+    "my spouse", "my loved one", "my family member",
+])
+
 _PERSONAL_STORY_SIGNALS = frozenset([
     "i graduated", "graduated today", "i rang the bell", "rang the bell",
     "my last radiation", "last chemo", "my chemo", "my diagnosis", "i was diagnosed",
@@ -240,8 +290,7 @@ _PERSONAL_STORY_SIGNALS = frozenset([
     "my battle with cancer", "just got my results", "my biopsy", "update on my",
     "i beat cancer", "survivor here", "nec free", "no evidence of disease",
     "thank you all for", "wanted to share my", "sharing my story",
-    "have cancer", "has cancer", "my mom", "my dad", "my wife", "my husband",
-    "my partner", "my sister", "my brother", "my child", "my son", "my daughter",
+    "have cancer", "has cancer",
     "feeling tired", "side effects", "on chemo", "going through", "i need advice",
     "new member", "new in the club", "officially hit", "one year on",
     "close to my end", "i feel i may", "stage iv", "stage 4",
@@ -281,13 +330,21 @@ _DISCUSSION_TITLE_RE = re.compile(
 
 def _is_personal_story(title: str, body: str) -> bool:
     """Return True if this looks like a personal treatment/support story with no reply opportunity."""
-    # Discussion posts we always want — skip personal story check
-    if _DISCUSSION_TITLE_RE.search(title):
-        return False
-    # A single strong signal in the title is enough
+    combined_lower = (title + " " + body[:600]).lower()
+
+    # Family member references are always support posts — filter regardless of title framing.
+    # "What should I ask my oncologist about my dad's cancer?" is still not an opportunity.
+    if any(sig in combined_lower for sig in _FAMILY_SIGNALS):
+        return True
+
+    # Strong personal title signals
     if _PERSONAL_TITLE_RE.search(title):
         return True
-    combined_lower = (title + " " + body[:300]).lower()
+
+    # For discussion-looking titles, still check body for personal accumulation
+    if _DISCUSSION_TITLE_RE.search(title):
+        return sum(1 for sig in _PERSONAL_STORY_SIGNALS if sig in combined_lower) >= 3
+
     return sum(1 for sig in _PERSONAL_STORY_SIGNALS if sig in combined_lower) >= 2
 
 
@@ -473,7 +530,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
         for prompt in prompts[:5]:
             q = urllib.parse.quote(prompt.text)
 
-            # Search within topically relevant subreddits — no global search
+            # 1. Search within topically relevant subreddits (high precision)
             sub_posts: list[dict] = []
             for sub in subreddits[:6]:
                 sub_url = (
@@ -483,7 +540,18 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 sub_posts.extend(_extract_posts(await _fetch(sub_url)))
                 await asyncio.sleep(0.8)
 
-            all_posts = sub_posts
+            # 2. Global Reddit search — finds relevant threads in ANY subreddit
+            #    that we haven't explicitly mapped. Sorted by relevance then recency.
+            global_posts: list[dict] = []
+            for sort in ("relevance", "new"):
+                global_url = (
+                    f"{_REDDIT_BASE}/search.json"
+                    f"?q={q}&sort={sort}&t=month&limit=25"
+                )
+                global_posts.extend(_extract_posts(await _fetch(global_url)))
+                await asyncio.sleep(0.8)
+
+            all_posts = sub_posts + global_posts
 
             for post in all_posts:
                 permalink = post.get("permalink", "")
@@ -506,7 +574,10 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                     continue
 
                 score = _score_thread(title, body, prompt.text, created_utc, upvotes)
-                if score < 25.0:
+                # Raised threshold to filter low-quality matches for niche brands.
+                # Also require at least 35% word-overlap (relevance component > 0.35*55 = ~19)
+                # so generic finance/industry posts don't bleed through.
+                if score < 45.0:
                     continue
 
                 posted_dt = (

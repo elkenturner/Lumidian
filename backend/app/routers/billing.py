@@ -139,12 +139,13 @@ async def stripe_webhook(request: Request, db: DbDep):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Stripe not configured")
     _stripe.api_key = stripe_key
 
+    if not webhook_secret:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="STRIPE_WEBHOOK_SECRET is not configured — webhook rejected for security.",
+        )
     try:
-        if webhook_secret:
-            event = _stripe.Webhook.construct_event(body, sig_header, webhook_secret)
-        else:
-            import json
-            event = json.loads(body)
+        event = _stripe.Webhook.construct_event(body, sig_header, webhook_secret)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 

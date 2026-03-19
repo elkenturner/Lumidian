@@ -50,6 +50,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── Startup ───────────────────────────────────────────────────────────────
+    # Validate required environment variables
+    missing = [v for v in ("JWT_SECRET", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET") if not os.getenv(v)]
+    if missing:
+        logger.warning("Missing recommended env vars: %s — some features may be unavailable", ", ".join(missing))
+
     google_client_id = os.getenv("GOOGLE_CLIENT_ID", "")
     if google_client_id:
         logger.info("Google OAuth: GOOGLE_CLIENT_ID loaded (%s…)", google_client_id[:20])
@@ -90,12 +95,18 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
+# Set ALLOWED_ORIGINS in .env as a comma-separated list.
+# Include your ngrok URL there for remote testing, e.g.:
+#   ALLOWED_ORIGINS=http://localhost:3000,https://abc123.ngrok-free.app
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001,http://localhost:3002")
+_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Cookie"],
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────

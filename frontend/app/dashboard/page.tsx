@@ -15,6 +15,9 @@ import {
   Play,
   Loader2,
   RefreshCw,
+  X,
+  Trash2,
+  Sparkles,
 } from 'lucide-react';
 import {
   getBrands,
@@ -28,6 +31,13 @@ import {
   getRunStatus,
   generateNow,
   triggerScan,
+  addPrompt,
+  deletePrompt,
+  getSuggestedPrompts,
+  getCompetitors,
+  addCompetitor,
+  removeCompetitor,
+  getBrandProfile,
   Brand,
   BrandDetail,
   OverviewData,
@@ -36,6 +46,8 @@ import {
   QueryResult,
   TrackingRun,
   Prompt,
+  Competitor,
+  BrandProfile,
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
 import {
@@ -55,7 +67,6 @@ import { format, parseISO } from 'date-fns';
 
 const parseUTCISO = (s: string) => parseISO(s.endsWith('Z') ? s : s + 'Z');
 
-type Tab = 'overview' | 'reports';
 
 const MODEL_ORDER = ['chatgpt', 'claude', 'perplexity', 'gemini'];
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -97,7 +108,7 @@ function HelpTooltip({ text }: { text: string }) {
         ?
       </span>
       {open && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[rgba(15,20,40,0.95)] border border-[rgba(255,255,255,0.12)] rounded-lg p-3 text-xs text-[#94A3B8] leading-relaxed shadow-lg z-50 pointer-events-none whitespace-normal">
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[rgba(15,20,40,0.95)] border border-[rgba(99,102,241,0.15)] rounded-lg p-3 text-xs text-[#94A3B8] leading-relaxed shadow-lg z-50 pointer-events-none whitespace-normal">
           {text}
         </span>
       )}
@@ -111,7 +122,7 @@ function SparklineTooltip({ active, payload }: { active?: boolean; payload?: Arr
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="bg-[rgba(15,20,40,0.95)] border border-[rgba(255,255,255,0.12)] rounded-lg p-2 shadow-lg text-xs">
+    <div className="bg-[rgba(15,20,40,0.95)] border border-[rgba(99,102,241,0.15)] rounded-lg p-2 shadow-lg text-xs">
       <p className="text-[#64748B]">{d.formattedDate}</p>
       <p className="text-[#6366f1] font-bold">{Math.round(d.score)}%</p>
     </div>
@@ -122,16 +133,6 @@ function SparklineTooltip({ active, payload }: { active?: boolean; payload?: Arr
 
 const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4'];
 
-function PieTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: { domain: string; pct: number; domain_type: string } }> }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  return (
-    <div className="bg-[rgba(15,20,40,0.95)] border border-[rgba(255,255,255,0.12)] rounded-lg px-3 py-2 shadow-xl text-xs pointer-events-none">
-      <p className="text-[#F0F4F8] font-semibold truncate max-w-[180px]">{d.domain}</p>
-      <p className="text-[#6366f1] font-bold mt-1">{d.pct.toFixed(1)}% of responses</p>
-    </div>
-  );
-}
 
 function ActivePieSlice(props: Record<string, unknown>) {
   const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props as {
@@ -155,10 +156,12 @@ function DonutDomains({ domains }: { domains: Array<{ domain: string; pct: numbe
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const data = domains.map((d) => ({ ...d, value: d.count }));
   const total = data.reduce((s, d) => s + d.count, 0);
+  const activeItem = activeIndex !== null ? data[activeIndex] : null;
+  const activePct = activeItem && total > 0 ? ((activeItem.count / total) * 100).toFixed(1) : null;
 
   return (
     <div className="flex items-center gap-4 flex-1">
-      <div className="flex-shrink-0">
+      <div className="flex-shrink-0 relative">
         <ResponsiveContainer width={120} height={120}>
           <PieChart>
             <Pie
@@ -184,9 +187,20 @@ function DonutDomains({ domains }: { domains: Array<{ domain: string; pct: numbe
                 />
               ))}
             </Pie>
-            <Tooltip content={<PieTooltip />} />
           </PieChart>
         </ResponsiveContainer>
+        {/* Custom tooltip — positioned below the chart, never overlapping */}
+        <div
+          className="absolute left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-150"
+          style={{ bottom: -36, minWidth: 110 }}
+        >
+          {activeItem && activePct ? (
+            <div className="bg-[rgba(15,20,40,0.95)] border border-[rgba(99,102,241,0.20)] rounded-lg px-2.5 py-1.5 shadow-xl text-xs whitespace-nowrap">
+              <p className="text-[#F0F4F8] font-semibold truncate max-w-[140px]">{activeItem.domain}</p>
+              <p className="text-[#818CF8] font-bold mt-0.5">{activePct}%</p>
+            </div>
+          ) : null}
+        </div>
       </div>
       <div className="flex-1 min-w-0 space-y-1.5">
         {data.map((d, i) => {
@@ -299,7 +313,7 @@ function extractGapMentions(group: PromptGroup, brandName: string): string {
 
 // ── Best Performing Prompt card ────────────────────────────────────────────────
 
-function BestPromptCard({ responses, loading }: { responses: QueryResult[]; loading: boolean }) {
+function BestPromptCard({ responses, loading, onAddCompetitors }: { responses: QueryResult[]; loading: boolean; onAddCompetitors: () => void }) {
   // Compute the top prompt by mention rate from available responses
   const best = (() => {
     if (!responses.length) return null;
@@ -327,7 +341,7 @@ function BestPromptCard({ responses, loading }: { responses: QueryResult[]; load
   })();
 
   return (
-    <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] flex flex-col">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] flex flex-col">
       <div className="flex items-start justify-between mb-2">
         <p className="text-sm font-medium text-[#94A3B8] flex items-center">
           Best Performing Prompt
@@ -367,9 +381,252 @@ function BestPromptCard({ responses, loading }: { responses: QueryResult[]; load
           <p className="text-xs text-[#475569] mt-1">No data yet</p>
         </>
       )}
-      <p className="text-[10px] text-[#475569] mt-3 pt-2 border-t border-[rgba(255,255,255,0.12)]">
-        Add competitors to enable Share of Voice
-      </p>
+      <button
+        onClick={onAddCompetitors}
+        className="text-[10px] text-[#6366f1] hover:text-[#818cf8] mt-3 pt-2 border-t border-[rgba(99,102,241,0.15)] w-full text-left transition-colors"
+      >
+        + Add competitors to enable Share of Voice →
+      </button>
+    </div>
+  );
+}
+
+// ── Manage Prompts Modal ───────────────────────────────────────────────────────
+
+function ManagePromptsModal({
+  brandId,
+  prompts,
+  onClose,
+  onChanged,
+}: {
+  brandId: number;
+  prompts: Prompt[];
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [localPrompts, setLocalPrompts] = useState(prompts);
+  const [newText, setNewText] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  async function handleAdd() {
+    if (!newText.trim()) return;
+    setAdding(true);
+    try {
+      const p = await addPrompt(brandId, newText.trim());
+      setLocalPrompts((prev) => [...prev, p]);
+      setNewText('');
+      onChanged();
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleDelete(promptId: number) {
+    setDeletingId(promptId);
+    try {
+      await deletePrompt(brandId, promptId);
+      setLocalPrompts((prev) => prev.filter((p) => p.id !== promptId));
+      onChanged();
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  async function handleSuggest() {
+    setSuggesting(true);
+    try {
+      const s = await getSuggestedPrompts(brandId);
+      setSuggestions(s);
+    } catch { /* ignore */ } finally {
+      setSuggesting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-lg w-full shadow-2xl max-h-[80vh] flex flex-col">
+        <div className="flex items-center justify-between mb-5 shrink-0">
+          <div>
+            <h3 className="text-base font-semibold text-[#F0F4F8]">Manage Prompts</h3>
+            <p className="text-xs text-[#64748B] mt-0.5">Add or remove the prompts AI models are queried with</p>
+          </div>
+          <button onClick={onClose} className="text-[#475569] hover:text-[#94A3B8] transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Current prompts */}
+        <div className="flex-1 overflow-y-auto space-y-2 mb-4">
+          {localPrompts.length === 0 ? (
+            <p className="text-sm text-[#475569] text-center py-4">No prompts yet</p>
+          ) : (
+            localPrompts.map((p) => (
+              <div key={p.id} className="flex items-start gap-3 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] rounded-lg px-3 py-2.5">
+                <p className="text-sm text-[#94A3B8] flex-1 leading-snug">{p.text}</p>
+                <button
+                  onClick={() => handleDelete(p.id)}
+                  disabled={deletingId === p.id}
+                  className="text-[#475569] hover:text-[#f87171] transition-colors shrink-0 disabled:opacity-40"
+                >
+                  {deletingId === p.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Suggestions */}
+        {suggestions.length > 0 && (
+          <div className="mb-4 space-y-1.5 shrink-0">
+            <p className="text-xs text-[#64748B] font-medium uppercase tracking-wide">Suggested prompts</p>
+            {suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => { setNewText(s); setSuggestions([]); }}
+                className="w-full text-left text-xs text-[#94A3B8] bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] hover:border-[rgba(99,102,241,0.25)] rounded-lg px-3 py-2 transition-colors"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Add new */}
+        <div className="shrink-0 space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newText}
+              onChange={(e) => setNewText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+              placeholder="e.g. What is the best tool for early cancer detection?"
+              className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1]"
+            />
+            <button
+              onClick={handleAdd}
+              disabled={adding || !newText.trim()}
+              className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-3 py-2 transition-colors shrink-0"
+            >
+              {adding ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
+              Add
+            </button>
+          </div>
+          <button
+            onClick={handleSuggest}
+            disabled={suggesting}
+            className="w-full flex items-center justify-center gap-1.5 text-xs text-[#64748B] hover:text-[#94A3B8] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.14)] rounded-lg py-2 transition-colors"
+          >
+            {suggesting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+            {suggesting ? 'Generating suggestions…' : 'Suggest prompts with AI'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Competitor Modal ───────────────────────────────────────────────────────────
+
+function CompetitorModal({
+  brandId,
+  competitors,
+  onClose,
+  onChanged,
+}: {
+  brandId: number;
+  competitors: Competitor[];
+  onClose: () => void;
+  onChanged: (updated: Competitor[]) => void;
+}) {
+  const [local, setLocal] = useState(competitors);
+  const [newName, setNewName] = useState('');
+  const [adding, setAdding] = useState(false);
+  const [removingId, setRemovingId] = useState<number | null>(null);
+
+  async function handleAdd() {
+    if (!newName.trim()) return;
+    setAdding(true);
+    try {
+      const c = await addCompetitor(brandId, newName.trim());
+      const updated = [...local, c];
+      setLocal(updated);
+      setNewName('');
+      onChanged(updated);
+    } finally {
+      setAdding(false);
+    }
+  }
+
+  async function handleRemove(id: number) {
+    setRemovingId(id);
+    try {
+      await removeCompetitor(brandId, id);
+      const updated = local.filter((c) => c.id !== id);
+      setLocal(updated);
+      onChanged(updated);
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-base font-semibold text-[#F0F4F8]">Competitors</h3>
+            <p className="text-xs text-[#64748B] mt-0.5">Track competitor mentions to unlock Share of Voice</p>
+          </div>
+          <button onClick={onClose} className="text-[#475569] hover:text-[#94A3B8] transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-2 mb-4 min-h-[40px]">
+          {local.length === 0 ? (
+            <p className="text-sm text-[#475569] text-center py-3">No competitors added yet</p>
+          ) : local.map((c) => (
+            <div key={c.id} className="flex items-center gap-3 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] rounded-lg px-3 py-2.5">
+              <p className="text-sm text-[#F0F4F8] flex-1 font-medium">{c.name}</p>
+              <button
+                onClick={() => handleRemove(c.id)}
+                disabled={removingId === c.id}
+                className="text-[#475569] hover:text-[#f87171] transition-colors disabled:opacity-40"
+              >
+                {removingId === c.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+            placeholder="Competitor brand name"
+            className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1]"
+          />
+          <button
+            onClick={handleAdd}
+            disabled={adding || !newName.trim()}
+            className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-3 py-2 transition-colors"
+          >
+            {adding ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
+            Add
+          </button>
+        </div>
+
+        {local.length > 0 && (
+          <p className="text-xs text-[#475569] mt-3">Run a new report to see updated Share of Voice data.</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -379,7 +636,6 @@ function BestPromptCard({ responses, loading }: { responses: QueryResult[]; load
 export default function DashboardPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [newBrandMode, setNewBrandMode] = useState(false);
   const [newBrandStep, setNewBrandStep] = useState<'running' | 'drafting' | 'done'>('running');
   const newBrandHandledRef = useRef(false);
@@ -396,6 +652,19 @@ export default function DashboardPage() {
   const [loadingResponses, setLoadingResponses] = useState(false);
   const [brandDetail, setBrandDetail] = useState<BrandDetail | null>(null);
 
+  // Toast
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+
+  // Brand profile completeness
+  const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
+
+  // Prompt modal
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
+
+  // Competitor modal
+  const [competitors, setCompetitors] = useState<Competitor[]>([]);
+  const [competitorModalOpen, setCompetitorModalOpen] = useState(false);
+
   // Run state
   const [triggering, setTriggering] = useState(false);
   const [activeRunId, setActiveRunId] = useState<number | null>(null);
@@ -408,11 +677,18 @@ export default function DashboardPage() {
   // UI state
   const [expandedPromptId, setExpandedPromptId] = useState<number | null>(null);
   const [expandedConvId, setExpandedConvId] = useState<number | null>(null);
+  const [convModelFilter, setConvModelFilter] = useState<string>('all');
 
   useEffect(() => {
     getBrands().then((b) => {
       setBrands(b);
-      if (b.length > 0) setSelectedBrandId(b[0].id);
+      if (b.length > 0) {
+        // If ?brandId=X is in the URL, pre-select that brand (new-brand onboarding)
+        const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+        const urlBrandId = params ? parseInt(params.get('brandId') ?? '', 10) : NaN;
+        const match = !isNaN(urlBrandId) && b.find((br) => br.id === urlBrandId);
+        setSelectedBrandId(match ? match.id : b[0].id);
+      }
       setLoadingBrands(false);
     }).catch(() => setLoadingBrands(false));
   }, []);
@@ -428,17 +704,21 @@ export default function DashboardPage() {
     setExpandedConvId(null);
 
     try {
-      const [ov, tr, an, runs, detail] = await Promise.all([
+      const [ov, tr, an, runs, detail, bp, comps] = await Promise.all([
         getOverview(brandId),
         getTrends(brandId),
         getDashboardAnalytics(brandId),
         getRecentRuns(brandId),
         getBrand(brandId).catch(() => null),
+        getBrandProfile(brandId).catch(() => null),
+        getCompetitors(brandId).catch(() => []),
       ]);
       setOverview(ov);
       setTrends(Array.isArray(tr) ? tr : []);
       setAnalytics(an);
       setBrandDetail(detail);
+      setBrandProfile(bp);
+      setCompetitors(Array.isArray(comps) ? comps : []);
       setLoadingAnalytics(false);
 
       // Load responses from latest completed run
@@ -553,6 +833,11 @@ export default function DashboardPage() {
         if (run.status === 'completed' || run.status === 'failed') {
           setActiveRunId(null);
           if (pollRef.current) clearInterval(pollRef.current);
+          if (run.status === 'completed') {
+            setToast({ message: 'Report complete! Data refreshed.', type: 'success' });
+          } else if (run.status === 'failed') {
+            setToast({ message: 'Report run failed. Check API keys in Settings.', type: 'info' });
+          }
           if (selectedBrandId) {
             loadData(selectedBrandId);
             // Auto-generate drafts for new brand onboarding
@@ -576,6 +861,26 @@ export default function DashboardPage() {
     }, 3000);
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [activeRunId, selectedBrandId, loadData, newBrandMode]);
+
+  // Broadcast report-running state to other pages via localStorage
+  // Use overview?.latest_run?.status directly — latestRun is declared later in render
+  useEffect(() => {
+    try {
+      const status = overview?.latest_run?.status;
+      if (activeRunId !== null || status === 'running' || status === 'pending') {
+        localStorage.setItem('clarity_report_running', '1');
+      } else {
+        localStorage.removeItem('clarity_report_running');
+      }
+    } catch {}
+  }, [activeRunId, overview?.latest_run?.status]);
+
+  // Auto-clear toast after 4 seconds
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   async function handleRunReport() {
     if (!selectedBrandId) return;
@@ -625,10 +930,13 @@ export default function DashboardPage() {
     : '#f59e0b'
     : '#475569';
 
-  // Sort prompt groups by visibility score descending (fix 5)
+  // Sort: prompts where brand IS mentioned appear first, then by mention rate within each group
   const promptGroups = buildPromptGroups(responses).sort((a, b) => {
-    const pctA = a.total > 0 ? a.mentioned / a.total : -1;
-    const pctB = b.total > 0 ? b.mentioned / b.total : -1;
+    const aMentioned = a.mentioned > 0 ? 1 : 0;
+    const bMentioned = b.mentioned > 0 ? 1 : 0;
+    if (bMentioned !== aMentioned) return bMentioned - aMentioned;
+    const pctA = a.total > 0 ? a.mentioned / a.total : 0;
+    const pctB = b.total > 0 ? b.mentioned / b.total : 0;
     return pctB - pctA;
   });
 
@@ -689,8 +997,16 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
+            onClick={() => setPromptModalOpen(true)}
+            disabled={!selectedBrandId}
+            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.09)] border border-[rgba(99,102,241,0.15)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 text-xs transition-all duration-150"
+          >
+            <MessageSquare size={14} />
+            Prompts
+          </button>
+          <button
             onClick={() => selectedBrandId && loadData(selectedBrandId)}
-            className="flex items-center gap-2 bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.12)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-all duration-150"
+            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-all duration-150"
           >
             <RefreshCw size={14} />
           </button>
@@ -736,52 +1052,64 @@ export default function DashboardPage() {
       {loadingBrands ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1,2,3,4].map(i => (
-            <div key={i} className="h-28 bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.12)] rounded-xl animate-pulse" />
+            <div key={i} className="h-28 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl animate-pulse" />
           ))}
         </div>
       ) : brands.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-16 h-16 bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] rounded-2xl flex items-center justify-center mb-4">
+        <div className="flex flex-col items-center justify-center py-16 text-center max-w-xl mx-auto">
+          <div className="w-16 h-16 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] rounded-2xl flex items-center justify-center mb-5">
             <Zap size={28} className="text-[#6366f1]" />
           </div>
-          <h3 className="text-lg font-semibold text-[#F0F4F8] mb-2">No brands tracked yet</h3>
-          <p className="text-sm text-[#64748B] mb-6 max-w-sm">
-            Start tracking your first brand to see how it&apos;s being mentioned across AI models.
+          <h3 className="text-xl font-bold text-[#F0F4F8] mb-2">Track your first brand</h3>
+          <p className="text-sm text-[#64748B] mb-8 max-w-sm leading-relaxed">
+            Add your brand, define the prompts you want AI models to mention you for, and we&apos;ll run an instant visibility report and generate content drafts automatically.
           </p>
+          {/* Step cards */}
+          <div className="flex items-start gap-3 mb-8 text-left w-full">
+            {[
+              { n: '1', title: 'Add your brand', body: 'Name, website, and the prompts you want to rank for.' },
+              { n: '2', title: 'Auto-run report', body: 'We instantly query ChatGPT, Claude, Perplexity, and Gemini.' },
+              { n: '3', title: 'Get content drafts', body: 'AI-generated posts targeting your top visibility gaps.' },
+            ].map(({ n, title, body }) => (
+              <div key={n} className="flex-1 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl p-4">
+                <div className="w-6 h-6 rounded-full bg-[rgba(99,102,241,0.20)] text-[#818cf8] text-xs font-bold flex items-center justify-center mb-2">{n}</div>
+                <p className="text-sm font-semibold text-[#F0F4F8] mb-1">{title}</p>
+                <p className="text-xs text-[#64748B] leading-relaxed">{body}</p>
+              </div>
+            ))}
+          </div>
           <Link
-            href="/tracker"
-            className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
+            href="/tracker/new"
+            className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-6 py-3 text-sm font-semibold transition-colors shadow-lg shadow-[#6366f1]/20"
           >
             <Plus size={16} />
-            Track Your First Brand
+            Get Started
           </Link>
         </div>
       ) : (
         <>
-          {/* Tab navigation */}
-          <div className="flex gap-1 border-b border-[rgba(255,255,255,0.12)] mb-6">
-            {([['overview', 'Overview'], ['reports', 'Reports']] as [Tab, string][]).map(([tab, label]) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors ${
-                  activeTab === tab
-                    ? 'text-[#818CF8] border-[#6366f1] bg-[rgba(255,255,255,0.06)]'
-                    : 'text-[#64748B] border-transparent hover:text-[#94A3B8]'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+          {/* ── OVERVIEW ─────────────────────────────────────────────────── */}
+          <>
+              {/* Brand profile completeness nudge */}
+              {brandProfile && brandProfile.completion_pct < 100 && (
+                <div className="mb-4 flex items-center gap-4 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl px-5 py-3">
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <p className="text-xs font-medium text-[#94A3B8]">Brand Profile — {brandProfile.completion_pct}% complete</p>
+                      <Link href="/settings?tab=profile" className="text-xs text-[#6366f1] hover:text-[#818cf8] transition-colors font-medium">Complete profile →</Link>
+                    </div>
+                    <div className="h-1.5 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+                      <div className="h-full bg-[#6366f1] rounded-full transition-all" style={{ width: `${brandProfile.completion_pct}%` }} />
+                    </div>
+                    <p className="text-[11px] text-[#475569] mt-1">A complete brand profile improves draft quality and visibility tracking accuracy.</p>
+                  </div>
+                </div>
+              )}
 
-          {/* ── OVERVIEW TAB ──────────────────────────────────────────────── */}
-          {activeTab === 'overview' && (
-            <>
               {/* Row 1: visibility + SOV + sentiment */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 {/* Visibility score + sparkline */}
-                <div className="col-span-2 bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] border-t-2 border-t-[#6366f1] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="col-span-2 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] border-t-2 border-t-[#6366f1] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <p className="text-sm font-medium text-[#94A3B8]">Visibility Score</p>
@@ -831,7 +1159,7 @@ export default function DashboardPage() {
 
                 {/* SOV or Best Performing Prompt */}
                 {analytics?.sov.has_competitors ? (
-                  <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                  <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
                     <div className="flex items-start justify-between mb-2">
                       <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                         Share of Voice
@@ -855,11 +1183,11 @@ export default function DashboardPage() {
                     )}
                   </div>
                 ) : (
-                  <BestPromptCard responses={responses} loading={loadingAnalytics} />
+                  <BestPromptCard responses={responses} loading={loadingAnalytics} onAddCompetitors={() => setCompetitorModalOpen(true)} />
                 )}
 
                 {/* Sentiment */}
-                <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
                   <div className="flex items-start justify-between mb-2">
                     <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                       Sentiment
@@ -897,7 +1225,7 @@ export default function DashboardPage() {
               {/* Row 2: Avg Position + Top Domains */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 {/* Avg Position */}
-                <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                       Avg Position
@@ -932,7 +1260,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Top Domains */}
-                <div className="lg:col-span-2 bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] flex flex-col">
+                <div className="lg:col-span-2 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] flex flex-col">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                       Top Cited Domains (across all tracked prompts)
@@ -955,8 +1283,8 @@ export default function DashboardPage() {
               </div>
 
               {/* Recent Conversations */}
-              <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-                <div className="px-5 py-4 border-b border-[rgba(255,255,255,0.12)] flex items-center justify-between bg-[rgba(255,255,255,0.08)]">
+              <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="px-5 py-4 border-b border-[rgba(99,102,241,0.15)] flex items-center justify-between bg-[rgba(99,102,241,0.06)]">
                   <div className="flex items-center gap-2">
                     <MessageSquare size={16} className="text-[#6366f1]" />
                     <h3 className="text-base font-semibold text-[#F0F4F8]">Recent Conversations</h3>
@@ -966,10 +1294,41 @@ export default function DashboardPage() {
                       </span>
                     )}
                   </div>
+                  {/* Model filter tabs */}
+                  {analytics && analytics.recent_conversations.length > 0 && (() => {
+                    const models = Array.from(new Set(analytics.recent_conversations.map((c) => {
+                      const key = c.model.toLowerCase().replace(/[-_\s]/g, '');
+                      return Object.keys(MODEL_CONFIG).find((k) => key.includes(k)) ?? c.model;
+                    })));
+                    if (models.length < 2) return null;
+                    return (
+                      <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5">
+                        <button
+                          onClick={() => setConvModelFilter('all')}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${convModelFilter === 'all' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+                        >
+                          All
+                        </button>
+                        {models.map((mk) => {
+                          const cfg = MODEL_CONFIG[mk] ?? { label: mk, text: '#94a3b8' };
+                          return (
+                            <button
+                              key={mk}
+                              onClick={() => setConvModelFilter(convModelFilter === mk ? 'all' : mk)}
+                              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${convModelFilter === mk ? 'bg-[rgba(99,102,241,0.25)]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+                              style={convModelFilter === mk ? { color: cfg.text } : {}}
+                            >
+                              {cfg.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {loadingAnalytics ? (
-                  <div className="divide-y divide-[rgba(255,255,255,0.08)]">
+                  <div className="divide-y divide-[rgba(99,102,241,0.10)]">
                     {[1,2,3,4].map(i => (
                       <div key={i} className="px-5 py-4 animate-pulse">
                         <div className="flex items-center justify-between mb-2">
@@ -984,8 +1343,13 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 ) : analytics && analytics.recent_conversations.length > 0 ? (
-                  <div className="divide-y divide-[rgba(255,255,255,0.08)]">
-                    {analytics.recent_conversations.map((conv) => {
+                  <div className="divide-y divide-[rgba(99,102,241,0.10)]">
+                    {analytics.recent_conversations.filter((conv) => {
+                      if (convModelFilter === 'all') return true;
+                      const key = conv.model.toLowerCase().replace(/[-_\s]/g, '');
+                      return key.includes(convModelFilter);
+                    }).sort((a, b) => (b.mentioned ? 1 : 0) - (a.mentioned ? 1 : 0))
+                    .map((conv) => {
                       const modelKey = conv.model.toLowerCase().replace(/[-_\s]/g, '');
                       const mc = Object.entries(MODEL_CONFIG).find(([k]) => modelKey.includes(k))?.[1]
                         ?? { bg: '#1e293b', text: '#94a3b8' };
@@ -1014,7 +1378,7 @@ export default function DashboardPage() {
                                   className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
                                     conv.mentioned
                                       ? 'bg-[#064e3b]/30 text-[#10b981]'
-                                      : 'bg-[rgba(255,255,255,0.08)] text-[#64748B]'
+                                      : 'bg-[rgba(99,102,241,0.06)] text-[#64748B]'
                                   }`}
                                 >
                                   {conv.mentioned ? 'Mentioned' : 'Not mentioned'}
@@ -1035,7 +1399,7 @@ export default function DashboardPage() {
                             )}
                           </button>
                           {expandedConvId === conv.id && conv.response_text && (
-                            <div className="px-5 pb-4 pt-3 border-t border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.08)]">
+                            <div className="px-5 pb-4 pt-3 border-t border-[rgba(99,102,241,0.15)] bg-[rgba(99,102,241,0.06)]">
                               <p className="text-xs text-[#64748B] leading-relaxed whitespace-pre-wrap">
                                 {conv.response_text}
                               </p>
@@ -1052,189 +1416,38 @@ export default function DashboardPage() {
                 )}
               </div>
             </>
-          )}
-
-          {/* ── REPORTS TAB ───────────────────────────────────────────────── */}
-          {activeTab === 'reports' && (
-            <>
-              {/* Trend chart */}
-              <div className="mb-4">
-                {loadingAnalytics ? (
-                  <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)] animate-pulse">
-                    <div className="h-5 bg-[rgba(255,255,255,0.06)] rounded w-32 mb-4" />
-                    <div className="h-48 bg-[rgba(255,255,255,0.06)] rounded-lg" />
-                  </div>
-                ) : (
-                  <TrendChart data={trends} />
-                )}
-              </div>
-
-              {/* Schedule note */}
-              <p className="text-xs text-[#475569] mb-4 px-1">
-                Reports update automatically twice daily at 8:00 AM and 8:00 PM UTC.
-              </p>
-
-              {/* Prompt list */}
-              <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-                <div className="px-5 py-3.5 border-b border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.08)] flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-[#F0F4F8]">Prompt Visibility</h3>
-                  {!loadingResponses && (promptGroups.length + untrackedPrompts.length) > 0 && (
-                    <span className="text-xs text-[#64748B]">
-                      {promptGroups.length + untrackedPrompts.length} prompt{(promptGroups.length + untrackedPrompts.length) !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-
-                {loadingResponses ? (
-                  <div className="divide-y divide-[rgba(255,255,255,0.08)]">
-                    {[1,2,3].map(i => (
-                      <div key={i} className="px-5 py-5 animate-pulse">
-                        <div className="h-4 bg-[rgba(255,255,255,0.06)] rounded w-3/4 mb-3" />
-                        <div className="flex gap-2">
-                          {[1,2,3,4].map(j => <div key={j} className="h-7 w-28 bg-[rgba(255,255,255,0.06)] rounded-lg" />)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : promptGroups.length === 0 && untrackedPrompts.length === 0 ? (
-                  <div className="px-5 py-12 text-center text-[#475569] text-sm">
-                    No report data yet. Run a report to see prompt visibility.
-                  </div>
-                ) : (
-                  <div className="divide-y divide-[rgba(255,255,255,0.08)]">
-                    {promptGroups.map((g) => {
-                      const overallPct = g.total > 0 ? Math.round((g.mentioned / g.total) * 100) : 0;
-                      const overallColor = overallPct >= 60 ? '#10b981' : overallPct >= 30 ? '#f59e0b' : '#ef4444';
-                      const isExpanded = expandedPromptId === g.promptId;
-
-                      return (
-                        <div key={g.promptId}>
-                          <button
-                            className="w-full px-5 py-4 hover:bg-[rgba(255,255,255,0.06)] transition-colors text-left"
-                            onClick={() => setExpandedPromptId(isExpanded ? null : g.promptId)}
-                          >
-                            <div className="flex items-start gap-3 mb-3">
-                              <p className="text-sm text-[#94A3B8] leading-snug font-medium flex-1">
-                                {g.promptText}
-                              </p>
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                <span className="text-sm font-bold tabular-nums" style={{ color: overallColor }}>
-                                  {overallPct}%
-                                </span>
-                                <ChevronDown
-                                  size={14}
-                                  className={`text-[#475569] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Model breakdown badges */}
-                            <div className="flex items-center gap-2 flex-wrap">
-                              {MODEL_ORDER.map(modelKey => {
-                                const ms = g.modelStats.get(modelKey);
-                                if (!ms) return null;
-                                const cfg = getModelCfg(modelKey);
-                                const pct = ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : 0;
-                                const mentionColor = pct >= 60 ? '#10b981' : pct >= 30 ? '#f59e0b' : '#ef4444';
-                                return (
-                                  <div
-                                    key={modelKey}
-                                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.08)]"
-                                  >
-                                    <span className="text-xs font-semibold" style={{ color: cfg.text }}>
-                                      {cfg.label}
-                                    </span>
-                                    <span className="text-[rgba(255,255,255,0.15)]">·</span>
-                                    <span className="text-xs font-bold tabular-nums" style={{ color: mentionColor }}>
-                                      {pct}%
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                            {/* Gap explanation — shown when overall visibility < 50% */}
-                            {overallPct < 50 && selectedBrand && (() => {
-                              const explanation = extractGapMentions(g, selectedBrand.name);
-                              return explanation ? (
-                                <p className="text-xs text-[#475569] mt-2 italic">
-                                  {explanation}
-                                </p>
-                              ) : null;
-                            })()}
-                          </button>
-
-                          {/* Expanded: individual query responses */}
-                          {isExpanded && (
-                            <div className="border-t border-[rgba(255,255,255,0.12)] bg-[rgba(255,255,255,0.08)] divide-y divide-[rgba(255,255,255,0.08)]">
-                              {g.responses.map((r) => {
-                                const cfg = getModelCfg(r.model);
-                                return (
-                                  <div key={r.id} className="px-5 py-3 flex items-start gap-3">
-                                    <span
-                                      className="text-[10px] font-semibold px-2 py-0.5 rounded-full flex-shrink-0 mt-0.5"
-                                      style={{ backgroundColor: cfg.bg, color: cfg.text }}
-                                    >
-                                      {cfg.label}
-                                    </span>
-                                    <div className="flex-1 min-w-0">
-                                      {r.response_text ? (
-                                        <p className="text-xs text-[#64748B] leading-relaxed line-clamp-3">
-                                          {stripMarkdown(r.response_text).slice(0, 200)}
-                                          {r.response_text.length > 200 ? '…' : ''}
-                                        </p>
-                                      ) : (
-                                        <p className="text-xs text-[#475569] italic">No response text</p>
-                                      )}
-                                    </div>
-                                    <span
-                                      className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full flex-shrink-0 ${
-                                        r.mentioned
-                                          ? 'bg-[#064e3b]/30 text-[#10b981]'
-                                          : 'bg-[rgba(255,255,255,0.08)] text-[#64748B]'
-                                      }`}
-                                    >
-                                      {r.mentioned ? 'Mentioned' : 'Not mentioned'}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                    {/* Untracked prompts — added since last run */}
-                    {untrackedPrompts.map((p) => {
-                      const isRunning = pendingRuns.has(p.id);
-                      return (
-                        <div key={`untracked-${p.id}`} className="px-5 py-4">
-                          <div className="flex items-start gap-3 mb-2">
-                            <p className="text-sm text-[#64748B] leading-snug font-medium flex-1">
-                              {p.text}
-                            </p>
-                            {isRunning ? (
-                              <span className="flex-shrink-0 flex items-center gap-1.5 text-[10px] font-semibold px-2 py-1 rounded-full bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] text-[#6366f1]">
-                                <Loader2 size={10} className="animate-spin" />
-                                Running…
-                              </span>
-                            ) : (
-                              <span className="flex-shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] text-[#475569]">
-                                Not yet tracked
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-[#475569]">
-                            {isRunning ? 'Collecting AI responses for this prompt…' : 'Will be included in your next report run.'}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </>
-          )}
         </>
+      )}
+
+      {/* Modals */}
+      {promptModalOpen && selectedBrandId && brandDetail && (
+        <ManagePromptsModal
+          brandId={selectedBrandId}
+          prompts={brandDetail.prompts}
+          onClose={() => setPromptModalOpen(false)}
+          onChanged={() => { if (selectedBrandId) loadData(selectedBrandId); }}
+        />
+      )}
+      {competitorModalOpen && selectedBrandId && (
+        <CompetitorModal
+          brandId={selectedBrandId}
+          competitors={competitors}
+          onClose={() => setCompetitorModalOpen(false)}
+          onChanged={(updated) => setCompetitors(updated)}
+        />
+      )}
+
+      {/* Toast notification */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium transition-all ${
+          toast.type === 'success'
+            ? 'bg-[rgba(6,78,59,0.90)] border-[#065f46]/50 text-[#34d399]'
+            : 'bg-[rgba(10,14,24,0.95)] border-[rgba(99,102,241,0.25)] text-[#94A3B8]'
+        } backdrop-blur-xl`}>
+          {toast.type === 'success' ? <span className="text-[#34d399]">✓</span> : <span className="text-[#6366f1]">ℹ</span>}
+          {toast.message}
+          <button onClick={() => setToast(null)} className="ml-2 text-current opacity-50 hover:opacity-100 transition-opacity text-xs">✕</button>
+        </div>
       )}
     </div>
   );

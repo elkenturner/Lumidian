@@ -56,7 +56,7 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
-type SettingsTab = 'general' | 'profile' | 'account';
+type SettingsTab = 'general' | 'profile';
 
 // ── Auto-growing textarea ─────────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ function EditableList({
         />
         <button
           onClick={addItem}
-          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg text-[#64748B] hover:text-[#6366f1] hover:border-[#6366f1]/40 hover:bg-[rgba(255,255,255,0.08)] transition-all duration-150"
+          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg text-[#64748B] hover:text-[#6366f1] hover:border-[#6366f1]/40 hover:bg-[rgba(99,102,241,0.06)] transition-all duration-150"
         >
           <Plus size={16} />
         </button>
@@ -152,7 +152,7 @@ function CompletionBar({ pct }: { pct: number }) {
   const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#6366f1';
   return (
     <div className="flex items-center gap-3">
-      <div className="flex-1 bg-[rgba(255,255,255,0.08)] rounded-full h-2">
+      <div className="flex-1 bg-[rgba(99,102,241,0.06)] rounded-full h-2">
         <div
           className="h-2 rounded-full transition-all duration-500"
           style={{ width: `${pct}%`, backgroundColor: color }}
@@ -179,7 +179,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       <div className="flex items-start gap-3 mb-4">
         <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] flex items-center justify-center shrink-0 mt-0.5">
           <Icon size={15} className="text-[#6366f1]" />
@@ -219,7 +219,7 @@ function PublicationsEditor({
   return (
     <div className="space-y-3">
       {items.map((pub, idx) => (
-        <div key={idx} className="bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.12)] rounded-lg p-3 space-y-2">
+        <div key={idx} className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-lg p-3 space-y-2">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-[#64748B] font-medium">Publication {idx + 1}</span>
             <button onClick={() => remove(idx)} className="text-[#475569] hover:text-[#f87171] transition-colors">
@@ -261,7 +261,7 @@ function PublicationsEditor({
       <button
         type="button"
         onClick={add}
-        className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#6366f1] border border-dashed border-[rgba(255,255,255,0.12)] hover:border-[#6366f1]/40 rounded-lg px-3 py-2 transition-colors w-full justify-center"
+        className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#6366f1] border border-dashed border-[rgba(99,102,241,0.15)] hover:border-[#6366f1]/40 rounded-lg px-3 py-2 transition-colors w-full justify-center"
       >
         <Plus size={13} />
         Add publication
@@ -393,16 +393,21 @@ export default function SettingsPage() {
   async function handleSave() {
     if (!brandId || !editName.trim()) return;
     setSaving(true);
+    const normalisedUrl = normaliseWebsiteUrl(editWebsiteUrl);
+    const urlChanged = normalisedUrl !== (brand?.website_url ?? '');
     try {
       const updated = await updateBrand(brandId, {
         name: editName.trim(),
-        website_url: normaliseWebsiteUrl(editWebsiteUrl),
+        website_url: normalisedUrl,
       });
       setBrand((prev) => prev ? { ...prev, ...updated } : null);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
     } finally {
       setSaving(false);
+    }
+    if (urlChanged && normalisedUrl) {
+      handleRefreshContext();
     }
   }
 
@@ -619,7 +624,7 @@ export default function SettingsPage() {
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-32" />
           <div className="h-10 bg-[rgba(255,255,255,0.06)] rounded w-64" />
-          <div className="h-48 bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.12)] rounded-xl" />
+          <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl" />
         </div>
       </div>
     );
@@ -638,8 +643,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Tab navigation */}
-      <div className="flex gap-1 border-b border-[rgba(255,255,255,0.12)] mb-6">
-        {(['general', 'profile', 'account'] as SettingsTab[]).map((tab) => (
+      <div className="flex gap-1 border-b border-[rgba(99,102,241,0.15)] mb-6">
+        {(['general', 'profile'] as SettingsTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -650,7 +655,7 @@ export default function SettingsPage() {
                 : 'text-[#64748B] border-transparent hover:text-[#94A3B8]'
             )}
           >
-            {tab === 'general' ? 'General' : tab === 'profile' ? 'Brand Profile' : 'Account'}
+            {tab === 'general' ? 'General' : 'Brand Profile'}
           </button>
         ))}
       </div>
@@ -659,7 +664,7 @@ export default function SettingsPage() {
       {activeTab === 'general' && brand && (
         <div className="space-y-5">
           {/* Brand Settings */}
-          <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <h2 className="text-base font-semibold text-[#F0F4F8] mb-5">Brand Settings</h2>
             <div className="space-y-4">
               <div>
@@ -679,50 +684,35 @@ export default function SettingsPage() {
                     type="text"
                     value={editWebsiteUrl}
                     onChange={(e) => setEditWebsiteUrl(e.target.value)}
-                    placeholder="https://yourcompany.com"
+                    placeholder="yourcompany.com"
                     className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569]"
                   />
-                  <button
-                    onClick={handleRefreshContext}
-                    disabled={refreshingContext || !editWebsiteUrl.trim()}
-                    title="Fetch website content to improve draft quality"
-                    className={`flex items-center gap-1.5 border disabled:opacity-50 rounded-lg px-3 py-2.5 text-xs font-medium transition-colors whitespace-nowrap ${
-                      contextFailed
-                        ? 'bg-[#7f1d1d]/20 border-[#991b1b]/40 text-[#f87171]'
-                        : 'bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border-[rgba(255,255,255,0.10)] text-[#94A3B8]'
-                    }`}
-                  >
-                    {refreshingContext ? (
-                      <><Loader2 size={13} className="animate-spin" />Fetching…</>
-                    ) : contextRefreshed ? (
-                      '✓ Content fetched'
-                    ) : contextFailed ? (
-                      '✕ Fetch failed — retry'
-                    ) : (
-                      'Fetch Content'
-                    )}
-                  </button>
+                  {refreshingContext && (
+                    <span className="flex items-center gap-1.5 text-xs text-[#94A3B8] whitespace-nowrap">
+                      <Loader2 size={13} className="animate-spin" />Importing…
+                    </span>
+                  )}
                 </div>
                 {profile?.website_context_last_fetched ? (
-                  <p className="text-xs text-[#475569] mt-1">
-                    Last fetched:{' '}
-                    <span className="text-[#64748B]">
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${contextRefreshed ? 'bg-green-400 animate-pulse' : 'bg-green-500'}`} />
+                    <p className="text-xs text-[#64748B]">
+                      Content imported{' '}
                       {new Date(profile.website_context_last_fetched + 'Z').toLocaleString()}
-                    </span>
-                    {' · '}
-                    <span className="text-[#94A3B8]">Refreshed monthly automatically</span>
-                  </p>
+                      {' · '}refreshed monthly
+                    </p>
+                  </div>
                 ) : (
                   <p className="text-xs text-[#475569] mt-1">
                     {contextFailed
-                      ? 'Fetch failed. Check the URL is publicly accessible and try again.'
-                      : 'No content fetched yet. Click "Fetch Content" to import your website.'}
+                      ? 'Import failed. Check the URL is publicly accessible and save again.'
+                      : 'Website content will be imported automatically when you save a URL.'}
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="flex items-center gap-3 mt-5 pt-5 border-t border-[rgba(255,255,255,0.12)]">
+            <div className="flex items-center gap-3 mt-5 pt-5 border-t border-[rgba(99,102,241,0.15)]">
               <button
                 onClick={handleSave}
                 disabled={saving || saveSuccess}
@@ -740,7 +730,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Tracking Prompts */}
-          <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <div className="flex items-center justify-between mb-5">
               <div>
                 <h2 className="text-base font-semibold text-[#F0F4F8]">Tracking Prompts</h2>
@@ -751,7 +741,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleSuggestPrompts}
                 disabled={loadingSuggestions}
-                className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#6366f1] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(99,102,241,0.06)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#6366f1] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
               >
                 {loadingSuggestions ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                 Suggest
@@ -778,7 +768,7 @@ export default function SettingsPage() {
             </div>
 
             {brand.prompts.length === 0 ? (
-              <div className="text-center py-8 text-[#64748B] text-sm border border-dashed border-[rgba(255,255,255,0.12)] rounded-lg bg-[rgba(255,255,255,0.03)]">
+              <div className="text-center py-8 text-[#64748B] text-sm border border-dashed border-[rgba(99,102,241,0.15)] rounded-lg bg-[rgba(255,255,255,0.03)]">
                 No prompts yet. Add one above.
               </div>
             ) : (
@@ -808,7 +798,7 @@ export default function SettingsPage() {
 
             {showSuggestions && (
               <div className="mt-4 border border-[rgba(255,255,255,0.10)] rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-[rgba(255,255,255,0.06)] border-b border-[rgba(255,255,255,0.12)]">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-[rgba(255,255,255,0.06)] border-b border-[rgba(99,102,241,0.15)]">
                   <div className="flex items-center gap-2">
                     <Sparkles size={13} className="text-[#6366f1]" />
                     <span className="text-xs font-semibold text-[#F0F4F8]">Suggested Prompts</span>
@@ -849,7 +839,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Competitors */}
-          <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <div className="mb-5">
               <h2 className="text-base font-semibold text-[#F0F4F8]">Competitors</h2>
               <p className="text-xs text-[#64748B] mt-0.5">Track competitor mention rates alongside your brand</p>
@@ -873,7 +863,7 @@ export default function SettingsPage() {
               </button>
             </div>
             {competitors.length === 0 ? (
-              <div className="text-center py-8 text-[#64748B] text-sm border border-dashed border-[rgba(255,255,255,0.12)] rounded-lg bg-[rgba(255,255,255,0.03)]">
+              <div className="text-center py-8 text-[#64748B] text-sm border border-dashed border-[rgba(99,102,241,0.15)] rounded-lg bg-[rgba(255,255,255,0.03)]">
                 No competitors tracked. Add one above.
               </div>
             ) : (
@@ -903,7 +893,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Drafting / Platform Toggles */}
-          <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <div className="flex items-center gap-2 mb-5">
               <Radio size={16} className="text-[#6366f1]" />
               <div>
@@ -925,7 +915,7 @@ export default function SettingsPage() {
                   { value: 'manual', label: 'Manual only' },
                 ];
                 return (
-                  <div key={platform} className="flex items-center gap-3 py-2 border-b border-[rgba(255,255,255,0.12)] last:border-0">
+                  <div key={platform} className="flex items-center gap-3 py-2 border-b border-[rgba(99,102,241,0.15)] last:border-0">
                     <button
                       onClick={() => handleToggleDraftPlatform(platform, !enabled)}
                       className="text-[#475569] hover:text-[#94A3B8] transition-colors shrink-0"
@@ -958,7 +948,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Delete Brand */}
-          <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-red-900/40 rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-red-900/40 rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <h2 className="text-base font-semibold text-red-400 mb-2 flex items-center gap-2">
               <AlertTriangle size={16} />
               Delete Brand
@@ -983,7 +973,7 @@ export default function SettingsPage() {
                   <button
                     onClick={() => setShowDeleteBrandConfirm(false)}
                     disabled={deletingBrand}
-                    className="bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.12)] text-[#94A3B8] rounded-lg px-4 py-2 text-sm font-medium hover:bg-[rgba(255,255,255,0.10)] transition-colors"
+                    className="bg-[rgba(255,255,255,0.06)] border border-[rgba(99,102,241,0.15)] text-[#94A3B8] rounded-lg px-4 py-2 text-sm font-medium hover:bg-[rgba(255,255,255,0.10)] transition-colors"
                   >
                     Cancel
                   </button>
@@ -1019,7 +1009,7 @@ export default function SettingsPage() {
       {activeTab === 'profile' && (
         <div>
           {profile && (
-            <div className="mb-5 p-4 bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="mb-5 p-4 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-[#94A3B8]">Profile Completion</span>
                 <span className="text-xs text-[#64748B]">
@@ -1157,171 +1147,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* ── ACCOUNT TAB ──────────────────────────────────────────────────────── */}
-      {activeTab === 'account' && (
-        <div className="space-y-6">
-          {/* Profile */}
-          <section className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 space-y-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-            <div className="flex items-center gap-2 mb-1">
-              <User className="w-4 h-4 text-[#6366f1]" />
-              <h2 className="text-sm font-semibold text-[#F0F4F8]">Profile</h2>
-            </div>
-
-            {user && (
-              <div className="space-y-1">
-                <p className="text-xs text-[#64748B] uppercase tracking-wide">Email</p>
-                <p className="text-sm text-[#94A3B8]">{user.email}</p>
-              </div>
-            )}
-
-            <div>
-              <label className="block text-xs text-[#64748B] uppercase tracking-wide mb-1.5">Display Name</label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="e.g. Acme Corp"
-                className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#6366f1] placeholder-[#475569]"
-              />
-            </div>
-
-            <button
-              onClick={handleAccountSave}
-              className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-            >
-              <Save className="w-4 h-4" />
-              {accountSaved ? 'Saved!' : 'Save Changes'}
-            </button>
-          </section>
-
-          {/* Scheduler */}
-          <section className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-            <div className="flex items-center gap-2 mb-1">
-              <Calendar className="w-4 h-4 text-[#6366f1]" />
-              <h2 className="text-sm font-semibold text-[#F0F4F8]">Automatic Scheduler</h2>
-            </div>
-            <p className="text-xs text-[#475569] mb-5">
-              Controls the 8:00 AM and 8:00 PM UTC tracking sweeps, the nightly Reddit scan, and
-              auto-drafting. Manual &ldquo;Run Report Now&rdquo; always works regardless of this setting.
-            </p>
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {schedulerLoading ? (
-                  <div className="w-[4.5rem] h-6 bg-[rgba(255,255,255,0.06)] rounded-full animate-pulse" />
-                ) : (
-                  <span
-                    className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${
-                      schedulerPaused
-                        ? 'bg-[#451a03]/40 text-[#fb923c] border-[#78350f]/60'
-                        : 'bg-[#052e16]/40 text-[#34d399] border-[#065f46]/60'
-                    }`}
-                  >
-                    <span className={`w-1.5 h-1.5 rounded-full ${schedulerPaused ? 'bg-[#fb923c]' : 'bg-[#34d399] animate-pulse'}`} />
-                    {schedulerPaused ? 'Paused' : 'Active'}
-                  </span>
-                )}
-                <p className="text-sm text-[#94A3B8]">
-                  {schedulerPaused ? 'Scheduled runs will not fire' : 'Running at 8:00 AM and 8:00 PM UTC'}
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleToggleScheduler}
-                disabled={schedulerLoading}
-                className={`flex items-center gap-2 text-sm font-medium rounded-lg px-4 py-2 border transition-colors disabled:opacity-50 ${
-                  schedulerPaused
-                    ? 'bg-[#052e16]/40 hover:bg-[#052e16]/70 border-[#065f46]/60 text-[#34d399]'
-                    : 'bg-[#451a03]/30 hover:bg-[#451a03]/50 border-[#78350f]/50 text-[#fb923c]'
-                }`}
-              >
-                {schedulerLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : schedulerPaused ? (
-                  <Play className="w-4 h-4" />
-                ) : (
-                  <Pause className="w-4 h-4" />
-                )}
-                {schedulerLoading ? 'Updating…' : schedulerPaused ? 'Resume Scheduler' : 'Pause Scheduler'}
-              </button>
-            </div>
-
-            {schedulerPaused && !schedulerLoading && (
-              <div className="mt-4 flex items-start gap-2 text-xs text-[#fb923c] bg-[#451a03]/20 border border-[#78350f]/30 rounded-lg px-3 py-2.5">
-                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                <span>
-                  Automatic tracking, Reddit scanning, and auto-drafting are paused.
-                  Use &ldquo;Run Report Now&rdquo; on the Dashboard to trigger a manual run.
-                </span>
-              </div>
-            )}
-
-            {schedulerError && (
-              <p className="mt-3 text-xs text-[#f87171]">{schedulerError}</p>
-            )}
-          </section>
-
-          {/* Danger Zone — Delete Account */}
-          <section className="border border-red-900/40 rounded-xl overflow-hidden">
-            <div className="px-6 py-4 bg-red-900/10">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-[#ef4444]" />
-                <h2 className="text-sm font-semibold text-[#ef4444]">Danger Zone</h2>
-              </div>
-            </div>
-            <div className="px-6 py-5 bg-[rgba(255,255,255,0.02)]">
-              <div className="flex items-start justify-between gap-6">
-                <div>
-                  <p className="text-sm font-medium text-[#F0F4F8]">Delete account</p>
-                  <p className="text-xs text-[#64748B] mt-0.5">
-                    Permanently delete all brands, prompts, tracking history, and content drafts. This cannot be undone.
-                  </p>
-                </div>
-                {!showDeleteAccountConfirm ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowDeleteAccountConfirm(true)}
-                    className="flex-shrink-0 flex items-center gap-1.5 text-sm text-[#ef4444] border border-red-900/40 hover:border-red-700 hover:bg-red-900/10 rounded-lg px-4 py-2 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Delete account
-                  </button>
-                ) : (
-                  <div className="flex-shrink-0 w-64">
-                    <p className="text-xs text-[#64748B] mb-2">
-                      Type <span className="text-[#ef4444] font-mono">DELETE</span> to confirm
-                    </p>
-                    <input
-                      type="text"
-                      value={deleteAccountInput}
-                      onChange={(e) => setDeleteAccountInput(e.target.value)}
-                      placeholder="DELETE"
-                      className="w-full bg-[rgba(255,255,255,0.08)] border border-red-900/40 text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-red-700 placeholder-[#475569]"
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountInput(''); }}
-                        className="flex-1 py-1.5 text-xs text-[#64748B] border border-[rgba(255,255,255,0.12)] rounded-lg hover:text-[#94A3B8] transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        disabled={deleteAccountInput !== 'DELETE'}
-                        className="flex-1 py-1.5 text-xs text-white bg-red-500 hover:bg-red-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                      >
-                        Confirm delete
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        </div>
-      )}
     </div>
   );
 }

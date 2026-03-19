@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 
 const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding'];
@@ -9,6 +9,21 @@ const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding'];
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
+  const [reportRunning, setReportRunning] = useState(false);
+  const [draftsGenerating, setDraftsGenerating] = useState(false);
+
+  // Poll localStorage for cross-page status signals written by dashboard/content pages
+  useEffect(() => {
+    const check = () => {
+      try {
+        setReportRunning(!!localStorage.getItem('clarity_report_running'));
+        setDraftsGenerating(!!localStorage.getItem('clarity_drafts_generating'));
+      } catch {}
+    };
+    check();
+    const id = setInterval(check, 2000);
+    return () => clearInterval(id);
+  }, []);
 
   const showSidebar = !NO_SIDEBAR_PATHS.some(
     (p) => pathname === p || pathname.startsWith(p + '/')
@@ -64,6 +79,35 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           zIndex: 0,
         }}
       >
+        {/* Global status banners — written by dashboard/content pages via localStorage */}
+        {reportRunning && (
+          <div style={{
+            background: 'rgba(99,102,241,0.08)',
+            borderBottom: '1px solid rgba(99,102,241,0.20)',
+            padding: '8px 28px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366f1', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
+            <span style={{ fontSize: 12, color: '#818cf8', fontWeight: 600 }}>Report in progress</span>
+            <span style={{ fontSize: 12, color: '#6366f1' }}>— querying AI models with your prompts, this may take a minute.</span>
+          </div>
+        )}
+        {draftsGenerating && (
+          <div style={{
+            background: 'rgba(16,185,129,0.06)',
+            borderBottom: '1px solid rgba(16,185,129,0.18)',
+            padding: '8px 28px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
+            <span style={{ fontSize: 12, color: '#34d399', fontWeight: 600 }}>Drafts generating</span>
+            <span style={{ fontSize: 12, color: '#10b981' }}>— writing new content drafts for your top visibility gaps.</span>
+          </div>
+        )}
         {children}
       </main>
     </>

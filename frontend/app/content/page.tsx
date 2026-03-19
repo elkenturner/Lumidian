@@ -14,7 +14,6 @@ import {
   CheckCircle2,
   Trash2,
   Edit2,
-  BarChart2,
   AlertTriangle,
   RefreshCw,
   Sparkles,
@@ -66,6 +65,40 @@ function relativeTime(iso: string | null): string {
   }
 }
 
+// ── Subreddit promotion restriction (mirrors backend classification) ──────────
+
+const PROMO_RESTRICTED_SUBREDDITS = new Set([
+  'personalfinance','legaladvice','tax','investing','financialindependence',
+  'frugal','povertyfinance','studentloans','debtfree','fire',
+  'medicine','askdocs','medical','medicaladvice','nursing','pharmacy',
+  'mentalhealth','depression','anxiety','bipolar','schizophrenia',
+  'chronicpain','diabetes','cancer','epilepsy','ibs','autoimmune',
+  'ems','emergencymedicine','veterinary',
+  'science','biology','chemistry','physics','neuroscience',
+  'psychology','datascience','statistics','academicphilosophy',
+  'compsci','machinelearning','artificial',
+  'relationships','amitheasshole','relationship_advice','tifu',
+  'confessions','grief','survivorsofabuse','ptsd','addiction',
+  'askreddit','todayilearned','explainlikeimfive','changemyview',
+  'nostupidquestions','worldnews','news','nottheonion',
+  'programming','learnprogramming','cscareerquestions','devops',
+  'sysadmin','netsec','cybersecurity',
+]);
+const RESTRICTED_NAME_SIGNALS = ['help','advice','support','care','recover','survivor','anon'];
+
+function isPromoRestricted(subreddit: string): boolean {
+  const sub = subreddit.toLowerCase().replace(/^r\//, '');
+  if (PROMO_RESTRICTED_SUBREDDITS.has(sub)) return true;
+  return RESTRICTED_NAME_SIGNALS.some((kw) => sub.includes(kw));
+}
+
+/** Extract subreddit name from opportunity draft content_brief. */
+function extractSubreddit(contentBrief: string | null | undefined): string | null {
+  if (!contentBrief) return null;
+  const m = contentBrief.match(/\bin r\/([A-Za-z0-9_]+)/i);
+  return m ? m[1] : null;
+}
+
 // ── Urgency scoring ───────────────────────────────────────────────────────────
 
 function computeUrgency(
@@ -100,11 +133,6 @@ function computeUrgency(
   return { score, level };
 }
 
-const URGENCY_STYLES = {
-  High:   { dot: 'bg-[#ef4444]', text: 'text-[#ef4444]', border: 'border-l-[#ef4444]/60' },
-  Medium: { dot: 'bg-[#f59e0b]', text: 'text-[#f59e0b]', border: 'border-l-[#f59e0b]/40' },
-  Low:    { dot: 'bg-[#10b981]', text: 'text-[#10b981]', border: 'border-l-transparent' },
-};
 
 // ── Help modal ────────────────────────────────────────────────────────────────
 
@@ -120,7 +148,7 @@ function HelpModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(255,255,255,0.12)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
+      <div className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-[#F0F4F8]">{title}</h3>
           <button onClick={onClose} className="text-[#475569] hover:text-[#94A3B8] transition-colors">
@@ -246,13 +274,7 @@ function runQualityChecks(
     checks.push({ label: 'Only approved statistics', passed: true });
   }
 
-  // 3. No hedging phrases (em dash enforcement is handled at generation time)
-  const hedgingFound = HEDGING_PHRASES.find((p) => lower.includes(p));
-  checks.push({
-    label: 'No hedging phrases',
-    passed: !hedgingFound,
-    detail: hedgingFound ? `Contains: "${hedgingFound}"` : undefined,
-  });
+  // 3. No hedging phrases — enforced silently at generation time; not surfaced as a user check
 
   // 4. Brand mention — platform-aware
   if (isRedditReply) {
@@ -283,23 +305,7 @@ function runQualityChecks(
     checks.push({ label: 'Brand mentioned', passed: true });
   }
 
-  // 5. Word count — platform and context aware
-  type Limits = [number, number, string];
-  const WORD_LIMITS: Record<string, Limits> = {
-    reddit: [150, 400, 'Reddit post'],
-    quora:  [200, 500, 'Quora'],
-    medium: [800, 2000, 'Medium'],
-  };
-  const [minWords, maxWords, platformLabel]: Limits = isRedditReply
-    ? [1, 100, 'Reddit reply']
-    : WORD_LIMITS[platform] ?? [50, 500, platform];
-
-  const inRange = wordCount >= minWords && wordCount <= maxWords;
-  checks.push({
-    label: `Word count (${minWords}–${maxWords} for ${platformLabel})`,
-    passed: inRange,
-    detail: !inRange ? `${wordCount} words` : undefined,
-  });
+  // Word count — enforced silently at generation time; not surfaced as a user check
 
   return checks;
 }
@@ -335,7 +341,7 @@ function QualityChecklist({
     <div className="border border-[rgba(255,255,255,0.10)] rounded-lg overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
       >
         <div className="flex items-center gap-2">
           <span className={`text-xs font-semibold ${scoreColor}`}>
@@ -355,7 +361,7 @@ function QualityChecklist({
         />
       </button>
       {expanded && (
-        <div className="divide-y divide-[rgba(255,255,255,0.08)]">
+        <div className="divide-y divide-[rgba(99,102,241,0.10)]">
           {checks.map((check, i) => {
             const icon = check.passed === true ? '✓' : check.passed === 'warning' ? '~' : '⚠';
             const iconColor = check.passed === true
@@ -404,15 +410,19 @@ function DraftCard({
   const [editTitle, setEditTitle] = useState(draft.title ?? '');
   const [editContent, setEditContent] = useState(draft.content_text);
   const [saving, setSaving] = useState(false);
+  const [copied, setCopied] = useState(false);
 
-  const urgency = computeUrgency(draft, postedItems);
-  const ustyle = URGENCY_STYLES[urgency.level];
+  async function handleCopy() {
+    await navigator.clipboard.writeText(draft.content_text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   // Quality score for border/prominence — based on hard fails only (warnings don't trigger red border)
   const qualityChecks = runQualityChecks(draft, profile, brandName);
   const isLowQuality = qualityChecks.filter((c) => c.passed === false).length >= 2;
 
-  const preview = draft.content_text.slice(0, 200) + (draft.content_text.length > 200 ? '…' : '');
+  // No truncation — show full text in a scrollable window so users can read without clicking Edit
 
   async function handleSave() {
     setSaving(true);
@@ -429,32 +439,48 @@ function DraftCard({
   }
 
   const borderClass = isLowQuality
-    ? 'border-l-[3px] border-l-[#ef4444]/50 border-[rgba(255,255,255,0.12)]'
-    : 'border-[rgba(255,255,255,0.12)]';
+    ? 'border-l-[3px] border-l-[#ef4444]/50 border-[rgba(99,102,241,0.15)]'
+    : 'border-[rgba(99,102,241,0.15)]';
 
   return (
-    <div className={`bg-[rgba(255,255,255,0.08)] backdrop-blur-md border rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors ${borderClass}`}>
+    <div className={`bg-[rgba(99,102,241,0.06)] backdrop-blur-md border rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors ${borderClass}`}>
       {/* Top row */}
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={draft.platform} />
-        {draft.visibility_score_at_draft != null && (
-          <span
-            className="text-xs text-[#64748B] flex items-center gap-1 cursor-help"
-            title="How often your brand appears in AI responses for this prompt. This draft targets improving this score."
-          >
-            <BarChart2 size={11} />
-            Prompt visibility: {Math.round(draft.visibility_score_at_draft)}%
-          </span>
-        )}
-        {/* Urgency badge */}
-        <span className={`ml-auto flex items-center gap-1 text-[10px] font-semibold ${ustyle.text}`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${ustyle.dot}`} />
-          {urgency.level}
-        </span>
       </div>
 
       {/* Target prompt / posting instruction */}
-      {draft.content_brief && draft.platform === 'quora' ? (
+      {draft.opportunity_id != null && draft.platform === 'reddit' &&
+       draft.platform_guidelines_applied?.startsWith('http') ? (
+        /* Reddit opportunity reply: single linked element with full thread context */
+        <>
+          <a
+            href={draft.platform_guidelines_applied}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-[rgba(249,115,22,0.07)] border border-[rgba(249,115,22,0.20)] rounded-lg px-3 py-2 group transition-colors hover:border-[rgba(249,115,22,0.35)] hover:bg-[rgba(249,115,22,0.11)]"
+          >
+            <span className="text-[#f97316] text-xs flex-shrink-0">↗</span>
+            <span className="text-xs text-[#f97316] font-medium flex-1 min-w-0 truncate">
+              {draft.content_brief ?? 'Reply directly in this thread'}
+            </span>
+            <ExternalLink size={11} className="text-[#f97316]/60 flex-shrink-0 group-hover:text-[#f97316]" />
+          </a>
+          {(() => {
+            const sub = extractSubreddit(draft.content_brief);
+            if (!sub || !isPromoRestricted(sub)) return null;
+            return (
+              <div className="flex items-center gap-1.5 text-[10px] text-[#f59e0b] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.20)] rounded-md px-2.5 py-1.5">
+                <AlertTriangle size={10} className="flex-shrink-0" />
+                <span>
+                  <span className="font-semibold">r/{sub} bans promotion</span>
+                  {' '}— this draft avoids direct brand mentions. You may cite sources or reference research indirectly.
+                </span>
+              </div>
+            );
+          })()}
+        </>
+      ) : draft.content_brief && draft.platform === 'quora' ? (
         <div className="flex items-start gap-2 bg-[#172554]/30 border border-[#1d4ed8]/25 rounded-lg px-3 py-2">
           <span className="text-[#6366f1] text-xs mt-0.5">→</span>
           <p className="text-xs text-[#60a5fa] leading-relaxed">{draft.content_brief}</p>
@@ -519,7 +545,12 @@ function DraftCard({
           {draft.title && (
             <p className="text-sm font-semibold text-[#F0F4F8] leading-snug mb-1">{draft.title}</p>
           )}
-          <p className="text-sm text-[#64748B] leading-relaxed">{preview}</p>
+          <div
+            className="text-sm text-[#64748B] leading-relaxed overflow-y-auto"
+            style={{ maxHeight: '9rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+          >
+            {draft.content_text}
+          </div>
         </div>
       )}
 
@@ -537,6 +568,17 @@ function DraftCard({
           >
             <Edit2 size={11} />
             Edit
+          </button>
+          <button
+            onClick={handleCopy}
+            className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors border ${
+              copied
+                ? 'bg-[#064e3b]/20 border-[#065f46]/25 text-[#34d399]'
+                : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] hover:bg-[rgba(255,255,255,0.10)]'
+            }`}
+          >
+            {copied ? <Check size={11} /> : <Copy size={11} />}
+            {copied ? 'Copied!' : 'Copy'}
           </button>
           <button
             onClick={() => onApprove(draft.id)}
@@ -659,11 +701,13 @@ function plainToWikiFormat(
 function WikipediaDraftCard({
   draft,
   brandName,
+  profile,
   onDelete,
   onSaved,
 }: {
   draft: ContentDraft;
   brandName: string;
+  profile: BrandProfile | null;
   onDelete: (id: number) => void;
   onSaved: (d: ContentDraft) => void;
 }) {
@@ -744,7 +788,7 @@ function WikipediaDraftCard({
         </div>
       )}
 
-      <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
+      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
         {/* Platform badge + article link */}
         <div className="flex items-start gap-2 flex-wrap">
           <PlatformBadge platform="wikipedia" />
@@ -762,21 +806,12 @@ function WikipediaDraftCard({
             ) : (
               <p className="text-sm font-medium text-[#F0F4F8] leading-snug">{articleTitle}</p>
             )}
-            {draft.visibility_score_at_draft != null && (
-              <p
-                className="text-xs text-[#64748B] mt-0.5 flex items-center gap-1 cursor-help"
-                title="How often your brand appears in AI responses for this prompt. This draft targets improving this score."
-              >
-                <BarChart2 size={10} />
-                Prompt visibility: {Math.round(draft.visibility_score_at_draft)}%
-              </p>
-            )}
           </div>
         </div>
 
         {/* Where to insert — only shown when we have a real placement instruction */}
         {insertLocation && (
-          <div className="bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.12)] rounded-lg px-3 py-2.5">
+          <div className="bg-[rgba(255,255,255,0.06)] border border-[rgba(99,102,241,0.15)] rounded-lg px-3 py-2.5">
             <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1 font-medium">Where to insert</p>
             <p className="text-xs text-[#94A3B8] leading-relaxed">{insertLocation}</p>
           </div>
@@ -798,6 +833,9 @@ function WikipediaDraftCard({
             Edit in plain text. Wiki links and citations are added when you copy.
           </p>
         </div>
+
+        {/* Quality checklist — wiki-specific checks */}
+        <QualityChecklist draft={draft} profile={profile} brandName={brandName} liveText={wikiFormat} />
 
         {/* Actions */}
         <div className="flex items-center gap-2 pt-1 flex-wrap">
@@ -881,7 +919,7 @@ function RequestDraftModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(255,255,255,0.12)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
+      <div className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="text-base font-semibold text-[#F0F4F8]">Request a Draft</h3>
@@ -1016,7 +1054,7 @@ function OpportunityCard({
       : 'text-[#64748B]';
 
   return (
-    <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
       {/* Top row */}
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={opp.platform} />
@@ -1158,7 +1196,7 @@ function ScheduledCard({
   const guidance = POSTING_GUIDANCE[draft.platform];
 
   return (
-    <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
       {/* Top row */}
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={draft.platform} />
@@ -1190,7 +1228,7 @@ function ScheduledCard({
 
       {/* Expandable full draft */}
       {expanded && (
-        <div className="bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.10)] rounded-lg p-3 relative">
+        <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg p-3 relative">
           <pre className="text-xs text-[#94A3B8] whitespace-pre-wrap leading-relaxed font-mono pr-14">
             {draft.content_text}
           </pre>
@@ -1206,10 +1244,10 @@ function ScheduledCard({
 
       {/* How to Post guidance */}
       {guidance && (
-        <div className="border border-[rgba(255,255,255,0.12)] rounded-lg overflow-hidden">
+        <div className="border border-[rgba(99,102,241,0.15)] rounded-lg overflow-hidden">
           <button
             onClick={() => setGuideOpen(!guideOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(255,255,255,0.08)] hover:bg-[rgba(255,255,255,0.06)] text-left transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(255,255,255,0.06)] text-left transition-colors"
           >
             <span className="flex items-center gap-1.5 text-xs text-[#64748B] font-medium">
               <BookOpen size={11} />
@@ -1258,7 +1296,7 @@ function ScheduledCard({
 function PostedCard({ draft }: { draft: ContentDraft }) {
   const title = draft.title ?? draft.content_text.slice(0, 80) + (draft.content_text.length > 80 ? '…' : '');
   return (
-    <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl px-4 py-3 flex items-center gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl px-4 py-3 flex items-center gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       <PlatformBadge platform={draft.platform} />
       <p className="flex-1 text-sm text-[#94A3B8] truncate">{title}</p>
       <span className="text-xs text-[#475569] shrink-0">{relativeTime(draft.updated_at)}</span>
@@ -1272,6 +1310,14 @@ export default function ContentHubPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<QueueTab>('drafts');
+
+  // Sync tab from URL after mount — avoids SSR/client hydration mismatch
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get('tab');
+    if (tab === 'opportunities' || tab === 'scheduled' || tab === 'posted') {
+      setActiveTab(tab as QueueTab);
+    }
+  }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -1286,6 +1332,13 @@ export default function ContentHubPage() {
 
   // Right panel
   const [generating, setGenerating] = useState(false);
+  // Broadcast drafts-generating state to other pages via localStorage
+  useEffect(() => {
+    try {
+      if (generating) localStorage.setItem('clarity_drafts_generating', '1');
+      else localStorage.removeItem('clarity_drafts_generating');
+    } catch {}
+  }, [generating]);
   const [scanning, setScanning] = useState(false);
   const [requestDraftOpen, setRequestDraftOpen] = useState(false);
   const [draftStatus, setDraftStatus] = useState<DraftQueueStatus | null>(null);
@@ -1300,6 +1353,9 @@ export default function ContentHubPage() {
     contentSettings.filter((s) => !s.enabled).map((s) => s.platform)
   );
 
+  // Active platform filter (All / specific platform)
+  const [platformFilter, setPlatformFilter] = useState<string>('all');
+
   // Tab counts (using filtered draft/scheduled counts)
   const tabCounts = {
     drafts: draftItems.filter((d) => !_disabledPlatforms.has(d.platform)).length,
@@ -1310,7 +1366,12 @@ export default function ContentHubPage() {
 
   // ── Load data ──────────────────────────────────────────────────────────────
 
+  const loadingRef = useRef(false);
+
   const loadAll = useCallback(async (brandId: number) => {
+    // Prevent concurrent loads — double-clicking nav can trigger 16+ simultaneous requests
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -1346,6 +1407,7 @@ export default function ContentHubPage() {
       setError('Failed to load content data. Check that the backend is running.');
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, []);
 
@@ -1409,10 +1471,21 @@ export default function ContentHubPage() {
   // ── Opportunity actions ────────────────────────────────────────────────────
 
   async function handleDraftOpportunity(oppId: number) {
-    const draft = await draftOpportunity(oppId);
-    setOpportunities((prev) => prev.filter((o) => o.id !== oppId));
-    setDraftItems((prev) => [draft, ...prev]);
-    setActiveTab('drafts');
+    if (draftStatus?.draft_queue_full) {
+      alert(`Draft queue is full (${draftStatus.draft_cap}/${draftStatus.draft_cap}). Approve or dismiss drafts to make room.`);
+      return;
+    }
+    try {
+      const draft = await draftOpportunity(oppId);
+      setOpportunities((prev) => prev.filter((o) => o.id !== oppId));
+      setDraftItems((prev) => [draft, ...prev]);
+      // Refresh status so the count is accurate
+      if (selectedBrandId) getDraftStatus(selectedBrandId).then(setDraftStatus).catch(() => {});
+      setActiveTab('drafts');
+    } catch (e: any) {
+      const detail = e?.response?.data?.detail ?? 'Failed to draft reply. Try again.';
+      alert(detail);
+    }
   }
 
   async function handleDismissOpportunity(oppId: number) {
@@ -1424,13 +1497,16 @@ export default function ContentHubPage() {
 
   async function handleGenerateNow() {
     if (!selectedBrandId) return;
-    if (draftStatus?.draft_queue_full) {
-      alert(`Draft queue is full (${draftStatus.draft_cap}/${draftStatus.draft_cap}). Approve or dismiss drafts to generate new ones.`);
+    const cap = draftStatus?.draft_cap ?? 20;
+    const current = draftStatus?.draft_count ?? 0;
+    const slots = Math.max(0, cap - current);
+    if (slots === 0) {
+      alert(`Draft queue is full (${current}/${cap}). Approve or dismiss drafts to generate new ones.`);
       return;
     }
     setGenerating(true);
     try {
-      const newDrafts = await generateNow(selectedBrandId, 3);
+      const newDrafts = await generateNow(selectedBrandId, slots);
       if (newDrafts.length > 0) {
         setDraftItems((prev) => [...newDrafts, ...prev]);
         setActiveTab('drafts');
@@ -1472,29 +1548,60 @@ export default function ContentHubPage() {
   // ── Tab content ────────────────────────────────────────────────────────────
 
   function renderDraftsTab() {
-    if (visibleDraftItems.length === 0) {
-      return (
-        <EmptyState
-          icon={<FileText size={22} className="text-[#475569]" />}
-          title="No drafts waiting"
-          description='Click "Generate Drafts Now" to create drafts targeting your top visibility gaps.'
-        />
-      );
-    }
     const selectedBrand = brands.find((b) => b.id === selectedBrandId);
     const brandName = selectedBrand?.name ?? '';
+
+    // Collect distinct platforms present in ALL drafts (before platform filter)
+    const draftPlatforms = Array.from(new Set(
+      draftItems.filter((d) => !_disabledPlatforms.has(d.platform)).map((d) => d.platform)
+    )).sort();
+
+    const filterBar = draftPlatforms.length >= 2 ? (
+      <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 mb-4 self-start">
+        <button
+          onClick={() => setPlatformFilter('all')}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+        >
+          All
+        </button>
+        {draftPlatforms.map((p) => (
+          <button
+            key={p}
+            onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
+    if (visibleDraftItems.length === 0) {
+      return (
+        <>
+          {filterBar}
+          <EmptyState
+            icon={<FileText size={22} className="text-[#475569]" />}
+            title={platformFilter !== 'all' ? `No ${platformFilter} drafts` : 'No drafts waiting'}
+            description={platformFilter !== 'all' ? 'Try "All" or generate new drafts.' : 'Click "Generate Drafts Now" to create drafts targeting your top visibility gaps.'}
+          />
+        </>
+      );
+    }
     // Sort by urgency score descending (High first)
     const sorted = [...visibleDraftItems].sort(
       (a, b) => computeUrgency(b, postedItems).score - computeUrgency(a, postedItems).score
     );
     return (
       <div className="flex flex-col gap-3">
+        {filterBar}
         {sorted.map((d) =>
           d.platform === 'wikipedia' ? (
             <WikipediaDraftCard
               key={d.id}
               draft={d}
               brandName={brandName}
+              profile={brandProfile}
               onDelete={handleDelete}
               onSaved={handleSaved}
             />
@@ -1555,6 +1662,28 @@ export default function ContentHubPage() {
       </div>
     );
 
+    // Collect platforms present in opportunities
+    const oppPlatforms = Array.from(new Set(opportunities.map((o) => o.platform))).sort();
+    const oppFilterBar = oppPlatforms.length >= 2 ? (
+      <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 mb-4 self-start">
+        <button
+          onClick={() => setPlatformFilter('all')}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+        >
+          All
+        </button>
+        {oppPlatforms.map((p) => (
+          <button
+            key={p}
+            onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+          >
+            {p}
+          </button>
+        ))}
+      </div>
+    ) : null;
+
     if (opportunities.length === 0) {
       return (
         <>
@@ -1580,8 +1709,9 @@ export default function ContentHubPage() {
     return (
       <>
         {header}
+        {oppFilterBar}
         <div className="flex flex-col gap-3">
-          {opportunities.map((o) => (
+          {visibleOpportunities.map((o) => (
             <OpportunityCard
               key={o.id}
               opp={o}
@@ -1589,6 +1719,13 @@ export default function ContentHubPage() {
               onDismiss={handleDismissOpportunity}
             />
           ))}
+          {visibleOpportunities.length === 0 && (
+            <EmptyState
+              icon={<Radio size={22} className="text-[#475569]" />}
+              title={`No ${platformFilter} opportunities`}
+              description='Try "All" or switch platform.'
+            />
+          )}
         </div>
       </>
     );
@@ -1630,10 +1767,15 @@ export default function ContentHubPage() {
     );
   }
 
-  // Filter drafts to only show enabled platforms
+  // Filter drafts to only show enabled platforms + active platform filter
   const redditEnabled = !_disabledPlatforms.has('reddit');
-  const visibleDraftItems = draftItems.filter((d) => !_disabledPlatforms.has(d.platform));
+  const visibleDraftItems = draftItems.filter(
+    (d) => !_disabledPlatforms.has(d.platform) && (platformFilter === 'all' || d.platform === platformFilter)
+  );
   const visibleScheduledItems = scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform));
+  const visibleOpportunities = opportunities.filter(
+    (o) => platformFilter === 'all' || o.platform === platformFilter
+  );
 
   const TABS: { key: QueueTab; label: string }[] = [
     { key: 'drafts', label: 'Drafts' },
@@ -1691,9 +1833,9 @@ export default function ContentHubPage() {
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60" onClick={() => setPostingGuideOpen(false)} />
           {/* Panel */}
-          <div className="relative ml-auto w-full max-w-2xl h-full bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border-l border-[rgba(255,255,255,0.12)] flex flex-col shadow-2xl">
+          <div className="relative ml-auto w-full max-w-2xl h-full bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border-l border-[rgba(99,102,241,0.15)] flex flex-col shadow-2xl">
             {/* Panel header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.12)] shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(99,102,241,0.15)] shrink-0">
               <div className="flex items-center gap-2">
                 <BookOpen size={16} className="text-[#6366f1]" />
                 <h2 className="text-base font-semibold text-[#F0F4F8]">Posting Guide</h2>
@@ -1709,7 +1851,7 @@ export default function ContentHubPage() {
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#ff4500]/15 text-[#ff6a33] border border-[#ff4500]/30">Reddit</span>
-                  <div className="flex-1 h-px bg-[rgba(255,255,255,0.08)]" />
+                  <div className="flex-1 h-px bg-[rgba(99,102,241,0.06)]" />
                 </div>
                 <div className="space-y-5">
                   <div>
@@ -1751,7 +1893,7 @@ export default function ContentHubPage() {
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#b92b27]/15 text-[#e05a56] border border-[#b92b27]/30">Quora</span>
-                  <div className="flex-1 h-px bg-[rgba(255,255,255,0.08)]" />
+                  <div className="flex-1 h-px bg-[rgba(99,102,241,0.06)]" />
                 </div>
                 <div className="space-y-5">
                   <div>
@@ -1792,7 +1934,7 @@ export default function ContentHubPage() {
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[rgba(255,255,255,0.06)] text-[#94A3B8] border border-[rgba(255,255,255,0.10)]">Medium</span>
-                  <div className="flex-1 h-px bg-[rgba(255,255,255,0.08)]" />
+                  <div className="flex-1 h-px bg-[rgba(99,102,241,0.06)]" />
                 </div>
                 <div className="space-y-5">
                   <div>
@@ -1833,7 +1975,7 @@ export default function ContentHubPage() {
               <section>
                 <div className="flex items-center gap-2 mb-4">
                   <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#64748b]/15 text-[#94A3B8] border border-[#64748b]/30">Wikipedia</span>
-                  <div className="flex-1 h-px bg-[rgba(255,255,255,0.08)]" />
+                  <div className="flex-1 h-px bg-[rgba(99,102,241,0.06)]" />
                 </div>
                 <div className="space-y-5">
                   <div>
@@ -1963,7 +2105,7 @@ export default function ContentHubPage() {
           {/* ── Left panel (70%) — Content Queue ────────────────────────────── */}
           <div className="flex-1 min-w-0">
             {/* Tab bar */}
-            <div className="flex gap-0 mb-5 border-b border-[rgba(255,255,255,0.12)]">
+            <div className="flex gap-0 mb-5 border-b border-[rgba(99,102,241,0.15)]">
               {TABS.map((tab) => (
                 <button
                   key={tab.key}
@@ -2002,7 +2144,7 @@ export default function ContentHubPage() {
           {/* ── Right panel (30%) — Settings ─────────────────────────────────── */}
           <div className="w-72 shrink-0 flex flex-col gap-4">
             {/* Generate now */}
-            <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
               {draftStatus?.draft_queue_full ? (
                 <div className="bg-[#7f1d1d]/15 border border-[#991b1b]/30 rounded-lg px-3 py-2.5 mb-3">
                   <p className="text-xs text-[#f87171] font-medium leading-relaxed">
@@ -2033,7 +2175,7 @@ export default function ContentHubPage() {
             </div>
 
             {/* Queue stats */}
-            <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
               <div className="space-y-2.5">
                 {draftStatus ? (
                   <>
@@ -2051,7 +2193,7 @@ export default function ContentHubPage() {
                     </div>
                   </>
                 ) : (
-                  <div className="h-8 bg-[rgba(255,255,255,0.08)] rounded animate-pulse" />
+                  <div className="h-8 bg-[rgba(99,102,241,0.06)] rounded animate-pulse" />
                 )}
                 <div className="border-t border-[rgba(255,255,255,0.06)] pt-2.5 space-y-1.5">
                   <div className="flex items-center justify-between">
@@ -2071,7 +2213,7 @@ export default function ContentHubPage() {
             </div>
 
             {/* Weekly refresh note */}
-            <div className="bg-[rgba(255,255,255,0.08)] backdrop-blur-md border border-[rgba(255,255,255,0.12)] rounded-xl p-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
               <p className="text-xs text-[#475569] leading-relaxed">
                 Draft queue refreshes weekly. Approve drafts before they are replaced.
               </p>

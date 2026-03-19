@@ -5,11 +5,11 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Settings,
-  Zap,
   FileText,
   LogOut,
   CreditCard,
   User,
+  BarChart2,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -86,8 +86,10 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
 
   const navItems: NavItem[] = [
     { label: 'Dashboard',   href: '/dashboard', icon: LayoutDashboard },
+    { label: 'Reports',     href: '/reports',   icon: BarChart2 },
     { label: 'Content Hub', href: '/content',   icon: FileText },
     { label: 'Settings',    href: '/settings',  icon: Settings },
+    { label: 'Account',     href: '/account',   icon: User },
   ];
 
   async function handleLogout() {
@@ -127,12 +129,79 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
           borderBottom: '1px solid rgba(255,255,255,0.07)',
         }}
       >
-        <Link href="/dashboard" className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)', boxShadow: '0 2px 8px rgba(99,102,241,0.35)' }}>
-            <Zap size={16} className="text-white" fill="white" />
+        <Link href="/dashboard" className="flex items-center gap-3">
+          {/* Vesica Piscis eye — sacred geometry mark */}
+          <div
+            className="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden"
+            style={{
+              background: '#f9f8f6',
+              boxShadow: '0 1px 8px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.07)',
+            }}
+          >
+            <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+              {/* Outer sacred geometry rings */}
+              <circle cx="50" cy="50" r="46" stroke="#0d0d0d" strokeWidth="0.5" opacity="0.12"/>
+              <circle cx="50" cy="50" r="39" stroke="#0d0d0d" strokeWidth="0.35" opacity="0.08"/>
+
+              {/* The two source circles of the Vesica Piscis — faint, foundational */}
+              <circle cx="50" cy="26" r="48" stroke="#0d0d0d" strokeWidth="0.6" opacity="0.09" fill="none"/>
+              <circle cx="50" cy="74" r="48" stroke="#0d0d0d" strokeWidth="0.6" opacity="0.09" fill="none"/>
+
+              {/* 8 radial rays from center — behind the eye */}
+              <g stroke="#0d0d0d" strokeWidth="0.7" opacity="0.08">
+                <line x1="50" y1="50" x2="50" y2="4"/>
+                <line x1="50" y1="50" x2="82" y2="18"/>
+                <line x1="50" y1="50" x2="96" y2="50"/>
+                <line x1="50" y1="50" x2="82" y2="82"/>
+                <line x1="50" y1="50" x2="50" y2="96"/>
+                <line x1="50" y1="50" x2="18" y2="82"/>
+                <line x1="50" y1="50" x2="4" y2="50"/>
+                <line x1="50" y1="50" x2="18" y2="18"/>
+              </g>
+
+              {/* Eye lens (Vesica Piscis) — white fill covers rays inside */}
+              {/* Upper arc: CCW on Circle B (center 50,74, r≈48) */}
+              {/* Lower arc: CW on Circle A (center 50,26, r≈48) */}
+              <path
+                d="M 8 50 A 48 48 0 0 0 92 50 A 48 48 0 0 1 8 50 Z"
+                fill="#f9f8f6"
+                stroke="#0d0d0d"
+                strokeWidth="1.3"
+                strokeLinejoin="round"
+              />
+
+              {/* Iris */}
+              <circle cx="50" cy="50" r="15" stroke="#0d0d0d" strokeWidth="1" fill="#f9f8f6"/>
+
+              {/* Inner iris detail ring */}
+              <circle cx="50" cy="50" r="11" stroke="#0d0d0d" strokeWidth="0.4" opacity="0.35" fill="none"/>
+
+              {/* Pupil */}
+              <circle cx="50" cy="50" r="7" fill="#0d0d0d"/>
+
+              {/* Highlight — tiny reflection dot, keeps it alive not creepy */}
+              <circle cx="53.5" cy="46" r="2" fill="#f9f8f6"/>
+
+              {/* Concentric rings at left tip — where the circles intersect */}
+              <circle cx="8" cy="50" r="4"   stroke="#0d0d0d" strokeWidth="0.5" opacity="0.22" fill="none"/>
+              <circle cx="8" cy="50" r="7.5" stroke="#0d0d0d" strokeWidth="0.35" opacity="0.15" fill="none"/>
+              <circle cx="8" cy="50" r="11"  stroke="#0d0d0d" strokeWidth="0.3" opacity="0.1"  fill="none"/>
+
+              {/* Concentric rings at right tip */}
+              <circle cx="92" cy="50" r="4"   stroke="#0d0d0d" strokeWidth="0.5" opacity="0.22" fill="none"/>
+              <circle cx="92" cy="50" r="7.5" stroke="#0d0d0d" strokeWidth="0.35" opacity="0.15" fill="none"/>
+              <circle cx="92" cy="50" r="11"  stroke="#0d0d0d" strokeWidth="0.3" opacity="0.1"  fill="none"/>
+
+            </svg>
           </div>
           {expanded && (
-            <span className="text-[15px] font-bold text-[#F0F4F8] tracking-tight whitespace-nowrap">ClarityAI</span>
+            <span
+              className="whitespace-nowrap"
+              style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.01em', color: '#e2e8f0' }}
+            >
+              ClarityAI
+            </span>
           )}
         </Link>
       </div>

@@ -30,6 +30,13 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
+# Admin emails from env — comma-separated. Falls back to ken@clarityai.com if not set.
+_raw_admin_emails = os.getenv("ADMIN_EMAILS", "ken@clarityai.com")
+_ADMIN_EMAILS: set[str] = {e.strip().lower() for e in _raw_admin_emails.split(",") if e.strip()}
+
+# Use secure cookies when ENVIRONMENT=production
+_COOKIE_SECURE = os.getenv("ENVIRONMENT", "development").lower() == "production"
+
 
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
@@ -60,6 +67,7 @@ def set_auth_cookies(response: Response, token: str) -> None:
         "clarity_token",
         token,
         httponly=True,
+        secure=_COOKIE_SECURE,
         samesite="lax",
         max_age=COOKIE_MAX_AGE,
         path="/",
@@ -69,6 +77,7 @@ def set_auth_cookies(response: Response, token: str) -> None:
         "clarity_session",
         "1",
         httponly=False,
+        secure=_COOKIE_SECURE,
         samesite="lax",
         max_age=COOKIE_MAX_AGE,
         path="/",
@@ -116,7 +125,7 @@ async def register(request: RegisterRequest, response: Response, db: DbDep):
         email=email,
         password_hash=password_hash,
         name=request.name or email.split("@")[0],
-        is_admin=(email == "ken@clarityai.com"),
+        is_admin=(email in _ADMIN_EMAILS),
     )
     db.add(user)
     await db.commit()
@@ -215,7 +224,7 @@ async def google_auth(request: GoogleAuthRequest, response: Response, db: DbDep)
                 email=email,
                 google_id=google_id,
                 name=name,
-                is_admin=(email == "ken@clarityai.com"),
+                is_admin=(email in _ADMIN_EMAILS),
             )
             db.add(user)
 

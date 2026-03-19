@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, get_brand_for_user
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user
 from app.models import Brand, TrackingRun
 from app.schemas import ManualRunResponse, TrackingRunStatus, TrackingRunSummary
 from app.services.tracking_service import run_tracking
@@ -46,6 +46,7 @@ async def _background_run(brand_id: int) -> None:
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDep, user: CurrentUser):
+    check_rate_limit(user.id, limit=3)  # 3 manual runs per minute per user
     await get_brand_for_user(brand_id, db, user)
 
     # Pre-create the TrackingRun record so we can return its ID immediately.

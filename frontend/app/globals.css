@@ -6,13 +6,13 @@
 :root {
   --bg-base:      #080C14;
   --bg-raised:    #0D1117;
-  --bg-card:      rgba(255,255,255,0.08);
-  --bg-elevated:  rgba(255,255,255,0.10);
-  --bg-highest:   rgba(255,255,255,0.13);
+  --bg-card:      rgba(99,102,241,0.06);
+  --bg-elevated:  rgba(99,102,241,0.09);
+  --bg-highest:   rgba(99,102,241,0.13);
 
-  --border-card:    rgba(255,255,255,0.12);
-  --border-default: rgba(255,255,255,0.12);
-  --border-muted:   rgba(255,255,255,0.14);
+  --border-card:    rgba(99,102,241,0.15);
+  --border-default: rgba(99,102,241,0.15);
+  --border-muted:   rgba(99,102,241,0.22);
   --border-accent:  rgba(99,102,241,0.40);
 
   --text-primary:   #F0F4F8;
@@ -52,23 +52,24 @@ body {
   transition-timing-function: ease;
 }
 
-/* ── Card utility — glassmorphism ──────────────────────────────────────────── */
+/* ── Card utility — glassmorphism with indigo tint ─────────────────────────── */
 .card {
-  background: rgba(255,255,255,0.08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(99,102,241,0.06);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(99,102,241,0.15);
   border-radius: var(--radius-lg);
   padding: 20px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.10);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.06);
 }
 .card-hover:hover {
-  border-color: rgba(255,255,255,0.18);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.12);
+  background: rgba(99,102,241,0.09);
+  border-color: rgba(99,102,241,0.22);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 .card-inset {
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.10);
+  background: rgba(99,102,241,0.04);
+  border: 1px solid rgba(99,102,241,0.12);
   border-radius: var(--radius-md);
 }
 

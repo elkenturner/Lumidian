@@ -54,7 +54,8 @@ PLATFORM_SPECS: dict[str, dict] = {
         "tone": "conversational, genuine community member voice — like a person talking, not an article being written",
         "rules": [
             "Write as a genuine community member, not a marketer — conversational and first-person where natural",
-            "NO formal headers or markdown formatting — at most 1 to 2 bullet points maximum, only if a short list genuinely helps",
+            "NO formal headers, NO markdown formatting (no ##, no bold headers) — at most 1 to 2 bullet points maximum, only if a short list genuinely helps",
+            "CRITICAL: Do NOT pose a question and then answer it yourself. You are writing a comment or contribution to an existing discussion — not a standalone Q&A post. Write as if you are directly responding to something, sharing a perspective, or contributing a genuine insight.",
             "Add genuine value — answer a question, share a personal experience, contribute a real insight",
             "Mention the brand only if it fits naturally into the conversation; never force it",
             "No promotional language, no calls to action, no links unless absolutely essential",
@@ -99,8 +100,9 @@ PLATFORM_SPECS: dict[str, dict] = {
         "tone": "thought leadership, editorial, analytical — structured like a quality article with a clear arc",
         "rules": [
             "Open with a strong hook in the first 1-2 sentences — a surprising fact, a provocative question, or a bold statement that earns the reader's attention",
-            "Structure the article clearly: hook → context/problem → main argument with subheadings → strong conclusion",
-            "Use subheadings (##) to organize each major section — readers must be able to skim and understand the full structure",
+            "Structure the article clearly with flowing prose sections: hook → context/problem → main argument → strong conclusion. Separate sections with a blank line — do NOT use ## markdown headers",
+            "NO ## headings, NO markdown headers of any kind — write in editorial prose that flows naturally from one idea to the next",
+            "Mention the brand naturally and specifically at least once — tie it to a concrete claim, data point, or unique capability",
             "Where the Brand Profile includes peer-reviewed publications, cite them naturally in the body (e.g. 'A study published in...' or 'Research from...')",
             "Include concrete data, examples, or evidence to support every major claim — never make unsupported assertions",
             "End with a strong, specific conclusion that delivers an actionable insight — not a generic 'in conclusion' paragraph",
@@ -139,6 +141,89 @@ PLATFORM_MAX_TOKENS: dict[str, int] = {
     "medium": 3500,
     "wikipedia": 900,  # handled in separate branch, kept here for reference
 }
+
+
+# ── Subreddit promotion classification ───────────────────────────────────────
+
+# Subreddits with documented rules against self-promotion / advertising.
+# Content in these subs must be purely value-driven — no brand naming.
+_PROMO_RESTRICTED_SUBREDDITS: frozenset[str] = frozenset({
+    # Finance / Legal
+    "personalfinance", "legaladvice", "tax", "investing", "financialindependence",
+    "frugal", "povertyfinance", "studentloans", "debtfree", "fire",
+    # Health / Medicine
+    "medicine", "askdocs", "medical", "medicaladvice", "nursing", "pharmacy",
+    "mentalhealth", "depression", "anxiety", "bipolar", "schizophrenia",
+    "chronicpain", "diabetes", "cancer", "epilepsy", "ibs", "autoimmune",
+    "ems", "emergencymedicine", "veterinary",
+    # Science / Academia
+    "science", "biology", "chemistry", "physics", "neuroscience",
+    "psychology", "datascience", "statistics", "academicphilosophy",
+    "compsci", "machinelearning", "artificial",
+    # Support / Advice communities
+    "relationships", "amitheasshole", "relationship_advice", "tifu",
+    "confessions", "grief", "survivorsofabuse", "ptsd", "addiction",
+    # General large subs with anti-spam rules
+    "askreddit", "todayilearned", "explainlikeimfive", "changemyview",
+    "nostupidquestions", "worldnews", "news", "nottheonion",
+    # Tech / Career — strong no-spam norms
+    "programming", "learnprogramming", "cscareerquestions", "devops",
+    "sysadmin", "netsec", "cybersecurity",
+})
+
+# Keywords in subreddit names that suggest promo-friendly or promo-restricted posture
+_RESTRICTED_NAME_SIGNALS = ("help", "advice", "support", "care", "recover", "survivor", "anon")
+_ALLOWED_NAME_SIGNALS = (
+    "entrepreneur", "startup", "business", "marketing", "growth",
+    "smallbusiness", "b2b", "saas", "productmanagement", "venturecapital",
+    "growthhacking", "digitalmarketing", "contentmarketing",
+)
+
+
+def _classify_subreddit(subreddit: str) -> str:
+    """Returns 'restricted', 'allowed', or 'cautious' for a given subreddit name."""
+    sub = subreddit.lower().strip().lstrip("r/")
+    if sub in _PROMO_RESTRICTED_SUBREDDITS:
+        return "restricted"
+    if any(kw in sub for kw in _RESTRICTED_NAME_SIGNALS):
+        return "restricted"
+    if any(kw in sub for kw in _ALLOWED_NAME_SIGNALS):
+        return "allowed"
+    return "cautious"
+
+
+def _build_subreddit_strategy(subreddit: str, brand_name: str, strategy: str) -> str:
+    """Returns the prompt block telling Claude how to handle promotion for this subreddit."""
+    sub = subreddit.lstrip("r/")
+    if strategy == "restricted":
+        return (
+            f"\nCOMMUNITY STRATEGY — CRITICAL:\n"
+            f"r/{sub} strictly prohibits self-promotion and direct brand advertising. "
+            f"You MUST NOT mention {brand_name} by name or make any promotional claims about it.\n"
+            f"You MAY reference {brand_name}'s knowledge, data, or research indirectly:\n"
+            f"  - Cite published papers or studies by title/journal without attributing them to {brand_name} "
+            f"(e.g. 'A 2024 study in Nature found...' rather than '{brand_name} published a study...')\n"
+            f"  - Share factual insights drawn from {brand_name}'s expertise as your own informed perspective "
+            f"(e.g. 'Research suggests...' or 'In my experience working in this space...')\n"
+            f"  - Link to independent sources, papers, or data — not to {brand_name}'s website directly\n"
+            f"  - Goal: be the most genuinely helpful reply in the thread. Earn credibility through expertise, "
+            f"not brand recognition."
+        )
+    elif strategy == "allowed":
+        return (
+            f"\nCOMMUNITY STRATEGY:\n"
+            f"r/{sub} allows relevant brand mentions. You may reference {brand_name} naturally "
+            f"once if it directly and clearly answers the question being asked. Lead with genuine "
+            f"insight or value — the brand mention, if present, should feel earned and secondary."
+        )
+    else:  # cautious
+        return (
+            f"\nCOMMUNITY STRATEGY:\n"
+            f"r/{sub}'s stance on self-promotion is unclear — default to value-first. "
+            f"Only name {brand_name} if it is the most direct, obvious answer to the exact "
+            f"question asked and nothing else would serve better. If in doubt, omit the brand "
+            f"name entirely and focus on being the most helpful reply in the thread."
+        )
 
 
 # ── Brand profile loader ──────────────────────────────────────────────────────
@@ -671,8 +756,8 @@ _ANALYSIS_HEADER_RE = _re2.compile(
 
 def _post_process(text: str) -> str:
     """
-    Strip em dashes, AI hedging phrases, and internal analysis notes from generated content.
-    Em dashes (—) are replaced with a comma + space.
+    Strip em dashes, AI hedging phrases, markdown headers, and internal analysis
+    notes from generated content. Em dashes (—) are replaced with a comma + space.
     """
     if not text:
         return text
@@ -680,6 +765,9 @@ def _post_process(text: str) -> str:
     # Strip any internal analysis section the LLM appended after the actual content
     processed = _ANALYSIS_HEADER_RE.sub("", text)
     processed = _ANALYSIS_SECTION_RE.sub("", processed)
+
+    # Strip markdown headers (## Heading, ### Heading) — not appropriate in any platform
+    processed = _re2.sub(r"^#{1,6}\s+(.+)$", r"\1", processed, flags=_re2.MULTILINE)
 
     # Replace em dash used as a separator: "word — word" → "word, word"
     processed = _re2.sub(r"\s*—\s*", ", ", processed)
@@ -723,9 +811,24 @@ async def _store_draft(
     visibility_pct: float,
     estimated_impact: float,
     opportunity_id: Optional[int] = None,
+    guidelines_override: Optional[str] = None,
 ) -> ContentDraft:
     spec = PLATFORM_SPECS.get(platform, {})
-    guidelines_applied = json.dumps(spec.get("rules", []))
+    guidelines_applied = guidelines_override if guidelines_override is not None else json.dumps(spec.get("rules", []))
+
+    # Final atomic recount immediately before INSERT — catches concurrent requests
+    # that both passed the earlier cap check before either committed.
+    final_count_result = await db.execute(
+        select(sqlfunc.count(ContentDraft.id)).where(
+            ContentDraft.brand_id == brand_id,
+            ContentDraft.status == "draft",
+        )
+    )
+    if final_count_result.scalar_one() >= DRAFT_CAP:
+        raise ValueError(
+            f"Draft queue is full ({DRAFT_CAP}/{DRAFT_CAP}). "
+            "Another draft was just created — try again after approving or dismissing one."
+        )
 
     draft = ContentDraft(
         brand_id=brand_id,
@@ -965,6 +1068,20 @@ async def generate_opportunity_draft(
     if brand is None:
         raise ValueError(f"Brand {opp.brand_id} not found")
 
+    # Enforce DRAFT_CAP — opportunity drafts count toward the same queue
+    draft_count_result = await db.execute(
+        select(sqlfunc.count(ContentDraft.id)).where(
+            ContentDraft.brand_id == opp.brand_id,
+            ContentDraft.status == "draft",
+        )
+    )
+    draft_count = draft_count_result.scalar_one()
+    if draft_count >= DRAFT_CAP:
+        raise ValueError(
+            f"Draft queue is full ({DRAFT_CAP}/{DRAFT_CAP}). "
+            "Approve or dismiss existing drafts before creating new ones."
+        )
+
     profile_context = await _load_profile_context(db, opp.brand_id)
 
     prompt_text = ""
@@ -977,6 +1094,8 @@ async def generate_opportunity_draft(
             visibility_pct = await _get_prompt_visibility(db, opp.prompt_id)
 
     # Build opportunity context block
+    promo_strategy = _classify_subreddit(opp.subreddit) if opp.subreddit else "cautious"
+
     opp_context_lines = []
     if opp.thread_title:
         opp_context_lines.append(f"Title: {opp.thread_title}")
@@ -985,6 +1104,10 @@ async def generate_opportunity_draft(
     if opp.body_preview:
         opp_context_lines.append(f"Post body: {opp.body_preview}")
     opp_context_lines.append(f"URL: {opp.thread_url}")
+    # Append subreddit-specific promotion strategy
+    opp_context_lines.append(
+        _build_subreddit_strategy(opp.subreddit or "this subreddit", brand.name, promo_strategy)
+    )
     opportunity_context = "\n".join(opp_context_lines)
 
     response_analysis = ""
@@ -1030,6 +1153,7 @@ async def generate_opportunity_draft(
         visibility_pct=visibility_pct,
         estimated_impact=estimated_impact,
         opportunity_id=opportunity_id,
+        guidelines_override=opp.thread_url,  # frontend uses this to link directly to the thread
     )
 
     # Mark opportunity as drafted
@@ -1042,18 +1166,25 @@ async def generate_opportunity_draft(
 async def auto_draft_top_gaps(
     db: AsyncSession,
     brand_id: int,
-    max_gaps: int = 3,
+    max_gaps: int = 20,
     clear_existing: bool = False,
 ) -> list[ContentDraft]:
     """
-    Identify the highest-impact gaps for a brand and generate drafts across
-    all enabled platforms. Returns all newly created drafts.
+    Generate up to max_gaps total drafts for a brand across all enabled platforms.
 
-    When clear_existing=True (weekly scheduler), all existing "draft" status
-    drafts for this brand are deleted before generating. This is the weekly
-    refresh behavior — it replaces pending drafts with fresh ones targeting
-    current gaps. Drafts in "approved" or "posted" status are never touched.
+    Strategy:
+    1. Prioritise prompts that have ContentGap entries (sorted by gap_score desc).
+    2. Fall back to ALL tracked prompts so we fill the queue even when gap data
+       is sparse — this prevents the hard cap of "only 3 drafts because only 3
+       gaps exist".
+    3. For each prompt, cycle through enabled platforms, stopping when
+       max_gaps drafts have been created or DRAFT_CAP is hit.
+
+    When clear_existing=True (weekly scheduler), all pending "draft" status rows
+    for this brand are wiped first. Approved/posted drafts are never touched.
     """
+    from app.models import Prompt
+
     # Weekly refresh: clear all pending drafts before generating new ones
     if clear_existing:
         from sqlalchemy import delete as sql_delete
@@ -1069,35 +1200,40 @@ async def auto_draft_top_gaps(
             brand_id,
         )
 
-    # Load more gaps than needed to allow deduplication by prompt
+    # --- Build ordered prompt list ---
+    # Best gap per prompt (highest gap_score), ordered desc
     gaps_result = await db.execute(
         select(ContentGap)
         .where(ContentGap.brand_id == brand_id)
         .order_by(ContentGap.gap_score.desc())
-        .limit(max_gaps * 4)
     )
     all_gaps = list(gaps_result.scalars().all())
 
-    if not all_gaps:
-        logger.info("auto_draft_top_gaps: no gaps found for brand_id=%d", brand_id)
+    # Map prompt_id → best gap
+    best_gap_by_prompt: dict[int, ContentGap] = {}
+    for g in all_gaps:
+        if g.prompt_id not in best_gap_by_prompt:
+            best_gap_by_prompt[g.prompt_id] = g
+
+    # All prompts for the brand — ordered: gapped prompts first (by score), then the rest
+    prompts_result = await db.execute(
+        select(Prompt).where(Prompt.brand_id == brand_id)
+    )
+    all_prompts = list(prompts_result.scalars().all())
+
+    gapped = sorted(
+        [p for p in all_prompts if p.id in best_gap_by_prompt],
+        key=lambda p: best_gap_by_prompt[p.id].gap_score,
+        reverse=True,
+    )
+    ungapped = [p for p in all_prompts if p.id not in best_gap_by_prompt]
+    ordered_prompts = gapped + ungapped
+
+    if not ordered_prompts:
+        logger.info("auto_draft_top_gaps: no prompts found for brand_id=%d", brand_id)
         return []
 
-    # Deduplicate: take the highest-scoring gap per prompt_id so the top N
-    # gaps always come from different prompts — ensures content diversity
-    seen_prompts: set[int] = set()
-    gaps: list[ContentGap] = []
-    for gap in all_gaps:
-        if gap.prompt_id not in seen_prompts:
-            seen_prompts.add(gap.prompt_id)
-            gaps.append(gap)
-            if len(gaps) >= max_gaps:
-                break
-
-    if not gaps:
-        logger.info("auto_draft_top_gaps: no unique prompt gaps found for brand_id=%d", brand_id)
-        return []
-
-    # Load enabled platform settings
+    # --- Load enabled platforms ---
     settings_result = await db.execute(
         select(BrandContentSettings).where(
             BrandContentSettings.brand_id == brand_id,
@@ -1109,30 +1245,44 @@ async def auto_draft_top_gaps(
         s.platform for s in enabled_settings
         if s.platform in CONTENT_PLATFORMS
     ]
-
     if not enabled_platforms:
-        # Default to reddit + quora if nothing configured
         enabled_platforms = ["reddit", "quora"]
 
+    # --- Generate: prompt × platform until max_gaps total drafts created ---
     created: list[ContentDraft] = []
-    for gap in gaps:
+    for prompt in ordered_prompts:
+        if len(created) >= max_gaps:
+            break
         for platform in enabled_platforms:
+            if len(created) >= max_gaps:
+                break
             try:
                 draft = await generate_gap_draft(
                     db=db,
                     brand_id=brand_id,
-                    prompt_id=gap.prompt_id,
+                    prompt_id=prompt.id,
                     platform=platform,
                 )
                 created.append(draft)
+            except ValueError as exc:
+                # DRAFT_CAP hit — stop generating
+                if "full" in str(exc).lower() or "cap" in str(exc).lower():
+                    logger.info(
+                        "auto_draft_top_gaps: draft cap reached for brand_id=%d after %d drafts",
+                        brand_id, len(created),
+                    )
+                    return created
+                logger.warning(
+                    "auto_draft_top_gaps: skipped brand=%d prompt=%d platform=%s: %s",
+                    brand_id, prompt.id, platform, exc,
+                )
             except Exception:
                 logger.exception(
                     "auto_draft_top_gaps: failed for brand=%d prompt=%d platform=%s",
-                    brand_id, gap.prompt_id, platform,
+                    brand_id, prompt.id, platform,
                 )
 
     logger.info(
-        "auto_draft_top_gaps: created %d drafts for brand_id=%d",
-        len(created), brand_id,
+        "auto_draft_top_gaps: created %d drafts for brand_id=%d", len(created), brand_id,
     )
     return created

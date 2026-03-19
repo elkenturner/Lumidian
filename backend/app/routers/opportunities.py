@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, get_brand_for_user
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user
 from app.models import Brand, ContentOpportunity, Prompt, utcnow
 from app.schemas import ContentDraftSchema, ContentOpportunitySchema
 
@@ -108,6 +108,7 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     Generate a reply draft for a specific Reddit/Quora thread opportunity.
     Uses the dynamic drafting engine with full BrandProfile context.
     """
+    check_rate_limit(user.id, limit=10)  # 10 opportunity drafts per minute per user
     from app.services.drafting_service import generate_opportunity_draft
 
     opp = await _get_opportunity_or_404(db, opportunity_id)
@@ -174,6 +175,7 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     """
     import asyncio
 
+    check_rate_limit(user.id, limit=3)  # 3 manual scans per minute per user
     await get_brand_for_user(brand_id, db, user)
 
     asyncio.create_task(

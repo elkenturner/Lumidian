@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, get_brand_for_user
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user
 from app.models import Brand, ContentDraft, ContentPost, ContentAttribution, BrandContentSettings
 from app.schemas import (
     ContentDraftSchema,
@@ -134,6 +134,7 @@ async def list_drafts(
 @router.post("/{brand_id}/draft", response_model=ContentDraftSchema, status_code=status.HTTP_201_CREATED)
 async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, user: CurrentUser):
     """Generate a new content draft using Claude for the given brand and platform."""
+    check_rate_limit(user.id, limit=10)  # 10 manual drafts per minute per user
     await get_brand_for_user(brand_id, db, user)
 
     if request.platform not in SUPPORTED_PLATFORMS:
@@ -302,12 +303,13 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
     Immediately run gap analysis and generate drafts for the top N gaps
     across all enabled platforms. Returns all newly created drafts.
     """
+    check_rate_limit(user.id, limit=2)  # 2 bulk generate-now calls per minute per user
     await get_brand_for_user(brand_id, db, user)
     try:
         drafts = await auto_draft_top_gaps(
             db=db,
             brand_id=brand_id,
-            max_gaps=min(request.max_gaps, 5),
+            max_gaps=min(request.max_gaps, 20),  # allow filling up to the full cap
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

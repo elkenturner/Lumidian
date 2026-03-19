@@ -101,7 +101,7 @@ export default function NewBrandPage() {
     try {
       const brand = await createBrand({ name: name.trim(), tier, prompts });
       await triggerRun(brand.id);
-      router.push(`/results/${brand.id}`);
+      router.push(`/dashboard?newBrand=true&brandId=${brand.id}`);
     } catch {
       setError('Failed to create brand. Please check your connection and try again.');
       setCreating(false);

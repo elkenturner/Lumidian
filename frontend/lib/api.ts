@@ -13,6 +13,8 @@ export interface Brand {
   name: string;
   slug: string;
   tier: 'basic' | 'standard' | 'premium';
+  brand_type: 'standard' | 'pitch';
+  pitch_expires_at: string | null;
   prompt_count: number;
   website_url?: string | null;
   created_at: string;
@@ -22,6 +24,7 @@ export interface Prompt {
   id: number;
   brand_id: number;
   text: string;
+  prompt_type: 'standard' | 'pitch';
 }
 
 export interface BrandDetail extends Brand {
@@ -60,6 +63,7 @@ export interface TrendPoint {
   completed_at: string;
   total_queries: number;
   total_mentions: number;
+  model_scores: Record<string, number>;
 }
 
 export interface QueryResult {
@@ -116,6 +120,7 @@ export interface ContentDraft {
   approved_at: string | null;
   dismissed_at: string | null;
   posted_at: string | null;
+  visibility_at_post: number | null;
   edited_count: number;
   time_to_approve_seconds: number | null;
   created_at: string;
@@ -176,6 +181,7 @@ export async function getBrand(id: number): Promise<BrandDetail> {
 export async function createBrand(data: {
   name: string;
   tier: string;
+  brand_type?: 'standard' | 'pitch';
   prompts: string[];
   website_url?: string;
 }): Promise<BrandDetail> {
@@ -266,6 +272,7 @@ export async function getTrends(brandId: number): Promise<TrendPoint[]> {
     completed_at: p.completed_at ?? p.created_at,
     total_queries: p.total_queries ?? 0,
     total_mentions: p.total_mentions ?? 0,
+    model_scores: (p as Record<string, unknown>).model_scores as Record<string, number> ?? {},
   }));
 }
 
@@ -356,7 +363,7 @@ export async function getAttribution(brandId: number): Promise<ContentAttributio
   return res.data;
 }
 
-export async function generateNow(brandId: number, maxGaps = 3): Promise<ContentDraft[]> {
+export async function generateNow(brandId: number, maxGaps = 20): Promise<ContentDraft[]> {
   const res = await api.post<ContentDraft[]>(`/content/${brandId}/generate-now`, { max_gaps: maxGaps });
   return res.data;
 }
@@ -423,6 +430,7 @@ export interface Competitor {
   id: number;
   brand_id: number;
   name: string;
+  website_url?: string | null;
   created_at: string;
 }
 
@@ -431,8 +439,15 @@ export async function getCompetitors(brandId: number): Promise<Competitor[]> {
   return res.data;
 }
 
-export async function addCompetitor(brandId: number, name: string): Promise<Competitor> {
-  const res = await api.post<Competitor>(`/brands/${brandId}/competitors`, { name });
+export async function addCompetitor(
+  brandId: number,
+  name: string,
+  websiteUrl?: string,
+): Promise<Competitor> {
+  const res = await api.post<Competitor>(`/brands/${brandId}/competitors`, {
+    name,
+    website_url: websiteUrl || null,
+  });
   return res.data;
 }
 
@@ -440,8 +455,59 @@ export async function removeCompetitor(brandId: number, competitorId: number): P
   await api.delete(`/brands/${brandId}/competitors/${competitorId}`);
 }
 
+// ── Competitor analysis types & functions ─────────────────────────────────────
+
+export interface CompetitorByModel {
+  name: string;
+  rate: number;
+  by_model: Record<string, number>;
+}
+
+export interface CompetitorPromptResult {
+  prompt_id: number;
+  prompt_text: string;
+  brand_rate: number;
+  brand_by_model: Record<string, number>;
+  outcome: 'win' | 'lose' | 'tie';
+  competitors: CompetitorByModel[];
+}
+
+export interface CompetitorAnalysis {
+  brand_id: number;
+  brand_name: string;
+  run_id: number | null;
+  has_data: boolean;
+  overall: {
+    brand_name: string;
+    brand_pct: number;
+    competitors: { name: string; pct: number }[];
+  };
+  prompts: CompetitorPromptResult[];
+}
+
+export async function getCompetitorAnalysis(
+  brandId: number,
+  runId?: number,
+): Promise<CompetitorAnalysis> {
+  const params: Record<string, unknown> = {};
+  if (runId) params.run_id = runId;
+  const res = await api.get<CompetitorAnalysis>(`/brands/${brandId}/competitor-analysis`, { params });
+  return res.data;
+}
+
 export async function getSuggestedPrompts(brandId: number): Promise<string[]> {
   const res = await api.post<string[]>(`/brands/${brandId}/suggest-prompts`);
+  return res.data;
+}
+
+export async function getSuggestedPromptsPreview(
+  name: string,
+  description?: string,
+): Promise<string[]> {
+  const res = await api.post<string[]>('/brands/suggest-prompts-preview', {
+    name,
+    description: description ?? '',
+  });
   return res.data;
 }
 
@@ -491,6 +557,22 @@ export interface CompetitorStat {
   is_primary: boolean;
 }
 
+export interface ModelStat {
+  model: string;
+  label: string;
+  mention_count: number;
+  total: number;
+  mention_rate: number;
+}
+
+export interface CitationGap {
+  domain: string;
+  domain_type: string;
+  cited_total: number;
+  cited_with_brand: number;
+  gap_score: number;
+}
+
 export interface DashboardAnalytics {
   brand_id: number;
   brand_name: string;
@@ -500,6 +582,8 @@ export interface DashboardAnalytics {
   top_domains: DomainStat[];
   recent_conversations: ConversationItem[];
   competitor_comparison: CompetitorStat[];
+  model_breakdown: ModelStat[];
+  citation_gaps: CitationGap[];
   total_responses_analyzed: number;
 }
 
@@ -515,6 +599,8 @@ export interface BrandWithStats {
   name: string;
   slug: string;
   tier: 'basic' | 'standard' | 'premium';
+  brand_type: 'standard' | 'pitch';
+  pitch_expires_at: string | null;
   prompt_count: number;
   overall_score: number | null;
   last_run_at: string | null;
@@ -630,6 +716,9 @@ export interface AuthUser {
   is_admin: boolean;
   prompt_limit: number;
   created_at: string;
+  is_team_member?: boolean;
+  team_owner_name?: string | null;
+  team_owner_email?: string | null;
 }
 
 export async function authRegister(data: {
@@ -660,14 +749,29 @@ export async function authGoogle(idToken: string): Promise<AuthUser> {
   return res.data;
 }
 
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/auth/forgot-password', { email });
+  return res.data;
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/auth/reset-password', {
+    token,
+    new_password: newPassword,
+  });
+  return res.data;
+}
+
 // ── Billing types & functions ─────────────────────────────────────────────────
 
 export interface BillingStatus {
   subscription_tier: 'starter' | 'pro' | null;
   subscription_status: string | null;
   prompt_limit: number;
+  brand_limits: { standard: number; pitch: number };
   is_admin: boolean;
   stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
 }
 
 export async function getBillingStatus(): Promise<BillingStatus> {
@@ -675,12 +779,161 @@ export async function getBillingStatus(): Promise<BillingStatus> {
   return res.data;
 }
 
-export async function createCheckoutSession(tier: string): Promise<{ checkout_url: string }> {
-  const res = await api.post<{ checkout_url: string }>('/billing/create-checkout', { tier });
+export async function createCheckoutSession(
+  tier: string,
+  successUrl?: string,
+  cancelUrl?: string,
+): Promise<{ checkout_url: string }> {
+  const res = await api.post<{ checkout_url: string }>('/billing/create-checkout', {
+    tier,
+    success_url: successUrl ?? `${window.location.origin}/account?upgraded=true`,
+    cancel_url: cancelUrl ?? `${window.location.origin}/account`,
+  });
   return res.data;
 }
 
 export async function createPortalSession(): Promise<{ portal_url: string }> {
-  const res = await api.post<{ portal_url: string }>('/billing/portal');
+  const res = await api.post<{ portal_url: string }>('/billing/portal', {
+    return_url: `${window.location.origin}/account`,
+  });
+  return res.data;
+}
+
+export async function cancelSubscription(): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/billing/cancel');
+  return res.data;
+}
+
+// ── Admin ─────────────────────────────────────────────────────────────────────
+
+export interface AdminUser {
+  id: number;
+  email: string;
+  name: string | null;
+  subscription_tier: string | null;
+  subscription_status: string | null;
+  is_admin: boolean;
+  created_at: string | null;
+  brand_count: number;
+  last_active: string | null;
+}
+
+export interface AdminRun {
+  id: number;
+  brand_id: number;
+  brand_name: string;
+  user_email: string | null;
+  status: string;
+  run_type: string;
+  overall_score: number | null;
+  total_queries: number | null;
+  total_mentions: number | null;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export interface AdminStats {
+  total_users: number;
+  total_brands: number;
+  total_prompts: number;
+  total_drafts: number;
+  runs_today: number;
+}
+
+export async function adminGetUsers(): Promise<AdminUser[]> {
+  const res = await api.get<AdminUser[]>('/analytics/admin/users');
+  return res.data;
+}
+
+export async function adminGetRuns(): Promise<AdminRun[]> {
+  const res = await api.get<AdminRun[]>('/analytics/admin/runs');
+  return res.data;
+}
+
+export async function adminGetStats(): Promise<AdminStats> {
+  const res = await api.get<AdminStats>('/analytics/admin/stats');
+  return res.data;
+}
+
+export async function adminTriggerRun(brandId: number): Promise<{ run_id: number; status: string }> {
+  const res = await api.post<{ run_id: number; status: string }>(`/analytics/admin/trigger-run/${brandId}`);
+  return res.data;
+}
+
+export async function adminGetLogs(lines = 100): Promise<{ lines: string[]; exists: boolean }> {
+  const res = await api.get<{ lines: string[]; exists: boolean }>(`/analytics/admin/logs?lines=${lines}`);
+  return res.data;
+}
+
+export async function exportReportPDF(brandId: number): Promise<void> {
+  const res = await api.get(`/reports/${brandId}/export`, { responseType: 'blob' });
+  const blob = new Blob([res.data], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const disp: string = res.headers['content-disposition'] ?? '';
+  const match = disp.match(/filename="?([^"]+)"?/);
+  a.download = match ? match[1] : `visibility-report-${brandId}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── Draft Attribution ──────────────────────────────────────────────────────────
+
+export interface DraftAttribution {
+  id: number;
+  draft_id: number;
+  brand_id: number;
+  prompt_id: number | null;
+  prompt_text: string | null;
+  draft_title: string | null;
+  draft_platform: string | null;
+  posted_at: string;
+  score_at_posting: number | null;
+  current_score: number | null;
+  delta: number | null;
+  runs_since_posting: number;
+  created_at: string;
+}
+
+export async function getDraftAttributions(brandId: number): Promise<DraftAttribution[]> {
+  const res = await api.get<DraftAttribution[]>(`/brands/${brandId}/content-attribution`);
+  return res.data;
+}
+
+// ── Team Members ──────────────────────────────────────────────────────────────
+
+export interface TeamMember {
+  id: number;
+  invited_email: string;
+  user_id: number | null;
+  role: string;
+  accepted: boolean;
+  invited_at: string;
+  accepted_at: string | null;
+}
+
+export interface InviteResponse {
+  id: number;
+  invite_link: string;
+  message: string;
+}
+
+export async function getTeamMembers(): Promise<TeamMember[]> {
+  const res = await api.get<TeamMember[]>('/team/members');
+  return res.data;
+}
+
+export async function inviteTeamMember(email: string): Promise<InviteResponse> {
+  const res = await api.post<InviteResponse>('/team/invite', { email });
+  return res.data;
+}
+
+export async function removeTeamMember(memberId: number): Promise<void> {
+  await api.delete(`/team/members/${memberId}`);
+}
+
+export async function acceptTeamInvite(token: string): Promise<{ message: string; account_owner_id: number }> {
+  const res = await api.get<{ message: string; account_owner_id: number }>(`/team/accept?token=${token}`);
   return res.data;
 }

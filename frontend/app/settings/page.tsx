@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User,
   Save,
@@ -47,16 +47,20 @@ import {
   getSchedulerStatus,
   setSchedulerStatus,
   triggerPromptRun,
+  getTeamMembers,
+  inviteTeamMember,
+  removeTeamMember,
   BrandDetail,
   Prompt,
   Competitor,
   BrandProfile,
   BrandContentSettings,
   Publication,
+  TeamMember,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
-type SettingsTab = 'general' | 'profile';
+type SettingsTab = 'general' | 'profile' | 'team';
 
 // ── Auto-growing textarea ─────────────────────────────────────────────────────
 
@@ -274,8 +278,11 @@ function PublicationsEditor({
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [activeTab, setActiveTab] = useState<SettingsTab>(
+    (searchParams.get('tab') as SettingsTab) || 'general'
+  );
   const [loading, setLoading] = useState(true);
   const [brandId, setBrandId] = useState<number | null>(null);
   const [brand, setBrand] = useState<BrandDetail | null>(null);
@@ -323,12 +330,38 @@ export default function SettingsPage() {
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [deleteAccountInput, setDeleteAccountInput] = useState('');
 
+  // Team tab state
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteLink, setInviteLink] = useState<string | null>(null);
+  const [inviteError, setInviteError] = useState<string | null>(null);
+  const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
+
+  useEffect(() => { document.title = 'Settings — ClarityAI'; }, []);
+
   useEffect(() => {
     async function load() {
       try {
-        const [brands, schedulerStatus] = await Promise.all([
-          getBrands(),
-          getSchedulerStatus().catch(() => null),
+        // Start brand details fetching as soon as getBrands resolves —
+        // don't wait for getSchedulerStatus (independent, slower).
+        const brandsPromise = getBrands();
+        const schedulerPromise = getSchedulerStatus().catch(() => null);
+        const detailsPromise = brandsPromise.then((brands) => {
+          if (brands.length === 0) return null;
+          return Promise.all([
+            getBrand(brands[0].id),
+            getCompetitors(brands[0].id),
+            getBrandProfile(brands[0].id).catch(() => null),
+            getContentSettings(brands[0].id).catch(() => [] as BrandContentSettings[]),
+          ]);
+        });
+
+        const [brands, schedulerStatus, details] = await Promise.all([
+          brandsPromise,
+          schedulerPromise,
+          detailsPromise.catch(() => null),
         ]);
 
         if (schedulerStatus) {
@@ -344,7 +377,7 @@ export default function SettingsPage() {
         const firstBrand = brands[0];
         setBrandId(firstBrand.id);
 
-        const [brandDetail, comps, prof, settings] = await Promise.all([
+        const [brandDetail, comps, prof, settings] = details ?? await Promise.all([
           getBrand(firstBrand.id),
           getCompetitors(firstBrand.id),
           getBrandProfile(firstBrand.id).catch(() => null),
@@ -387,6 +420,43 @@ export default function SettingsPage() {
 
     load();
   }, []);
+
+  // Load team members when team tab is selected
+  useEffect(() => {
+    if (activeTab !== 'team') return;
+    setTeamLoading(true);
+    getTeamMembers()
+      .then(setTeamMembers)
+      .catch(() => {})
+      .finally(() => setTeamLoading(false));
+  }, [activeTab]);
+
+  async function handleInvite() {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    setInviteError(null);
+    setInviteLink(null);
+    try {
+      const res = await inviteTeamMember(inviteEmail.trim());
+      setInviteLink(window.location.origin + res.invite_link);
+      setInviteEmail('');
+      const updated = await getTeamMembers();
+      setTeamMembers(updated);
+    } catch (e: any) {
+      setInviteError(e?.response?.data?.detail ?? 'Failed to send invite');
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function handleRemoveMember(id: number) {
+    setRemovingMemberId(id);
+    try {
+      await removeTeamMember(id);
+      setTeamMembers((prev) => prev.filter((m) => m.id !== id));
+    } catch {}
+    setRemovingMemberId(null);
+  }
 
   // ── General handlers ────────────────────────────────────────────────────────
 
@@ -620,7 +690,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-3xl">
+      <div className="p-4 sm:p-8 max-w-3xl">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-32" />
           <div className="h-10 bg-[rgba(255,255,255,0.06)] rounded w-64" />
@@ -633,7 +703,7 @@ export default function SettingsPage() {
   const completionPct = profile?.completion_pct ?? 0;
 
   return (
-    <div className="px-8 py-8 max-w-3xl">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-3xl">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#F0F4F8]">Settings</h1>
@@ -644,7 +714,7 @@ export default function SettingsPage() {
 
       {/* Tab navigation */}
       <div className="flex gap-1 border-b border-[rgba(99,102,241,0.15)] mb-6">
-        {(['general', 'profile'] as SettingsTab[]).map((tab) => (
+        {(['general', 'profile', 'team'] as SettingsTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -655,7 +725,7 @@ export default function SettingsPage() {
                 : 'text-[#64748B] border-transparent hover:text-[#94A3B8]'
             )}
           >
-            {tab === 'general' ? 'General' : 'Brand Profile'}
+            {tab === 'general' ? 'General' : tab === 'profile' ? 'Brand Profile' : 'Team'}
           </button>
         ))}
       </div>
@@ -783,6 +853,7 @@ export default function SettingsPage() {
                     <button
                       onClick={() => handleDeletePrompt(prompt.id)}
                       disabled={deletingPromptId === prompt.id}
+                      aria-label="Delete prompt"
                       className="text-[rgba(255,255,255,0.15)] hover:text-[#f87171] opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
                     >
                       {deletingPromptId === prompt.id ? (
@@ -806,6 +877,7 @@ export default function SettingsPage() {
                   </div>
                   <button
                     onClick={() => { setShowSuggestions(false); setSuggestions([]); }}
+                    aria-label="Close suggestions"
                     className="text-[#475569] hover:text-[#94A3B8] transition-colors"
                   >
                     <X size={14} />
@@ -878,6 +950,7 @@ export default function SettingsPage() {
                     <button
                       onClick={() => handleRemoveCompetitor(comp.id)}
                       disabled={deletingCompetitorId === comp.id}
+                      aria-label="Remove competitor"
                       className="text-[rgba(255,255,255,0.15)] hover:text-[#f87171] opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
                     >
                       {deletingCompetitorId === comp.id ? (
@@ -1143,6 +1216,90 @@ export default function SettingsPage() {
                 <><Save size={16} />{profileSaving ? 'Saving…' : 'Save Profile'}</>
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── TEAM TAB ─────────────────────────────────────────────────────────── */}
+      {activeTab === 'team' && (
+        <div className="space-y-5">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <h2 className="text-base font-semibold text-[#F0F4F8] mb-1">Invite Team Members</h2>
+            <p className="text-sm text-[#64748B] mb-4">Team members get read-only access to your brands, reports, and drafts. They cannot trigger runs or change settings.</p>
+
+            <div className="flex gap-2">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
+                placeholder="colleague@company.com"
+                className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1]"
+              />
+              <button
+                onClick={handleInvite}
+                disabled={inviting || !inviteEmail.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-[#6366f1] text-white rounded-lg text-sm font-medium hover:bg-[#4f46e5] disabled:opacity-50 transition-colors"
+              >
+                {inviting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                Invite
+              </button>
+            </div>
+
+            {inviteError && (
+              <p className="mt-2 text-xs text-[#f87171]">{inviteError}</p>
+            )}
+
+            {inviteLink && (
+              <div className="mt-3 p-3 bg-[rgba(16,185,129,0.08)] border border-[rgba(16,185,129,0.2)] rounded-lg">
+                <p className="text-xs text-[#10b981] mb-1 font-medium">Invite link generated — share this with your team member:</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs text-[#94A3B8] break-all bg-[rgba(0,0,0,0.2)] px-2 py-1.5 rounded">{inviteLink}</code>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(inviteLink)}
+                    className="shrink-0 px-2 py-1.5 text-xs text-[#64748B] hover:text-[#94A3B8] border border-[rgba(255,255,255,0.08)] rounded transition-colors"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <p className="text-xs text-[#475569] mt-1">Link expires in 48 hours.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <h2 className="text-base font-semibold text-[#F0F4F8] mb-4">Team Members</h2>
+            {teamLoading ? (
+              <div className="flex items-center gap-2 text-[#64748B] text-sm"><Loader2 size={14} className="animate-spin" />Loading…</div>
+            ) : teamMembers.length === 0 ? (
+              <p className="text-sm text-[#475569]">No team members yet. Invite someone above.</p>
+            ) : (
+              <div className="divide-y divide-[rgba(255,255,255,0.06)]">
+                {teamMembers.map((m) => (
+                  <div key={m.id} className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="text-sm text-[#F0F4F8]">{m.invited_email}</p>
+                      <p className="text-xs text-[#475569] mt-0.5">
+                        {m.accepted ? (
+                          <span className="text-[#10b981]">Active · Viewer</span>
+                        ) : (
+                          <span className="text-[#f59e0b]">Pending invitation</span>
+                        )}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleRemoveMember(m.id)}
+                      disabled={removingMemberId === m.id}
+                      aria-label="Remove team member"
+                      className="p-1.5 text-[#475569] hover:text-[#f87171] transition-colors rounded"
+                      title="Remove"
+                    >
+                      {removingMemberId === m.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -23,8 +23,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user
-from app.models import Brand, ContentDraft, ContentPost, ContentAttribution, BrandContentSettings
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_active_subscription
+from app.models import Brand, ContentDraft, ContentPost, ContentAttribution, BrandContentSettings, TrackingRun
 from app.schemas import (
     ContentDraftSchema,
     ContentPostSchema,
@@ -182,6 +182,53 @@ async def get_draft(draft_id: int, db: DbDep, user: CurrentUser):
     return draft_data
 
 
+# ── Draft attribution helper ──────────────────────────────────────────────────
+
+async def _create_draft_attribution(db: AsyncSession, draft: ContentDraft) -> None:
+    """Record current prompt visibility at time of posting for attribution tracking."""
+    from app.models import DraftAttribution, TrackingRun, QueryResult
+
+    if draft.prompt_id is None:
+        return  # No prompt linked — skip attribution
+
+    # Find the latest completed tracking run for this brand
+    latest_run_result = await db.execute(
+        select(TrackingRun)
+        .where(TrackingRun.brand_id == draft.brand_id, TrackingRun.status == "completed")
+        .order_by(TrackingRun.completed_at.desc())
+        .limit(1)
+    )
+    latest_run = latest_run_result.scalar_one_or_none()
+
+    score_at_posting: float | None = None
+    if latest_run:
+        # Compute prompt visibility from that run's query results
+        qr_result = await db.execute(
+            select(QueryResult).where(
+                QueryResult.tracking_run_id == latest_run.id,
+                QueryResult.prompt_id == draft.prompt_id,
+                QueryResult.response_text.isnot(None),
+            )
+        )
+        qrs = qr_result.scalars().all()
+        if qrs:
+            mentions = sum(1 for q in qrs if q.mentioned)
+            score_at_posting = round(mentions / len(qrs) * 100.0, 2)
+
+    attribution = DraftAttribution(
+        draft_id=draft.id,
+        brand_id=draft.brand_id,
+        prompt_id=draft.prompt_id,
+        posted_at=draft.posted_at or utcnow(),
+        score_at_posting=score_at_posting,
+        current_score=score_at_posting,
+        delta=0.0 if score_at_posting is not None else None,
+        runs_since_posting=0,
+    )
+    db.add(attribution)
+    await db.commit()
+
+
 # ── Draft update ──────────────────────────────────────────────────────────────
 
 @router.put("/draft/{draft_id}", response_model=ContentDraftSchema)
@@ -226,6 +273,18 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
             secs = int((now - draft.created_at).total_seconds()) if draft.created_at else None
             draft.time_to_approve_seconds = secs
         draft.status = request.status
+        if request.status == "posted" and old_status != "posted":
+            draft.posted_at = utcnow()
+            # Snapshot overall brand visibility at time of posting
+            latest_run_res = await db.execute(
+                select(TrackingRun)
+                .where(TrackingRun.brand_id == draft.brand_id, TrackingRun.status == "completed")
+                .order_by(TrackingRun.completed_at.desc())
+                .limit(1)
+            )
+            latest_run = latest_run_res.scalar_one_or_none()
+            if latest_run and latest_run.overall_score is not None:
+                draft.visibility_at_post = round(latest_run.overall_score, 1)
 
     draft.updated_at = utcnow()
     await db.commit()
@@ -250,6 +309,7 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
             {"draft_id": draft.id, "platform": draft.platform},
             brand_id=draft.brand_id,
         )
+        await _create_draft_attribution(db, draft)
 
     return ContentDraftSchema.model_validate(draft)
 
@@ -303,6 +363,7 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
     Immediately run gap analysis and generate drafts for the top N gaps
     across all enabled platforms. Returns all newly created drafts.
     """
+    require_active_subscription(user)
     check_rate_limit(user.id, limit=2)  # 2 bulk generate-now calls per minute per user
     await get_brand_for_user(brand_id, db, user)
     try:

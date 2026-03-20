@@ -38,6 +38,7 @@ import {
   triggerScan,
   getBrandProfile,
   getContentSettings,
+  getDraftAttributions,
   Brand,
   BrandDetail,
   Prompt,
@@ -46,8 +47,11 @@ import {
   BrandProfile,
   BrandContentSettings,
   DraftQueueStatus,
+  DraftAttribution,
 } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
+import SubscriptionBanner from '@/components/SubscriptionBanner';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -145,13 +149,19 @@ function HelpModal({
   children: React.ReactNode;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
+      <div role="dialog" aria-modal="true" className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-[#F0F4F8]">{title}</h3>
-          <button onClick={onClose} className="text-[#475569] hover:text-[#94A3B8] transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-[#475569] hover:text-[#94A3B8] transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -893,6 +903,12 @@ function RequestDraftModal({
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
+
   async function handleSubmit() {
     setCreating(true);
     setError(null);
@@ -919,13 +935,13 @@ function RequestDraftModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
+      <div role="dialog" aria-modal="true" className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="text-base font-semibold text-[#F0F4F8]">Request a Draft</h3>
             <p className="text-xs text-[#64748B] mt-0.5">Generate a targeted draft for a specific prompt or topic</p>
           </div>
-          <button onClick={onClose} className="text-[#475569] hover:text-[#94A3B8] transition-colors">
+          <button onClick={onClose} aria-label="Close" className="text-[#475569] hover:text-[#94A3B8] transition-colors">
             <X size={16} />
           </button>
         </div>
@@ -1293,12 +1309,44 @@ function ScheduledCard({
 
 // ── Posted card ───────────────────────────────────────────────────────────────
 
-function PostedCard({ draft }: { draft: ContentDraft }) {
+function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?: DraftAttribution }) {
   const title = draft.title ?? draft.content_text.slice(0, 80) + (draft.content_text.length > 80 ? '…' : '');
+
+  let visibilityNode: JSX.Element | null = null;
+  if (attribution) {
+    if (attribution.runs_since_posting === 0) {
+      visibilityNode = (
+        <span className="text-xs text-[#475569] shrink-0 italic">Awaiting next report…</span>
+      );
+    } else {
+      const score = attribution.current_score ?? 0;
+      const delta = attribution.delta;
+      const deltaColor = delta == null ? '#94A3B8' : delta > 0 ? '#10b981' : delta < 0 ? '#f87171' : '#94A3B8';
+      const deltaLabel = delta == null ? '' : delta > 0 ? `+${delta.toFixed(1)}%` : `${delta.toFixed(1)}%`;
+      visibilityNode = (
+        <span className="text-xs shrink-0 flex items-center gap-1">
+          <span className="text-[#94A3B8]">Visibility:</span>
+          <span className="text-[#E2E8F0] font-medium">{score.toFixed(1)}%</span>
+          {delta != null && delta !== 0 && (
+            <span style={{ color: deltaColor }} className="font-medium">{deltaLabel}</span>
+          )}
+        </span>
+      );
+    }
+  } else if (draft.visibility_at_post != null) {
+    visibilityNode = (
+      <span className="text-xs shrink-0 flex items-center gap-1" title="Overall brand visibility at time of posting">
+        <span className="text-[#475569]">Posted at</span>
+        <span className="text-[#94A3B8] font-medium">{draft.visibility_at_post.toFixed(1)}%</span>
+      </span>
+    );
+  }
+
   return (
     <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl px-4 py-3 flex items-center gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       <PlatformBadge platform={draft.platform} />
       <p className="flex-1 text-sm text-[#94A3B8] truncate">{title}</p>
+      {visibilityNode}
       <span className="text-xs text-[#475569] shrink-0">{relativeTime(draft.updated_at)}</span>
     </div>
   );
@@ -1307,11 +1355,14 @@ function PostedCard({ draft }: { draft: ContentDraft }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ContentHubPage() {
+  const { user } = useAuth();
   const [brands, setBrands] = useState<Brand[]>([]);
   const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<QueueTab>('drafts');
 
   // Sync tab from URL after mount — avoids SSR/client hydration mismatch
+  useEffect(() => { document.title = 'Content Hub — ClarityAI'; }, []);
+
   useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
     if (tab === 'opportunities' || tab === 'scheduled' || tab === 'posted') {
@@ -1325,6 +1376,7 @@ export default function ContentHubPage() {
   const [draftItems, setDraftItems] = useState<ContentDraft[]>([]);
   const [scheduledItems, setScheduledItems] = useState<ContentDraft[]>([]);
   const [postedItems, setPostedItems] = useState<ContentDraft[]>([]);
+  const [draftAttributions, setDraftAttributions] = useState<DraftAttribution[]>([]);
   const [opportunities, setOpportunities] = useState<ContentOpportunity[]>([]);
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [brandPrompts, setBrandPrompts] = useState<Prompt[]>([]);
@@ -1367,8 +1419,9 @@ export default function ContentHubPage() {
   // ── Load data ──────────────────────────────────────────────────────────────
 
   const loadingRef = useRef(false);
+  const loadAbortRef = useRef<AbortController | null>(null);
 
-  const loadAll = useCallback(async (brandId: number) => {
+  const loadAll = useCallback(async (brandId: number, signal?: AbortSignal) => {
     // Prevent concurrent loads — double-clicking nav can trigger 16+ simultaneous requests
     if (loadingRef.current) return;
     loadingRef.current = true;
@@ -1384,6 +1437,7 @@ export default function ContentHubPage() {
         brandDetail,
         settingsData,
         statusData,
+        attributionsData,
       ] = await Promise.all([
         getDrafts(brandId, undefined, 'draft'),
         getDrafts(brandId, undefined, 'approved'),
@@ -1393,21 +1447,27 @@ export default function ContentHubPage() {
         getBrand(brandId).catch(() => null),
         getContentSettings(brandId).catch(() => [] as BrandContentSettings[]),
         getDraftStatus(brandId).catch(() => null),
+        getDraftAttributions(brandId).catch(() => [] as DraftAttribution[]),
       ]);
+
+      // Ignore results if the user switched to a different brand while fetching
+      if (signal?.aborted) return;
 
       setDraftItems(draftsData);
       setScheduledItems(scheduledData);
       setPostedItems(postedData);
+      setDraftAttributions(attributionsData);
       setOpportunities(oppsData);
       setBrandProfile(profileData);
       setBrandPrompts(brandDetail?.prompts ?? []);
       setContentSettings(settingsData);
       setDraftStatus(statusData);
     } catch {
+      if (signal?.aborted) return;
       setError('Failed to load content data. Check that the backend is running.');
     } finally {
-      setLoading(false);
       loadingRef.current = false;
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
@@ -1425,7 +1485,12 @@ export default function ContentHubPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedBrandId) loadAll(selectedBrandId);
+    if (!selectedBrandId) return;
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+    loadAll(selectedBrandId, controller.signal);
+    return () => controller.abort();
   }, [selectedBrandId, loadAll]);
 
   // ── Draft actions ──────────────────────────────────────────────────────────
@@ -1459,7 +1524,6 @@ export default function ContentHubPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Remove this draft?')) return;
     await deleteDraft(id);
     if (selectedBrandId) loadAll(selectedBrandId);
   }
@@ -1741,10 +1805,11 @@ export default function ContentHubPage() {
         />
       );
     }
+    const attributionByDraftId = new Map(draftAttributions.map((a) => [a.draft_id, a]));
     return (
       <div className="flex flex-col gap-2">
         {postedItems.map((d) => (
-          <PostedCard key={d.id} draft={d} />
+          <PostedCard key={d.id} draft={d} attribution={attributionByDraftId.get(d.id)} />
         ))}
       </div>
     );
@@ -1754,7 +1819,7 @@ export default function ContentHubPage() {
 
   if (error && brands.length === 0) {
     return (
-      <div className="px-8 py-8 max-w-7xl">
+      <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl">
         <h1 className="text-2xl font-bold text-[#F0F4F8] mb-8">Content Hub</h1>
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <div className="w-14 h-14 bg-[#7f1d1d]/15 border border-[#991b1b]/25 rounded-2xl flex items-center justify-center mb-4">
@@ -1785,7 +1850,14 @@ export default function ContentHubPage() {
   ];
 
   return (
-    <div className="px-8 py-8 max-w-[1400px]">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px]">
+      {/* Subscription status banner */}
+      {user?.subscription_status && ['past_due', 'canceled', 'unpaid'].includes(user.subscription_status) && (
+        <div className="-mx-8 -mt-8 mb-6">
+          <SubscriptionBanner status={user.subscription_status} />
+        </div>
+      )}
+
       {/* Request Draft modal */}
       {requestDraftOpen && selectedBrandId && (
         <RequestDraftModal
@@ -1833,14 +1905,14 @@ export default function ContentHubPage() {
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60" onClick={() => setPostingGuideOpen(false)} />
           {/* Panel */}
-          <div className="relative ml-auto w-full max-w-2xl h-full bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border-l border-[rgba(99,102,241,0.15)] flex flex-col shadow-2xl">
+          <div className="relative ml-auto w-full sm:max-w-2xl h-full bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border-l border-[rgba(99,102,241,0.15)] flex flex-col shadow-2xl">
             {/* Panel header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(99,102,241,0.15)] shrink-0">
               <div className="flex items-center gap-2">
                 <BookOpen size={16} className="text-[#6366f1]" />
                 <h2 className="text-base font-semibold text-[#F0F4F8]">Posting Guide</h2>
               </div>
-              <button onClick={() => setPostingGuideOpen(false)} className="text-[#475569] hover:text-[#94A3B8] transition-colors">
+              <button onClick={() => setPostingGuideOpen(false)} aria-label="Close posting guide" className="text-[#475569] hover:text-[#94A3B8] transition-colors">
                 <X size={18} />
               </button>
             </div>
@@ -2037,16 +2109,17 @@ export default function ContentHubPage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div className="flex items-center gap-2">
           <div>
-            <h1 className="text-2xl font-bold text-[#F0F4F8]">Content Hub</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#F0F4F8]">Content Hub</h1>
             <p className="text-sm text-[#64748B] mt-1">
               AI-powered content to close visibility gaps across every platform
             </p>
           </div>
           <button
             onClick={() => setHubHelpOpen(true)}
+            aria-label="How does Content Hub work?"
             className="text-[#475569] hover:text-[#6366f1] transition-colors mt-1 ml-1"
             title="How does Content Hub work?"
           >
@@ -2097,11 +2170,13 @@ export default function ContentHubPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-32">
-          <Loader2 size={24} className="animate-spin text-[#6366f1]" />
+        <div className="animate-pulse space-y-4">
+          <div className="h-10 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl" />
+          <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl" />
+          <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl" />
         </div>
       ) : (
-        <div className="flex gap-6">
+        <div className="flex flex-col md:flex-row gap-6">
           {/* ── Left panel (70%) — Content Queue ────────────────────────────── */}
           <div className="flex-1 min-w-0">
             {/* Tab bar */}
@@ -2142,7 +2217,7 @@ export default function ContentHubPage() {
           </div>
 
           {/* ── Right panel (30%) — Settings ─────────────────────────────────── */}
-          <div className="w-72 shrink-0 flex flex-col gap-4">
+          <div className="w-full md:w-72 shrink-0 flex flex-col gap-4">
             {/* Generate now */}
             <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
               {draftStatus?.draft_queue_full ? (

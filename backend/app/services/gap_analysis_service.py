@@ -118,7 +118,6 @@ async def run_gap_analysis(brand_id: int, run_id: int) -> list[int]:
             last_content_per_prompt[pid] = post_result.scalar_one_or_none()
 
         # Find platforms with recent activity per brand (last 30 days)
-        thirty_days_ago_ts = _utcnow()
         from datetime import timedelta
         thirty_days_ago_ts = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
 

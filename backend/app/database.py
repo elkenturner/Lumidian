@@ -1,5 +1,6 @@
 import logging
 import os
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
 from dotenv import load_dotenv
@@ -15,6 +16,17 @@ engine = create_async_engine(
     echo=False,
     connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
 )
+
+# Enable FK constraints for every new SQLite connection (aiosqlite uses the sync
+# driver under the hood, so the sync `connect` event fires reliably).
+if "sqlite" in DATABASE_URL:
+    from sqlalchemy import text as _text
+
+    @event.listens_for(engine.sync_engine, "connect")
+    def _set_sqlite_pragma(dbapi_conn, _connection_record):
+        cursor = dbapi_conn.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
@@ -151,6 +163,64 @@ async def run_migrations():
         # Website scraping: Jina-fetched context on brand_profiles
         "ALTER TABLE brand_profiles ADD COLUMN internal_brand_context TEXT",
         "ALTER TABLE brand_profiles ADD COLUMN website_context_last_fetched DATETIME",
+        # Password reset tokens
+        """CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token TEXT NOT NULL UNIQUE,
+            expires_at DATETIME NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )""",
+        # Competitor website URL
+        "ALTER TABLE competitors ADD COLUMN website_url TEXT",
+        # Competitor mention tracking (no extra API calls — reuses QueryResult data)
+        """CREATE TABLE IF NOT EXISTS competitor_mentions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            competitor_id INTEGER NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id),
+            model TEXT NOT NULL,
+            run_number INTEGER NOT NULL,
+            mentioned INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )""",
+        # Content performance tracking — draft attribution
+        """CREATE TABLE IF NOT EXISTS content_attributions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            draft_id INTEGER NOT NULL REFERENCES content_drafts(id) ON DELETE CASCADE,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL,
+            posted_at DATETIME NOT NULL,
+            score_at_posting REAL,
+            current_score REAL,
+            delta REAL,
+            runs_since_posting INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME
+        )""",
+        # Team members for multi-user access
+        """CREATE TABLE IF NOT EXISTS team_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            invited_email TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            invite_token TEXT NOT NULL UNIQUE,
+            invited_at DATETIME,
+            accepted_at DATETIME,
+            expires_at DATETIME NOT NULL
+        )""",
+        # Performance indexes — speed up dashboard/reports queries
+        "CREATE INDEX IF NOT EXISTS idx_tracking_runs_brand_status ON tracking_runs(brand_id, status, completed_at)",
+        "CREATE INDEX IF NOT EXISTS idx_query_results_run_id ON query_results(tracking_run_id)",
+        "CREATE INDEX IF NOT EXISTS idx_query_results_run_text ON query_results(tracking_run_id, response_text)",
+        "CREATE INDEX IF NOT EXISTS idx_opportunities_brand_status ON content_opportunities(brand_id, status)",
+        "ALTER TABLE content_drafts ADD COLUMN visibility_at_post REAL",
+        # Pitch brand support: brand_type + expiry, and prompt type labelling
+        "ALTER TABLE brands ADD COLUMN brand_type TEXT NOT NULL DEFAULT 'standard'",
+        "ALTER TABLE brands ADD COLUMN pitch_expires_at DATETIME",
+        "ALTER TABLE prompts ADD COLUMN prompt_type TEXT NOT NULL DEFAULT 'standard'",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

@@ -2,15 +2,33 @@
 
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { LayoutDashboard, BarChart2, FileText, Settings } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding'];
+
+const MOBILE_NAV = [
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Reports',   href: '/reports',   icon: BarChart2 },
+  { label: 'Content',   href: '/content',   icon: FileText },
+  { label: 'Settings',  href: '/settings',  icon: Settings },
+];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [reportRunning, setReportRunning] = useState(false);
   const [draftsGenerating, setDraftsGenerating] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   // Poll localStorage for cross-page status signals written by dashboard/content pages
   useEffect(() => {
@@ -30,10 +48,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   );
 
   if (!showSidebar) {
-    return <>{children}</>;
+    return <ErrorBoundary>{children}</ErrorBoundary>;
   }
 
   return (
+    <ErrorBoundary>
     <>
       {/* Fixed dark base */}
       <div style={{ position: 'fixed', inset: 0, background: '#080C14', zIndex: -2 }} />
@@ -70,11 +89,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         }} />
       </div>
 
-      <Sidebar expanded={sidebarExpanded} onExpandedChange={setSidebarExpanded} />
+      {/* Desktop sidebar — hidden on mobile */}
+      {!isMobile && (
+        <Sidebar expanded={sidebarExpanded} onExpandedChange={setSidebarExpanded} />
+      )}
+
       <main
         className="min-h-screen relative"
         style={{
-          marginLeft: sidebarExpanded ? 220 : 56,
+          marginLeft: isMobile ? 0 : (sidebarExpanded ? 220 : 56),
+          marginBottom: isMobile ? 56 : 0,
           transition: 'margin-left 0.2s ease',
           zIndex: 0,
         }}
@@ -110,6 +134,51 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         )}
         {children}
       </main>
+
+      {/* Mobile bottom navigation */}
+      {isMobile && (
+        <nav
+          aria-label="Main navigation"
+          style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+            height: 56,
+            background: 'rgba(8,12,20,0.95)',
+            backdropFilter: 'blur(20px)',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-around',
+            padding: '0 8px',
+          }}
+        >
+          {MOBILE_NAV.map(({ label, href, icon: Icon }) => {
+            const isActive = pathname === href || pathname.startsWith(href + '/');
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-label={label}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 3,
+                  flex: 1,
+                  padding: '6px 0',
+                  color: isActive ? '#818cf8' : '#475569',
+                  textDecoration: 'none',
+                  fontSize: 10,
+                  fontWeight: 500,
+                }}
+              >
+                <Icon size={20} />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </>
+    </ErrorBoundary>
   );
 }

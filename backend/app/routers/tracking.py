@@ -18,24 +18,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_active_subscription
 from app.models import Brand, TrackingRun
 from app.schemas import ManualRunResponse, TrackingRunStatus, TrackingRunSummary
-from app.services.tracking_service import run_tracking
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tracking", tags=["tracking"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
-
-
-async def _background_run(brand_id: int) -> None:
-    """Wraps run_tracking for use as a fire-and-forget task."""
-    try:
-        await run_tracking(brand_id=brand_id, run_type="manual")
-    except Exception:
-        logger.exception("Background tracking run failed for brand %d", brand_id)
 
 
 # ── Trigger manual run ────────────────────────────────────────────────────────
@@ -46,6 +37,7 @@ async def _background_run(brand_id: int) -> None:
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDep, user: CurrentUser):
+    require_active_subscription(user)
     check_rate_limit(user.id, limit=3)  # 3 manual runs per minute per user
     await get_brand_for_user(brand_id, db, user)
 
@@ -84,7 +76,6 @@ async def _background_run_with_id(run_id: int, brand_id: int) -> None:
     We update its status to 'running' immediately, then delegate to the service.
     """
     from app.database import AsyncSessionLocal
-    from app.services.tracking_service import run_tracking as _run_tracking
 
     # Mark as running
     async with AsyncSessionLocal() as db:
@@ -96,9 +87,6 @@ async def _background_run_with_id(run_id: int, brand_id: int) -> None:
             await db.commit()
 
     try:
-        # run_tracking creates its own TrackingRun; here we use the service
-        # directly but skip the internal record creation by calling the internal
-        # steps manually with the existing run_id.
         await _execute_run_with_id(run_id=run_id, brand_id=brand_id)
     except Exception:
         logger.exception(
@@ -302,7 +290,9 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
                 m: {"total_queries": 0, "total_mentions": 0} for m in SUPPORTED_MODELS
             }
             for qr in query_results:
-                if qr.error == "api_key_not_configured":
+                # Exclude ALL errors — they should not count as "not mentioned"
+                # and should not inflate the denominator (mirrors tracking_service.py)
+                if not qr.response_text:
                     continue
                 model_stats[qr.model]["total_queries"] += 1
                 if qr.mentioned:
@@ -373,6 +363,75 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
         )
     except Exception as exc:
         logger.warning("Run event logging failed (non-fatal): %s", exc)
+
+    # Detect competitor mentions (non-fatal)
+    try:
+        from app.models import Competitor as CompetitorModel, CompetitorMention
+        from app.database import AsyncSessionLocal
+
+        async with AsyncSessionLocal() as comp_db:
+            comps_result = await comp_db.execute(
+                select(CompetitorModel).where(CompetitorModel.brand_id == brand_id)
+            )
+            competitors = comps_result.scalars().all()
+            if competitors:
+                comp_rows = []
+                for qr in query_results:
+                    if not qr.response_text:
+                        continue
+                    for comp in competitors:
+                        comp_rows.append(CompetitorMention(
+                            tracking_run_id=run_id,
+                            competitor_id=comp.id,
+                            prompt_id=qr.prompt_id,
+                            model=qr.model,
+                            run_number=qr.run_number,
+                            mentioned=comp.name.lower() in qr.response_text.lower(),
+                        ))
+                for cm in comp_rows:
+                    comp_db.add(cm)
+                await comp_db.commit()
+                logger.info("Competitor detection: %d records for manual run %d", len(comp_rows), run_id)
+    except Exception as exc:
+        logger.warning("Competitor detection failed for manual run %d (non-fatal): %s", run_id, exc)
+
+    # Update draft attributions (non-fatal)
+    try:
+        from app.models import DraftAttribution
+        from app.database import AsyncSessionLocal
+        from datetime import datetime, timezone
+
+        def _utcnow_local():
+            return datetime.now(timezone.utc).replace(tzinfo=None)
+
+        async with AsyncSessionLocal() as attr_db:
+            attr_result = await attr_db.execute(
+                select(DraftAttribution).where(
+                    DraftAttribution.brand_id == brand_id,
+                    DraftAttribution.prompt_id.is_not(None),
+                )
+            )
+            attributions = attr_result.scalars().all()
+            if attributions:
+                prompt_stats: dict[int, tuple[int, int]] = {}
+                for qr in query_results:
+                    if not qr.response_text:
+                        continue
+                    pid = qr.prompt_id
+                    m, t = prompt_stats.get(pid, (0, 0))
+                    prompt_stats[pid] = (m + (1 if qr.mentioned else 0), t + 1)
+                for attr in attributions:
+                    pid = attr.prompt_id
+                    if pid in prompt_stats:
+                        mentions, total = prompt_stats[pid]
+                        new_score = round(mentions / total * 100.0, 2) if total > 0 else 0.0
+                        attr.current_score = new_score
+                        if attr.score_at_posting is not None:
+                            attr.delta = round(new_score - attr.score_at_posting, 2)
+                    attr.runs_since_posting = (attr.runs_since_posting or 0) + 1
+                await attr_db.commit()
+    except Exception as exc:
+        logger.warning("Draft attribution update failed for manual run %d (non-fatal): %s", run_id, exc)
 
     # Run gap analysis (non-fatal)
     logger.info("Manual run %d complete — starting gap analysis", run_id)
@@ -513,7 +572,7 @@ async def _background_prompt_run(
 
             model_stats = {m: {"total_queries": 0, "total_mentions": 0} for m in SUPPORTED_MODELS}
             for qr in query_results:
-                if qr.error == "api_key_not_configured":
+                if not qr.response_text:
                     continue
                 model_stats[qr.model]["total_queries"] += 1
                 if qr.mentioned:

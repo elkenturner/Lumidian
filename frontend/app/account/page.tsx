@@ -13,27 +13,68 @@ import {
   CreditCard,
   ReceiptText,
   Zap,
+  X,
 } from 'lucide-react';
 import {
   getSchedulerStatus,
   setSchedulerStatus,
+  getBillingStatus,
+  createCheckoutSession,
+  createPortalSession,
+  cancelSubscription,
+  BillingStatus,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
-import { useRouter } from 'next/navigation';
 
 const PLANS = [
-  { key: 'free',  label: 'Free',       price: '$0/mo',   features: ['1 brand', '5 prompts', '2 runs/day'] },
-  { key: 'pro',   label: 'Pro',        price: '$49/mo',  features: ['5 brands', '50 prompts', 'Unlimited runs', 'Content Hub'] },
-  { key: 'scale', label: 'Scale',      price: '$149/mo', features: ['Unlimited brands', 'Unlimited prompts', 'Priority support', 'API access'] },
+  {
+    key: null,
+    label: 'Free',
+    price: '$0/mo',
+    features: ['1 pitch brand (10 prompts)', 'Pitch expires after 7 days', '4 AI models tracked', 'Visibility scoring'],
+  },
+  {
+    key: 'starter',
+    label: 'Starter',
+    price: '$300/mo',
+    features: [
+      '1 standard brand (25 prompts)',
+      '1 pitch brand (10 prompts, 7-day)',
+      'Content Hub & gap analysis',
+      'Brand profile & voice',
+      'Email support',
+    ],
+  },
+  {
+    key: 'pro',
+    label: 'Pro',
+    price: '$500/mo',
+    trial: true,
+    features: [
+      '5 standard brands (100 prompts each)',
+      'Unlimited pitch decks',
+      '7-day free trial',
+      'Content Hub & gap analysis',
+      'Priority support',
+    ],
+  },
 ];
 
 export default function AccountPage() {
   const { user } = useAuth();
-  const router = useRouter();
 
   // Profile
   const [displayName, setDisplayName] = useState('');
   const [accountSaved, setAccountSaved] = useState(false);
+
+  // Billing
+  const [billing, setBilling] = useState<BillingStatus | null>(null);
+  const [billingLoading, setBillingLoading] = useState(true);
+  const [upgradeLoading, setUpgradeLoading] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [billingError, setBillingError] = useState<string | null>(null);
 
   // Scheduler
   const [schedulerPaused, setSchedulerPaused] = useState(false);
@@ -44,8 +85,9 @@ export default function AccountPage() {
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [deleteAccountInput, setDeleteAccountInput] = useState('');
 
+  useEffect(() => { document.title = 'Account — ClarityAI'; }, []);
+
   useEffect(() => {
-    // Load display name from localStorage
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('clarity_settings');
       if (stored) {
@@ -55,7 +97,12 @@ export default function AccountPage() {
         } catch { /* ignore */ }
       }
     }
-    // Load scheduler status
+
+    getBillingStatus()
+      .then(setBilling)
+      .catch(() => setBillingError('Could not load billing status'))
+      .finally(() => setBillingLoading(false));
+
     getSchedulerStatus()
       .then((s) => { setSchedulerPaused(s.paused); setSchedulerLoading(false); })
       .catch(() => setSchedulerLoading(false));
@@ -67,6 +114,47 @@ export default function AccountPage() {
     }
     setAccountSaved(true);
     setTimeout(() => setAccountSaved(false), 2500);
+  }
+
+  async function handleUpgrade(tier: string) {
+    setUpgradeLoading(tier);
+    setBillingError(null);
+    try {
+      const { checkout_url } = await createCheckoutSession(tier);
+      window.location.href = checkout_url;
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setBillingError(msg ?? 'Could not start checkout. Please try again.');
+      setUpgradeLoading(null);
+    }
+  }
+
+  async function handleManageBilling() {
+    setPortalLoading(true);
+    setBillingError(null);
+    try {
+      const { portal_url } = await createPortalSession();
+      window.location.href = portal_url;
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setBillingError(msg ?? 'Could not open billing portal.');
+      setPortalLoading(false);
+    }
+  }
+
+  async function handleCancel() {
+    setCancelLoading(true);
+    setBillingError(null);
+    try {
+      await cancelSubscription();
+      setBilling((prev) => prev ? { ...prev, subscription_status: 'canceling' } : prev);
+      setShowCancelConfirm(false);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setBillingError(msg ?? 'Could not cancel subscription.');
+    } finally {
+      setCancelLoading(false);
+    }
   }
 
   async function handleToggleScheduler() {
@@ -82,10 +170,13 @@ export default function AccountPage() {
     }
   }
 
-  const currentPlan = user?.subscription_tier ?? 'free';
+  const currentTier = billing?.subscription_tier ?? null;
+  const subStatus = billing?.subscription_status ?? null;
+  const hasActiveSub = billing?.stripe_subscription_id != null && subStatus !== 'canceled';
+  const isCanceling = subStatus === 'canceling';
 
   return (
-    <div className="px-8 py-8 max-w-3xl space-y-6">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-3xl space-y-6">
       {/* Header */}
       <div className="mb-2">
         <h1 className="text-2xl font-bold text-[#F0F4F8]">Account</h1>
@@ -128,17 +219,34 @@ export default function AccountPage() {
 
       {/* Subscription */}
       <section className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
-        <div className="flex items-center gap-2 mb-4">
-          <CreditCard className="w-4 h-4 text-[#6366f1]" />
-          <h2 className="text-sm font-semibold text-[#F0F4F8]">Subscription</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-[#6366f1]" />
+            <h2 className="text-sm font-semibold text-[#F0F4F8]">Subscription</h2>
+          </div>
+          {billingLoading && <Loader2 className="w-4 h-4 text-[#6366f1] animate-spin" />}
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        {billingError && (
+          <div className="mb-4 flex items-center gap-2 text-xs text-[#fb923c] bg-[#451a03]/20 border border-[#78350f]/30 rounded-lg px-3 py-2.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            {billingError}
+          </div>
+        )}
+
+        {isCanceling && (
+          <div className="mb-4 flex items-center gap-2 text-xs text-[#fb923c] bg-[#451a03]/20 border border-[#78350f]/30 rounded-lg px-3 py-2.5">
+            <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+            Your subscription is set to cancel at the end of the current billing period. You&apos;ll keep access until then.
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
           {PLANS.map((plan) => {
-            const isCurrent = currentPlan === plan.key;
+            const isCurrent = currentTier === plan.key;
             return (
               <div
-                key={plan.key}
+                key={String(plan.key)}
                 className={`rounded-xl p-4 border transition-colors ${
                   isCurrent
                     ? 'bg-[rgba(99,102,241,0.15)] border-[rgba(99,102,241,0.40)]'
@@ -147,44 +255,106 @@ export default function AccountPage() {
               >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-semibold text-[#F0F4F8]">{plan.label}</p>
-                  {isCurrent && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(99,102,241,0.25)] text-[#818CF8]">
-                      Current
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {plan.trial && (
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(16,185,129,0.15)] text-[#34d399] border border-[rgba(16,185,129,0.25)]">
+                        7-day trial
+                      </span>
+                    )}
+                    {isCurrent && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(99,102,241,0.25)] text-[#818CF8]">
+                        Current
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p className="text-base font-bold text-[#6366f1] mb-3">{plan.price}</p>
                 <ul className="space-y-1 mb-4">
                   {plan.features.map((f) => (
-                    <li key={f} className="text-xs text-[#64748B] flex items-center gap-1.5">
-                      <Zap size={9} className="text-[#6366f1] flex-shrink-0" />
+                    <li key={f} className="text-xs text-[#64748B] flex items-start gap-1.5">
+                      <Zap size={9} className="text-[#6366f1] flex-shrink-0 mt-0.5" />
                       {f}
                     </li>
                   ))}
                 </ul>
-                {!isCurrent && (
+                {!isCurrent && plan.key !== null && (
                   <button
-                    onClick={() => alert('Billing portal coming soon')}
-                    className={`w-full py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                      plan.key === 'free'
-                        ? 'border-[rgba(255,255,255,0.12)] text-[#64748B] hover:text-[#94A3B8] hover:border-[rgba(255,255,255,0.20)]'
-                        : 'bg-[#6366f1] hover:bg-[#4f46e5] text-white border-transparent'
-                    }`}
+                    onClick={() => handleUpgrade(plan.key!)}
+                    disabled={!!upgradeLoading}
+                    className="w-full py-1.5 text-xs font-medium rounded-lg bg-[#6366f1] hover:bg-[#4f46e5] text-white border-transparent border transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
                   >
-                    {plan.key === 'free' ? 'Downgrade' : 'Upgrade'}
+                    {upgradeLoading === plan.key ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                    {plan.trial ? 'Start Free Trial' : 'Upgrade'}
                   </button>
                 )}
               </div>
             );
           })}
         </div>
+
+        {/* Billing portal / cancel row */}
+        {hasActiveSub && (
+          <div className="flex items-center gap-3 pt-3 border-t border-[rgba(99,102,241,0.10)]">
+            <button
+              onClick={handleManageBilling}
+              disabled={portalLoading}
+              className="flex items-center gap-1.5 text-xs text-[#6366f1] hover:text-[#818cf8] transition-colors disabled:opacity-50"
+            >
+              {portalLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : <CreditCard className="w-3 h-3" />}
+              Manage billing &amp; invoices
+            </button>
+
+            {!isCanceling && (
+              <>
+                <span className="text-[#334155]">·</span>
+                {showCancelConfirm ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-[#64748B]">Cancel at period end?</span>
+                    <button
+                      onClick={handleCancel}
+                      disabled={cancelLoading}
+                      className="text-xs text-[#ef4444] hover:text-red-400 font-medium disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {cancelLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                      Yes, cancel
+                    </button>
+                    <button
+                      onClick={() => setShowCancelConfirm(false)}
+                      className="text-xs text-[#64748B] hover:text-[#94A3B8]"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowCancelConfirm(true)}
+                    className="text-xs text-[#64748B] hover:text-[#94A3B8] transition-colors"
+                  >
+                    Cancel subscription
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
       </section>
 
       {/* Billing History */}
       <section className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
-        <div className="flex items-center gap-2 mb-4">
-          <ReceiptText className="w-4 h-4 text-[#6366f1]" />
-          <h2 className="text-sm font-semibold text-[#F0F4F8]">Billing History</h2>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <ReceiptText className="w-4 h-4 text-[#6366f1]" />
+            <h2 className="text-sm font-semibold text-[#F0F4F8]">Billing History</h2>
+          </div>
+          {billing?.stripe_customer_id && (
+            <button
+              onClick={handleManageBilling}
+              disabled={portalLoading}
+              className="text-xs text-[#6366f1] hover:text-[#818cf8] transition-colors disabled:opacity-50"
+            >
+              View all invoices →
+            </button>
+          )}
         </div>
         <div className="border border-[rgba(99,102,241,0.10)] rounded-lg overflow-hidden">
           <div className="px-4 py-3 border-b border-[rgba(99,102,241,0.10)] bg-[rgba(99,102,241,0.04)] flex items-center justify-between">

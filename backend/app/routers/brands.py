@@ -15,7 +15,6 @@ DELETE /api/brands/{brand_id}/prompts/{prompt_id} — remove a prompt
 import json as _json
 import os as _os
 import re
-import re as _re
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -24,8 +23,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_current_user, get_brand_for_user, CurrentUser
+from app.dependencies import get_current_user, get_brand_for_user, get_data_owner_id, CurrentUser
 from app.models import Brand, Prompt, Competitor, TrackingRun, User
+from datetime import datetime, timezone, timedelta
 from app.schemas import (
     BrandCreate,
     BrandUpdate,
@@ -36,6 +36,10 @@ from app.schemas import (
     PromptResponse,
     CompetitorCreate,
     CompetitorResponse,
+    CompetitorAnalysisResponse,
+    OverallSOV,
+    CompetitorPromptResult,
+    CompetitorByModel,
 )
 
 router = APIRouter(prefix="/brands", tags=["brands"])
@@ -73,11 +77,12 @@ async def _get_brand_or_404(db: AsyncSession, brand_id: int, user: Optional[User
 @router.get("/with-stats", response_model=list[BrandWithStats])
 async def list_brands_with_stats(db: DbDep, user: CurrentUser):
     """Returns brands enriched with latest run score and trend direction."""
+    owner_id = await get_data_owner_id(db, user)
     # Get user's brands with prompt count
     brands_result = await db.execute(
         select(Brand, func.count(Prompt.id).label("prompt_count"))
         .outerjoin(Prompt, Prompt.brand_id == Brand.id)
-        .where(Brand.user_id == user.id)
+        .where(Brand.user_id == owner_id)
         .group_by(Brand.id)
         .order_by(Brand.created_at.desc())
     )
@@ -128,6 +133,8 @@ async def list_brands_with_stats(db: DbDep, user: CurrentUser):
                 name=brand.name,
                 slug=brand.slug,
                 tier=brand.tier,
+                brand_type=getattr(brand, "brand_type", "standard"),
+                pitch_expires_at=getattr(brand, "pitch_expires_at", None),
                 prompt_count=prompt_count,
                 overall_score=round(latest_run.overall_score, 2) if latest_run and latest_run.overall_score is not None else None,
                 last_run_at=latest_run.completed_at if latest_run else None,
@@ -143,10 +150,11 @@ async def list_brands_with_stats(db: DbDep, user: CurrentUser):
 
 @router.get("", response_model=list[BrandSummary])
 async def list_brands(db: DbDep, user: CurrentUser):
+    owner_id = await get_data_owner_id(db, user)
     result = await db.execute(
         select(Brand, func.count(Prompt.id).label("prompt_count"))
         .outerjoin(Prompt, Prompt.brand_id == Brand.id)
-        .where(Brand.user_id == user.id)
+        .where(Brand.user_id == owner_id)
         .group_by(Brand.id)
         .order_by(Brand.created_at.desc())
     )
@@ -172,6 +180,26 @@ async def list_brands(db: DbDep, user: CurrentUser):
 
 @router.post("", response_model=BrandDetail, status_code=status.HTTP_201_CREATED)
 async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
+    if not user.is_admin:
+        from app.routers.auth import BRAND_TYPE_LIMITS
+        limits = BRAND_TYPE_LIMITS.get(user.subscription_tier, BRAND_TYPE_LIMITS[None])
+        brand_type_limit = limits.get(payload.brand_type, 0)
+
+        existing_of_type = await db.execute(
+            select(func.count(Brand.id)).where(
+                Brand.user_id == user.id,
+                Brand.brand_type == payload.brand_type,
+            )
+        )
+        count_of_type = existing_of_type.scalar_one()
+        if count_of_type >= brand_type_limit:
+            tier_name = user.subscription_tier or "free"
+            kind = "pitch" if payload.brand_type == "pitch" else "standard"
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=f"Brand limit reached: your {tier_name} plan allows {brand_type_limit} {kind} brand(s). Upgrade to add more.",
+            )
+
     slug = _slugify(payload.name)
 
     # Ensure slug uniqueness
@@ -182,14 +210,30 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
             detail=f"A brand with slug '{slug}' already exists",
         )
 
-    brand = Brand(name=payload.name, slug=slug, tier=payload.tier, user_id=user.id, website_url=payload.website_url)
+    pitch_expires_at = None
+    if payload.brand_type == "pitch":
+        pitch_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=7)
+
+    brand = Brand(
+        name=payload.name,
+        slug=slug,
+        tier=payload.tier,
+        brand_type=payload.brand_type,
+        pitch_expires_at=pitch_expires_at,
+        user_id=user.id,
+        website_url=payload.website_url,
+    )
     db.add(brand)
     await db.flush()  # gets brand.id without committing
 
-    for text in payload.prompts:
+    # Pitch brands cap at 10 prompts
+    pitch_limit = 10
+    prompt_list = payload.prompts[:pitch_limit] if payload.brand_type == "pitch" else payload.prompts
+    for text in prompt_list:
         text = text.strip()
         if text:
-            db.add(Prompt(brand_id=brand.id, text=text))
+            prompt_type = "pitch" if payload.brand_type == "pitch" else "standard"
+            db.add(Prompt(brand_id=brand.id, text=text, prompt_type=prompt_type))
 
     await db.commit()
     await db.refresh(brand)
@@ -278,22 +322,39 @@ async def add_prompt(
 
     # Enforce prompt limits for non-admin users
     if not user.is_admin:
-        from app.routers.auth import TIER_LIMITS
-        limit = TIER_LIMITS.get(user.subscription_tier or "", 25)
-        count_result = await db.execute(
-            select(func.count(Prompt.id)).where(
-                Prompt.brand_id.in_(
-                    select(Brand.id).where(Brand.user_id == user.id)
+        # Re-fetch brand to check brand_type and pitch expiry
+        brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
+        brand_obj = brand_result.scalar_one_or_none()
+
+        if brand_obj and brand_obj.brand_type == "pitch":
+            # Pitch brand: hard cap of 10 prompts per brand
+            pitch_prompt_count_result = await db.execute(
+                select(func.count(Prompt.id)).where(Prompt.brand_id == brand_id)
+            )
+            pitch_count = pitch_prompt_count_result.scalar_one()
+            if pitch_count >= 10:
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail="Pitch brands are limited to 10 prompts. Upgrade to a standard brand for more.",
+                )
+        else:
+            # Standard brand: check total prompt count against tier limit
+            from app.routers.auth import TIER_LIMITS
+            limit = TIER_LIMITS.get(user.subscription_tier or "", 10)
+            count_result = await db.execute(
+                select(func.count(Prompt.id)).where(
+                    Prompt.brand_id.in_(
+                        select(Brand.id).where(Brand.user_id == user.id, Brand.brand_type == "standard")
+                    )
                 )
             )
-        )
-        total_prompts = count_result.scalar_one()
-        if total_prompts >= limit:
-            tier_name = user.subscription_tier or "free"
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail=f"Prompt limit reached ({total_prompts}/{limit} for {tier_name} plan). Please upgrade to add more prompts.",
-            )
+            total_prompts = count_result.scalar_one()
+            if total_prompts >= limit:
+                tier_name = user.subscription_tier or "free"
+                raise HTTPException(
+                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                    detail=f"Prompt limit reached ({total_prompts}/{limit} for {tier_name} plan). Upgrade to add more prompts.",
+                )
 
     prompt = Prompt(brand_id=brand_id, text=text)
     db.add(prompt)
@@ -353,7 +414,7 @@ async def list_competitors(brand_id: int, db: DbDep, user: CurrentUser):
 )
 async def add_competitor(brand_id: int, payload: CompetitorCreate, db: DbDep, user: CurrentUser):
     await get_brand_for_user(brand_id, db, user)
-    competitor = Competitor(brand_id=brand_id, name=payload.name)
+    competitor = Competitor(brand_id=brand_id, name=payload.name, website_url=payload.website_url)
     db.add(competitor)
     await db.commit()
     await db.refresh(competitor)
@@ -460,12 +521,63 @@ The goal is to find queries where a user is researching a problem or category, a
         )
         text = response.content[0].text.strip() if response.content else "[]"
         # Extract JSON array from response
-        m = _re.search(r"\[[\s\S]*\]", text)
+        m = re.search(r"\[[\s\S]*\]", text)
         if m:
             suggestions = _json.loads(m.group())
         else:
             suggestions = _json.loads(text)
         return [s for s in suggestions if isinstance(s, str)][:15]
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Suggestion generation failed: {exc}",
+        )
+
+
+# ── Suggest prompts without an existing brand (onboarding) ───────────────────
+
+from pydantic import BaseModel as _BaseModel
+
+class _SuggestPreviewReq(_BaseModel):
+    name: str
+    description: str = ""
+
+
+@router.post("/suggest-prompts-preview", response_model=list[str])
+async def suggest_prompts_preview(payload: _SuggestPreviewReq, db: DbDep, user: CurrentUser):
+    """Generate tracking prompt suggestions from just a brand name (for onboarding wizard)."""
+    api_key = _os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ANTHROPIC_API_KEY not configured",
+        )
+
+    context_parts = [f"Brand name: {payload.name.strip()}"]
+    if payload.description.strip():
+        context_parts.append(f"Company description: {payload.description.strip()}")
+    context = "\n".join(context_parts)
+
+    system_prompt = f"""You generate AI visibility tracking prompts for brands. Find the real queries users type into ChatGPT/Claude/Perplexity when researching solutions — NOT looking up a specific brand.
+
+{context}
+
+Return ONLY a valid JSON array of 12 strings — no explanation, no markdown.
+
+Generate category queries, comparison queries, problem-seeking queries, and buying-decision queries. NEVER include the brand name in any question."""
+
+    try:
+        import anthropic
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1000,
+            messages=[{"role": "user", "content": system_prompt}],
+        )
+        text = response.content[0].text.strip() if response.content else "[]"
+        m = re.search(r"\[[\s\S]*\]", text)
+        suggestions = _json.loads(m.group() if m else text)
+        return [s for s in suggestions if isinstance(s, str)][:12]
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -491,3 +603,248 @@ async def refresh_website_context(brand_id: int, db: DbDep, user: CurrentUser):
         name=f"jina-refresh-{brand_id}",
     )
     return {"message": "Website context refresh started", "brand_id": brand_id}
+
+
+# ── Competitor analysis ────────────────────────────────────────────────────────
+
+@router.get("/{brand_id}/competitor-analysis", response_model=CompetitorAnalysisResponse)
+async def get_competitor_analysis(
+    brand_id: int,
+    db: DbDep,
+    user: CurrentUser,
+    run_id: Optional[int] = None,
+):
+    """Per-prompt brand vs competitor mention rates with model breakdown."""
+    from app.models import QueryResult, CompetitorMention
+
+    brand = await get_brand_for_user(brand_id, db, user)
+
+    # Load competitors
+    comps_result = await db.execute(
+        select(Competitor)
+        .where(Competitor.brand_id == brand_id)
+        .order_by(Competitor.created_at)
+    )
+    competitors = comps_result.scalars().all()
+
+    _empty = CompetitorAnalysisResponse(
+        brand_id=brand_id,
+        brand_name=brand.name,
+        run_id=None,
+        has_data=False,
+        overall=OverallSOV(brand_name=brand.name, brand_pct=0.0, competitors=[]),
+        prompts=[],
+    )
+
+    if not competitors:
+        return _empty
+
+    # Resolve run
+    if run_id is None:
+        run_result = await db.execute(
+            select(TrackingRun)
+            .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+            .order_by(TrackingRun.completed_at.desc())
+            .limit(1)
+        )
+        run = run_result.scalar_one_or_none()
+        if run is None:
+            return _empty
+        run_id = run.id
+
+    # Load query results (exclude errors)
+    from app.models import Prompt as PromptModel
+    qr_result = await db.execute(
+        select(QueryResult, PromptModel.text.label("prompt_text"))
+        .join(PromptModel, QueryResult.prompt_id == PromptModel.id)
+        .where(QueryResult.tracking_run_id == run_id, QueryResult.response_text.isnot(None))
+    )
+    query_rows = qr_result.all()
+
+    if not query_rows:
+        return _empty
+
+    # Load competitor mention rows for this run
+    cm_result = await db.execute(
+        select(CompetitorMention).where(CompetitorMention.tracking_run_id == run_id)
+    )
+    comp_mention_rows = cm_result.scalars().all()
+
+    # Build brand stats per prompt
+    brand_stats: dict[int, dict] = {}
+    prompt_texts: dict[int, str] = {}
+    for qr, pt in query_rows:
+        pid = qr.prompt_id
+        prompt_texts[pid] = pt
+        if pid not in brand_stats:
+            brand_stats[pid] = {"total": 0, "mentioned": 0, "by_model": {}}
+        brand_stats[pid]["total"] += 1
+        if qr.mentioned:
+            brand_stats[pid]["mentioned"] += 1
+        m = qr.model
+        bm = brand_stats[pid]["by_model"]
+        if m not in bm:
+            bm[m] = {"total": 0, "mentioned": 0}
+        bm[m]["total"] += 1
+        if qr.mentioned:
+            bm[m]["mentioned"] += 1
+
+    # Build competitor stats per (competitor_id, prompt_id)
+    comp_stats: dict[int, dict[int, dict]] = {}
+
+    if comp_mention_rows:
+        for cm in comp_mention_rows:
+            cid, pid, m = cm.competitor_id, cm.prompt_id, cm.model
+            if cid not in comp_stats:
+                comp_stats[cid] = {}
+            if pid not in comp_stats[cid]:
+                comp_stats[cid][pid] = {"total": 0, "mentioned": 0, "by_model": {}}
+            comp_stats[cid][pid]["total"] += 1
+            if cm.mentioned:
+                comp_stats[cid][pid]["mentioned"] += 1
+            if m not in comp_stats[cid][pid]["by_model"]:
+                comp_stats[cid][pid]["by_model"][m] = {"total": 0, "mentioned": 0}
+            comp_stats[cid][pid]["by_model"][m]["total"] += 1
+            if cm.mentioned:
+                comp_stats[cid][pid]["by_model"][m]["mentioned"] += 1
+    else:
+        # Fallback: text-search competitor names in query results
+        for qr, _ in query_rows:
+            pid, m = qr.prompt_id, qr.model
+            text = qr.response_text or ""
+            for comp in competitors:
+                cid = comp.id
+                mentioned = comp.name.lower() in text.lower()
+                if cid not in comp_stats:
+                    comp_stats[cid] = {}
+                if pid not in comp_stats[cid]:
+                    comp_stats[cid][pid] = {"total": 0, "mentioned": 0, "by_model": {}}
+                comp_stats[cid][pid]["total"] += 1
+                if mentioned:
+                    comp_stats[cid][pid]["mentioned"] += 1
+                if m not in comp_stats[cid][pid]["by_model"]:
+                    comp_stats[cid][pid]["by_model"][m] = {"total": 0, "mentioned": 0}
+                comp_stats[cid][pid]["by_model"][m]["total"] += 1
+                if mentioned:
+                    comp_stats[cid][pid]["by_model"][m]["mentioned"] += 1
+
+    # Build prompt results
+    prompt_results: list[CompetitorPromptResult] = []
+    for pid, bs in brand_stats.items():
+        brand_rate = (bs["mentioned"] / bs["total"] * 100) if bs["total"] > 0 else 0.0
+        brand_by_model = {
+            mk: round((v["mentioned"] / v["total"] * 100) if v["total"] > 0 else 0.0, 1)
+            for mk, v in bs["by_model"].items()
+        }
+        comp_rates: list[CompetitorByModel] = []
+        for comp in competitors:
+            cs = comp_stats.get(comp.id, {}).get(pid, {"total": 0, "mentioned": 0, "by_model": {}})
+            rate = (cs["mentioned"] / cs["total"] * 100) if cs["total"] > 0 else 0.0
+            by_model = {
+                mk: round((v["mentioned"] / v["total"] * 100) if v["total"] > 0 else 0.0, 1)
+                for mk, v in cs["by_model"].items()
+            }
+            comp_rates.append(CompetitorByModel(
+                name=comp.name, rate=round(rate, 1), by_model=by_model,
+            ))
+        max_comp = max((c.rate for c in comp_rates), default=0.0)
+        if brand_rate > max_comp:
+            outcome = "win"
+        elif brand_rate < max_comp:
+            outcome = "lose"
+        else:
+            outcome = "tie"
+        prompt_results.append(CompetitorPromptResult(
+            prompt_id=pid,
+            prompt_text=prompt_texts.get(pid, ""),
+            brand_rate=round(brand_rate, 1),
+            brand_by_model=brand_by_model,
+            outcome=outcome,
+            competitors=comp_rates,
+        ))
+
+    # Overall SOV
+    total_brand_q = sum(bs["total"] for bs in brand_stats.values())
+    total_brand_m = sum(bs["mentioned"] for bs in brand_stats.values())
+    overall_brand_pct = (total_brand_m / total_brand_q * 100) if total_brand_q > 0 else 0.0
+
+    overall_comps = []
+    for comp in competitors:
+        total_m = sum(comp_stats.get(comp.id, {}).get(pid, {}).get("mentioned", 0) for pid in brand_stats)
+        total_q = sum(comp_stats.get(comp.id, {}).get(pid, {}).get("total", 0) for pid in brand_stats)
+        overall_comps.append({
+            "name": comp.name,
+            "pct": round((total_m / total_q * 100) if total_q > 0 else 0.0, 1),
+        })
+
+    return CompetitorAnalysisResponse(
+        brand_id=brand_id,
+        brand_name=brand.name,
+        run_id=run_id,
+        has_data=len(prompt_results) > 0,
+        overall=OverallSOV(
+            brand_name=brand.name,
+            brand_pct=round(overall_brand_pct, 1),
+            competitors=overall_comps,
+        ),
+        prompts=sorted(prompt_results, key=lambda p: (-p.brand_rate, p.prompt_id)),
+    )
+
+
+# ── Content attribution (draft performance tracking) ──────────────────────────
+
+@router.get("/{brand_id}/content-attribution")
+async def get_content_attribution(
+    brand_id: int, db: DbDep, user: CurrentUser
+):
+    """Return draft attribution records showing visibility delta since posting."""
+    from app.models import DraftAttribution, ContentDraft, Prompt as PromptModel
+    from app.schemas import DraftAttributionResponse
+
+    await get_brand_for_user(brand_id, db, user)
+
+    result = await db.execute(
+        select(DraftAttribution)
+        .where(DraftAttribution.brand_id == brand_id)
+        .order_by(DraftAttribution.posted_at.desc())
+    )
+    attributions = result.scalars().all()
+
+    if not attributions:
+        return []
+
+    # Load draft and prompt details
+    draft_ids = [a.draft_id for a in attributions]
+    prompt_ids = [a.prompt_id for a in attributions if a.prompt_id]
+
+    drafts_result = await db.execute(
+        select(ContentDraft).where(ContentDraft.id.in_(draft_ids))
+    )
+    drafts_map = {d.id: d for d in drafts_result.scalars().all()}
+
+    prompts_result = await db.execute(
+        select(PromptModel).where(PromptModel.id.in_(prompt_ids))
+    )
+    prompts_map = {p.id: p for p in prompts_result.scalars().all()}
+
+    output = []
+    for attr in attributions:
+        draft = drafts_map.get(attr.draft_id)
+        prompt = prompts_map.get(attr.prompt_id) if attr.prompt_id else None
+        output.append(DraftAttributionResponse(
+            id=attr.id,
+            draft_id=attr.draft_id,
+            brand_id=attr.brand_id,
+            prompt_id=attr.prompt_id,
+            prompt_text=prompt.text if prompt else None,
+            draft_title=draft.title if draft else None,
+            draft_platform=draft.platform if draft else None,
+            posted_at=attr.posted_at,
+            score_at_posting=attr.score_at_posting,
+            current_score=attr.current_score,
+            delta=attr.delta,
+            runs_since_posting=attr.runs_since_posting or 0,
+            created_at=attr.created_at,
+        ))
+
+    return output

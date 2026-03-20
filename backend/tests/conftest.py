@@ -1,0 +1,149 @@
+"""
+Shared pytest fixtures for ClarityAI backend tests.
+
+Env vars are set BEFORE any app module is imported so that:
+  - app.database creates its engine pointing at the test DB
+  - app.dependencies reads the correct JWT_SECRET
+"""
+from __future__ import annotations
+
+import os
+import tempfile
+from typing import Optional
+
+import pytest
+import pytest_asyncio
+import httpx
+from unittest.mock import patch, AsyncMock
+from sqlalchemy.ext.asyncio import AsyncSession
+
+# ── Must come before all app imports ─────────────────────────────────────────
+_db_fd, _db_path = tempfile.mkstemp(suffix=".test.db")
+os.close(_db_fd)
+
+os.environ.setdefault("DATABASE_URL", f"sqlite+aiosqlite:///{_db_path}")
+os.environ["JWT_SECRET"] = "test-jwt-secret-minimum-32-chars-clarity-ai-test"
+os.environ["ENVIRONMENT"] = "development"
+os.environ["ADMIN_EMAILS"] = "admin@test.com"
+os.environ["STRIPE_SECRET_KEY"] = "sk_test_placeholder"
+os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test_placeholder"
+# Prevent auto-seeding admin user during tests (no ADMIN_PASSWORD set)
+
+# App imports after env vars are configured
+from app.database import engine, Base, AsyncSessionLocal, get_db
+from app.main import app
+
+
+# ── Database setup ────────────────────────────────────────────────────────────
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def create_test_db():
+    """Create all tables once for the test session."""
+    async with engine.begin() as conn:
+        import app.models  # noqa: F401 — registers models
+        await conn.run_sync(Base.metadata.create_all)
+    yield
+    await engine.dispose()
+    try:
+        os.unlink(_db_path)
+    except OSError:
+        pass
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def clean_tables():
+    """Truncate all data-bearing tables and reset rate store between tests."""
+    yield
+    # Reset in-memory rate limiter so tests don't affect each other
+    from app.dependencies import _rate_store
+    _rate_store.clear()
+
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        # Order matters for FK constraints
+        for table in [
+            "analytics_events", "content_attribution", "content_posts",
+            "content_drafts", "content_gaps", "content_opportunities",
+            "run_model_scores", "query_results", "tracking_runs",
+            "competitors", "prompts", "brand_profiles",
+            "brand_content_settings", "account_connections",
+            "system_settings", "brands", "users",
+        ]:
+            await db.execute(text(f"DELETE FROM {table}"))
+        await db.commit()
+
+
+# ── HTTP client ───────────────────────────────────────────────────────────────
+
+@pytest_asyncio.fixture
+async def client():
+    """Async HTTP test client with scheduler mocked out."""
+    with (
+        patch("app.scheduler.start_scheduler"),
+        patch("app.scheduler.stop_scheduler"),
+        patch(
+            "app.services.auth_seeder.seed_admin_user",
+            new_callable=lambda: lambda: AsyncMock(return_value=None),
+        ),
+    ):
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app),
+            base_url="http://test",
+        ) as ac:
+            yield ac
+
+
+# ── Auth helpers ──────────────────────────────────────────────────────────────
+
+async def register_user(
+    client: httpx.AsyncClient,
+    email: str = "user@example.com",
+    password: str = "password123",
+    name: str = "Test User",
+) -> dict:
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": email, "password": password, "name": name},
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+async def login_user(
+    client: httpx.AsyncClient,
+    email: str = "user@example.com",
+    password: str = "password123",
+) -> httpx.Cookies:
+    resp = await client.post(
+        "/api/auth/login",
+        json={"email": email, "password": password},
+    )
+    assert resp.status_code == 200, resp.text
+    return resp.cookies
+
+
+async def register_and_login(
+    client: httpx.AsyncClient,
+    email: str = "user@example.com",
+    password: str = "password123",
+) -> None:
+    """Register + login in one call — sets cookies on the client."""
+    await register_user(client, email, password)
+    await login_user(client, email, password)
+
+
+async def create_brand(
+    client: httpx.AsyncClient,
+    name: str = "Test Brand",
+    prompts: Optional[list] = None,
+) -> dict:
+    resp = await client.post(
+        "/api/brands",
+        json={
+            "name": name,
+            "tier": "basic",
+            "prompts": prompts or ["What are the best tools for X?"],
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()

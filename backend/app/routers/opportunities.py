@@ -55,7 +55,7 @@ async def list_opportunities(
     db: DbDep,
     user: CurrentUser,
     opp_status: Optional[str] = Query(None, alias="status", description="Filter by status: new, drafted, dismissed"),
-    limit: int = Query(50, ge=1, le=200),
+    limit: int = Query(20, ge=1, le=200),
 ):
     """List content opportunities (Reddit/Quora threads) for a brand."""
     await get_brand_for_user(brand_id, db, user)

@@ -15,12 +15,15 @@ import {
   getTrends,
   getResponses,
   getRecentRuns,
+  exportReportPDF,
+  getCompetitorAnalysis,
   Brand,
   BrandDetail,
   TrendPoint,
   QueryResult,
   TrackingRun,
   Prompt,
+  CompetitorAnalysis,
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
 import { format, parseISO } from 'date-fns';
@@ -127,6 +130,8 @@ function extractGapMentions(group: PromptGroup, brandName: string): string {
   return `${top[0]}, ${top[1]}, and ${top[2]} are mentioned instead.`;
 }
 
+const MODEL_ORDER_REPORT = ['chatgpt', 'claude', 'perplexity', 'gemini'];
+
 export default function ReportsPage() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
@@ -138,9 +143,15 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(false);
   const [expandedPromptId, setExpandedPromptId] = useState<number | null>(null);
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
+  const [exportingPDF, setExportingPDF] = useState(false);
+  const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysis | null>(null);
+  const [competitorModelFilter, setCompetitorModelFilter] = useState<string>('all');
   const brandDropdownRef = useRef<HTMLDivElement>(null);
+  const loadAbortRef = useRef<AbortController | null>(null);
 
   // Close brand dropdown on outside click
+  useEffect(() => { document.title = 'Reports — ClarityAI'; }, []);
+
   useEffect(() => {
     function handler(e: MouseEvent) {
       if (brandDropdownRef.current && !brandDropdownRef.current.contains(e.target as Node)) {
@@ -159,19 +170,41 @@ export default function ReportsPage() {
     }).catch(() => setLoadingBrands(false));
   }, []);
 
-  const loadData = useCallback(async (brandId: number) => {
+  const loadData = useCallback(async (brandId: number, signal?: AbortSignal) => {
     setLoading(true);
     setTrends([]);
     setResponses([]);
     setPrevResponses([]);
     setExpandedPromptId(null);
     setBrandDetail(null);
+    setCompetitorAnalysis(null);
     try {
-      const [tr, runs, detail] = await Promise.all([
+      // Chain response/competitor fetches off getRecentRuns immediately so they
+      // start as soon as run IDs are known, overlapping with getTrends/getBrand.
+      const runsPromise = getRecentRuns(brandId);
+      const runsDataPromise = runsPromise.then((runs) => {
+        const completedRuns = [...(Array.isArray(runs) ? runs : [])]
+          .filter((r: TrackingRun) => r.status === 'completed')
+          .sort((a: TrackingRun, b: TrackingRun) => b.id - a.id);
+        const latestCompleted = completedRuns[0];
+        const prevCompleted = completedRuns[1];
+        if (!latestCompleted) return { resps: [], prevResps: [], compAnalysis: null };
+        return Promise.all([
+          getResponses(brandId, latestCompleted.id),
+          prevCompleted ? getResponses(brandId, prevCompleted.id) : Promise.resolve([]),
+          getCompetitorAnalysis(brandId, latestCompleted.id).catch(() => null),
+        ]).then(([resps, prevResps, compAnalysis]) => ({ resps, prevResps, compAnalysis }));
+      });
+
+      const [tr, runs, detail, runData] = await Promise.all([
         getTrends(brandId),
-        getRecentRuns(brandId),
+        runsPromise,
         getBrand(brandId).catch(() => null),
+        runsDataPromise.catch(() => ({ resps: [], prevResps: [], compAnalysis: null })),
       ]);
+
+      if (signal?.aborted) return;
+
       setTrends(
         (Array.isArray(tr) ? tr : []).map((p) => ({
           ...p,
@@ -180,38 +213,37 @@ export default function ReportsPage() {
         }))
       );
       setBrandDetail(detail);
-      const normalizedRuns = Array.isArray(runs) ? runs : [];
-      const completedRuns = [...normalizedRuns]
-        .filter((r: TrackingRun) => r.status === 'completed')
-        .sort((a: TrackingRun, b: TrackingRun) => b.id - a.id);
-      const latestCompleted = completedRuns[0];
-      const prevCompleted = completedRuns[1];
-      if (latestCompleted) {
-        const fetchLatest = getResponses(brandId, latestCompleted.id);
-        const fetchPrev = prevCompleted ? getResponses(brandId, prevCompleted.id) : Promise.resolve([]);
-        const [resps, prevResps] = await Promise.all([fetchLatest, fetchPrev]);
-        setResponses(
-          Array.isArray(resps)
-            ? resps.filter((r) => r.error !== 'api_key_not_configured')
-            : []
-        );
-        setPrevResponses(
-          Array.isArray(prevResps)
-            ? prevResps.filter((r) => r.error !== 'api_key_not_configured')
-            : []
-        );
-      }
+      const { resps, prevResps, compAnalysis } = runData;
+      setResponses(Array.isArray(resps) ? resps.filter((r) => r.response_text) : []);
+      setPrevResponses(Array.isArray(prevResps) ? prevResps.filter((r) => r.response_text) : []);
+      if (compAnalysis?.has_data) setCompetitorAnalysis(compAnalysis);
     } catch { /* ignore */ } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     if (!selectedBrandId) return;
-    loadData(selectedBrandId);
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+    loadData(selectedBrandId, controller.signal);
+    return () => controller.abort();
   }, [selectedBrandId, loadData]);
 
   const selectedBrand = brands.find((b) => b.id === selectedBrandId);
+
+  async function downloadPDF() {
+    if (!selectedBrandId) return;
+    setExportingPDF(true);
+    try {
+      await exportReportPDF(selectedBrandId);
+    } catch {
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setExportingPDF(false);
+    }
+  }
 
   function downloadCSV() {
     const groups = buildPromptGroups(responses).sort((a, b) => {
@@ -252,17 +284,25 @@ export default function ReportsPage() {
 
   const prevGroups = buildPromptGroups(prevResponses);
   const prevScoreMap = new Map(prevGroups.map((g) => [g.promptId, g.total > 0 ? Math.round((g.mentioned / g.total) * 100) : 0]));
+  // Per-model previous scores: promptId → modelKey → pct
+  const prevModelScoreMap = new Map(prevGroups.map((g) => {
+    const modelMap = new Map<string, number>();
+    g.modelStats.forEach((ms, mk) => {
+      modelMap.set(mk, ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : 0);
+    });
+    return [g.promptId, modelMap] as const;
+  }));
   const trackedPromptIds = new Set(promptGroups.map((g) => g.promptId));
   const untrackedPrompts: Prompt[] = (brandDetail?.prompts ?? []).filter(
     (p) => !trackedPromptIds.has(p.id)
   );
 
   return (
-    <div className="px-8 py-8 max-w-5xl">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-[#F0F4F8]">Reports</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-[#F0F4F8]">Reports</h1>
           <p className="text-sm text-[#64748B] mt-1">Per-prompt visibility breakdown by AI model</p>
         </div>
         <div className="flex items-center gap-3">
@@ -299,7 +339,20 @@ export default function ReportsPage() {
               title="Export as CSV"
             >
               <Download size={14} />
-              Export
+              CSV
+            </button>
+          )}
+          {selectedBrandId && (
+            <button
+              onClick={downloadPDF}
+              disabled={exportingPDF}
+              className="flex items-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[#818cf8] hover:text-[#a5b4fc] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
+              title="Export as PDF"
+            >
+              {exportingPDF
+                ? <Loader2 size={14} className="animate-spin" />
+                : <Download size={14} />}
+              PDF
             </button>
           )}
           <button
@@ -379,6 +432,21 @@ export default function ReportsPage() {
                   const prevPct = prevScoreMap.get(g.promptId);
                   const delta = prevPct !== undefined ? overallPct - prevPct : null;
 
+                  // Build per-model delta tooltip
+                  const prevModelScores = prevModelScoreMap.get(g.promptId);
+                  const modelDeltaTooltip = delta !== null && delta !== 0 && prevModelScores
+                    ? MODEL_ORDER.flatMap((mk) => {
+                        const ms = g.modelStats.get(mk);
+                        const prevMs = prevModelScores.get(mk);
+                        if (!ms || prevMs === undefined) return [];
+                        const curPct = ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : 0;
+                        const d = curPct - prevMs;
+                        if (d === 0) return [];
+                        const cfg = getModelCfg(mk);
+                        return [`${cfg.label} ${d > 0 ? '+' : ''}${d}%`];
+                      }).join(', ')
+                    : '';
+
                   return (
                     <div key={g.promptId}>
                       <button
@@ -392,8 +460,11 @@ export default function ReportsPage() {
                               {overallPct}%
                             </span>
                             {delta !== null && delta !== 0 && (
-                              <span className={`text-[10px] font-bold ${delta > 0 ? 'text-[#10b981]' : 'text-[#f87171]'}`}>
-                                {delta > 0 ? `+${delta}` : delta}
+                              <span
+                                className={`text-[10px] font-bold cursor-default ${delta > 0 ? 'text-[#10b981]' : 'text-[#f87171]'}`}
+                                title={modelDeltaTooltip || undefined}
+                              >
+                                {delta > 0 ? `+${delta}%` : `${delta}%`}
                               </span>
                             )}
                             <ChevronDown
@@ -483,6 +554,116 @@ export default function ReportsPage() {
               </div>
             )}
           </div>
+
+          {/* Competitors section */}
+          {!loading && competitorAnalysis && !competitorAnalysis.has_data && (
+            <div className="mt-4 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-8 text-center shadow-[0_4px_24px_rgba(0,0,0,0.30)]">
+              <div className="w-10 h-10 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.20)] rounded-xl flex items-center justify-center mb-3 mx-auto">
+                <BarChart2 size={18} className="text-[#6366f1]" />
+              </div>
+              <p className="text-sm font-semibold text-[#CBD5E1] mb-1">No competitor data yet</p>
+              <p className="text-xs text-[#64748B] max-w-xs mx-auto">Add competitors on the Dashboard to see a side-by-side share-of-voice comparison.</p>
+            </div>
+          )}
+          {competitorAnalysis && competitorAnalysis.has_data && (
+            <div className="mt-4 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <div className="px-5 py-3.5 border-b border-[rgba(99,102,241,0.12)] bg-[rgba(99,102,241,0.05)] flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-[#F0F4F8]">Competitor Share of Voice</h3>
+                  <p className="text-xs text-[#64748B] mt-0.5">
+                    Overall: {selectedBrand?.name} {competitorAnalysis.overall.brand_pct}%
+                    {competitorAnalysis.overall.competitors.map((c) => ` · ${c.name} ${c.pct}%`).join('')}
+                  </p>
+                </div>
+                {/* Model filter toggle */}
+                <div className="flex items-center gap-1">
+                  {['all', ...MODEL_ORDER_REPORT].map((mk) => {
+                    const cfg = mk === 'all' ? null : getModelCfg(mk);
+                    return (
+                      <button
+                        key={mk}
+                        onClick={() => setCompetitorModelFilter(mk)}
+                        className={`text-[10px] font-medium px-2 py-1 rounded transition-colors ${
+                          competitorModelFilter === mk
+                            ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]'
+                            : 'text-[#475569] hover:text-[#94A3B8]'
+                        }`}
+                        style={cfg && competitorModelFilter === mk ? { color: cfg.text } : {}}
+                      >
+                        {mk === 'all' ? 'All' : cfg?.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Table header */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-[rgba(99,102,241,0.10)]">
+                      <th className="text-left px-5 py-2.5 text-[#64748B] font-medium w-1/2">Prompt</th>
+                      <th className="text-center px-3 py-2.5 text-[#6366f1] font-medium whitespace-nowrap">
+                        {selectedBrand?.name ?? 'Your Brand'}
+                      </th>
+                      {competitorAnalysis.prompts[0]?.competitors.map((c) => (
+                        <th key={c.name} className="text-center px-3 py-2.5 text-[#64748B] font-medium whitespace-nowrap">
+                          {c.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[rgba(99,102,241,0.08)]">
+                    {competitorAnalysis.prompts.map((row) => {
+                      const brandRate = competitorModelFilter === 'all'
+                        ? row.brand_rate
+                        : (row.brand_by_model[competitorModelFilter] ?? 0);
+                      const compRates = row.competitors.map((c) => ({
+                        name: c.name,
+                        rate: competitorModelFilter === 'all'
+                          ? c.rate
+                          : (c.by_model[competitorModelFilter] ?? 0),
+                      }));
+                      const maxRate = Math.max(brandRate, ...compRates.map((c) => c.rate));
+                      const brandWins = brandRate >= maxRate && brandRate > 0;
+                      const brandLoses = compRates.some((c) => c.rate > brandRate);
+
+                      return (
+                        <tr key={row.prompt_id} className="hover:bg-[rgba(99,102,241,0.04)] transition-colors">
+                          <td className="px-5 py-3 text-[#94A3B8] leading-snug">
+                            <p className="line-clamp-2">{row.prompt_text}</p>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <span
+                              className="font-bold tabular-nums text-sm"
+                              style={{
+                                color: brandWins ? '#10b981' : brandLoses ? '#f87171' : '#94A3B8',
+                              }}
+                            >
+                              {Math.round(brandRate)}%
+                            </span>
+                          </td>
+                          {compRates.map((c) => {
+                            const compWins = c.rate > brandRate;
+                            return (
+                              <td key={c.name} className="px-3 py-3 text-center">
+                                <span
+                                  className="font-medium tabular-nums"
+                                  style={{ color: compWins ? '#ef4444' : '#64748B' }}
+                                >
+                                  {Math.round(c.rate)}%
+                                </span>
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

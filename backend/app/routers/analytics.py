@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import CurrentUser
-from app.models import TrackingRun, ContentDraft, AnalyticsEvent, Prompt
+from app.models import TrackingRun, ContentDraft, AnalyticsEvent, Prompt, User, Brand
 
 logger = logging.getLogger(__name__)
 
@@ -138,3 +138,170 @@ async def get_analytics_summary(db: DbDep, user: CurrentUser):
         "avg_time_to_approve_seconds": avg_time_to_approve,
         "top_performing_prompt": top_prompt,
     }
+
+
+# ── Admin: all users ──────────────────────────────────────────────────────────
+
+@router.get("/admin/users")
+async def admin_list_users(db: DbDep, user: CurrentUser):
+    """Return all users with brand count and last active. Admin only."""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    rows = await db.execute(
+        select(
+            User.id,
+            User.email,
+            User.name,
+            User.subscription_tier,
+            User.subscription_status,
+            User.is_admin,
+            User.created_at,
+            func.count(Brand.id).label("brand_count"),
+        )
+        .outerjoin(Brand, Brand.user_id == User.id)
+        .group_by(User.id)
+        .order_by(User.created_at.desc())
+    )
+    users_data = []
+    for row in rows.all():
+        # Last active = latest tracking run
+        last_run_result = await db.execute(
+            select(func.max(TrackingRun.created_at))
+            .join(Brand, TrackingRun.brand_id == Brand.id)
+            .where(Brand.user_id == row.id)
+        )
+        last_active = last_run_result.scalar_one_or_none()
+        users_data.append({
+            "id": row.id,
+            "email": row.email,
+            "name": row.name,
+            "subscription_tier": row.subscription_tier,
+            "subscription_status": row.subscription_status,
+            "is_admin": row.is_admin,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+            "brand_count": row.brand_count,
+            "last_active": last_active.isoformat() if last_active else None,
+        })
+    return users_data
+
+
+# ── Admin: all tracking runs ──────────────────────────────────────────────────
+
+@router.get("/admin/runs")
+async def admin_list_runs(db: DbDep, user: CurrentUser):
+    """Return all tracking runs across all users. Admin only."""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    runs_result = await db.execute(
+        select(TrackingRun, Brand.name.label("brand_name"), User.email.label("user_email"))
+        .join(Brand, TrackingRun.brand_id == Brand.id)
+        .outerjoin(User, Brand.user_id == User.id)
+        .order_by(TrackingRun.created_at.desc())
+        .limit(200)
+    )
+    rows = runs_result.all()
+    return [
+        {
+            "id": r.TrackingRun.id,
+            "brand_id": r.TrackingRun.brand_id,
+            "brand_name": r.brand_name,
+            "user_email": r.user_email,
+            "status": r.TrackingRun.status,
+            "run_type": r.TrackingRun.run_type,
+            "overall_score": r.TrackingRun.overall_score,
+            "total_queries": r.TrackingRun.total_queries,
+            "total_mentions": r.TrackingRun.total_mentions,
+            "created_at": r.TrackingRun.created_at.isoformat() if r.TrackingRun.created_at else None,
+            "completed_at": r.TrackingRun.completed_at.isoformat() if r.TrackingRun.completed_at else None,
+        }
+        for r in rows
+    ]
+
+
+# ── Admin: system stats ────────────────────────────────────────────────────────
+
+@router.get("/admin/stats")
+async def admin_system_stats(db: DbDep, user: CurrentUser):
+    """Return high-level system counts. Admin only."""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    from datetime import datetime, timezone, timedelta
+
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+
+    total_users = (await db.execute(select(func.count(User.id)))).scalar_one()
+    total_brands = (await db.execute(select(func.count(Brand.id)))).scalar_one()
+    total_prompts = (await db.execute(select(func.count(Prompt.id)))).scalar_one()
+    total_drafts = (await db.execute(select(func.count(ContentDraft.id)))).scalar_one()
+    runs_today = (
+        await db.execute(
+            select(func.count(TrackingRun.id)).where(
+                TrackingRun.created_at >= today_start
+            )
+        )
+    ).scalar_one()
+
+    return {
+        "total_users": total_users,
+        "total_brands": total_brands,
+        "total_prompts": total_prompts,
+        "total_drafts": total_drafts,
+        "runs_today": runs_today,
+    }
+
+
+# ── Admin: trigger run for any brand ─────────────────────────────────────────
+
+@router.post("/admin/trigger-run/{brand_id}", status_code=status.HTTP_202_ACCEPTED)
+async def admin_trigger_run(brand_id: int, db: DbDep, user: CurrentUser):
+    """Manually trigger a tracking run for any brand. Admin only."""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    brand = await db.get(Brand, brand_id)
+    if not brand:
+        raise HTTPException(status_code=404, detail=f"Brand {brand_id} not found")
+
+    import asyncio
+    from app.models import TrackingRun as TR
+
+    run = TR(brand_id=brand_id, status="pending", run_type="manual")
+    db.add(run)
+    await db.commit()
+    await db.refresh(run)
+
+    async def _bg():
+        from app.routers.tracking import _background_run_with_id
+        try:
+            await _background_run_with_id(run.id, brand_id)
+        except Exception:
+            logger.exception("Admin-triggered run failed for brand %d", brand_id)
+
+    asyncio.create_task(_bg(), name=f"admin-run-{brand_id}-{run.id}")
+    return {"run_id": run.id, "brand_id": brand_id, "status": "pending"}
+
+
+# ── Admin: tail log file ──────────────────────────────────────────────────────
+
+@router.get("/admin/logs")
+async def admin_get_logs(user: CurrentUser, lines: int = 100):
+    """Return the last N lines of the rotating log file. Admin only."""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    from pathlib import Path
+
+    log_file = Path(__file__).resolve().parent.parent.parent / "logs" / "app.log"
+    if not log_file.exists():
+        return {"lines": [], "file": str(log_file), "exists": False}
+
+    try:
+        with open(log_file, "r", encoding="utf-8", errors="replace") as f:
+            all_lines = f.readlines()
+        tail = [l.rstrip("\n") for l in all_lines[-lines:]]
+        return {"lines": tail, "file": str(log_file), "exists": True, "total_lines": len(all_lines)}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Could not read log file: {exc}")

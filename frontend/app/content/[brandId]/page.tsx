@@ -218,9 +218,9 @@ export default function BrandContentPage() {
                   </div>
                 </div>
 
-                {/* Auto-post toggle */}
+                {/* Mark as posted toggle */}
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#94a3b8]">Auto-post</span>
+                  <span className="text-xs text-[#94a3b8]">Track posting</span>
                   <button
                     onClick={() => toggleAutoPost(platform)}
                     className={`flex items-center gap-1 text-xs transition-colors ${
@@ -240,12 +240,8 @@ export default function BrandContentPage() {
           })}
         </div>
         <p className="text-xs text-[#64748b] mt-4">
-          Auto-post is <span className="text-[#f59e0b]">OFF</span> by default. Enable only after
-          reviewing content and connecting your accounts in{' '}
-          <Link href="/settings/accounts" className="text-[#6366f1] underline">
-            Connected Accounts
-          </Link>
-          .
+          ClarityAI drafts content for you to post manually. Enable &ldquo;Track posting&rdquo; to log
+          when you&apos;ve posted a draft so ClarityAI can measure its impact on your visibility score.
         </p>
       </div>
 

@@ -276,7 +276,7 @@ async def generate_draft(
     custom_brief: Optional[str] = None,
 ) -> ContentDraft:
     """
-    Generate a content draft using Claude (claude-haiku-4-5).
+    Generate a content draft using Claude (claude-haiku-4-5-20251001).
 
     1. Load brand info.
     2. If no prompt_id, find the lowest-scoring prompt automatically.
@@ -339,7 +339,7 @@ async def generate_draft(
 
     client = anthropic.AsyncAnthropic(api_key=anthropic_api_key)
     response = await client.messages.create(
-        model="claude-haiku-4-5",
+        model="claude-haiku-4-5-20251001",
         max_tokens=2000,
         messages=[{"role": "user", "content": claude_prompt}],
     )

@@ -93,11 +93,26 @@ async def _query_chatgpt(prompt: str, brand_name: str) -> dict:
             max_tokens=1024,
             temperature=0.7,
         )
-        text = response.choices[0].message.content or ""
         latency_ms = int((time.monotonic() - start) * 1000)
+        text = response.choices[0].message.content
+        if not text:
+            logger.warning(
+                "[chatgpt] API returned empty/null content for prompt %r", prompt[:100]
+            )
+            return _build_result(
+                None, brand_name, latency_ms,
+                error="Empty response from ChatGPT API",
+            )
         return _build_result(text, brand_name, latency_ms)
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
+        logger.error("[chatgpt] API error for prompt %r: %s", prompt[:100], exc)
+        body = getattr(exc, "response", None)
+        if body is not None:
+            try:
+                logger.error("[chatgpt] API error body: %s", body.text)
+            except Exception:
+                pass
         return _build_result(None, brand_name, latency_ms, error=str(exc))
 
 
@@ -116,12 +131,20 @@ async def _query_claude(prompt: str, brand_name: str) -> dict:
             max_tokens=1024,
             messages=[{"role": "user", "content": prompt}],
         )
-        text = response.content[0].text if response.content else ""
         latency_ms = int((time.monotonic() - start) * 1000)
+        text = response.content[0].text if response.content else None
+        if not text:
+            logger.warning(
+                "[claude] API returned empty/null content for prompt %r", prompt[:100]
+            )
+            return _build_result(
+                None, brand_name, latency_ms,
+                error="Empty response from Claude API",
+            )
         return _build_result(text, brand_name, latency_ms)
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.error("[claude] API error: %s", exc)
+        logger.error("[claude] API error for prompt %r: %s", prompt[:100], exc)
         body = getattr(exc, "response", None)
         if body is not None:
             try:
@@ -145,16 +168,31 @@ async def _query_perplexity(prompt: str, brand_name: str) -> dict:
             base_url="https://api.perplexity.ai",
         )
         response = await client.chat.completions.create(
-            model="sonar",
+            model="sonar-pro",
             messages=[{"role": "user", "content": prompt}],
             max_tokens=1024,
             temperature=0.7,
         )
-        text = response.choices[0].message.content or ""
         latency_ms = int((time.monotonic() - start) * 1000)
+        text = response.choices[0].message.content
+        if not text:
+            logger.warning(
+                "[perplexity] API returned empty/null content for prompt %r", prompt[:100]
+            )
+            return _build_result(
+                None, brand_name, latency_ms,
+                error="Empty response from Perplexity API",
+            )
         return _build_result(text, brand_name, latency_ms)
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
+        logger.error("[perplexity] API error for prompt %r: %s", prompt[:100], exc)
+        body = getattr(exc, "response", None)
+        if body is not None:
+            try:
+                logger.error("[perplexity] API error body: %s", body.text)
+            except Exception:
+                pass
         return _build_result(None, brand_name, latency_ms, error=str(exc))
 
 
@@ -196,11 +234,19 @@ async def _query_gemini(prompt: str, brand_name: str) -> dict:
             latency_ms = int((time.monotonic() - start) * 1000)
             return _build_result(None, brand_name, latency_ms, error=f"gemini_blocked: {val_err}")
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.debug("[gemini] response preview: %r", text[:200] if text else "")
+        if not text:
+            logger.warning(
+                "[gemini] API returned empty/null content for prompt %r", prompt[:100]
+            )
+            return _build_result(
+                None, brand_name, latency_ms,
+                error="Empty response from Gemini API",
+            )
+        logger.debug("[gemini] response preview: %r", text[:200])
         return _build_result(text, brand_name, latency_ms)
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.error("[gemini] API error: %s", exc)
+        logger.error("[gemini] API error for prompt %r: %s", prompt[:100], exc)
         body = getattr(exc, "response", None)
         if body is not None:
             try:
@@ -220,6 +266,53 @@ _DISPATCHERS = {
 }
 
 SUPPORTED_MODELS = list(_DISPATCHERS.keys())
+
+
+async def _with_retry(handler, prompt: str, brand_name: str, model_key: str) -> dict:
+    """
+    Call handler(prompt, brand_name) and retry once after 3 seconds if the
+    response is empty or errored (but not due to a missing API key, which is
+    a permanent configuration issue).
+    """
+    result = await handler(prompt, brand_name)
+
+    # Successful response — return immediately
+    if result.get("response_text") and not result.get("error"):
+        return result
+
+    # api_key_not_configured is permanent — retrying won't help
+    if result.get("error") == "api_key_not_configured":
+        return result
+
+    display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
+    first_error = result.get("error") or "empty response"
+    logger.warning(
+        "[%s] First attempt failed (error=%r) for prompt %r — retrying in 3s",
+        model_key, first_error, prompt[:100],
+    )
+    await asyncio.sleep(3)
+
+    retry = await handler(prompt, brand_name)
+    if retry.get("response_text") and not retry.get("error"):
+        logger.info("[%s] Retry succeeded for prompt %r", model_key, prompt[:100])
+        return retry
+
+    # Both attempts failed — return a single descriptive error
+    retry_error = retry.get("error") or "empty response"
+    final_error = (
+        f"Empty response from {display} API after retry "
+        f"(attempt 1: {first_error}; attempt 2: {retry_error})"
+    )
+    logger.error(
+        "[%s] Both attempts failed for prompt %r. Final error: %s",
+        model_key, prompt[:100], final_error,
+    )
+    return {
+        "response_text": None,
+        "mentioned": False,
+        "latency_ms": retry.get("latency_ms"),
+        "error": final_error,
+    }
 
 
 async def query_model(model: str, prompt: str, brand_name: str) -> dict:
@@ -247,4 +340,4 @@ async def query_model(model: str, prompt: str, brand_name: str) -> dict:
             "latency_ms": 0,
             "error": f"Unknown model: {model}",
         }
-    return await handler(prompt, brand_name)
+    return await _with_retry(handler, prompt, brand_name, model)

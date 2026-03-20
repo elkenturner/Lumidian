@@ -102,7 +102,7 @@ PLATFORM_SPECS: dict[str, dict] = {
             "Open with a strong hook in the first 1-2 sentences — a surprising fact, a provocative question, or a bold statement that earns the reader's attention",
             "Structure the article clearly with flowing prose sections: hook → context/problem → main argument → strong conclusion. Separate sections with a blank line — do NOT use ## markdown headers",
             "NO ## headings, NO markdown headers of any kind — write in editorial prose that flows naturally from one idea to the next",
-            "Mention the brand naturally and specifically at least once — tie it to a concrete claim, data point, or unique capability",
+            "The brand name MUST appear at least once in the article. Find a natural, earned place for it: a concrete claim, an example of the approach in action, a specific data point, or a direct mention of a capability. The brand name must appear in the body text.",
             "Where the Brand Profile includes peer-reviewed publications, cite them naturally in the body (e.g. 'A study published in...' or 'Research from...')",
             "Include concrete data, examples, or evidence to support every major claim — never make unsupported assertions",
             "End with a strong, specific conclusion that delivers an actionable insight — not a generic 'in conclusion' paragraph",
@@ -306,14 +306,27 @@ SCHEDULED_CAP = 20
 async def _get_existing_drafts_for_prompt(
     db: AsyncSession, brand_id: int, prompt_id: int, platform: str
 ) -> list[ContentDraft]:
-    """Load existing non-dismissed drafts for a prompt/platform combination."""
+    """
+    Load existing active or recently-posted drafts for a prompt/platform combination.
+    Includes "posted" drafts from the last 30 days so the deduplication context
+    instructs Claude to take a completely different angle (different edit, same platform is ok).
+    """
+    from datetime import timedelta
+    recent_cutoff = _utcnow() - timedelta(days=30)
     result = await db.execute(
         select(ContentDraft)
         .where(
             ContentDraft.brand_id == brand_id,
             ContentDraft.prompt_id == prompt_id,
             ContentDraft.platform == platform,
-            ContentDraft.status.in_(["draft", "approved"]),
+            # Include active queued drafts AND recently posted ones
+            (
+                ContentDraft.status.in_(["draft", "approved"]) |
+                (
+                    (ContentDraft.status == "posted") &
+                    (ContentDraft.created_at >= recent_cutoff)
+                )
+            ),
         )
         .order_by(ContentDraft.created_at.desc())
         .limit(5)
@@ -719,7 +732,7 @@ async def _call_claude(prompt: str, max_tokens: int = 2500) -> str:
     import anthropic
     client = anthropic.AsyncAnthropic(api_key=api_key)
     response = await client.messages.create(
-        model="claude-haiku-4-5",
+        model="claude-haiku-4-5-20251001",
         max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -954,6 +967,17 @@ async def generate_gap_draft(
             wiki_text = raw_text.strip()
         title = article_title or f"Wikipedia edit: {prompt.text[:80]}"
         brief = article_url  # content_brief stores the article URL
+
+        # Citation check: verify the actual wikitext paste contains a <ref> tag.
+        # If Claude omitted it, append the citation built from the brand's publications.
+        if "<ref>" not in wiki_text:
+            publications = publications if publications else []
+            citation_ref = _build_citation_ref(publications, brand.name)
+            wiki_text = wiki_text.rstrip() + " " + citation_ref
+            logger.warning(
+                "Wikipedia draft for brand %d was missing <ref> — appended citation",
+                brand_id,
+            )
 
         # Store insert_location (section + placement) in platform_guidelines_applied
         draft = ContentDraft(
@@ -1248,39 +1272,49 @@ async def auto_draft_top_gaps(
     if not enabled_platforms:
         enabled_platforms = ["reddit", "quora"]
 
-    # --- Generate: prompt × platform until max_gaps total drafts created ---
+    # --- Generate: round-robin across platforms for equal distribution ---
+    # Each cycle generates one draft per platform (in order) using the best
+    # remaining prompt. This ensures e.g. 4 platforms × 5 rounds = 20 evenly
+    # spread drafts rather than front-loading the first prompt/platform.
     created: list[ContentDraft] = []
-    for prompt in ordered_prompts:
-        if len(created) >= max_gaps:
-            break
-        for platform in enabled_platforms:
-            if len(created) >= max_gaps:
-                break
-            try:
-                draft = await generate_gap_draft(
-                    db=db,
-                    brand_id=brand_id,
-                    prompt_id=prompt.id,
-                    platform=platform,
+    n_platforms = len(enabled_platforms)
+    prompt_idx = 0
+    platform_idx = 0  # absolute index, wraps via modulo
+
+    while len(created) < max_gaps and prompt_idx < len(ordered_prompts):
+        platform = enabled_platforms[platform_idx % n_platforms]
+        prompt = ordered_prompts[prompt_idx]
+
+        try:
+            draft = await generate_gap_draft(
+                db=db,
+                brand_id=brand_id,
+                prompt_id=prompt.id,
+                platform=platform,
+            )
+            created.append(draft)
+        except ValueError as exc:
+            exc_str = str(exc).lower()
+            if "full" in exc_str or "cap" in exc_str:
+                logger.info(
+                    "auto_draft_top_gaps: draft cap reached for brand_id=%d after %d drafts",
+                    brand_id, len(created),
                 )
-                created.append(draft)
-            except ValueError as exc:
-                # DRAFT_CAP hit — stop generating
-                if "full" in str(exc).lower() or "cap" in str(exc).lower():
-                    logger.info(
-                        "auto_draft_top_gaps: draft cap reached for brand_id=%d after %d drafts",
-                        brand_id, len(created),
-                    )
-                    return created
-                logger.warning(
-                    "auto_draft_top_gaps: skipped brand=%d prompt=%d platform=%s: %s",
-                    brand_id, prompt.id, platform, exc,
-                )
-            except Exception:
-                logger.exception(
-                    "auto_draft_top_gaps: failed for brand=%d prompt=%d platform=%s",
-                    brand_id, prompt.id, platform,
-                )
+                return created
+            logger.warning(
+                "auto_draft_top_gaps: skipped brand=%d prompt=%d platform=%s: %s",
+                brand_id, prompt.id, platform, exc,
+            )
+        except Exception:
+            logger.exception(
+                "auto_draft_top_gaps: failed for brand=%d prompt=%d platform=%s",
+                brand_id, prompt.id, platform,
+            )
+
+        # Advance: after visiting every platform once for this prompt, move to next prompt
+        platform_idx += 1
+        if platform_idx % n_platforms == 0:
+            prompt_idx += 1
 
     logger.info(
         "auto_draft_top_gaps: created %d drafts for brand_id=%d", len(created), brand_id,

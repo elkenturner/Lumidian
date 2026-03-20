@@ -31,6 +31,8 @@ from app.schemas import (
     DomainStat,
     ConversationItem,
     CompetitorStat,
+    ModelStat,
+    CitationGap,
 )
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -40,8 +42,30 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 _LOOKBACK_DAYS = 30
 _MAX_RUNS = 50
-_MAX_CONVERSATIONS = 20
+_MAX_CONVERSATIONS = 80
 _MAX_DOMAINS = 10
+# Cap raw QueryResult load. With many runs each result row carries a full LLM
+# response (~500-2000 chars), so loading all rows is the primary slow path.
+# 400 rows is representative for all analytics (sentiment, SOV, position, domains)
+# while keeping the payload small.
+_MAX_QUERY_ROWS = 400
+
+_MODEL_LABELS: dict[str, str] = {
+    "chatgpt": "ChatGPT",
+    "claude": "Claude",
+    "perplexity": "Perplexity",
+    "gemini": "Gemini",
+}
+
+def _model_key(model: str) -> str:
+    m = model.lower().replace("-", "").replace("_", "").replace(" ", "")
+    for k in _MODEL_LABELS:
+        if k in m:
+            return k
+    return model
+
+def _model_label(key: str) -> str:
+    return _MODEL_LABELS.get(key, key.title())
 
 
 # ── Position helper ───────────────────────────────────────────────────────────
@@ -198,12 +222,16 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
             top_domains=[],
             recent_conversations=[],
             competitor_comparison=[],
+            model_breakdown=[],
+            citation_gaps=[],
             total_responses_analyzed=0,
         )
 
     run_ids = [r.id for r in runs]
 
-    # 4. Load query results (skip placeholders), joined with prompt text
+    # 4. Load query results (skip placeholders), joined with prompt text.
+    # Capped to _MAX_QUERY_ROWS newest rows — enough for representative analytics
+    # across all metrics (sentiment, SOV, position, domains, conversations).
     qr_result = await db.execute(
         select(QueryResult, Prompt.text.label("prompt_text"))
         .join(Prompt, QueryResult.prompt_id == Prompt.id)
@@ -212,6 +240,7 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
             QueryResult.response_text.isnot(None),
         )
         .order_by(QueryResult.created_at.desc())
+        .limit(_MAX_QUERY_ROWS)
     )
     rows = qr_result.all()  # list of (QueryResult, str)
 
@@ -335,6 +364,59 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         for comp in competitors
     ]
 
+    # 11. Model breakdown — mention rate per AI model
+    model_totals: dict[str, int] = defaultdict(int)
+    model_mentions: dict[str, int] = defaultdict(int)
+    for qr, _ in rows:
+        key = _model_key(qr.model)
+        model_totals[key] += 1
+        if qr.mentioned:
+            model_mentions[key] += 1
+
+    model_breakdown = sorted(
+        [
+            ModelStat(
+                model=key,
+                label=_model_label(key),
+                mention_count=model_mentions[key],
+                total=model_totals[key],
+                mention_rate=round(model_mentions[key] / model_totals[key], 4) if model_totals[key] else 0.0,
+            )
+            for key in model_totals
+        ],
+        key=lambda s: s.mention_rate,
+        reverse=True,
+    )
+
+    # 12. Citation gaps — domains frequently cited in responses that DON'T mention the brand
+    domain_with: dict[str, int] = defaultdict(int)
+    domain_total_counts: dict[str, int] = defaultdict(int)
+    for qr, _ in rows:
+        if not qr.response_text:
+            continue
+        domains_in_response = _extract_domains(qr.response_text)
+        for domain in domains_in_response:
+            domain_total_counts[domain] += 1
+            if qr.mentioned:
+                domain_with[domain] += 1
+
+    _MIN_CITATIONS = 2  # ignore domains that appear only once
+    citation_gaps = sorted(
+        [
+            CitationGap(
+                domain=dom,
+                domain_type=_classify_domain(dom),
+                cited_total=cnt,
+                cited_with_brand=domain_with.get(dom, 0),
+                gap_score=round(1.0 - (domain_with.get(dom, 0) / cnt), 4),
+            )
+            for dom, cnt in domain_total_counts.items()
+            if cnt >= _MIN_CITATIONS
+        ],
+        key=lambda g: (g.gap_score, g.cited_total),
+        reverse=True,
+    )[:10]
+
     return DashboardAnalytics(
         brand_id=brand.id,
         brand_name=brand.name,
@@ -344,5 +426,7 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         top_domains=domain_stats,
         recent_conversations=conversations,
         competitor_comparison=competitor_comparison,
+        model_breakdown=model_breakdown,
+        citation_gaps=citation_gaps,
         total_responses_analyzed=total,
     )

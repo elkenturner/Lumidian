@@ -63,6 +63,18 @@ class User(Base):
 
 # ── System-wide key-value settings ───────────────────────────────────────────
 
+class PasswordResetToken(Base):
+    """Short-lived token for password reset flow."""
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 class SystemSetting(Base):
     """Generic key-value store for system-wide settings (e.g. scheduler_paused)."""
     __tablename__ = "system_settings"
@@ -85,6 +97,9 @@ class Brand(Base):
         default=TierEnum.basic.value,
     )
     website_url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    # "standard" | "pitch" — pitch brands expire after 7 days and cap at 10 prompts
+    brand_type: Mapped[str] = mapped_column(String(20), nullable=False, default="standard")
+    pitch_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -111,6 +126,8 @@ class Prompt(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     brand_id: Mapped[int] = mapped_column(Integer, ForeignKey("brands.id"), nullable=False, index=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Label for display — "standard" | "pitch". Does not change tracking behaviour.
+    prompt_type: Mapped[str] = mapped_column(String(20), nullable=False, default="standard")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     brand: Mapped["Brand"] = relationship("Brand", back_populates="prompts")
@@ -211,9 +228,37 @@ class Competitor(Base):
         Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    website_url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     brand: Mapped["Brand"] = relationship("Brand", back_populates="competitors")
+    mentions: Mapped[List["CompetitorMention"]] = relationship(
+        "CompetitorMention", back_populates="competitor", cascade="all, delete-orphan"
+    )
+
+
+class CompetitorMention(Base):
+    """Records whether each competitor was mentioned in each query result."""
+    __tablename__ = "competitor_mentions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    tracking_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tracking_runs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    competitor_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    prompt_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("prompts.id"), nullable=False, index=True
+    )
+    model: Mapped[str] = mapped_column(String(50), nullable=False)
+    run_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    mentioned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    competitor: Mapped["Competitor"] = relationship("Competitor", back_populates="mentions")
+    tracking_run: Mapped["TrackingRun"] = relationship("TrackingRun")
+    prompt: Mapped["Prompt"] = relationship("Prompt")
 
 
 # ── New content / account models ──────────────────────────────────────────────
@@ -279,6 +324,7 @@ class ContentDraft(Base):
     approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     dismissed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    visibility_at_post: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     edited_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     time_to_approve_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -428,6 +474,63 @@ class ContentGap(Base):
     brand: Mapped["Brand"] = relationship("Brand")
     prompt: Mapped["Prompt"] = relationship("Prompt")
     tracking_run: Mapped["TrackingRun"] = relationship("TrackingRun")
+
+
+# ── Draft Attribution (content performance tracking) ─────────────────────────
+
+class DraftAttribution(Base):
+    """Tracks visibility score change for a prompt after a draft is posted."""
+    __tablename__ = "content_attributions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    draft_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("content_drafts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    brand_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    prompt_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("prompts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    posted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    score_at_posting: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    current_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    delta: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    runs_since_posting: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    draft: Mapped["ContentDraft"] = relationship("ContentDraft")
+    brand: Mapped["Brand"] = relationship("Brand")
+    prompt: Mapped[Optional["Prompt"]] = relationship("Prompt")
+
+
+# ── Team Members ──────────────────────────────────────────────────────────────
+
+class TeamMember(Base):
+    """Invited team members who get read-only access to an account owner's brands."""
+    __tablename__ = "team_members"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    account_owner_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    invited_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    role: Mapped[str] = mapped_column(String(50), nullable=False, default="viewer")
+    invite_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    invited_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+    account_owner: Mapped["User"] = relationship(
+        "User", foreign_keys=[account_owner_id]
+    )
+    user: Mapped[Optional["User"]] = relationship(
+        "User", foreign_keys=[user_id]
+    )
 
 
 # ── Analytics event log ───────────────────────────────────────────────────────

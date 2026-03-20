@@ -10,12 +10,21 @@ class PromptBase(BaseModel):
 
 
 class PromptCreate(PromptBase):
-    pass
+    # "standard" | "pitch" — display label only, does not change tracking behaviour
+    prompt_type: str = "standard"
+
+    @field_validator("prompt_type")
+    @classmethod
+    def validate_prompt_type(cls, v: str) -> str:
+        if v not in ("standard", "pitch"):
+            raise ValueError("prompt_type must be 'standard' or 'pitch'")
+        return v
 
 
 class PromptResponse(PromptBase):
     id: int
     brand_id: int
+    prompt_type: str = "standard"
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -26,6 +35,7 @@ class PromptResponse(PromptBase):
 class BrandCreate(BaseModel):
     name: str
     tier: str = "basic"
+    brand_type: str = "standard"  # "standard" | "pitch"
     prompts: list[str] = []
     website_url: Optional[str] = None
 
@@ -35,6 +45,13 @@ class BrandCreate(BaseModel):
         allowed = {"basic", "standard", "premium"}
         if v not in allowed:
             raise ValueError(f"tier must be one of {allowed}")
+        return v
+
+    @field_validator("brand_type")
+    @classmethod
+    def validate_brand_type(cls, v: str) -> str:
+        if v not in ("standard", "pitch"):
+            raise ValueError("brand_type must be 'standard' or 'pitch'")
         return v
 
     @field_validator("name")
@@ -66,6 +83,8 @@ class BrandSummary(BaseModel):
     name: str
     slug: str
     tier: str
+    brand_type: str = "standard"
+    pitch_expires_at: Optional[datetime] = None
     prompt_count: int
     website_url: Optional[str] = None
     created_at: datetime
@@ -79,6 +98,8 @@ class BrandDetail(BaseModel):
     name: str
     slug: str
     tier: str
+    brand_type: str = "standard"
+    pitch_expires_at: Optional[datetime] = None
     website_url: Optional[str] = None
     created_at: datetime
     updated_at: datetime
@@ -193,6 +214,7 @@ class TrendPoint(BaseModel):
     run_type: str
     schedule_slot: Optional[str] = None
     has_content_influence: bool = False
+    model_scores: dict[str, float] = {}
 
 
 class TrendsResponse(BaseModel):
@@ -246,6 +268,7 @@ class ContentDraftSchema(BaseModel):
     approved_at: Optional[datetime] = None
     dismissed_at: Optional[datetime] = None
     posted_at: Optional[datetime] = None
+    visibility_at_post: Optional[float] = None
     edited_count: int = 0
     time_to_approve_seconds: Optional[int] = None
     created_at: datetime
@@ -310,7 +333,7 @@ class CreateDraftRequest(BaseModel):
 
 
 class GenerateNowRequest(BaseModel):
-    max_gaps: int = 3
+    max_gaps: int = 20
 
 
 class UpdateDraftRequest(BaseModel):
@@ -357,6 +380,7 @@ class ContentAttributionSummary(BaseModel):
 
 class CompetitorCreate(BaseModel):
     name: str
+    website_url: Optional[str] = None
 
     @field_validator("name")
     @classmethod
@@ -371,9 +395,42 @@ class CompetitorResponse(BaseModel):
     id: int
     brand_id: int
     name: str
+    website_url: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ── Competitor analysis schemas ───────────────────────────────────────────────
+
+class CompetitorByModel(BaseModel):
+    name: str
+    rate: float
+    by_model: dict[str, float]
+
+
+class CompetitorPromptResult(BaseModel):
+    prompt_id: int
+    prompt_text: str
+    brand_rate: float
+    brand_by_model: dict[str, float]
+    outcome: str  # "win" | "lose" | "tie"
+    competitors: list[CompetitorByModel]
+
+
+class OverallSOV(BaseModel):
+    brand_name: str
+    brand_pct: float
+    competitors: list[dict]  # [{"name": str, "pct": float}]
+
+
+class CompetitorAnalysisResponse(BaseModel):
+    brand_id: int
+    brand_name: str
+    run_id: Optional[int]
+    has_data: bool
+    overall: OverallSOV
+    prompts: list[CompetitorPromptResult]
 
 
 # ── Dashboard analytics schemas ───────────────────────────────────────────────
@@ -422,6 +479,22 @@ class CompetitorStat(BaseModel):
     is_primary: bool
 
 
+class ModelStat(BaseModel):
+    model: str           # raw model key e.g. "chatgpt"
+    label: str           # display name e.g. "ChatGPT"
+    mention_count: int
+    total: int
+    mention_rate: float  # 0–1
+
+
+class CitationGap(BaseModel):
+    domain: str
+    domain_type: str
+    cited_total: int          # times this domain appears across all responses
+    cited_with_brand: int     # subset where brand IS mentioned
+    gap_score: float          # fraction of citations that don't mention brand (0–1)
+
+
 class DashboardAnalytics(BaseModel):
     brand_id: int
     brand_name: str
@@ -431,6 +504,8 @@ class DashboardAnalytics(BaseModel):
     top_domains: list[DomainStat]
     recent_conversations: list[ConversationItem]
     competitor_comparison: list[CompetitorStat]
+    model_breakdown: list[ModelStat]
+    citation_gaps: list[CitationGap]
     total_responses_analyzed: int
 
 
@@ -479,6 +554,8 @@ class BrandWithStats(BaseModel):
     name: str
     slug: str
     tier: str
+    brand_type: str = "standard"
+    pitch_expires_at: Optional[datetime] = None
     prompt_count: int
     overall_score: Optional[float] = None
     last_run_at: Optional[datetime] = None
@@ -508,6 +585,44 @@ class ContentGapResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+# ── Draft Attribution schemas ─────────────────────────────────────────────────
+
+class DraftAttributionResponse(BaseModel):
+    id: int
+    draft_id: int
+    brand_id: int
+    prompt_id: Optional[int] = None
+    prompt_text: Optional[str] = None
+    draft_title: Optional[str] = None
+    draft_platform: Optional[str] = None
+    posted_at: datetime
+    score_at_posting: Optional[float] = None
+    current_score: Optional[float] = None
+    delta: Optional[float] = None
+    runs_since_posting: int = 0
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+# ── Team Member schemas ────────────────────────────────────────────────────────
+
+class TeamMemberResponse(BaseModel):
+    id: int
+    invited_email: str
+    user_id: Optional[int] = None
+    role: str
+    accepted: bool
+    invited_at: datetime
+    accepted_at: Optional[datetime] = None
+
+    model_config = {"from_attributes": True}
+
+
+class InviteTeamMemberRequest(BaseModel):
+    email: str
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

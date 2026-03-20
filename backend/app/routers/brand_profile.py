@@ -102,6 +102,8 @@ def _profile_to_response(profile: BrandProfile) -> BrandProfileResponse:
         approved_language=_parse_list(profile.approved_language),
         publications=_parse_publications(profile.publications),
         completion_pct=_compute_completion(profile),
+        internal_brand_context=profile.internal_brand_context,
+        website_context_last_fetched=profile.website_context_last_fetched,
         created_at=profile.created_at,
         updated_at=profile.updated_at,
     )

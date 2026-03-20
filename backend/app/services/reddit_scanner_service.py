@@ -606,6 +606,29 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
         logger.info(
             "Reddit scanner: %d new opportunities for brand_id=%d", new_count, brand_id
         )
+
+        # ── Cap: keep only the top 20 "new" leads per brand (by relevance score) ──
+        # This prevents the list from ballooning across daily runs and keeps the
+        # feed tight and relevant.
+        LEAD_CAP = 20
+        all_new_result = await db.execute(
+            select(ContentOpportunity)
+            .where(
+                ContentOpportunity.brand_id == brand_id,
+                ContentOpportunity.status == "new",
+            )
+            .order_by(ContentOpportunity.relevance_score.desc())
+        )
+        all_new = list(all_new_result.scalars().all())
+        if len(all_new) > LEAD_CAP:
+            for opp_to_drop in all_new[LEAD_CAP:]:
+                await db.delete(opp_to_drop)
+            await db.commit()
+            logger.info(
+                "Reddit scanner: trimmed to top %d leads for brand_id=%d (had %d)",
+                LEAD_CAP, brand_id, len(all_new),
+            )
+
         return new_count
 
 

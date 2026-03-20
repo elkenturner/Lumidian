@@ -29,8 +29,9 @@ from dotenv import load_dotenv
 # Resolve relative to this file so it works regardless of cwd.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.database import create_tables, run_migrations
 from app.scheduler import start_scheduler, stop_scheduler
@@ -38,6 +39,9 @@ from app.routers import brands, tracking, results, content, accounts, dashboard
 from app.routers import brand_profile, gaps, opportunities, settings
 from app.routers import auth as auth_router, billing as billing_router
 from app.routers import analytics as analytics_router
+from app.routers import reports as reports_router
+from app.routers import team as team_router
+from app.routers import errors as errors_router
 from app.schemas import HealthResponse
 
 logging.basicConfig(
@@ -45,6 +49,9 @@ logging.basicConfig(
     format="%(asctime)s  %(levelname)-8s  %(name)s — %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+from app.logging_config import configure_logging
+configure_logging()
 
 
 @asynccontextmanager
@@ -94,6 +101,13 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 
+# ── Global exception handler ──────────────────────────────────────────────────
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 # ── CORS ──────────────────────────────────────────────────────────────────────
 # Set ALLOWED_ORIGINS in .env as a comma-separated list.
 # Include your ngrok URL there for remote testing, e.g.:
@@ -123,6 +137,9 @@ app.include_router(settings.router, prefix="/api")
 app.include_router(auth_router.router, prefix="/api")
 app.include_router(billing_router.router, prefix="/api")
 app.include_router(analytics_router.router, prefix="/api")
+app.include_router(reports_router.router, prefix="/api")
+app.include_router(team_router.router, prefix="/api")
+app.include_router(errors_router.router, prefix="/api")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

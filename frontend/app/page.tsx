@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { BarChart2, Target, Sparkles, TrendingUp, Check, ArrowRight, MessageSquare, Settings2, Zap, ChevronDown } from 'lucide-react';
+import { BarChart2, Target, Sparkles, TrendingUp, Check, ArrowRight, MessageSquare, Settings2, ChevronDown } from 'lucide-react';
+import OceanLogo from '@/components/OceanLogo';
 
 // ── Scroll-reveal hook ─────────────────────────────────────────────────────────
 
@@ -97,24 +98,19 @@ const FEATURES = [
 ];
 
 const STARTER_FEATURES = [
-  '25 tracked prompts',
-  '4 AI models tracked',
-  'Twice-daily reports',
-  'Gap analysis',
-  'Content drafts (Reddit, Quora, Medium, Wikipedia)',
-  'Email support',
+  '1 pitch brand (10 prompts, 7-day)',
+  'No credit card required',
+  '4 AI models (ChatGPT, Claude, Perplexity, Gemini)',
+  'Visibility score & report',
 ];
 
 const PRO_FEATURES = [
-  '100 tracked prompts',
-  '4 AI models tracked',
-  'Twice-daily reports',
-  'Advanced gap analysis',
-  'Priority content drafts',
-  'Competitor comparison',
+  '1 standard brand (25 prompts)',
+  '1 pitch brand (10 prompts, 7-day)',
+  'Content Hub & gap analysis',
   'Brand profile & voice settings',
   'Reddit opportunity scanner',
-  'Priority support',
+  'Email support',
 ];
 
 const AI_MODELS = ['ChatGPT', 'Claude', 'Perplexity', 'Gemini'];
@@ -348,9 +344,7 @@ export default function LandingPage() {
         >
           <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 32, height: 32, borderRadius: 10, background: '#0F0F12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Zap size={15} color="#fff" fill="#fff" />
-              </div>
+              <OceanLogo size={32} withCircle />
               <span style={{ fontSize: 16, fontWeight: 700, color: '#0F0F12', letterSpacing: '-0.02em' }}>ClarityAI</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -836,20 +830,20 @@ export default function LandingPage() {
                   Simple, transparent pricing
                 </h2>
                 <p style={{ fontSize: 17, color: '#6B7280', maxWidth: 380, margin: '0 auto', lineHeight: 1.6 }}>
-                  Start with 25 prompts, scale to 100 as you grow.
+                  Start free with a pitch deck — upgrade when you're ready to scale.
                 </p>
               </div>
             </FadeUp>
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
                 gap: 20,
-                maxWidth: 760,
+                maxWidth: 1000,
                 margin: '0 auto',
               }}
             >
-              {/* Starter */}
+              {/* Free */}
               <FadeUp delay={0}>
                 <div
                   style={{
@@ -860,12 +854,12 @@ export default function LandingPage() {
                     height: '100%',
                   }}
                 >
-                  <p style={{ fontSize: 13, fontWeight: 600, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>Starter</p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>Free</p>
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, marginBottom: 4 }}>
-                    <span style={{ fontSize: 48, fontWeight: 800, color: '#0F0F12', letterSpacing: '-0.04em', lineHeight: 1 }}>$300</span>
+                    <span style={{ fontSize: 48, fontWeight: 800, color: '#0F0F12', letterSpacing: '-0.04em', lineHeight: 1 }}>$0</span>
                     <span style={{ fontSize: 15, color: '#9CA3AF', paddingBottom: 4 }}>/mo</span>
                   </div>
-                  <p style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 28 }}>Billed monthly</p>
+                  <p style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 28 }}>Pitch deck · no card required</p>
                   <Link
                     href="/register"
                     style={{
@@ -929,9 +923,9 @@ export default function LandingPage() {
                   >
                     Most Popular
                   </div>
-                  <p style={{ fontSize: 13, fontWeight: 600, color: '#6366F1', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>Pro</p>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: '#6366F1', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>Starter</p>
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, marginBottom: 4 }}>
-                    <span style={{ fontSize: 48, fontWeight: 800, color: '#0F0F12', letterSpacing: '-0.04em', lineHeight: 1 }}>$500</span>
+                    <span style={{ fontSize: 48, fontWeight: 800, color: '#0F0F12', letterSpacing: '-0.04em', lineHeight: 1 }}>$300</span>
                     <span style={{ fontSize: 15, color: '#9CA3AF', paddingBottom: 4 }}>/mo</span>
                   </div>
                   <p style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 28 }}>Billed monthly</p>
@@ -962,6 +956,81 @@ export default function LandingPage() {
                     {PRO_FEATURES.map((f) => (
                       <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                         <Check size={15} color="#6366F1" style={{ flexShrink: 0, marginTop: 2 }} />
+                        <span style={{ fontSize: 14, color: '#4B5563' }}>{f}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </FadeUp>
+
+              {/* Pro */}
+              <FadeUp delay={200}>
+                <div
+                  style={{
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    borderRadius: 24,
+                    padding: '36px 32px',
+                    background: 'rgba(250,250,249,0.85)',
+                    height: '100%',
+                    position: 'relative',
+                  }}
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: -14,
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      background: '#10B981',
+                      color: '#fff',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '4px 14px',
+                      borderRadius: 100,
+                      whiteSpace: 'nowrap',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    7-Day Free Trial
+                  </div>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: '#9CA3AF', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>Pro</p>
+                  <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, marginBottom: 4 }}>
+                    <span style={{ fontSize: 48, fontWeight: 800, color: '#0F0F12', letterSpacing: '-0.04em', lineHeight: 1 }}>$500</span>
+                    <span style={{ fontSize: 15, color: '#9CA3AF', paddingBottom: 4 }}>/mo</span>
+                  </div>
+                  <p style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 28 }}>Billed monthly · 7 days free</p>
+                  <Link
+                    href="/register"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 600,
+                      fontSize: 14,
+                      color: '#fff',
+                      background: '#10B981',
+                      border: '1.5px solid #10B981',
+                      borderRadius: 100,
+                      padding: '12px 20px',
+                      textDecoration: 'none',
+                      marginBottom: 28,
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = '#059669'; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = '#10B981'; }}
+                  >
+                    Start Free Trial
+                  </Link>
+                  <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {[
+                      '5 standard brands (100 prompts each)',
+                      'Unlimited pitch decks',
+                      'Content Hub & gap analysis',
+                      'Brand profile & voice settings',
+                      'Priority support',
+                    ].map((f) => (
+                      <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                        <Check size={15} color="#10B981" style={{ flexShrink: 0, marginTop: 2 }} />
                         <span style={{ fontSize: 14, color: '#4B5563' }}>{f}</span>
                       </li>
                     ))}
@@ -1025,9 +1094,7 @@ export default function LandingPage() {
         <footer style={{ borderTop: '1px solid rgba(0,0,0,0.06)', padding: '28px 24px' }}>
           <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 24, height: 24, borderRadius: 7, background: '#0F0F12', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Zap size={11} color="#fff" fill="#fff" />
-              </div>
+              <OceanLogo size={24} withCircle />
               <span style={{ fontSize: 13, fontWeight: 700, color: '#6B7280' }}>ClarityAI</span>
             </div>
             <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>&copy; 2026 ClarityAI. All rights reserved.</p>

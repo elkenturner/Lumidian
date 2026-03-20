@@ -144,6 +144,14 @@ async def run_tracking(
             result = await query_model(model, prompt_text, brand_name)
         response_text = result.get("response_text")
         error = result.get("error")
+
+        # Log every non-configuration error so nothing is silently swallowed
+        if error and error != "api_key_not_configured":
+            logger.warning(
+                "[tracking] model=%s run_number=%d prompt=%r error=%s",
+                model, run_number, prompt_text[:120], error,
+            )
+
         mentioned = _detect_mention(brand_name, response_text, error, model)
         return QueryResult(
             tracking_run_id=run_id,
@@ -190,7 +198,10 @@ async def run_tracking(
                 for m in SUPPORTED_MODELS
             }
             for qr in query_results:
-                if qr.error == "api_key_not_configured":
+                # Exclude ALL error responses from scoring — errors (rate limits,
+                # timeouts, empty responses) should not count as "not mentioned"
+                # and should not inflate the denominator.
+                if qr.error:
                     continue
                 stats = model_stats[qr.model]
                 stats["total_queries"] += 1
@@ -262,6 +273,44 @@ async def run_tracking(
             "Sentiment classification failed for run %d (non-fatal): %s", run_id, exc
         )
 
+    # ── 6b. Detect competitor mentions ───────────────────────────────────────
+    logger.info("Running competitor mention detection for run %d", run_id)
+    try:
+        from app.models import Competitor as CompetitorModel, CompetitorMention
+
+        async with AsyncSessionLocal() as comp_db:
+            comps_result = await comp_db.execute(
+                select(CompetitorModel).where(CompetitorModel.brand_id == brand_id)
+            )
+            competitors = comps_result.scalars().all()
+
+            if competitors:
+                comp_mention_rows = []
+                for qr in query_results:
+                    if not qr.response_text or qr.error:
+                        continue
+                    for comp in competitors:
+                        mentioned = comp.name.lower() in qr.response_text.lower()
+                        comp_mention_rows.append(CompetitorMention(
+                            tracking_run_id=run_id,
+                            competitor_id=comp.id,
+                            prompt_id=qr.prompt_id,
+                            model=qr.model,
+                            run_number=qr.run_number,
+                            mentioned=mentioned,
+                        ))
+                for cm in comp_mention_rows:
+                    comp_db.add(cm)
+                await comp_db.commit()
+                logger.info(
+                    "Competitor detection: %d mention records for run %d",
+                    len(comp_mention_rows), run_id,
+                )
+    except Exception as exc:
+        logger.warning(
+            "Competitor detection failed for run %d (non-fatal): %s", run_id, exc
+        )
+
     # ── 7. Calculate content attribution ────────────────────────────────────
     try:
         from app.services.content_service import calculate_attribution
@@ -280,6 +329,45 @@ async def run_tracking(
             "Attribution calculation failed for run %d (non-fatal): %s", run_id, exc
         )
 
+    # ── 9. Update draft attributions ─────────────────────────────────────────
+    logger.info("Updating draft attributions for run %d", run_id)
+    try:
+        from app.models import DraftAttribution
+
+        async with AsyncSessionLocal() as attr_db:
+            attr_result = await attr_db.execute(
+                select(DraftAttribution).where(
+                    DraftAttribution.brand_id == brand_id,
+                    DraftAttribution.prompt_id.is_not(None),
+                )
+            )
+            attributions = attr_result.scalars().all()
+
+            if attributions:
+                # Build prompt_id → (mentions, total) from this run
+                prompt_stats: dict[int, tuple[int, int]] = {}
+                for qr in query_results:
+                    if qr.error:
+                        continue
+                    pid = qr.prompt_id
+                    m, t = prompt_stats.get(pid, (0, 0))
+                    prompt_stats[pid] = (m + (1 if qr.mentioned else 0), t + 1)
+
+                for attr in attributions:
+                    pid = attr.prompt_id
+                    if pid in prompt_stats:
+                        mentions, total = prompt_stats[pid]
+                        new_score = round(mentions / total * 100.0, 2) if total > 0 else 0.0
+                        attr.current_score = new_score
+                        if attr.score_at_posting is not None:
+                            attr.delta = round(new_score - attr.score_at_posting, 2)
+                    attr.runs_since_posting = (attr.runs_since_posting or 0) + 1
+
+                await attr_db.commit()
+                logger.info("Updated %d draft attributions for run %d", len(attributions), run_id)
+    except Exception as exc:
+        logger.warning("Draft attribution update failed for run %d (non-fatal): %s", run_id, exc)
+
     # ── 8. Run content gap analysis ──────────────────────────────────────────
     logger.info("Starting content gap analysis for run %d", run_id)
     try:
@@ -293,5 +381,32 @@ async def run_tracking(
         logger.warning(
             "Gap analysis failed for run %d (non-fatal): %s", run_id, exc
         )
+
+    # ── 9. Send report-ready email ────────────────────────────────────────────
+    try:
+        from app.models import User as UserModel
+        from app.services.email_service import send_report_ready_email
+
+        async with AsyncSessionLocal() as email_db:
+            brand_result = await email_db.execute(
+                select(Brand).where(Brand.id == brand_id)
+            )
+            brand_obj = brand_result.scalar_one_or_none()
+            if brand_obj and brand_obj.user_id:
+                user_result = await email_db.execute(
+                    select(UserModel).where(UserModel.id == brand_obj.user_id)
+                )
+                owner = user_result.scalar_one_or_none()
+                if owner:
+                    final_score = (overall_mentions / overall_queries * 100.0) if overall_queries > 0 else 0.0
+                    send_report_ready_email(
+                        email=owner.email,
+                        name=owner.name,
+                        brand_name=brand_name,
+                        overall_score=round(final_score, 1),
+                        run_id=run_id,
+                    )
+    except Exception as exc:
+        logger.warning("Report-ready email failed for run %d (non-fatal): %s", run_id, exc)
 
     return run_id

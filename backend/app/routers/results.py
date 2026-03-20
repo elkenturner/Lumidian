@@ -33,6 +33,15 @@ from app.schemas import (
 
 router = APIRouter(prefix="/results", tags=["results"])
 
+MODEL_ORDER = ["chatgpt", "claude", "perplexity", "gemini"]
+
+def _normalise_model(model: str) -> str:
+    key = model.lower().replace("-", "").replace("_", "").replace(" ", "")
+    for m in MODEL_ORDER:
+        if m in key:
+            return m
+    return model
+
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 
@@ -123,6 +132,22 @@ async def get_trends(brand_id: int, db: DbDep, user: CurrentUser):
     )
     runs = runs_result.scalars().all()
 
+    # Fetch all per-model scores for these runs in one query
+    run_ids = [r.id for r in runs]
+    if run_ids:
+        ms_result = await db.execute(
+            select(RunModelScore).where(RunModelScore.tracking_run_id.in_(run_ids))
+        )
+        all_model_scores = ms_result.scalars().all()
+    else:
+        all_model_scores = []
+
+    from collections import defaultdict as _dd
+    scores_by_run: dict[int, dict[str, float]] = _dd(dict)
+    for ms in all_model_scores:
+        key = _normalise_model(ms.model)
+        scores_by_run[ms.tracking_run_id][key] = round(ms.score, 1)
+
     trend_data = [
         TrendPoint(
             run_id=r.id,
@@ -134,6 +159,7 @@ async def get_trends(brand_id: int, db: DbDep, user: CurrentUser):
             run_type=r.run_type,
             schedule_slot=r.schedule_slot,
             has_content_influence=r.has_content_influence,
+            model_scores=scores_by_run.get(r.id, {}),
         )
         for r in runs
     ]

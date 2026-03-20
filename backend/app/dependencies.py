@@ -93,13 +93,72 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 OptionalUser = Annotated[Optional[User], Depends(get_current_user_optional)]
 
 
+def require_active_subscription(user: User) -> None:
+    """
+    Raise HTTP 402 if the user's subscription is canceled or past_due.
+    Admins are always exempt. Users without any subscription (free tier) are allowed.
+    Only blocks users who explicitly have a degraded paid-plan status.
+    """
+    if user.is_admin:
+        return
+    blocked_statuses = {"canceled", "past_due", "unpaid"}
+    if user.subscription_status in blocked_statuses:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=(
+                f"Your subscription is {user.subscription_status}. "
+                "Please update your payment method to continue using this feature."
+            ),
+        )
+
+
+async def get_data_owner_id(db: AsyncSession, user: User) -> int:
+    """
+    Return the effective data owner's user_id.
+    If the user is a team member (viewer), return the account_owner_id.
+    Otherwise return the user's own id.
+    """
+    from app.models import TeamMember
+    from datetime import datetime, timezone
+
+    result = await db.execute(
+        select(TeamMember).where(
+            TeamMember.user_id == user.id,
+            TeamMember.accepted_at.is_not(None),
+        ).limit(1)
+    )
+    membership = result.scalar_one_or_none()
+    if membership:
+        return membership.account_owner_id
+    return user.id
+
+
 async def get_brand_for_user(brand_id: int, db: AsyncSession, user: User) -> "Brand":
-    """Load a brand and verify it belongs to the authenticated user. Raises 404/403."""
+    """Load a brand and verify it belongs to the authenticated user or their team owner. Raises 404/403."""
     from app.models import Brand
     result = await db.execute(select(Brand).where(Brand.id == brand_id))
     brand = result.scalar_one_or_none()
     if brand is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Brand {brand_id} not found")
-    if brand.user_id != user.id:
+    effective_owner_id = await get_data_owner_id(db, user)
+    if brand.user_id != effective_owner_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return brand
+
+
+async def require_owner_only(db: AsyncSession, user: User) -> None:
+    """Raise HTTP 403 if the user is a team member (viewer) — write operations are owner-only."""
+    from app.models import TeamMember
+
+    result = await db.execute(
+        select(TeamMember).where(
+            TeamMember.user_id == user.id,
+            TeamMember.accepted_at.is_not(None),
+        ).limit(1)
+    )
+    membership = result.scalar_one_or_none()
+    if membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Team members have read-only access and cannot perform this action.",
+        )

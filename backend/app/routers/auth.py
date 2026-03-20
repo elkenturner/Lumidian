@@ -22,9 +22,14 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import secrets
+import logging
+
 from app.database import get_db
 from app.dependencies import JWT_SECRET, JWT_ALGORITHM, get_current_user
-from app.models import User, utcnow
+from app.models import User, PasswordResetToken, utcnow
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -50,7 +55,16 @@ COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 TIER_LIMITS = {
     "starter": 25,
     "pro": 100,
-    None: 25,  # default for new accounts (no subscription yet)
+    None: 10,   # free: pitch only (10 prompts)
+    "": 10,     # same, for callers that convert None → ""
+}
+
+# How many brands of each type a user may own
+BRAND_TYPE_LIMITS: dict[str | None, dict[str, int]] = {
+    None: {"standard": 0, "pitch": 1},      # free: 1 pitch brand, no standard
+    "": {"standard": 0, "pitch": 1},
+    "starter": {"standard": 1, "pitch": 1}, # starter: 1 standard + 1 pitch
+    "pro": {"standard": 5, "pitch": 10},    # pro: up to 5 standard + pitch decks
 }
 
 
@@ -137,6 +151,12 @@ async def register(request: RegisterRequest, response: Response, db: DbDep):
     from app.services.analytics_service import log_event
     await log_event("user_registered", {"plan": user.subscription_tier}, user_id=user.id)
 
+    try:
+        from app.services.email_service import send_welcome_email
+        send_welcome_email(email=user.email, name=user.name)
+    except Exception as exc:
+        logger.warning("Welcome email failed (non-fatal): %s", exc)
+
     return user_to_dict(user)
 
 
@@ -175,8 +195,32 @@ async def logout(response: Response):
 # ── Me ────────────────────────────────────────────────────────────────────────
 
 @router.get("/me")
-async def get_me(user: Annotated[User, Depends(get_current_user)]):
-    return user_to_dict(user)
+async def get_me(user: Annotated[User, Depends(get_current_user)], db: DbDep):
+    from app.models import TeamMember
+    from sqlalchemy import select as sa_select
+
+    data = user_to_dict(user)
+
+    # Check if this user is a team member — if so, include owner info
+    tm_result = await db.execute(
+        sa_select(TeamMember).where(
+            TeamMember.user_id == user.id,
+            TeamMember.accepted_at.is_not(None),
+        ).limit(1)
+    )
+    membership = tm_result.scalar_one_or_none()
+    if membership:
+        owner_result = await db.execute(sa_select(User).where(User.id == membership.account_owner_id))
+        owner = owner_result.scalar_one_or_none()
+        data["is_team_member"] = True
+        data["team_owner_name"] = owner.name if owner else None
+        data["team_owner_email"] = owner.email if owner else None
+    else:
+        data["is_team_member"] = False
+        data["team_owner_name"] = None
+        data["team_owner_email"] = None
+
+    return data
 
 
 # ── Google OAuth ──────────────────────────────────────────────────────────────
@@ -234,3 +278,129 @@ async def google_auth(request: GoogleAuthRequest, response: Response, db: DbDep)
     token = create_token(user.id)
     set_auth_cookies(response, token)
     return user_to_dict(user)
+
+
+# ── Forgot password ───────────────────────────────────────────────────────────
+
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+async def forgot_password(request: ForgotPasswordRequest, db: DbDep):
+    """
+    Generate a 1-hour password reset token and log the reset link to console.
+    Always returns 200 to avoid user enumeration.
+    """
+    email = request.email.strip().lower()
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if user:
+        # Invalidate any existing unused tokens for this user
+        from sqlalchemy import update as sa_update
+        await db.execute(
+            sa_update(PasswordResetToken)
+            .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used == False)
+            .values(used=True)
+        )
+
+        token_value = secrets.token_urlsafe(48)
+        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1)
+        reset_token = PasswordResetToken(
+            user_id=user.id,
+            token=token_value,
+            expires_at=expires_at,
+        )
+        db.add(reset_token)
+        await db.commit()
+
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        reset_link = f"{frontend_url}/reset-password?token={token_value}"
+
+        try:
+            from app.services.email_service import send_password_reset_email
+            send_password_reset_email(email=user.email, name=user.name, reset_link=reset_link)
+        except Exception as exc:
+            logger.warning("Password reset email failed (non-fatal): %s", exc)
+            # Always log the link as a fallback so it's not lost
+            logger.info("PASSWORD RESET LINK for %s: %s", email, reset_link)
+
+    return {"message": "If that email is registered, a reset link has been sent."}
+
+
+# ── Reset password ─────────────────────────────────────────────────────────────
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+async def reset_password(request: ResetPasswordRequest, db: DbDep):
+    """Validate reset token and update user's password."""
+    if len(request.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at least 6 characters",
+        )
+
+    result = await db.execute(
+        select(PasswordResetToken).where(PasswordResetToken.token == request.token)
+    )
+    reset_token = result.scalar_one_or_none()
+
+    if not reset_token:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if reset_token.used or reset_token.expires_at < now:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
+
+    # Update password
+    user_result = await db.execute(select(User).where(User.id == reset_token.user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
+
+    user.password_hash = hash_password(request.new_password)
+    reset_token.used = True
+    await db.commit()
+
+    return {"message": "Password updated successfully"}
+
+
+# ── Admin: reset any user's password ──────────────────────────────────────────
+
+class AdminResetPasswordRequest(BaseModel):
+    email: str
+    new_password: str
+
+
+@router.post("/admin/reset-password", status_code=status.HTTP_200_OK)
+async def admin_reset_password(
+    request: AdminResetPasswordRequest,
+    db: DbDep,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Admin-only: directly reset any user's password without a reset token."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    if len(request.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Password must be at least 6 characters",
+        )
+
+    email = request.email.strip().lower()
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    user.password_hash = hash_password(request.new_password)
+    await db.commit()
+
+    logger.info("Admin %s reset password for user %s", current_user.email, email)
+    return {"message": f"Password reset successfully for {email}"}

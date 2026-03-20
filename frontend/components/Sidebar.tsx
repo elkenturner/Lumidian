@@ -10,8 +10,10 @@ import {
   CreditCard,
   User,
   BarChart2,
+  Shield,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import OceanLogo from '@/components/OceanLogo';
 
 interface NavItem {
   label: string;
@@ -38,6 +40,7 @@ function NavLink({
   return (
     <Link
       href={item.href}
+      aria-label={item.label}
       title={!expanded ? item.label : undefined}
       className={[
         'flex items-center gap-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 relative overflow-hidden',
@@ -130,71 +133,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
         }}
       >
         <Link href="/dashboard" className="flex items-center gap-3">
-          {/* Vesica Piscis eye — sacred geometry mark */}
-          <div
-            className="w-10 h-10 rounded-full flex-shrink-0 overflow-hidden"
-            style={{
-              background: '#f9f8f6',
-              boxShadow: '0 1px 8px rgba(0,0,0,0.22), 0 0 0 1px rgba(0,0,0,0.07)',
-            }}
-          >
-            <svg width="40" height="40" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-
-              {/* Outer sacred geometry rings */}
-              <circle cx="50" cy="50" r="46" stroke="#0d0d0d" strokeWidth="0.5" opacity="0.12"/>
-              <circle cx="50" cy="50" r="39" stroke="#0d0d0d" strokeWidth="0.35" opacity="0.08"/>
-
-              {/* The two source circles of the Vesica Piscis — faint, foundational */}
-              <circle cx="50" cy="26" r="48" stroke="#0d0d0d" strokeWidth="0.6" opacity="0.09" fill="none"/>
-              <circle cx="50" cy="74" r="48" stroke="#0d0d0d" strokeWidth="0.6" opacity="0.09" fill="none"/>
-
-              {/* 8 radial rays from center — behind the eye */}
-              <g stroke="#0d0d0d" strokeWidth="0.7" opacity="0.08">
-                <line x1="50" y1="50" x2="50" y2="4"/>
-                <line x1="50" y1="50" x2="82" y2="18"/>
-                <line x1="50" y1="50" x2="96" y2="50"/>
-                <line x1="50" y1="50" x2="82" y2="82"/>
-                <line x1="50" y1="50" x2="50" y2="96"/>
-                <line x1="50" y1="50" x2="18" y2="82"/>
-                <line x1="50" y1="50" x2="4" y2="50"/>
-                <line x1="50" y1="50" x2="18" y2="18"/>
-              </g>
-
-              {/* Eye lens (Vesica Piscis) — white fill covers rays inside */}
-              {/* Upper arc: CCW on Circle B (center 50,74, r≈48) */}
-              {/* Lower arc: CW on Circle A (center 50,26, r≈48) */}
-              <path
-                d="M 8 50 A 48 48 0 0 0 92 50 A 48 48 0 0 1 8 50 Z"
-                fill="#f9f8f6"
-                stroke="#0d0d0d"
-                strokeWidth="1.3"
-                strokeLinejoin="round"
-              />
-
-              {/* Iris */}
-              <circle cx="50" cy="50" r="15" stroke="#0d0d0d" strokeWidth="1" fill="#f9f8f6"/>
-
-              {/* Inner iris detail ring */}
-              <circle cx="50" cy="50" r="11" stroke="#0d0d0d" strokeWidth="0.4" opacity="0.35" fill="none"/>
-
-              {/* Pupil */}
-              <circle cx="50" cy="50" r="7" fill="#0d0d0d"/>
-
-              {/* Highlight — tiny reflection dot, keeps it alive not creepy */}
-              <circle cx="53.5" cy="46" r="2" fill="#f9f8f6"/>
-
-              {/* Concentric rings at left tip — where the circles intersect */}
-              <circle cx="8" cy="50" r="4"   stroke="#0d0d0d" strokeWidth="0.5" opacity="0.22" fill="none"/>
-              <circle cx="8" cy="50" r="7.5" stroke="#0d0d0d" strokeWidth="0.35" opacity="0.15" fill="none"/>
-              <circle cx="8" cy="50" r="11"  stroke="#0d0d0d" strokeWidth="0.3" opacity="0.1"  fill="none"/>
-
-              {/* Concentric rings at right tip */}
-              <circle cx="92" cy="50" r="4"   stroke="#0d0d0d" strokeWidth="0.5" opacity="0.22" fill="none"/>
-              <circle cx="92" cy="50" r="7.5" stroke="#0d0d0d" strokeWidth="0.35" opacity="0.15" fill="none"/>
-              <circle cx="92" cy="50" r="11"  stroke="#0d0d0d" strokeWidth="0.3" opacity="0.1"  fill="none"/>
-
-            </svg>
-          </div>
+          <OceanLogo size={40} withCircle />
           {expanded && (
             <span
               className="whitespace-nowrap"
@@ -220,6 +159,29 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
             expanded={expanded}
           />
         ))}
+
+        {/* Admin link — only visible to admin users */}
+        {user?.is_admin && (
+          <NavLink
+            item={{ label: 'Admin', href: '/admin', icon: Shield }}
+            pathname={pathname}
+            exact
+            expanded={expanded}
+          />
+        )}
+
+        {/* Read-only banner for team members */}
+        {user?.is_team_member && expanded && (
+          <div
+            className="mt-3 px-3 py-2 rounded-lg text-[10px] leading-snug"
+            style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#d97706' }}
+          >
+            <p className="font-semibold mb-0.5">Read-only access</p>
+            <p className="text-[#92400e] opacity-80">
+              Viewing {user.team_owner_name ?? user.team_owner_email ?? 'owner'}&apos;s workspace
+            </p>
+          </div>
+        )}
       </nav>
 
       {/* ── User section ─────────────────────────────────────────────────────── */}
@@ -267,6 +229,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 <button
                   onClick={handleLogout}
                   className="text-[#334155] hover:text-[#64748B] transition-colors flex-shrink-0 p-1 rounded-md"
+                  aria-label="Sign out"
                   title="Sign out"
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
@@ -281,6 +244,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
               <button
                 onClick={handleLogout}
                 title="Sign out"
+                aria-label="Sign out"
                 className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
                 style={{ background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.30)' }}
               >

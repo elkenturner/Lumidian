@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { AuthUser, authMe, authLogin, authRegister, authLogout } from '@/lib/api';
 
 interface AuthContextValue {
@@ -14,9 +15,12 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-// The backend sets clarity_session on localhost:3001, but Next.js middleware
-// runs on localhost:3000 — different port = different cookie jar. So we also
-// set/clear the session flag from the frontend JS so middleware can read it.
+// Mirrored from middleware.ts — paths that don't require authentication
+const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password'];
+
+// Set/clear the JS-accessible session flag that Next.js middleware reads.
+// (The httponly clarity_token is set by the backend; this companion cookie
+//  lets the middleware know a session exists without reading the token.)
 function setSessionCookie() {
   document.cookie = 'clarity_session=1; path=/; max-age=604800; samesite=lax';
 }
@@ -25,6 +29,8 @@ function clearSessionCookie() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -36,6 +42,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       setUser(null);
       clearSessionCookie();
+      // If the token was stale/expired and we're on a protected route,
+      // redirect to login so the user isn't stranded on a broken page.
+      const isPublic = PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
+      if (!isPublic) {
+        router.push('/login');
+      }
     }
   }
 

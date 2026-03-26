@@ -11,7 +11,7 @@ Jobs:
   • 21:00 UTC        — Visibility drop alerts (email if score drops ≥ 15 pts vs previous run)
 
 Pitch brand lifecycle:
-  - Created with pitch_expires_at = now + 7 days
+  - Created with pitch_expires_at = now + 30 days
   - At 06:00 UTC daily: users whose pitch brand expires in 23–25 h receive a warning email
   - At 06:00 UTC daily: brands whose pitch_expires_at <= now are deleted (cascade removes prompts,
     tracking runs, drafts, and content settings)

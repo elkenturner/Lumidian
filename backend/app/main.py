@@ -42,6 +42,7 @@ from app.routers import analytics as analytics_router
 from app.routers import reports as reports_router
 from app.routers import team as team_router
 from app.routers import errors as errors_router
+from app.routers import notifications as notifications_router
 from app.schemas import HealthResponse
 
 logging.basicConfig(
@@ -140,6 +141,7 @@ app.include_router(analytics_router.router, prefix="/api")
 app.include_router(reports_router.router, prefix="/api")
 app.include_router(team_router.router, prefix="/api")
 app.include_router(errors_router.router, prefix="/api")
+app.include_router(notifications_router.router, prefix="/api")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

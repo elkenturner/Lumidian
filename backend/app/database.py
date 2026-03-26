@@ -185,6 +185,19 @@ async def run_migrations():
             mentioned INTEGER NOT NULL DEFAULT 0,
             created_at DATETIME
         )""",
+        # Content post attribution — links content posts to visibility changes per run
+        """CREATE TABLE IF NOT EXISTS content_attribution (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content_post_id INTEGER NOT NULL REFERENCES content_posts(id) ON DELETE CASCADE,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id),
+            brand_id INTEGER NOT NULL REFERENCES brands(id),
+            visibility_before REAL,
+            visibility_after REAL,
+            improvement_pct REAL,
+            measured_at DATETIME NOT NULL,
+            created_at DATETIME
+        )""",
         # Content performance tracking — draft attribution
         """CREATE TABLE IF NOT EXISTS content_attributions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -221,6 +234,23 @@ async def run_migrations():
         "ALTER TABLE brands ADD COLUMN brand_type TEXT NOT NULL DEFAULT 'standard'",
         "ALTER TABLE brands ADD COLUMN pitch_expires_at DATETIME",
         "ALTER TABLE prompts ADD COLUMN prompt_type TEXT NOT NULL DEFAULT 'standard'",
+        # Notification center
+        """CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT,
+            link TEXT,
+            read INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read, created_at)",
+        # Quora question suggestions stored per content gap
+        "ALTER TABLE content_gaps ADD COLUMN quora_questions TEXT",
+        # Admin user management — pause and trial-end tracking
+        "ALTER TABLE users ADD COLUMN is_paused INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE users ADD COLUMN subscription_trial_end DATETIME",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

@@ -14,7 +14,7 @@ import logging
 import re
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, or_
@@ -75,7 +75,7 @@ def _normalize(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
-def _position_score(response_text: str, brand_name: str) -> float | None:
+def _position_score(response_text: str, brand_name: str) -> Optional[float]:
     """
     Return a 1–10 score for where in the response the brand first appears.
     1 = very beginning, 10 = very end.

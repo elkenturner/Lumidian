@@ -3,21 +3,28 @@ Auth router — registration, login, logout, session.
 
 Routes
 ------
-POST /api/auth/register  — create account
-POST /api/auth/login     — authenticate, set cookie
-POST /api/auth/logout    — clear cookie
-GET  /api/auth/me        — return current user
-POST /api/auth/google    — exchange Google ID token for session
+POST /api/auth/register            — create account
+POST /api/auth/login               — authenticate, set cookie
+POST /api/auth/logout              — clear cookie
+GET  /api/auth/me                  — return current user
+GET  /api/auth/google/url          — return Google OAuth authorization URL
+GET  /api/auth/google/callback     — handle OAuth redirect, set cookie, redirect to app
+POST /api/auth/google              — (legacy) exchange Google ID token for session
 """
 from __future__ import annotations
 
 import os
+import time
+import urllib.parse
+from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 from typing import Annotated, Optional
 
 import bcrypt
+import httpx
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +39,26 @@ from app.models import User, PasswordResetToken, utcnow
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+# ── In-memory rate limiter ─────────────────────────────────────────────────────
+# Stores per-IP attempt timestamps; pruned on each check (no background task needed).
+_login_attempts: dict = defaultdict(list)
+_register_attempts: dict = defaultdict(list)
+_RATE_WINDOW = 60.0     # sliding 1-minute window
+_MAX_LOGIN = 10         # 10 attempts / minute / IP
+_MAX_REGISTER = 5       # 5 attempts / minute / IP
+
+
+def _rate_check(ip: str, store: dict, limit: int) -> None:
+    now = time.monotonic()
+    cutoff = now - _RATE_WINDOW
+    store[ip] = [t for t in store[ip] if t > cutoff]
+    if len(store[ip]) >= limit:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many requests — please try again later.",
+        )
+    store[ip].append(now)
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
@@ -55,16 +82,16 @@ COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 TIER_LIMITS = {
     "starter": 25,
     "pro": 100,
-    None: 10,   # free: pitch only (10 prompts)
-    "": 10,     # same, for callers that convert None → ""
+    None: 25,   # free: same prompt limit as starter
+    "": 25,
 }
 
 # How many brands of each type a user may own
-BRAND_TYPE_LIMITS: dict[str | None, dict[str, int]] = {
-    None: {"standard": 0, "pitch": 1},      # free: 1 pitch brand, no standard
-    "": {"standard": 0, "pitch": 1},
-    "starter": {"standard": 1, "pitch": 1}, # starter: 1 standard + 1 pitch
-    "pro": {"standard": 5, "pitch": 10},    # pro: up to 5 standard + pitch decks
+BRAND_TYPE_LIMITS: dict = {
+    None: {"standard": 1, "pitch": 1},      # free: 1 standard + 1 pitch brand
+    "": {"standard": 1, "pitch": 1},
+    "starter": {"standard": 1, "pitch": 2}, # starter: 1 standard + 2 pitch brands
+    "pro": {"standard": 5, "pitch": 4},     # pro: up to 5 standard + 4 pitch brands
 }
 
 
@@ -104,7 +131,7 @@ def clear_auth_cookies(response: Response) -> None:
 
 
 def user_to_dict(user: User) -> dict:
-    limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier, 25)
+    limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier or "", 25)
     return {
         "id": user.id,
         "email": user.email,
@@ -126,7 +153,9 @@ class RegisterRequest(BaseModel):
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register(request: RegisterRequest, response: Response, db: DbDep):
+async def register(body: RegisterRequest, http_req: Request, response: Response, db: DbDep):
+    request = body
+    _rate_check(http_req.client.host if http_req.client else "unknown", _register_attempts, _MAX_REGISTER)
     email = request.email.strip().lower()
     existing = await db.execute(select(User).where(User.email == email))
     if existing.scalar_one_or_none():
@@ -168,7 +197,9 @@ class LoginRequest(BaseModel):
 
 
 @router.post("/login")
-async def login(request: LoginRequest, response: Response, db: DbDep):
+async def login(body: LoginRequest, http_req: Request, response: Response, db: DbDep):
+    _rate_check(http_req.client.host if http_req.client else "unknown", _login_attempts, _MAX_LOGIN)
+    request = body
     email = request.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
@@ -280,6 +311,171 @@ async def google_auth(request: GoogleAuthRequest, response: Response, db: DbDep)
     return user_to_dict(user)
 
 
+# ── Google OAuth — redirect flow ──────────────────────────────────────────────
+
+def _google_redirect_uri() -> str:
+    """
+    The callback URL registered in Google Cloud Console.
+    Routes through the Next.js dev proxy so cookies land on the frontend origin.
+    """
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3002")
+    return f"{frontend_url}/api/auth/google/callback"
+
+
+@router.get("/google/url")
+async def google_auth_url(redirect_to: str = "/dashboard"):
+    """Return the Google OAuth authorization URL. Frontend redirects the user there."""
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+    if not client_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google OAuth not configured. Set GOOGLE_CLIENT_ID in environment.",
+        )
+    params = {
+        "client_id": client_id,
+        "redirect_uri": _google_redirect_uri(),
+        "response_type": "code",
+        "scope": "openid email profile",
+        # state carries where to send the user after login; simple for dev use
+        "state": redirect_to,
+        "access_type": "online",
+        "prompt": "select_account",  # always show account chooser
+    }
+    url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+    return {"url": url}
+
+
+@router.get("/google/callback")
+async def google_auth_callback(
+    request: Request,
+    db: DbDep,
+    code: Optional[str] = None,
+    state: Optional[str] = None,
+    error: Optional[str] = None,
+):
+    """
+    Google redirects here after the user authenticates.
+    Exchange the auth code for an id_token, find/create the user,
+    set auth cookies, and redirect to the app.
+    """
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3002")
+    redirect_to = state if (state and state.startswith("/")) else "/dashboard"
+
+    # Google signalled an error (e.g. user cancelled)
+    if error:
+        return RedirectResponse(
+            f"{frontend_url}/login?error={urllib.parse.quote(error)}",
+            status_code=302,
+        )
+
+    if not code:
+        return RedirectResponse(f"{frontend_url}/login?error=missing_code", status_code=302)
+
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+    client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    if not client_id or not client_secret:
+        return RedirectResponse(
+            f"{frontend_url}/login?error=oauth_not_configured", status_code=302
+        )
+
+    # Exchange authorization code for tokens
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            token_resp = await client.post(
+                "https://oauth2.googleapis.com/token",
+                data={
+                    "code": code,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "redirect_uri": _google_redirect_uri(),
+                    "grant_type": "authorization_code",
+                },
+            )
+            token_resp.raise_for_status()
+            token_data = token_resp.json()
+    except Exception as exc:
+        logger.error("google_callback: token exchange failed — %s", exc)
+        return RedirectResponse(
+            f"{frontend_url}/login?error=token_exchange_failed", status_code=302
+        )
+
+    id_token_str = token_data.get("id_token", "")
+    if not id_token_str:
+        return RedirectResponse(
+            f"{frontend_url}/login?error=no_id_token", status_code=302
+        )
+
+    # Verify and decode the id_token
+    try:
+        from google.oauth2 import id_token as google_id_token
+        from google.auth.transport import requests as google_requests
+        id_info = google_id_token.verify_oauth2_token(
+            id_token_str,
+            google_requests.Request(),
+            client_id,
+        )
+        google_sub = id_info["sub"]
+        email = id_info.get("email", "").lower()
+        name = id_info.get("name")
+    except Exception as exc:
+        logger.error("google_callback: id_token verification failed — %s", exc)
+        return RedirectResponse(
+            f"{frontend_url}/login?error=token_invalid", status_code=302
+        )
+
+    # Find or create user — same logic as POST /google
+    result = await db.execute(select(User).where(User.google_id == google_sub))
+    user = result.scalar_one_or_none()
+    if not user:
+        result = await db.execute(select(User).where(User.email == email))
+        user = result.scalar_one_or_none()
+        if user:
+            user.google_id = google_sub
+        else:
+            user = User(
+                email=email,
+                google_id=google_sub,
+                name=name,
+                is_admin=(email in _ADMIN_EMAILS),
+            )
+            db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    token = create_token(user.id)
+
+    # Set auth cookies on the redirect response
+    _COOKIE_SECURE_LOCAL = os.getenv("ENVIRONMENT", "development").lower() == "production"
+    redirect_response = RedirectResponse(
+        url=f"{frontend_url}{redirect_to}",
+        status_code=302,
+    )
+    redirect_response.set_cookie(
+        "clarity_token",
+        token,
+        httponly=True,
+        secure=_COOKIE_SECURE_LOCAL,
+        samesite="lax",
+        max_age=COOKIE_MAX_AGE,
+        path="/",
+    )
+    # Non-httpOnly flag so Next.js middleware can detect the session
+    redirect_response.set_cookie(
+        "clarity_session",
+        "1",
+        httponly=False,
+        secure=_COOKIE_SECURE_LOCAL,
+        samesite="lax",
+        max_age=COOKIE_MAX_AGE,
+        path="/",
+    )
+
+    from app.services.analytics_service import log_event
+    await log_event("user_google_login", {}, user_id=user.id)
+
+    return redirect_response
+
+
 # ── Forgot password ───────────────────────────────────────────────────────────
 
 class ForgotPasswordRequest(BaseModel):
@@ -315,16 +511,14 @@ async def forgot_password(request: ForgotPasswordRequest, db: DbDep):
         db.add(reset_token)
         await db.commit()
 
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3002")
         reset_link = f"{frontend_url}/reset-password?token={token_value}"
 
         try:
             from app.services.email_service import send_password_reset_email
             send_password_reset_email(email=user.email, name=user.name, reset_link=reset_link)
         except Exception as exc:
-            logger.warning("Password reset email failed (non-fatal): %s", exc)
-            # Always log the link as a fallback so it's not lost
-            logger.info("PASSWORD RESET LINK for %s: %s", email, reset_link)
+            logger.warning("Password reset email failed for %s (non-fatal): %s", email, exc)
 
     return {"message": "If that email is registered, a reset link has been sent."}
 

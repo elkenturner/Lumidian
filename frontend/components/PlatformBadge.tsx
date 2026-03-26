@@ -1,5 +1,7 @@
 'use client';
 
+import { memo } from 'react';
+
 interface PlatformBadgeProps {
   platform: string;
   size?: 'sm' | 'md';
@@ -20,7 +22,7 @@ const PLATFORM_LABELS: Record<string, string> = {
   wikipedia: 'Wikipedia',
 };
 
-export default function PlatformBadge({ platform, size = 'md' }: PlatformBadgeProps) {
+const PlatformBadge = memo(function PlatformBadge({ platform, size = 'md' }: PlatformBadgeProps) {
   const key = platform.toLowerCase();
   const styles = PLATFORM_STYLES[key] ?? {
     bg: 'rgba(71,85,105,0.12)',
@@ -51,4 +53,6 @@ export default function PlatformBadge({ platform, size = 'md' }: PlatformBadgePr
       {label}
     </span>
   );
-}
+});
+
+export default PlatformBadge;

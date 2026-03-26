@@ -181,7 +181,7 @@ export default function NewBrandPage() {
   const progress = ((step + 1) / STEPS.length) * 100;
 
   // Expiry notice for review
-  const pitchExpiryDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
+  const pitchExpiryDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', {
     month: 'short', day: 'numeric', year: 'numeric',
   });
 
@@ -284,9 +284,9 @@ export default function NewBrandPage() {
                 <div className="text-xs font-bold px-2 py-1 rounded-md inline-block mb-2 bg-[#f59e0b]/20 text-[#f59e0b]">
                   Pitch Deck
                 </div>
-                <p className="text-sm font-semibold text-[#e2e8f0]">7-day snapshot</p>
+                <p className="text-sm font-semibold text-[#e2e8f0]">30-day snapshot</p>
                 <p className="text-xs text-[#64748b] mt-1 leading-snug">
-                  Up to 10 prompts. Expires after 7 days. Great for demos, proposals, or quick visibility checks.
+                  Up to 10 prompts. Expires after 30 days. Great for demos, proposals, or quick visibility checks.
                 </p>
               </button>
             </div>
@@ -339,9 +339,9 @@ export default function NewBrandPage() {
             <div className="flex items-start gap-3 bg-[#f59e0b]/5 border border-[#f59e0b]/20 rounded-xl px-4 py-3">
               <Clock size={14} className="text-[#f59e0b] flex-shrink-0 mt-0.5" />
               <div>
-                <p className="text-sm font-medium text-[#f59e0b]">Pitch deck — expires in 7 days</p>
+                <p className="text-sm font-medium text-[#f59e0b]">Pitch deck — expires in 30 days</p>
                 <p className="text-xs text-[#64748b] mt-0.5">
-                  Add up to 10 prompts. Tracking will stop automatically after 7 days. Upgrade to a standard brand for ongoing monitoring.
+                  Add up to 10 prompts. Tracking will stop automatically after 30 days. Upgrade to a standard brand for ongoing monitoring.
                 </p>
               </div>
             </div>
@@ -567,7 +567,7 @@ export default function NewBrandPage() {
                 <div className="flex items-center gap-2 mt-0.5">
                   {isPitch ? (
                     <span className="inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded bg-[#f59e0b]/20 text-[#f59e0b]">
-                      Pitch Deck — 7-day snapshot
+                      Pitch Deck — 30-day snapshot
                     </span>
                   ) : (
                     <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded ${selectedTier.badge}`}>

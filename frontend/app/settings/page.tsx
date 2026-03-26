@@ -333,6 +333,7 @@ export default function SettingsPage() {
   // Team tab state
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [teamLoading, setTeamLoading] = useState(false);
+  const [teamLoadError, setTeamLoadError] = useState<string | null>(null);
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviting, setInviting] = useState(false);
   const [inviteLink, setInviteLink] = useState<string | null>(null);
@@ -377,12 +378,12 @@ export default function SettingsPage() {
         const firstBrand = brands[0];
         setBrandId(firstBrand.id);
 
-        const [brandDetail, comps, prof, settings] = details ?? await Promise.all([
+        const [brandDetail, comps, prof, settings] = (details ?? await Promise.all([
           getBrand(firstBrand.id),
           getCompetitors(firstBrand.id),
           getBrandProfile(firstBrand.id).catch(() => null),
           getContentSettings(firstBrand.id).catch(() => [] as BrandContentSettings[]),
-        ]);
+        ])) as [BrandDetail, Competitor[], BrandProfile | null, BrandContentSettings[]];
 
         setBrand(brandDetail);
         setEditName(brandDetail.name);
@@ -427,7 +428,7 @@ export default function SettingsPage() {
     setTeamLoading(true);
     getTeamMembers()
       .then(setTeamMembers)
-      .catch(() => {})
+      .catch(() => setTeamLoadError('Could not load team members. Please refresh the page.'))
       .finally(() => setTeamLoading(false));
   }, [activeTab]);
 
@@ -575,7 +576,7 @@ export default function SettingsPage() {
     if (!brandId) return;
     setBrand((prev) => {
       if (!prev) return prev;
-      return { ...prev, prompts: [...prev.prompts, { id: Date.now(), brand_id: prev.id, text }], prompt_count: prev.prompt_count + 1 };
+      return { ...prev, prompts: [...prev.prompts, { id: Date.now(), brand_id: prev.id, text, prompt_type: 'standard' as const }], prompt_count: prev.prompt_count + 1 };
     });
     setSuggestions((prev) => prev.filter((s) => s !== text));
     try {
@@ -1116,7 +1117,7 @@ export default function SettingsPage() {
             <SectionCard
               icon={Building2}
               title="Company Description"
-              description="What the company does — used as context for all content drafts"
+              description="What your brand does — used as context for all content drafts"
             >
               <AutoTextarea
                 value={companyDescription}
@@ -1271,6 +1272,8 @@ export default function SettingsPage() {
             <h2 className="text-base font-semibold text-[#F0F4F8] mb-4">Team Members</h2>
             {teamLoading ? (
               <div className="flex items-center gap-2 text-[#64748B] text-sm"><Loader2 size={14} className="animate-spin" />Loading…</div>
+            ) : teamLoadError ? (
+              <p className="text-sm text-[#f87171]">{teamLoadError}</p>
             ) : teamMembers.length === 0 ? (
               <p className="text-sm text-[#475569]">No team members yet. Invite someone above.</p>
             ) : (

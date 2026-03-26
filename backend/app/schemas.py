@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 # ── Prompt schemas ────────────────────────────────────────────────────────────
@@ -192,6 +192,8 @@ class PaginatedQueryResults(BaseModel):
 # ── Results / analytics schemas ───────────────────────────────────────────────
 
 class OverviewResponse(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     brand_id: int
     brand_name: str
     brand_tier: str = "basic"
@@ -205,6 +207,8 @@ class OverviewResponse(BaseModel):
 
 
 class TrendPoint(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     run_id: int
     created_at: datetime
     completed_at: Optional[datetime] = None
@@ -330,6 +334,8 @@ class CreateDraftRequest(BaseModel):
     platform: str
     prompt_id: Optional[int] = None
     custom_brief: Optional[str] = None
+    quora_question_url: Optional[str] = None
+    quora_question_title: Optional[str] = None
 
 
 class GenerateNowRequest(BaseModel):
@@ -496,6 +502,8 @@ class CitationGap(BaseModel):
 
 
 class DashboardAnalytics(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     brand_id: int
     brand_name: str
     sov: SOVData
@@ -579,6 +587,7 @@ class ContentGapResponse(BaseModel):
     gap_score: float
     competitor_mentions: dict = {}
     platforms_lacking: list[str] = []
+    quora_questions: list[dict] = []
     prompt_visibility: Optional[float] = None
     last_content_at: Optional[datetime] = None
     identified_at: datetime

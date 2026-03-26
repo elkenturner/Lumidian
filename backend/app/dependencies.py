@@ -3,6 +3,7 @@ Shared FastAPI dependencies.
 """
 from __future__ import annotations
 
+import logging
 import os
 from time import monotonic
 from typing import Annotated, Optional
@@ -22,6 +23,7 @@ if not JWT_SECRET:
         "Generate one with: python -c \"import secrets; print(secrets.token_hex(32))\""
     )
 JWT_ALGORITHM = "HS256"
+logger = logging.getLogger(__name__)
 
 # ── Per-user in-memory rate limiting ─────────────────────────────────────────
 # {user_id: (call_count, window_start_monotonic)}
@@ -69,6 +71,11 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if getattr(user, "is_paused", False) and not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been paused. Contact support to restore access.",
+        )
     return user
 
 
@@ -85,7 +92,10 @@ async def get_current_user_optional(
             return None
         result = await db.execute(select(User).where(User.id == int(user_id)))
         return result.scalar_one_or_none()
-    except Exception:
+    except HTTPException:
+        return None
+    except Exception as exc:
+        logger.warning("Unexpected error in optional auth lookup: %s", exc)
         return None
 
 

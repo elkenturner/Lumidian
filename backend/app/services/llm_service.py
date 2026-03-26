@@ -28,6 +28,11 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
+# Perplexity rate-limit guard: allow at most 2 concurrent calls to avoid 429s.
+# Perplexity's per-minute quota is small; flooding it causes later prompts in a
+# run to fail while early ones succeed, producing inconsistent report data.
+_PERPLEXITY_SEM = asyncio.Semaphore(2)
+
 # Human-readable display names for each model (used in placeholder messages)
 _MODEL_DISPLAY_NAMES = {
     "chatgpt": "ChatGPT",
@@ -167,12 +172,15 @@ async def _query_perplexity(prompt: str, brand_name: str) -> dict:
             api_key=PERPLEXITY_API_KEY,
             base_url="https://api.perplexity.ai",
         )
-        response = await client.chat.completions.create(
-            model="sonar-pro",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=1024,
-            temperature=0.7,
-        )
+        # Throttle to at most _PERPLEXITY_SEM concurrent calls so we don't
+        # blast Perplexity's per-minute quota and cause 429s on later prompts.
+        async with _PERPLEXITY_SEM:
+            response = await client.chat.completions.create(
+                model="sonar-pro",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1024,
+                temperature=0.7,
+            )
         latency_ms = int((time.monotonic() - start) * 1000)
         text = response.choices[0].message.content
         if not text:
@@ -286,11 +294,17 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str) -> 
 
     display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
     first_error = result.get("error") or "empty response"
+
+    # Rate-limit errors (429) need a much longer backoff — the standard window
+    # is 60 seconds. A 3s retry will almost certainly hit the same limit again.
+    is_rate_limit = "429" in first_error or "rate_limit" in first_error.lower() or "rate limit" in first_error.lower()
+    retry_delay = 65 if is_rate_limit else 3
+
     logger.warning(
-        "[%s] First attempt failed (error=%r) for prompt %r — retrying in 3s",
-        model_key, first_error, prompt[:100],
+        "[%s] First attempt failed (error=%r) for prompt %r — retrying in %ds",
+        model_key, first_error, prompt[:100], retry_delay,
     )
-    await asyncio.sleep(3)
+    await asyncio.sleep(retry_delay)
 
     retry = await handler(prompt, brand_name)
     if retry.get("response_text") and not retry.get("error"):

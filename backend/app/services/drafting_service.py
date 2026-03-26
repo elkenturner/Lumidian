@@ -21,7 +21,7 @@ import json
 import logging
 import os
 from datetime import datetime, timezone
-from typing import Optional
+from typing import List, Optional
 
 from sqlalchemy import select, func as sqlfunc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,13 +36,10 @@ from app.models import (
     QueryResult,
     TrackingRun,
     BrandContentSettings,
+    utcnow as _utcnow,
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 # ── Extended platform guidelines ──────────────────────────────────────────────
@@ -533,7 +530,7 @@ def _build_wikipedia_prompt(
     prompt_text: str,
     profile_context: str,
     response_analysis: str,
-    publications: list[dict] | None = None,
+    publications: Optional[List[dict]] = None,
 ) -> str:
     citation_ref = _build_citation_ref(publications or [], brand_name)
     pub_note = ""
@@ -889,6 +886,8 @@ async def generate_gap_draft(
     prompt_id: int,
     platform: str,
     custom_brief: Optional[str] = None,
+    quora_question_url: Optional[str] = None,
+    quora_question_title: Optional[str] = None,
 ) -> ContentDraft:
     """
     Generate a draft targeting a specific prompt/platform gap.
@@ -1031,6 +1030,20 @@ async def generate_gap_draft(
             suggested_subreddit = subs[0]
 
     spec = PLATFORM_SPECS[platform]
+
+    # For Quora targeted drafts, prepend the specific question to the opportunity context
+    effective_opportunity_context = custom_brief
+    if platform == "quora" and quora_question_title and quora_question_url:
+        question_context = (
+            f"Write a Quora answer to this specific question: "
+            f"{quora_question_title} ({quora_question_url}). "
+            f"The answer should directly address this question while naturally "
+            f"incorporating relevant information about {brand.name}."
+        )
+        effective_opportunity_context = (
+            question_context + (f"\n\n{custom_brief}" if custom_brief else "")
+        )
+
     claude_prompt = _build_prompt(
         brand_name=brand.name,
         platform=platform,
@@ -1039,7 +1052,7 @@ async def generate_gap_draft(
         profile_context=profile_context,
         response_analysis=response_analysis,
         platform_spec=spec,
-        opportunity_context=custom_brief,
+        opportunity_context=effective_opportunity_context,
         existing_drafts_context=existing_drafts_context,
     )
 
@@ -1047,7 +1060,21 @@ async def generate_gap_draft(
     raw_text = _post_process(raw_text)
     title, body = _split_title_body(raw_text, platform)
 
-    if platform == "quora":
+    if platform == "quora" and quora_question_url and quora_question_title:
+        # Targeted draft: store URL in brief, title in guidelines_override
+        return await _store_draft(
+            db=db,
+            brand_id=brand_id,
+            prompt_id=prompt_id,
+            platform=platform,
+            title=title,
+            content_body=body,
+            brief=quora_question_url,
+            visibility_pct=visibility_pct,
+            estimated_impact=estimated_impact,
+            guidelines_override=quora_question_title,
+        )
+    elif platform == "quora":
         brief = (
             f'Find a relevant question on Quora about "{prompt.text}" '
             f"and post this answer there."

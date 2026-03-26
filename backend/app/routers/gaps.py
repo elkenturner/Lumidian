@@ -47,6 +47,7 @@ def _gap_to_response(gap: ContentGap, prompt_text: Optional[str] = None) -> Cont
         gap_score=gap.gap_score,
         competitor_mentions=_parse(gap.competitor_mentions, {}),
         platforms_lacking=_parse(gap.platforms_lacking, []),
+        quora_questions=_parse(gap.quora_questions, []),
         prompt_visibility=gap.prompt_visibility,
         last_content_at=gap.last_content_at,
         identified_at=gap.identified_at,

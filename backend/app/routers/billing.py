@@ -33,12 +33,15 @@ TIER_PRICES = {
     "starter": os.getenv("STRIPE_STARTER_PRICE_ID", ""),
     "pro": os.getenv("STRIPE_PRO_PRICE_ID", ""),
 }
-# Tiers that include a 7-day free trial
-TRIAL_TIERS = {"pro"}
+# All paid tiers include a 30-day free trial (requires payment method upfront)
+TRIAL_TIERS = {"starter", "pro"}
+TRIAL_DAYS = 30
 # Brand limits per tier: {"standard": N, "pitch": M}
 BRAND_LIMITS = {
-    "starter": {"standard": 1, "pitch": 1},
-    "pro": {"standard": 5, "pitch": 10},
+    None: {"standard": 1, "pitch": 1},      # free: 1 standard + 1 pitch
+    "": {"standard": 1, "pitch": 1},
+    "starter": {"standard": 1, "pitch": 2},  # 1 standard + 2 pitch
+    "pro": {"standard": 5, "pitch": 4},      # 5 standard + 4 pitch
 }
 
 
@@ -58,11 +61,13 @@ def get_stripe():
 
 @router.get("/status")
 async def billing_status(user: Annotated[User, Depends(get_current_user)]):
-    limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier or "", 10)
-    brand_limits = BRAND_LIMITS.get(user.subscription_tier or "", {"standard": 0, "pitch": 1})
+    limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier or "", 25)
+    brand_limits = BRAND_LIMITS.get(user.subscription_tier or "", BRAND_LIMITS[None])
+    trial_end = user.subscription_trial_end.isoformat() if getattr(user, "subscription_trial_end", None) else None
     return {
         "subscription_tier": user.subscription_tier,
         "subscription_status": user.subscription_status,
+        "subscription_trial_end": trial_end,
         "prompt_limit": limit,
         "brand_limits": brand_limits,
         "is_admin": user.is_admin,
@@ -112,12 +117,18 @@ async def create_checkout(
         mode="subscription",
         success_url=request.success_url,
         cancel_url=request.cancel_url,
+        # Always collect payment method upfront — required for trials
+        payment_method_collection="always",
         subscription_data={
             "metadata": {"user_id": str(user.id), "tier": request.tier},
         },
     )
     if request.tier in TRIAL_TIERS:
-        session_kwargs["subscription_data"]["trial_period_days"] = 7
+        session_kwargs["subscription_data"]["trial_period_days"] = TRIAL_DAYS
+        # Allow users to cancel during trial without being charged
+        session_kwargs["subscription_data"]["trial_settings"] = {
+            "end_behavior": {"missing_payment_method": "cancel"}
+        }
 
     session = stripe.checkout.Session.create(**session_kwargs)
     return {"checkout_url": session.url}
@@ -222,11 +233,20 @@ async def stripe_webhook(request: Request, db: DbDep):
         )
         user = result.scalar_one_or_none()
         if user:
+            from datetime import datetime, timezone
             old_tier = user.subscription_tier
             user.subscription_status = sub_status
             user.stripe_subscription_id = sub_id
             if tier:
                 user.subscription_tier = tier
+            # Store trial end date if present (Stripe sends unix timestamp)
+            trial_end_ts = data_obj.get("trial_end")
+            if trial_end_ts:
+                user.subscription_trial_end = datetime.fromtimestamp(
+                    trial_end_ts, tz=timezone.utc
+                ).replace(tzinfo=None)
+            elif sub_status not in ("trialing",):
+                user.subscription_trial_end = None
             user.updated_at = utcnow()
             await db.commit()
             if tier and tier != old_tier:

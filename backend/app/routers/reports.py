@@ -10,7 +10,7 @@ from __future__ import annotations
 import io
 import logging
 from datetime import datetime, timezone
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
@@ -27,16 +27,7 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
-MODEL_ORDER = ["chatgpt", "claude", "perplexity", "gemini"]
-MODEL_LABELS = {"chatgpt": "ChatGPT", "claude": "Claude", "perplexity": "Perplexity", "gemini": "Gemini"}
-
-
-def _normalise_model(model: str) -> str:
-    key = model.lower().replace("-", "").replace("_", "").replace(" ", "")
-    for m in MODEL_ORDER:
-        if m in key:
-            return m
-    return model
+from app.utils import normalise_model, MODEL_ORDER, MODEL_LABELS  # noqa: E402
 
 
 @router.get("/{brand_id}/export")
@@ -55,7 +46,7 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
     completed_runs: list[TrackingRun] = list(runs_result.scalars().all())
 
     latest_run = completed_runs[-1] if completed_runs else None
-    overall_score: float | None = latest_run.overall_score if latest_run else None
+    overall_score: Optional[float] = latest_run.overall_score if latest_run else None
 
     # Per-model scores for latest run
     model_scores: dict[str, float] = {}
@@ -64,7 +55,7 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
             select(RunModelScore).where(RunModelScore.tracking_run_id == latest_run.id)
         )
         for ms in ms_result.scalars().all():
-            model_scores[_normalise_model(ms.model)] = round(ms.score, 1)
+            model_scores[normalise_model(ms.model)] = round(ms.score, 1)
 
     # Query results for latest run
     query_results: list[QueryResult] = []
@@ -100,7 +91,7 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
         g.total += 1
         if qr.mentioned:
             g.mentioned += 1
-        mk = _normalise_model(qr.model)
+        mk = normalise_model(qr.model)
         if mk not in g.model_stats:
             g.model_stats[mk] = {"total": 0, "mentioned": 0}
         g.model_stats[mk]["total"] += 1
@@ -128,7 +119,8 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
         logger.exception("PDF generation failed for brand %d: %s", brand_id, exc)
         raise HTTPException(status_code=500, detail="PDF generation failed")
 
-    safe_name = brand.name.replace(" ", "_").replace("/", "-")
+    import re
+    safe_name = re.sub(r'[^\w\-]', '_', brand.name)
     date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     filename = f"{safe_name}_visibility_{date_str}.pdf"
 
@@ -143,7 +135,7 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
 
 def _build_pdf(
     brand_name: str,
-    overall_score: float | None,
+    overall_score: Optional[float],
     completed_runs: list,
     sorted_groups: list,
     model_scores: dict[str, float],

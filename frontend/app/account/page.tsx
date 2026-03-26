@@ -31,15 +31,16 @@ const PLANS = [
     key: null,
     label: 'Free',
     price: '$0/mo',
-    features: ['1 pitch brand (10 prompts)', 'Pitch expires after 7 days', '4 AI models tracked', 'Visibility scoring'],
+    features: ['1 pitch brand (10 prompts)', 'Pitch expires after 30 days', '4 AI models tracked', 'Visibility scoring'],
   },
   {
     key: 'starter',
     label: 'Starter',
     price: '$300/mo',
+    trial: true,
     features: [
       '1 standard brand (25 prompts)',
-      '1 pitch brand (10 prompts, 7-day)',
+      '2 pitch brands (10 prompts each, 30-day)',
       'Content Hub & gap analysis',
       'Brand profile & voice',
       'Email support',
@@ -52,8 +53,8 @@ const PLANS = [
     trial: true,
     features: [
       '5 standard brands (100 prompts each)',
-      'Unlimited pitch decks',
-      '7-day free trial',
+      '4 pitch brands (10 prompts each, 30-day)',
+      '30-day free trial',
       'Content Hub & gap analysis',
       'Priority support',
     ],
@@ -258,7 +259,7 @@ export default function AccountPage() {
                   <div className="flex items-center gap-1">
                     {plan.trial && (
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(16,185,129,0.15)] text-[#34d399] border border-[rgba(16,185,129,0.25)]">
-                        7-day trial
+                        30-day trial
                       </span>
                     )}
                     {isCurrent && (

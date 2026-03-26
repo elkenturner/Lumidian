@@ -10,10 +10,12 @@ After a tracking run completes, this service:
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
 from datetime import datetime, timezone
+from typing import Optional
 from collections import defaultdict
 
 from sqlalchemy import select, func
@@ -23,16 +25,13 @@ from app.database import AsyncSessionLocal
 from app.models import (
     Brand, Prompt, TrackingRun, QueryResult, RunModelScore,
     Competitor, ContentDraft, ContentPost, ContentGap,
+    utcnow as _utcnow,
 )
 
 logger = logging.getLogger(__name__)
 
 PLATFORMS = ["reddit", "quora", "medium", "wikipedia"]
 GAP_THRESHOLD = 50.0  # visibility below this triggers a gap
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _normalize(text: str) -> str:
@@ -213,6 +212,20 @@ async def run_gap_analysis(brand_id: int, run_id: int) -> list[int]:
                 + recency_score * 0.3
             )
 
+            # Fetch Quora questions relevant to this prompt (non-fatal, runs in thread)
+            quora_questions_json: Optional[str] = None
+            try:
+                from app.services.quora_search_service import extract_keywords, search_quora_questions
+                keywords = extract_keywords(prompt.text)
+                if keywords:
+                    questions = await asyncio.to_thread(
+                        search_quora_questions, keywords, 5, prompt_id
+                    )
+                    if questions:
+                        quora_questions_json = json.dumps(questions)
+            except Exception as _qe:
+                logger.debug("Quora search skipped for prompt %d: %s", prompt_id, _qe)
+
             gap = ContentGap(
                 brand_id=brand_id,
                 prompt_id=prompt_id,
@@ -224,6 +237,7 @@ async def run_gap_analysis(brand_id: int, run_id: int) -> list[int]:
                 gap_score=round(gap_score, 2),
                 competitor_mentions=json.dumps(dict(competitor_mention_counts)) if competitor_mention_counts else None,
                 platforms_lacking=json.dumps(platforms_lacking) if platforms_lacking else None,
+                quora_questions=quora_questions_json,
                 prompt_visibility=round(overall_visibility, 2),
                 last_content_at=last_content,
                 identified_at=_utcnow(),

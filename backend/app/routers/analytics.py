@@ -163,8 +163,28 @@ async def admin_list_users(db: DbDep, user: CurrentUser):
         .group_by(User.id)
         .order_by(User.created_at.desc())
     )
+    user_rows = rows.all()
+
+    # Fetch all brands grouped by user in one query
+    if user_rows:
+        user_ids = [r.id for r in user_rows]
+        brands_result = await db.execute(
+            select(Brand.id, Brand.user_id, Brand.name, Brand.brand_type)
+            .where(Brand.user_id.in_(user_ids))
+            .order_by(Brand.created_at.asc())
+        )
+        brands_by_user: dict = {}
+        for b in brands_result.all():
+            brands_by_user.setdefault(b.user_id, []).append({
+                "id": b.id,
+                "name": b.name,
+                "brand_type": b.brand_type,
+            })
+    else:
+        brands_by_user = {}
+
     users_data = []
-    for row in rows.all():
+    for row in user_rows:
         # Last active = latest tracking run
         last_run_result = await db.execute(
             select(func.max(TrackingRun.created_at))
@@ -172,6 +192,7 @@ async def admin_list_users(db: DbDep, user: CurrentUser):
             .where(Brand.user_id == row.id)
         )
         last_active = last_run_result.scalar_one_or_none()
+        user_brands = brands_by_user.get(row.id, [])
         users_data.append({
             "id": row.id,
             "email": row.email,
@@ -179,11 +200,60 @@ async def admin_list_users(db: DbDep, user: CurrentUser):
             "subscription_tier": row.subscription_tier,
             "subscription_status": row.subscription_status,
             "is_admin": row.is_admin,
+            "is_paused": bool(getattr(row, "is_paused", False)),
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "brand_count": row.brand_count,
+            "brands": user_brands,
             "last_active": last_active.isoformat() if last_active else None,
         })
     return users_data
+
+
+# ── Admin: pause / unpause a user ─────────────────────────────────────────────
+
+@router.post("/admin/users/{user_id}/pause")
+async def admin_pause_user(user_id: int, db: DbDep, user: CurrentUser):
+    """Pause or unpause a user account. Admin only. Cannot pause another admin."""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    target = await db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    # Admins can pause their own account, but not other admins
+    if target.is_admin and target.id != user.id:
+        raise HTTPException(status_code=400, detail="Cannot pause another admin account")
+
+    target.is_paused = not getattr(target, "is_paused", False)
+    target.updated_at = target.updated_at  # trigger onupdate
+    from app.models import utcnow as _utcnow
+    target.updated_at = _utcnow()
+    await db.commit()
+    action = "paused" if target.is_paused else "unpaused"
+    logger.info("Admin %s %s user %s (%s)", user.email, action, target.email, user_id)
+    return {"user_id": user_id, "is_paused": target.is_paused, "action": action}
+
+
+# ── Admin: remove a user account ──────────────────────────────────────────────
+
+@router.delete("/admin/users/{user_id}")
+async def admin_remove_user(user_id: int, db: DbDep, user: CurrentUser):
+    """Permanently delete a user and all their data. Admin only. Cannot delete another admin."""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    if user_id == user.id:
+        raise HTTPException(status_code=400, detail="Cannot delete your own admin account")
+
+    target = await db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.is_admin:
+        raise HTTPException(status_code=400, detail="Cannot delete an admin account")
+
+    logger.warning("Admin %s deleting user %s (%d) and all their data", user.email, target.email, user_id)
+    await db.delete(target)
+    await db.commit()
+    return {"user_id": user_id, "deleted": True}
 
 
 # ── Admin: all tracking runs ──────────────────────────────────────────────────

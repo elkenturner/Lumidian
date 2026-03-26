@@ -20,7 +20,6 @@ import {
   Sparkles,
 } from 'lucide-react';
 import {
-  getBrands,
   getBrand,
   getOverview,
   getTrends,
@@ -50,23 +49,22 @@ import {
   BrandProfile,
   CompetitorStat,
   ModelStat,
-  CitationGap,
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBrand } from '@/contexts/BrandContext';
 import {
   AreaChart,
   Area,
   PieChart,
   Pie,
-  Sector,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
 
@@ -134,92 +132,79 @@ function SparklineTooltip({ active, payload }: { active?: boolean; payload?: Arr
   );
 }
 
-// ── Pie domain chart ───────────────────────────────────────────────────────────
+// ── Top domains donut chart ─────────────────────────────────────────────────────
 
-const PIE_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4'];
-
-
-function ActivePieSlice(props: Record<string, unknown>) {
-  const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props as {
-    cx: number; cy: number; innerRadius: number; outerRadius: number;
-    startAngle: number; endAngle: number; fill: string;
-  };
-  return (
-    <Sector
-      cx={cx} cy={cy}
-      innerRadius={innerRadius}
-      outerRadius={(outerRadius as number) + 6}
-      startAngle={startAngle} endAngle={endAngle}
-      fill={fill}
-      stroke="#6366f1"
-      strokeWidth={1}
-    />
-  );
-}
+const DOMAIN_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#f43f5e', '#06b6d4'];
 
 function DonutDomains({ domains }: { domains: Array<{ domain: string; pct: number; count: number; domain_type: string }> }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const total = domains.reduce((s, d) => s + d.count, 0);
   const data = domains.map((d) => ({ ...d, value: d.count }));
-  const total = data.reduce((s, d) => s + d.count, 0);
-  const activeItem = activeIndex !== null ? data[activeIndex] : null;
-  const activePct = activeItem && total > 0 ? ((activeItem.count / total) * 100).toFixed(1) : null;
+  const active = activeIndex !== null ? data[activeIndex] : null;
+  const activePct = active && total > 0 ? ((active.count / total) * 100).toFixed(1) : null;
 
   return (
-    <div className="flex items-center gap-4 flex-1">
-      <div className="flex-shrink-0 relative">
-        <ResponsiveContainer width={120} height={120}>
-          <PieChart>
-            <Pie
-              data={data}
-              cx="50%"
-              cy="50%"
-              innerRadius={0}
-              outerRadius={52}
-              paddingAngle={1}
-              dataKey="value"
-              stroke="rgba(255,255,255,0.10)"
-              strokeWidth={1}
-              activeIndex={activeIndex ?? undefined}
-              activeShape={ActivePieSlice}
-              onMouseEnter={(_, index) => setActiveIndex(index)}
-              onMouseLeave={() => setActiveIndex(null)}
-            >
-              {data.map((_, i) => (
-                <Cell
-                  key={i}
-                  fill={PIE_COLORS[i % PIE_COLORS.length]}
-                  opacity={activeIndex === null || activeIndex === i ? 1 : 0.5}
-                />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-        {/* Custom tooltip — positioned below the chart, never overlapping */}
-        <div
-          className="absolute left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-150"
-          style={{ bottom: -36, minWidth: 110 }}
-        >
-          {activeItem && activePct ? (
-            <div className="bg-[rgba(15,20,40,0.95)] border border-[rgba(99,102,241,0.20)] rounded-lg px-2.5 py-1.5 shadow-xl text-xs whitespace-nowrap">
-              <p className="text-[#F0F4F8] font-semibold truncate max-w-[140px]">{activeItem.domain}</p>
-              <p className="text-[#818CF8] font-bold mt-0.5">{activePct}%</p>
-            </div>
-          ) : null}
+    <div className="flex items-center gap-5 flex-1 min-h-0">
+      {/* Donut */}
+      <div className="relative flex-shrink-0" style={{ width: 130, height: 130 }}>
+        <PieChart width={130} height={130}>
+          <Pie
+            data={data}
+            cx={65}
+            cy={65}
+            innerRadius={42}
+            outerRadius={60}
+            paddingAngle={2}
+            dataKey="value"
+            strokeWidth={0}
+            startAngle={90}
+            endAngle={-270}
+            onMouseEnter={(_, i) => setActiveIndex(i)}
+            onMouseLeave={() => setActiveIndex(null)}
+          >
+            {data.map((_, i) => (
+              <Cell
+                key={i}
+                fill={DOMAIN_COLORS[i % DOMAIN_COLORS.length]}
+                opacity={activeIndex === null || activeIndex === i ? 1 : 0.25}
+                style={{ cursor: 'default', outline: 'none' }}
+              />
+            ))}
+          </Pie>
+        </PieChart>
+        {/* Centre label */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          {active && activePct ? (
+            <>
+              <span className="text-base font-bold text-[#F0F4F8] leading-none">{activePct}%</span>
+              <span className="text-[10px] text-[#64748B] mt-0.5 max-w-[60px] text-center leading-tight truncate">{active.domain.replace(/^www\./, '')}</span>
+            </>
+          ) : (
+            <>
+              <span className="text-base font-bold text-[#F0F4F8] leading-none">{data.length}</span>
+              <span className="text-[10px] text-[#64748B] mt-0.5">sources</span>
+            </>
+          )}
         </div>
       </div>
-      <div className="flex-1 min-w-0 space-y-1.5">
+
+      {/* Legend */}
+      <div className="flex-1 min-w-0 space-y-2">
         {data.map((d, i) => {
-          const pct = total > 0 ? ((d.count / total) * 100) : 0;
+          const pct = total > 0 ? (d.count / total) * 100 : 0;
+          const color = DOMAIN_COLORS[i % DOMAIN_COLORS.length];
+          const isActive = activeIndex === i;
           return (
             <div
               key={d.domain}
               className="flex items-center gap-2 min-w-0 cursor-default"
               onMouseEnter={() => setActiveIndex(i)}
               onMouseLeave={() => setActiveIndex(null)}
+              style={{ opacity: activeIndex === null || isActive ? 1 : 0.4, transition: 'opacity 0.15s' }}
             >
-              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: PIE_COLORS[i % PIE_COLORS.length], opacity: activeIndex === null || activeIndex === i ? 1 : 0.4 }} />
-              <span className="text-xs truncate flex-1 min-w-0" style={{ color: activeIndex === i ? '#F0F4F8' : '#64748B' }}>{d.domain}</span>
-              <span className="text-xs tabular-nums flex-shrink-0 font-medium" style={{ color: activeIndex === i ? '#818CF8' : '#94A3B8' }}>{pct.toFixed(1)}%</span>
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+              <span className="text-xs truncate flex-1 min-w-0" style={{ color: isActive ? '#F0F4F8' : '#94A3B8' }}>{d.domain}</span>
+              <span className="text-xs tabular-nums font-semibold flex-shrink-0" style={{ color: isActive ? color : '#64748B' }}>{pct.toFixed(1)}%</span>
             </div>
           );
         })}
@@ -255,42 +240,6 @@ function ModelBreakdown({ models }: { models: ModelStat[] }) {
             <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
               <div className="h-full rounded-full transition-all duration-500" style={{ width: barWidth, background: barColor }} />
             </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Citation gaps list ─────────────────────────────────────────────────────────
-
-const DOMAIN_TYPE_COLOR: Record<string, string> = {
-  UGC: '#f59e0b',
-  Editorial: '#60a5fa',
-  Reference: '#a78bfa',
-  Institutional: '#10b981',
-  Corporate: '#94a3b8',
-};
-
-function CitationGapsList({ gaps }: { gaps: CitationGap[] }) {
-  if (!gaps.length) return <p className="text-xs text-[#475569]">No citation data yet</p>;
-  return (
-    <div className="space-y-2 w-full">
-      {gaps.map((g) => {
-        const missRate = Math.round(g.gap_score * 100);
-        const typeColor = DOMAIN_TYPE_COLOR[g.domain_type] ?? '#94a3b8';
-        return (
-          <div key={g.domain} className="flex items-center gap-3 min-w-0">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs font-medium text-[#CBD5E1] truncate">{g.domain}</span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full flex-shrink-0 font-medium" style={{ background: `${typeColor}20`, color: typeColor }}>{g.domain_type}</span>
-              </div>
-              <div className="h-1 w-full bg-[rgba(255,255,255,0.06)] rounded-full mt-1.5 overflow-hidden">
-                <div className="h-full rounded-full bg-[#ef4444]" style={{ width: `${missRate}%` }} />
-              </div>
-            </div>
-            <span className="text-xs tabular-nums text-[#ef4444] flex-shrink-0 font-medium">{missRate}% miss</span>
           </div>
         );
       })}
@@ -404,7 +353,7 @@ function BestPromptCard({ responses, loading, onAddCompetitors }: { responses: Q
     }
     let top: { text: string; total: number; mentioned: number; models: string[] } | null = null;
     let topRate = -1;
-    for (const [, p] of map) {
+    for (const [, p] of Array.from(map)) {
       if (p.total === 0) continue;
       const rate = p.mentioned / p.total;
       if (rate > topRate || (rate === topRate && top && p.mentioned > top.mentioned)) {
@@ -673,7 +622,7 @@ function CompetitorModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
+      <div role="dialog" aria-modal="true" className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="text-base font-semibold text-[#F0F4F8]">Competitors</h3>
@@ -755,8 +704,7 @@ function CompetitorModal({
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
+  const { brands, activeBrandId: selectedBrandId, loading: loadingBrands, setActiveBrandId } = useBrand();
   const [newBrandMode, setNewBrandMode] = useState(false);
   const [newBrandStep, setNewBrandStep] = useState<'running' | 'drafting' | 'done'>('running');
   const newBrandHandledRef = useRef(false);
@@ -765,7 +713,6 @@ export default function DashboardPage() {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [trends, setTrends] = useState<TrendPoint[]>([]);
   const [analytics, setAnalytics] = useState<DashboardAnalytics | null>(null);
-  const [loadingBrands, setLoadingBrands] = useState(true);
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
 
   // Reports data
@@ -805,19 +752,15 @@ export default function DashboardPage() {
 
   useEffect(() => { document.title = 'Dashboard — ClarityAI'; }, []);
 
+  // If ?brandId=X is in the URL (new-brand onboarding), override the active brand
   useEffect(() => {
-    getBrands().then((b) => {
-      setBrands(b);
-      if (b.length > 0) {
-        // If ?brandId=X is in the URL, pre-select that brand (new-brand onboarding)
-        const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-        const urlBrandId = params ? parseInt(params.get('brandId') ?? '', 10) : NaN;
-        const match = !isNaN(urlBrandId) && b.find((br) => br.id === urlBrandId);
-        setSelectedBrandId(match ? match.id : b[0].id);
-      }
-      setLoadingBrands(false);
-    }).catch(() => setLoadingBrands(false));
-  }, []);
+    if (!brands.length) return;
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const urlBrandId = params ? parseInt(params.get('brandId') ?? '', 10) : NaN;
+    if (!isNaN(urlBrandId) && brands.some((br) => br.id === urlBrandId)) {
+      setActiveBrandId(urlBrandId);
+    }
+  }, [brands, setActiveBrandId]);
 
   const loadData = useCallback(async (brandId: number, signal?: AbortSignal) => {
     setLoadingAnalytics(true);
@@ -1096,6 +1039,14 @@ export default function DashboardPage() {
     (p) => !trackedPromptIds.has(p.id)
   );
 
+  // Quick stats
+  const totalPrompts = (brandDetail?.prompts ?? []).length;
+  const totalRuns = trends.length;
+  const totalResponses = trends.reduce((acc, t) => acc + (t.total_queries ?? 0), 0);
+  const daysSinceFirst = trends.length > 0 && trends[0].completed_at
+    ? Math.max(0, Math.floor((Date.now() - parseUTCISO(trends[0].completed_at).getTime()) / 86_400_000))
+    : null;
+
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl">
       {/* Subscription status banner */}
@@ -1261,6 +1212,28 @@ export default function DashboardPage() {
                     </div>
                     <p className="text-[11px] text-[#475569] mt-1">A complete brand profile improves draft quality and visibility tracking accuracy.</p>
                   </div>
+                </div>
+              )}
+
+              {/* Quick stats row */}
+              {!loadingAnalytics && totalRuns > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                  {[
+                    { label: 'Prompts tracked', value: totalPrompts || '—', icon: MessageSquare },
+                    { label: 'Runs completed', value: totalRuns || '—', icon: RefreshCw },
+                    { label: 'Responses analyzed', value: totalResponses >= 1000 ? `${(totalResponses / 1000).toFixed(1)}k` : totalResponses || '—', icon: BarChart2 },
+                    { label: 'Days tracking', value: daysSinceFirst != null ? daysSinceFirst : '—', icon: TrendingUp },
+                  ].map(({ label, value, icon: Icon }) => (
+                    <div key={label} className="bg-[rgba(99,102,241,0.04)] border border-[rgba(99,102,241,0.12)] rounded-xl px-4 py-3 flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-[rgba(99,102,241,0.10)] flex items-center justify-center flex-shrink-0">
+                        <Icon size={14} className="text-[#6366f1]" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-bold text-[#F0F4F8] leading-tight">{value}</p>
+                        <p className="text-[11px] text-[#475569] mt-0.5">{label}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -1474,9 +1447,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Row 3: Model breakdown + Citation gaps */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-                {/* Performance by Model */}
+              {/* Row 3: Model breakdown */}
+              <div className="mb-4">
                 <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
                   <div className="flex items-center gap-2 mb-4">
                     <BarChart2 size={15} className="text-[#6366f1]" />
@@ -1489,22 +1461,6 @@ export default function DashboardPage() {
                     </div>
                   ) : (
                     <ModelBreakdown models={analytics?.model_breakdown ?? []} />
-                  )}
-                </div>
-
-                {/* Citation Gaps */}
-                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-                  <div className="flex items-center gap-2 mb-4">
-                    <Globe size={15} className="text-[#6366f1]" />
-                    <h3 className="text-sm font-semibold text-[#F0F4F8]">Citation Gaps</h3>
-                    <HelpTooltip text="Sources frequently cited by AI models that don't mention your brand — high-miss sources are the best targets for getting listed or published." />
-                  </div>
-                  {loadingAnalytics ? (
-                    <div className="space-y-3">
-                      {[1,2,3,4].map(i => <div key={i} className="h-6 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
-                    </div>
-                  ) : (
-                    <CitationGapsList gaps={analytics?.citation_gaps ?? []} />
                   )}
                 </div>
               </div>

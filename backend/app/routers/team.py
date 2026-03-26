@@ -10,6 +10,7 @@ DELETE /api/team/members/{id}     — revoke invite or remove member (owner only
 """
 from __future__ import annotations
 
+import logging
 import os
 import secrets
 from datetime import datetime, timezone, timedelta
@@ -25,6 +26,7 @@ from app.models import TeamMember, User
 from app.schemas import TeamMemberResponse, InviteTeamMemberRequest
 
 router = APIRouter(prefix="/team", tags=["team"])
+logger = logging.getLogger(__name__)
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 

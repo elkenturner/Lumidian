@@ -23,6 +23,7 @@ import ssl
 from datetime import datetime, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ def _send(to: str, subject: str, body: str) -> None:
 
 # ── Public email functions ────────────────────────────────────────────────────
 
-def send_welcome_email(email: str, name: str | None) -> None:
+def send_welcome_email(email: str, name: Optional[str]) -> None:
     """Sent immediately after a new user registers."""
     display = name or email.split("@")[0]
     brand_url = f"{_FRONTEND_URL}/tracker/new"
@@ -134,7 +135,7 @@ If you have questions, just reply to this email.
     )
 
 
-def send_password_reset_email(email: str, name: str | None, reset_link: str) -> None:
+def send_password_reset_email(email: str, name: Optional[str], reset_link: str) -> None:
     """Sent when a user requests a password reset."""
     display = name or email.split("@")[0]
 
@@ -162,7 +163,7 @@ Your password will not change.
 def send_team_invite_email(
     invited_email: str,
     invite_link: str,
-    inviter_name: str | None,
+    inviter_name: Optional[str],
 ) -> None:
     """Sent when a user is invited to join a team workspace."""
     inviter = inviter_name or "A ClarityAI user"
@@ -195,7 +196,7 @@ you can register for free at:
 
 def send_pitch_expiry_warning_email(
     email: str,
-    name: str | None,
+    name: Optional[str],
     brand_name: str,
     expires_at: datetime,
 ) -> None:
@@ -234,7 +235,7 @@ If you have questions, just reply to this email.
 
 def send_report_ready_email(
     email: str,
-    name: str | None,
+    name: Optional[str],
     brand_name: str,
     overall_score: float,
     run_id: int,
@@ -272,7 +273,7 @@ Run ID: #{run_id}
 
 def send_visibility_alert_email(
     email: str,
-    name: str | None,
+    name: Optional[str],
     brand_name: str,
     current_score: float,
     previous_score: float,

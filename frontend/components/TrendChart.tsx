@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { memo, useState, useMemo } from 'react';
 import {
   LineChart,
   Line,
@@ -76,7 +76,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
   );
 }
 
-export default function TrendChart({ data }: TrendChartProps) {
+const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>('all');
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
 
@@ -233,4 +233,6 @@ export default function TrendChart({ data }: TrendChartProps) {
       )}
     </div>
   );
-}
+});
+
+export default TrendChart;

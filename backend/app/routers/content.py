@@ -38,7 +38,7 @@ from app.schemas import (
 )
 from app.services.content_service import (
     PLATFORM_GUIDELINES,
-    generate_draft,
+    get_low_visibility_prompts,
     post_draft,
 )
 from app.services.drafting_service import (
@@ -137,19 +137,32 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
     check_rate_limit(user.id, limit=10)  # 10 manual drafts per minute per user
     await get_brand_for_user(brand_id, db, user)
 
-    if request.platform not in SUPPORTED_PLATFORMS:
+    if request.platform not in ALL_DRAFT_PLATFORMS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unsupported platform '{request.platform}'. Must be one of {SUPPORTED_PLATFORMS}",
+            detail=f"Unsupported platform '{request.platform}'. Must be one of {ALL_DRAFT_PLATFORMS}",
         )
 
+    # Auto-select lowest-scoring prompt if none specified
+    prompt_id = request.prompt_id
+    if prompt_id is None:
+        low = await get_low_visibility_prompts(db, brand_id, limit=1)
+        if not low:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No prompts configured for this brand.",
+            )
+        prompt_id = low[0]["prompt_id"]
+
     try:
-        draft = await generate_draft(
+        draft = await generate_gap_draft(
             db=db,
             brand_id=brand_id,
+            prompt_id=prompt_id,
             platform=request.platform,
-            prompt_id=request.prompt_id,
             custom_brief=request.custom_brief,
+            quora_question_url=request.quora_question_url,
+            quora_question_title=request.quora_question_title,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -200,7 +213,7 @@ async def _create_draft_attribution(db: AsyncSession, draft: ContentDraft) -> No
     )
     latest_run = latest_run_result.scalar_one_or_none()
 
-    score_at_posting: float | None = None
+    score_at_posting: Optional[float] = None
     if latest_run:
         # Compute prompt visibility from that run's query results
         qr_result = await db.execute(
@@ -371,6 +384,7 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
             db=db,
             brand_id=brand_id,
             max_gaps=min(request.max_gaps, 20),  # allow filling up to the full cap
+            clear_existing=True,  # discard unreviewed drafts before regenerating
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -456,6 +470,8 @@ async def create_gap_draft(brand_id: int, request: CreateDraftRequest, db: DbDep
             prompt_id=request.prompt_id,
             platform=request.platform,
             custom_brief=request.custom_brief,
+            quora_question_url=request.quora_question_url,
+            quora_question_title=request.quora_question_title,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -526,7 +542,7 @@ async def update_brand_settings(
             BrandContentSettings.platform == platform,
         )
     )
-    setting: BrandContentSettings | None = result.scalar_one_or_none()
+    setting: Optional[BrandContentSettings] = result.scalar_one_or_none()
 
     if setting is None:
         setting = BrandContentSettings(brand_id=brand_id, platform=platform)

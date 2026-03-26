@@ -1,13 +1,14 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { LayoutDashboard, BarChart2, FileText, Settings } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { BrandProvider } from '@/contexts/BrandContext';
 
-const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding'];
+const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password'];
 
 const MOBILE_NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -30,18 +31,36 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Poll localStorage for cross-page status signals written by dashboard/content pages
+  // Sync localStorage status flags — use storage events for cross-tab sync,
+  // with a single initial read. No polling needed.
   useEffect(() => {
-    const check = () => {
+    const sync = () => {
       try {
         setReportRunning(!!localStorage.getItem('clarity_report_running'));
         setDraftsGenerating(!!localStorage.getItem('clarity_drafts_generating'));
       } catch {}
     };
-    check();
-    const id = setInterval(check, 2000);
-    return () => clearInterval(id);
+    sync();
+    window.addEventListener('storage', sync);
+    // Fallback: poll only when the tab is visible and less aggressively
+    const id = setInterval(sync, 5000);
+    return () => {
+      window.removeEventListener('storage', sync);
+      clearInterval(id);
+    };
   }, []);
+
+  // Dev-mode navigation timing
+  const navTimerRef = useRef<number>(0);
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
+    const now = performance.now();
+    if (navTimerRef.current > 0) {
+      const elapsed = (now - navTimerRef.current).toFixed(0);
+      console.debug(`[ClarityAI] Route rendered in ${elapsed}ms`);
+    }
+    navTimerRef.current = now;
+  }, [pathname]);
 
   const showSidebar = !NO_SIDEBAR_PATHS.some(
     (p) => pathname === p || pathname.startsWith(p + '/')
@@ -53,6 +72,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ErrorBoundary>
+    <BrandProvider>
     <>
       {/* Fixed dark base */}
       <div style={{ position: 'fixed', inset: 0, background: '#080C14', zIndex: -2 }} />
@@ -179,6 +199,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
       )}
     </>
+    </BrandProvider>
     </ErrorBoundary>
   );
 }

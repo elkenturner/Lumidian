@@ -22,9 +22,11 @@ import {
   Check,
   PenLine,
   BookOpen,
+  TrendingDown,
+  ArrowRight,
+  BarChart2,
 } from 'lucide-react';
 import {
-  getBrands,
   getBrand,
   getDrafts,
   updateDraft,
@@ -39,6 +41,9 @@ import {
   getBrandProfile,
   getContentSettings,
   getDraftAttributions,
+  getContentGaps,
+  getGapSummary,
+  getQuoraQuestions,
   Brand,
   BrandDetail,
   Prompt,
@@ -48,15 +53,19 @@ import {
   BrandContentSettings,
   DraftQueueStatus,
   DraftAttribution,
+  ContentGap,
+  GapSummary,
+  QuoraQuestion,
 } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBrand } from '@/contexts/BrandContext';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted';
+type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted' | 'gaps';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -158,7 +167,7 @@ function HelpModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
+      <div role="dialog" aria-modal="true" className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-[#F0F4F8]">{title}</h3>
           <button onClick={onClose} aria-label="Close" className="text-[#475569] hover:text-[#94A3B8] transition-colors">
@@ -397,6 +406,21 @@ function QualityChecklist({
   );
 }
 
+// ── Simple markdown-to-html renderer for preview mode ─────────────────────────
+
+function renderPreviewHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/^#{3}\s+(.+)$/gm, '<h3 style="font-size:14px;font-weight:700;margin:10px 0 4px">$1</h3>')
+    .replace(/^#{2}\s+(.+)$/gm, '<h2 style="font-size:16px;font-weight:700;margin:12px 0 6px">$1</h2>')
+    .replace(/^#{1}\s+(.+)$/gm, '<h1 style="font-size:18px;font-weight:800;margin:14px 0 6px">$1</h1>')
+    .replace(/\n{2,}/g, '</p><p style="margin:8px 0">')
+    .replace(/\n/g, '<br/>');
+}
+
 // ── Draft card (Drafts tab) ───────────────────────────────────────────────────
 
 function DraftCard({
@@ -404,29 +428,63 @@ function DraftCard({
   profile,
   brandName,
   postedItems,
+  prompts,
+  brandId,
   onApprove,
   onDelete,
   onSaved,
+  onRegenerated,
 }: {
   draft: ContentDraft;
   profile: BrandProfile | null;
   brandName: string;
   postedItems: ContentDraft[];
+  prompts: Prompt[];
+  brandId: number;
   onApprove: (id: number) => void;
   onDelete: (id: number) => void;
   onSaved: (d: ContentDraft) => void;
+  onRegenerated: (d: ContentDraft) => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const [previewMode, setPreviewMode] = useState(false);
   const [editTitle, setEditTitle] = useState(draft.title ?? '');
   const [editContent, setEditContent] = useState(draft.content_text);
   const [saving, setSaving] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [showQuoraPicker, setShowQuoraPicker] = useState(false);
+  const [pendingQuestion, setPendingQuestion] = useState<QuoraQuestion | null>(null);
 
   async function handleCopy() {
     await navigator.clipboard.writeText(draft.content_text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   }
+
+  async function handleRegenerate(question?: QuoraQuestion) {
+    setRegenerating(true);
+    setShowQuoraPicker(false);
+    try {
+      const fresh = await generateDraft(brandId, {
+        platform: draft.platform,
+        prompt_id: draft.prompt_id ?? undefined,
+        quora_question_url: question?.url,
+        quora_question_title: question?.title,
+      });
+      onRegenerated(fresh);
+    } catch {
+      // ignore — user can retry
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  // Word count
+  const wordCount = draft.content_text.trim().split(/\s+/).filter(Boolean).length;
+
+  // Target prompt text
+  const targetPrompt = prompts.find((p) => p.id === draft.prompt_id);
 
   // Quality score for border/prominence — based on hard fails only (warnings don't trigger red border)
   const qualityChecks = runQualityChecks(draft, profile, brandName);
@@ -490,6 +548,57 @@ function DraftCard({
             );
           })()}
         </>
+      ) : draft.platform === 'quora' && draft.content_brief?.startsWith('https://www.quora.com') ? (
+        /* Targeted Quora draft — content_brief = question URL, guidelines_applied = question title */
+        <div className="flex flex-col gap-2">
+          <a
+            href={draft.content_brief}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-[#172554]/30 border border-[#1d4ed8]/25 rounded-lg px-3 py-2 group transition-colors hover:border-[#1d4ed8]/50 hover:bg-[#172554]/50"
+          >
+            <span className="text-[#60a5fa] text-xs flex-shrink-0">Q</span>
+            <span className="text-xs text-[#93c5fd] font-medium flex-1 min-w-0 line-clamp-2">
+              {draft.platform_guidelines_applied || draft.content_brief}
+            </span>
+            <ExternalLink size={11} className="text-[#60a5fa]/50 flex-shrink-0 group-hover:text-[#60a5fa]" />
+          </a>
+          {/* Change question inline picker */}
+          {showQuoraPicker ? (
+            <div className="border border-[rgba(99,102,241,0.15)] rounded-lg p-3 bg-[rgba(0,0,0,0.2)]">
+              <QuoraQuestionPicker
+                brandId={brandId}
+                promptId={draft.prompt_id ?? ''}
+                selected={pendingQuestion}
+                onSelect={setPendingQuestion}
+              />
+              <div className="flex items-center gap-2 mt-3">
+                <button
+                  onClick={() => pendingQuestion && handleRegenerate(pendingQuestion)}
+                  disabled={!pendingQuestion || regenerating}
+                  className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-40 text-white rounded-lg px-3 py-1.5 transition-colors"
+                >
+                  {regenerating ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                  Regenerate with this question
+                </button>
+                <button
+                  onClick={() => { setShowQuoraPicker(false); setPendingQuestion(null); }}
+                  className="text-xs text-[#475569] hover:text-[#94A3B8] transition-colors px-2 py-1.5"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowQuoraPicker(true)}
+              className="flex items-center gap-1.5 text-[10px] text-[#475569] hover:text-[#818cf8] transition-colors self-start"
+            >
+              <RefreshCw size={10} />
+              Find different question
+            </button>
+          )}
+        </div>
       ) : draft.content_brief && draft.platform === 'quora' ? (
         <div className="flex items-start gap-2 bg-[#172554]/30 border border-[#1d4ed8]/25 rounded-lg px-3 py-2">
           <span className="text-[#6366f1] text-xs mt-0.5">→</span>
@@ -552,15 +661,44 @@ function DraftCard({
         </div>
       ) : (
         <div>
+          {/* Target prompt line */}
+          {targetPrompt && (
+            <div className="flex items-start gap-1.5 mb-2">
+              <span className="text-[10px] text-[#475569] uppercase tracking-wide font-medium mt-0.5 flex-shrink-0">Targeting</span>
+              <span className="text-[11px] text-[#6366f1] bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] rounded-md px-2 py-0.5 leading-relaxed">{targetPrompt.text}</span>
+            </div>
+          )}
           {draft.title && (
             <p className="text-sm font-semibold text-[#F0F4F8] leading-snug mb-1">{draft.title}</p>
           )}
-          <div
-            className="text-sm text-[#64748B] leading-relaxed overflow-y-auto"
-            style={{ maxHeight: '9rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
-          >
-            {draft.content_text}
+          {/* Preview / Raw toggle */}
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
+              <button
+                onClick={() => setPreviewMode(false)}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${!previewMode ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+              >Raw</button>
+              <button
+                onClick={() => setPreviewMode(true)}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${previewMode ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+              >Preview</button>
+            </div>
+            <span className="text-[10px] text-[#475569]">{wordCount} words</span>
           </div>
+          {previewMode ? (
+            <div
+              className="text-sm text-[#94A3B8] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3"
+              style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+              dangerouslySetInnerHTML={{ __html: `<p style="margin:0">${renderPreviewHtml(draft.content_text)}</p>` }}
+            />
+          ) : (
+            <div
+              className="text-sm text-[#64748B] leading-relaxed overflow-y-auto"
+              style={{ maxHeight: '9rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+            >
+              {draft.content_text}
+            </div>
+          )}
         </div>
       )}
 
@@ -596,6 +734,15 @@ function DraftCard({
           >
             <CheckCircle2 size={11} />
             Approve
+          </button>
+          <button
+            onClick={() => handleRegenerate()}
+            disabled={regenerating}
+            className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+            title="Generate a fresh draft for the same prompt and platform"
+          >
+            {regenerating ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+            Regen
           </button>
           <button
             onClick={() => onDelete(draft.id)}
@@ -726,6 +873,8 @@ function WikipediaDraftCard({
 
   const [plainText, setPlainText] = useState(() => wikiToPlain(originalWiki));
   const [hasEdited, setHasEdited] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [viewMode, setViewMode] = useState<'preview' | 'raw'>('preview');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -735,6 +884,7 @@ function WikipediaDraftCard({
     ? plainToWikiFormat(plainText, originalWiki, citations, brandName)
     : originalWiki;
 
+  const wordCount = plainText.trim().split(/\s+/).filter(Boolean).length;
   const showCOI = plainText.toLowerCase().includes((brandName ?? '').toLowerCase()) && brandName.length > 0;
 
   function handlePlainChange(val: string) {
@@ -754,6 +904,7 @@ function WikipediaDraftCard({
       // Save the rebuilt wiki format so refreshing restores the latest edit
       const updated = await updateDraft(draft.id, { content_text: wikiFormat });
       onSaved(updated);
+      setEditing(false);
     } finally {
       setSaving(false);
     }
@@ -769,11 +920,9 @@ function WikipediaDraftCard({
     if (!rawGuidelines) return '';
     try {
       const parsed = JSON.parse(rawGuidelines);
-      // If it parses as an array it's the old platform rules, not an insert location
       if (Array.isArray(parsed)) return '';
       return String(parsed);
     } catch {
-      // Plain string — this is the actual insert location
       return rawGuidelines;
     }
   })();
@@ -819,7 +968,7 @@ function WikipediaDraftCard({
           </div>
         </div>
 
-        {/* Where to insert — only shown when we have a real placement instruction */}
+        {/* Where to insert */}
         {insertLocation && (
           <div className="bg-[rgba(255,255,255,0.06)] border border-[rgba(99,102,241,0.15)] rounded-lg px-3 py-2.5">
             <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1 font-medium">Where to insert</p>
@@ -827,57 +976,203 @@ function WikipediaDraftCard({
           </div>
         )}
 
-        {/* Plain-text editor */}
-        <div>
-          <label className="text-xs text-[#64748B] uppercase tracking-wide mb-1.5 block">
-            Text to insert
-          </label>
-          <textarea
-            value={plainText}
-            onChange={(e) => handlePlainChange(e.target.value)}
-            rows={5}
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] resize-none leading-relaxed font-sans"
-            placeholder="Edit the plain text. Wiki formatting and citations are applied automatically."
-          />
-          <p className="text-xs text-[#475569] mt-1">
-            Edit in plain text. Wiki links and citations are added when you copy.
-          </p>
-        </div>
+        {/* Content — edit mode or view mode */}
+        {editing ? (
+          <div className="flex flex-col gap-2">
+            <QualityChecklist draft={draft} profile={profile} brandName={brandName} autoExpand liveText={wikiFormat} />
+            <textarea
+              value={plainText}
+              onChange={(e) => handlePlainChange(e.target.value)}
+              rows={7}
+              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] resize-none leading-relaxed font-sans"
+              placeholder="Edit the plain text. Wiki formatting and citations are applied automatically."
+            />
+            <p className="text-[10px] text-[#475569]">
+              Edit in plain text — wiki links, citations, and markup are applied automatically when you copy.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors"
+              >
+                {saving ? <Loader2 size={11} className="animate-spin" /> : null}
+                Save
+              </button>
+              <button
+                onClick={() => setEditing(false)}
+                className="text-xs text-[#64748B] hover:text-[#94A3B8] px-3 py-1.5 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div>
+            {/* Raw / Preview toggle */}
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
+                <button
+                  onClick={() => setViewMode('preview')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'preview' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+                >Preview</button>
+                <button
+                  onClick={() => setViewMode('raw')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'raw' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+                >Raw</button>
+              </div>
+              <span className="text-[10px] text-[#475569]">{wordCount} words</span>
+            </div>
 
-        {/* Quality checklist — wiki-specific checks */}
-        <QualityChecklist draft={draft} profile={profile} brandName={brandName} liveText={wikiFormat} />
+            {viewMode === 'raw' ? (
+              <pre
+                className="text-xs text-[#94A3B8] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3 whitespace-pre-wrap font-mono"
+                style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+              >
+                {wikiFormat}
+              </pre>
+            ) : (
+              <div
+                className="text-sm text-[#94A3B8] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3"
+                style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+                dangerouslySetInnerHTML={{ __html: `<p style="margin:0">${renderPreviewHtml(plainText)}</p>` }}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Quality checklist — only shown in view mode */}
+        {!editing && (
+          <QualityChecklist draft={draft} profile={profile} brandName={brandName} liveText={wikiFormat} />
+        )}
 
         {/* Actions */}
-        <div className="flex items-center gap-2 pt-1 flex-wrap">
-          <button
-            onClick={handleCopy}
-            className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors ${
-              copied
-                ? 'bg-[#064e3b]/20 border border-[#065f46]/25 text-[#34d399]'
-                : 'bg-[#6366f1] hover:bg-[#4f46e5] text-white'
-            }`}
-          >
-            {copied ? <Check size={11} /> : <Copy size={11} />}
-            {copied ? 'Copied!' : 'Copy Wiki Format'}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-          >
-            {saving ? <Loader2 size={11} className="animate-spin" /> : null}
-            Save
-          </button>
-          <button
-            onClick={() => onDelete(draft.id)}
-            className="flex items-center gap-1.5 text-xs text-[#475569] hover:text-[#f87171] rounded-lg px-3 py-1.5 transition-colors ml-auto"
-          >
-            <Trash2 size={11} />
-            Dismiss
-          </button>
-        </div>
+        {!editing && (
+          <div className="flex items-center gap-2 pt-1 flex-wrap">
+            <button
+              onClick={handleCopy}
+              className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors ${
+                copied
+                  ? 'bg-[#064e3b]/20 border border-[#065f46]/25 text-[#34d399]'
+                  : 'bg-[#6366f1] hover:bg-[#4f46e5] text-white'
+              }`}
+            >
+              {copied ? <Check size={11} /> : <Copy size={11} />}
+              {copied ? 'Copied!' : 'Copy Wiki Format'}
+            </button>
+            <button
+              onClick={() => setEditing(true)}
+              className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-1.5 transition-colors"
+            >
+              <Edit2 size={11} />
+              Edit
+            </button>
+            <button
+              onClick={() => onDelete(draft.id)}
+              className="flex items-center gap-1.5 text-xs text-[#475569] hover:text-[#f87171] rounded-lg px-3 py-1.5 transition-colors ml-auto"
+            >
+              <Trash2 size={11} />
+              Dismiss
+            </button>
+          </div>
+        )}
       </div>
     </>
+  );
+}
+
+// ── Quora question picker ─────────────────────────────────────────────────────
+
+function QuoraQuestionPicker({
+  brandId,
+  promptId,
+  selected,
+  onSelect,
+}: {
+  brandId: number;
+  promptId: number | '';
+  selected: QuoraQuestion | null;
+  onSelect: (q: QuoraQuestion | null) => void;
+}) {
+  const [questions, setQuestions] = useState<QuoraQuestion[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  useEffect(() => {
+    if (!promptId) { setQuestions([]); setSearched(false); return; }
+    setLoading(true);
+    setSearched(false);
+    getQuoraQuestions(brandId, promptId as number)
+      .then((qs) => { setQuestions(qs); setSearched(true); })
+      .catch(() => { setQuestions([]); setSearched(true); })
+      .finally(() => setLoading(false));
+  }, [brandId, promptId]);
+
+  if (!promptId) return null;
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 py-2 text-xs text-[#64748B]">
+        <Loader2 size={12} className="animate-spin" />
+        Finding relevant Quora questions…
+      </div>
+    );
+  }
+
+  if (selected) {
+    return (
+      <div className="flex items-start gap-2 bg-[#172554]/30 border border-[#1d4ed8]/30 rounded-lg px-3 py-2.5">
+        <span className="text-[#60a5fa] text-xs mt-0.5 flex-shrink-0">↗</span>
+        <div className="flex-1 min-w-0">
+          <a
+            href={selected.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-[#93c5fd] font-medium hover:text-white transition-colors line-clamp-2"
+          >
+            {selected.title}
+          </a>
+        </div>
+        <button
+          onClick={() => onSelect(null)}
+          className="flex-shrink-0 text-[#475569] hover:text-[#94A3B8] transition-colors ml-1"
+          aria-label="Remove selected question"
+        >
+          <X size={12} />
+        </button>
+      </div>
+    );
+  }
+
+  if (searched && questions.length === 0) {
+    return (
+      <p className="text-xs text-[#475569] py-1">
+        No Quora questions found — the draft will be a general answer. You can find a question manually at quora.com.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <p className="text-[10px] text-[#64748B] uppercase tracking-wide font-medium">
+        Select a Quora question to target
+      </p>
+      {questions.map((q) => (
+        <button
+          key={q.url}
+          onClick={() => onSelect(q)}
+          className="w-full text-left flex items-start gap-2.5 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(99,102,241,0.08)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(99,102,241,0.25)] rounded-lg px-3 py-2.5 transition-colors group"
+        >
+          <span className="text-[#6366f1] text-xs mt-0.5 flex-shrink-0">Q</span>
+          <span className="text-xs text-[#CBD5E1] group-hover:text-[#F0F4F8] transition-colors line-clamp-2 flex-1">
+            {q.title}
+          </span>
+          <span className="text-[10px] text-[#475569] group-hover:text-[#6366f1] flex-shrink-0 mt-0.5 transition-colors">
+            Select →
+          </span>
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -902,6 +1197,7 @@ function RequestDraftModal({
   const [notes, setNotes] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedQuestion, setSelectedQuestion] = useState<QuoraQuestion | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -922,6 +1218,8 @@ function RequestDraftModal({
         platform,
         prompt_id: promptId !== '' ? (promptId as number) : undefined,
         custom_brief: brief,
+        quora_question_url: selectedQuestion?.url,
+        quora_question_title: selectedQuestion?.title,
       });
       onCreated(draft);
       onClose();
@@ -935,7 +1233,7 @@ function RequestDraftModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl">
+      <div role="dialog" aria-modal="true" className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-5">
           <div>
             <h3 className="text-base font-semibold text-[#F0F4F8]">Request a Draft</h3>
@@ -954,7 +1252,7 @@ function RequestDraftModal({
               {DRAFT_PLATFORMS.map((p) => (
                 <button
                   key={p}
-                  onClick={() => setPlatform(p)}
+                  onClick={() => { setPlatform(p); if (p !== 'quora') setSelectedQuestion(null); }}
                   className={`py-2 rounded-lg text-xs font-medium capitalize transition-colors border ${
                     platform === p
                       ? 'bg-[#6366f1]/20 border-[#6366f1]/50 text-[#6366f1]'
@@ -988,6 +1286,21 @@ function RequestDraftModal({
               <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#475569] pointer-events-none" />
             </div>
           </div>
+
+          {/* Quora question picker */}
+          {platform === 'quora' && (
+            <div>
+              <label className="text-xs text-[#64748B] font-medium uppercase tracking-wide mb-2 block">
+                Target Question <span className="text-[#475569] normal-case font-normal">(optional — picks a real Quora question)</span>
+              </label>
+              <QuoraQuestionPicker
+                brandId={brandId}
+                promptId={promptId}
+                selected={selectedQuestion}
+                onSelect={setSelectedQuestion}
+              />
+            </div>
+          )}
 
           {/* Custom topic */}
           <div>
@@ -1279,6 +1592,16 @@ function ScheduledCard({
         </div>
       )}
 
+      {/* Manual posting reminder */}
+      <div className="bg-[rgba(16,185,129,0.05)] border border-[rgba(16,185,129,0.12)] rounded-lg px-3 py-2 flex items-start gap-2">
+        <HelpCircle size={11} className="text-[#10b981] mt-0.5 shrink-0" />
+        <p className="text-[11px] text-[#475569] leading-relaxed">
+          <span className="text-[#64748B] font-medium">This draft needs to be posted manually.</span>
+          {' '}Use the View Draft button to copy the content, post it on {draft.platform.charAt(0).toUpperCase() + draft.platform.slice(1)}, then click{' '}
+          <span className="text-[#34d399]">Mark as Posted</span> to record it and start tracking visibility changes.
+        </p>
+      </div>
+
       {/* Actions */}
       <div className="flex items-center gap-2 pt-1 flex-wrap">
         <button
@@ -1310,44 +1633,124 @@ function ScheduledCard({
 // ── Posted card ───────────────────────────────────────────────────────────────
 
 function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?: DraftAttribution }) {
+  const [expanded, setExpanded] = useState(false);
   const title = draft.title ?? draft.content_text.slice(0, 80) + (draft.content_text.length > 80 ? '…' : '');
 
-  let visibilityNode: JSX.Element | null = null;
+  // Confidence tier based on number of tracking runs since posting
+  type ConfidenceTier = 'awaiting' | 'early' | 'developing' | 'established';
+  function getConfidenceTier(runs: number): ConfidenceTier {
+    if (runs === 0) return 'awaiting';
+    if (runs <= 2) return 'early';
+    if (runs <= 5) return 'developing';
+    return 'established';
+  }
+  const TIER_LABELS: Record<ConfidenceTier, string> = {
+    awaiting: 'Awaiting next report',
+    early: 'Early data',
+    developing: 'Developing',
+    established: 'Established',
+  };
+  const TIER_COLORS: Record<ConfidenceTier, string> = {
+    awaiting: '#475569',
+    early: '#64748B',
+    developing: '#818cf8',
+    established: '#10b981',
+  };
+
+  let attributionNode: JSX.Element | null = null;
   if (attribution) {
-    if (attribution.runs_since_posting === 0) {
-      visibilityNode = (
-        <span className="text-xs text-[#475569] shrink-0 italic">Awaiting next report…</span>
+    const tier = getConfidenceTier(attribution.runs_since_posting);
+    const tierColor = TIER_COLORS[tier];
+    const tierLabel = TIER_LABELS[tier];
+
+    if (tier === 'awaiting') {
+      attributionNode = (
+        <div className="flex items-center gap-1.5 mt-1">
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `${tierColor}40`, backgroundColor: `${tierColor}10` }}>
+            {tierLabel}
+          </span>
+          <span className="text-xs text-[#475569]">Next tracking run will measure visibility change.</span>
+        </div>
       );
     } else {
-      const score = attribution.current_score ?? 0;
+      const scoreBefore = attribution.score_at_posting;
+      const scoreNow = attribution.current_score ?? 0;
       const delta = attribution.delta;
       const deltaColor = delta == null ? '#94A3B8' : delta > 0 ? '#10b981' : delta < 0 ? '#f87171' : '#94A3B8';
-      const deltaLabel = delta == null ? '' : delta > 0 ? `+${delta.toFixed(1)}%` : `${delta.toFixed(1)}%`;
-      visibilityNode = (
-        <span className="text-xs shrink-0 flex items-center gap-1">
-          <span className="text-[#94A3B8]">Visibility:</span>
-          <span className="text-[#E2E8F0] font-medium">{score.toFixed(1)}%</span>
-          {delta != null && delta !== 0 && (
-            <span style={{ color: deltaColor }} className="font-medium">{deltaLabel}</span>
-          )}
-        </span>
+      const deltaLabel = delta == null ? '—' : delta > 0 ? `+${delta.toFixed(1)}pp` : `${delta.toFixed(1)}pp`;
+      const runs = attribution.runs_since_posting;
+
+      attributionNode = (
+        <div className="mt-2 flex flex-col gap-1.5">
+          <div className="flex items-center gap-3 flex-wrap">
+            {scoreBefore != null && (
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] text-[#475569]">At posting</span>
+                <span className="text-xs font-medium text-[#94A3B8]">{scoreBefore.toFixed(1)}%</span>
+              </div>
+            )}
+            {scoreBefore != null && <ArrowRight size={10} className="text-[#475569]" />}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-[#475569]">Now</span>
+              <span className="text-xs font-medium text-[#E2E8F0]">{scoreNow.toFixed(1)}%</span>
+            </div>
+            {delta != null && (
+              <span className="text-xs font-semibold" style={{ color: deltaColor }}>{deltaLabel}</span>
+            )}
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full border ml-auto" style={{ color: tierColor, borderColor: `${tierColor}40`, backgroundColor: `${tierColor}10` }}>
+              {tierLabel}
+            </span>
+          </div>
+          <p className="text-[10px] text-[#475569] leading-relaxed">
+            Based on {runs} tracking run{runs !== 1 ? 's' : ''} since posting.{' '}
+            {tier === 'early' && 'More data needed before drawing conclusions.'}
+            {tier === 'developing' && 'Trend is forming — keep an eye on the next few runs.'}
+            {tier === 'established' && 'Sufficient data to observe a trend (correlation, not causation).'}
+          </p>
+        </div>
       );
     }
   } else if (draft.visibility_at_post != null) {
-    visibilityNode = (
-      <span className="text-xs shrink-0 flex items-center gap-1" title="Overall brand visibility at time of posting">
-        <span className="text-[#475569]">Posted at</span>
-        <span className="text-[#94A3B8] font-medium">{draft.visibility_at_post.toFixed(1)}%</span>
-      </span>
+    attributionNode = (
+      <div className="flex items-center gap-1 mt-1">
+        <span className="text-[10px] text-[#475569]">Brand visibility at time of posting:</span>
+        <span className="text-xs font-medium text-[#94A3B8]">{draft.visibility_at_post.toFixed(1)}%</span>
+      </div>
     );
   }
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl px-4 py-3 flex items-center gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-      <PlatformBadge platform={draft.platform} />
-      <p className="flex-1 text-sm text-[#94A3B8] truncate">{title}</p>
-      {visibilityNode}
-      <span className="text-xs text-[#475569] shrink-0">{relativeTime(draft.updated_at)}</span>
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-4 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.20)] hover:border-[rgba(255,255,255,0.14)] transition-colors">
+      {/* Top row */}
+      <div className="flex items-center gap-2">
+        <PlatformBadge platform={draft.platform} />
+        <p className="flex-1 text-sm text-[#94A3B8] truncate">{title}</p>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="text-[10px] text-[#475569] hover:text-[#64748B] transition-colors shrink-0"
+        >
+          {expanded ? 'Hide' : 'View'}
+        </button>
+        <span className="text-xs text-[#475569] shrink-0">{relativeTime(draft.updated_at)}</span>
+      </div>
+
+      {/* Expanded content */}
+      {expanded && (
+        <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3">
+          <pre className="text-xs text-[#64748B] whitespace-pre-wrap leading-relaxed font-mono">{draft.content_text}</pre>
+        </div>
+      )}
+
+      {/* Attribution */}
+      {attributionNode && (
+        <div className="border-t border-[rgba(255,255,255,0.05)] pt-2">
+          <p className="text-[10px] text-[#475569] uppercase tracking-wide mb-1 flex items-center gap-1">
+            <BarChart2 size={9} />
+            Visibility change since posting
+          </p>
+          {attributionNode}
+        </div>
+      )}
     </div>
   );
 }
@@ -1356,8 +1759,7 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
 
 export default function ContentHubPage() {
   const { user } = useAuth();
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
+  const { brands, activeBrandId: selectedBrandId, setActiveBrandId: setSelectedBrandId } = useBrand();
   const [activeTab, setActiveTab] = useState<QueueTab>('drafts');
 
   // Sync tab from URL after mount — avoids SSR/client hydration mismatch
@@ -1378,6 +1780,10 @@ export default function ContentHubPage() {
   const [postedItems, setPostedItems] = useState<ContentDraft[]>([]);
   const [draftAttributions, setDraftAttributions] = useState<DraftAttribution[]>([]);
   const [opportunities, setOpportunities] = useState<ContentOpportunity[]>([]);
+  const [contentGaps, setContentGaps] = useState<ContentGap[]>([]);
+  const [gapSummary, setGapSummary] = useState<GapSummary | null>(null);
+  const [generatingGapDraft, setGeneratingGapDraft] = useState<number | null>(null); // gap.id
+  const [gapPlatforms, setGapPlatforms] = useState<Record<number, string>>({}); // gap.id → platform
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [brandPrompts, setBrandPrompts] = useState<Prompt[]>([]);
   const [contentSettings, setContentSettings] = useState<BrandContentSettings[]>([]);
@@ -1392,6 +1798,7 @@ export default function ContentHubPage() {
     } catch {}
   }, [generating]);
   const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
   const [requestDraftOpen, setRequestDraftOpen] = useState(false);
   const [draftStatus, setDraftStatus] = useState<DraftQueueStatus | null>(null);
 
@@ -1414,6 +1821,7 @@ export default function ContentHubPage() {
     scheduled: scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform)).length,
     opportunities: opportunities.length,
     posted: postedItems.length,
+    gaps: contentGaps.length,
   };
 
   // ── Load data ──────────────────────────────────────────────────────────────
@@ -1438,6 +1846,8 @@ export default function ContentHubPage() {
         settingsData,
         statusData,
         attributionsData,
+        gapsData,
+        gapSummaryData,
       ] = await Promise.all([
         getDrafts(brandId, undefined, 'draft'),
         getDrafts(brandId, undefined, 'approved'),
@@ -1448,6 +1858,8 @@ export default function ContentHubPage() {
         getContentSettings(brandId).catch(() => [] as BrandContentSettings[]),
         getDraftStatus(brandId).catch(() => null),
         getDraftAttributions(brandId).catch(() => [] as DraftAttribution[]),
+        getContentGaps(brandId).catch(() => [] as ContentGap[]),
+        getGapSummary(brandId).catch(() => null),
       ]);
 
       // Ignore results if the user switched to a different brand while fetching
@@ -1458,6 +1870,8 @@ export default function ContentHubPage() {
       setPostedItems(postedData);
       setDraftAttributions(attributionsData);
       setOpportunities(oppsData);
+      setContentGaps(gapsData);
+      setGapSummary(gapSummaryData);
       setBrandProfile(profileData);
       setBrandPrompts(brandDetail?.prompts ?? []);
       setContentSettings(settingsData);
@@ -1471,18 +1885,6 @@ export default function ContentHubPage() {
     }
   }, []);
 
-  useEffect(() => {
-    getBrands()
-      .then((bs) => {
-        setBrands(bs);
-        if (bs.length > 0) setSelectedBrandId(bs[0].id);
-        else setLoading(false);
-      })
-      .catch(() => {
-        setError('Unable to connect to server.');
-        setLoading(false);
-      });
-  }, []);
 
   useEffect(() => {
     if (!selectedBrandId) return;
@@ -1597,6 +1999,7 @@ export default function ContentHubPage() {
   async function handleScan() {
     if (!selectedBrandId) return;
     setScanning(true);
+    setScanError(null);
     try {
       await triggerScan(selectedBrandId);
       // Poll after a short delay
@@ -1606,6 +2009,7 @@ export default function ContentHubPage() {
       }, 4000);
     } catch {
       setScanning(false);
+      setScanError('Scan failed. Please try again.');
     }
   }
 
@@ -1659,6 +2063,12 @@ export default function ContentHubPage() {
     return (
       <div className="flex flex-col gap-3">
         {filterBar}
+        <div className="flex items-start gap-2 bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-3 py-2.5">
+          <RefreshCw size={12} className="text-[#475569] flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-[#475569]">
+            Unreviewed drafts are <span className="text-[#64748b]">automatically replaced</span> each time new drafts are generated. Move anything you want to keep to <span className="text-[#64748b]">Scheduled</span> first.
+          </p>
+        </div>
         {sorted.map((d) =>
           d.platform === 'wikipedia' ? (
             <WikipediaDraftCard
@@ -1676,9 +2086,12 @@ export default function ContentHubPage() {
               profile={brandProfile}
               brandName={brandName}
               postedItems={postedItems}
+              prompts={brandPrompts}
+              brandId={selectedBrandId!}
               onApprove={handleApprove}
               onDelete={handleDelete}
               onSaved={handleSaved}
+              onRegenerated={(fresh) => setDraftItems((prev) => [fresh, ...prev])}
             />
           )
         )}
@@ -1712,18 +2125,26 @@ export default function ContentHubPage() {
 
   function renderOpportunitiesTab() {
     const header = (
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-xs text-[#64748B]">
-          Reddit threads matched to your tracked prompts
-        </p>
-        <button
-          onClick={() => setOppHelpOpen(true)}
-          className="text-[#475569] hover:text-[#6366f1] transition-colors"
-          title="How do Live Opportunities work?"
-        >
-          <HelpCircle size={14} />
-        </button>
-      </div>
+      <>
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-xs text-[#64748B]">
+            Reddit threads matched to your tracked prompts
+          </p>
+          <button
+            onClick={() => setOppHelpOpen(true)}
+            className="text-[#475569] hover:text-[#6366f1] transition-colors"
+            title="How do Live Opportunities work?"
+          >
+            <HelpCircle size={14} />
+          </button>
+        </div>
+        {scanError && (
+          <div className="flex items-center gap-2 text-xs text-[#f87171] bg-[#f87171]/10 border border-[#f87171]/20 rounded-lg px-3 py-2 mb-3">
+            <AlertTriangle size={12} className="shrink-0" />
+            {scanError}
+          </div>
+        )}
+      </>
     );
 
     // Collect platforms present in opportunities
@@ -1795,6 +2216,236 @@ export default function ContentHubPage() {
     );
   }
 
+  function renderGapsTab() {
+    if (contentGaps.length === 0) {
+      return (
+        <div className="flex flex-col gap-4">
+          {gapSummary && (
+            <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl px-4 py-3 flex items-center gap-2">
+              <BarChart2 size={14} className="text-[#6366f1] shrink-0" />
+              <p className="text-xs text-[#64748B]">No visibility gaps detected — your brand is mentioned above the 50% threshold on all tracked prompts. Run a tracking report to refresh.</p>
+            </div>
+          )}
+          <EmptyState
+            icon={<TrendingDown size={22} className="text-[#475569]" />}
+            title="No visibility gaps"
+            description="Run a tracking report to identify prompts where your brand is under-represented in AI responses."
+          />
+        </div>
+      );
+    }
+
+    const sorted = [...contentGaps].sort((a, b) => b.gap_score - a.gap_score);
+
+    async function handleGapDraft(gap: ContentGap) {
+      if (!selectedBrandId) return;
+      const platform = gapPlatforms[gap.id] ?? gap.platforms_lacking[0] ?? 'reddit';
+      setGeneratingGapDraft(gap.id);
+      try {
+        const draft = await generateDraft(selectedBrandId, {
+          platform,
+          prompt_id: gap.prompt_id,
+        });
+        setDraftItems((prev) => [draft, ...prev]);
+        setActiveTab('drafts');
+      } catch (e: any) {
+        const detail = e?.response?.data?.detail ?? 'Draft generation failed. Check that API keys are configured.';
+        alert(detail);
+      } finally {
+        setGeneratingGapDraft(null);
+      }
+    }
+
+    function getGapPlatform(gap: ContentGap) {
+      return gapPlatforms[gap.id] ?? gap.platforms_lacking[0] ?? 'reddit';
+    }
+
+    function setGapPlatform(gapId: number, platform: string) {
+      setGapPlatforms((prev) => ({ ...prev, [gapId]: platform }));
+    }
+
+    const visibilityColor = (v: number) =>
+      v < 20 ? '#f87171' : v < 35 ? '#fb923c' : v < 50 ? '#fbbf24' : '#10b981';
+
+    const confidenceLabel = (score: number) =>
+      score >= 80 ? 'Critical' : score >= 60 ? 'High' : score >= 40 ? 'Medium' : 'Low';
+
+    const confidenceColor = (score: number) =>
+      score >= 80 ? '#f87171' : score >= 60 ? '#fb923c' : score >= 40 ? '#fbbf24' : '#10b981';
+
+    return (
+      <div className="flex flex-col gap-4">
+        {/* Summary bar */}
+        {gapSummary && gapSummary.total_gaps > 0 && (
+          <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl px-4 py-3 flex flex-wrap items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <TrendingDown size={13} className="text-[#f87171]" />
+              <span className="text-xs text-[#64748B]">{gapSummary.total_gaps} gap{gapSummary.total_gaps !== 1 ? 's' : ''} identified</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-[#475569]">Avg visibility</span>
+              <span className="text-xs font-medium" style={{ color: visibilityColor(gapSummary.avg_prompt_visibility) }}>
+                {gapSummary.avg_prompt_visibility.toFixed(1)}%
+              </span>
+            </div>
+            {gapSummary.top_competitors.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs text-[#475569]">AI mentions instead:</span>
+                {gapSummary.top_competitors.slice(0, 3).map((c) => (
+                  <span key={c.name} className="text-xs bg-[rgba(251,146,60,0.12)] border border-[rgba(251,146,60,0.20)] text-[#fb923c] rounded-full px-2 py-0.5">
+                    {c.name} ×{c.mention_count}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Gap cards */}
+        {sorted.map((gap, idx) => {
+          const vis = gap.prompt_visibility ?? 0;
+          const platform = getGapPlatform(gap);
+          const isGenerating = generatingGapDraft === gap.id;
+          const competitorEntries = Object.entries(gap.competitor_mentions ?? {}).sort((a, b) => b[1] - a[1]);
+
+          return (
+            <div
+              key={gap.id}
+              className="bg-[rgba(10,14,24,0.60)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-4 flex flex-col gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.20)] hover:border-[rgba(255,255,255,0.14)] transition-colors"
+            >
+              {/* Header row */}
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-semibold text-[#475569]">#{idx + 1}</span>
+                  <span
+                    className="text-xs font-bold px-2 py-0.5 rounded-full border"
+                    style={{
+                      color: confidenceColor(gap.gap_score),
+                      backgroundColor: `${confidenceColor(gap.gap_score)}15`,
+                      borderColor: `${confidenceColor(gap.gap_score)}30`,
+                    }}
+                  >
+                    {confidenceLabel(gap.gap_score)} priority
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-xs text-[#475569]">Visibility</span>
+                  <span className="text-sm font-bold" style={{ color: visibilityColor(vis) }}>
+                    {vis.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Prompt text */}
+              {gap.prompt_text && (
+                <p className="text-sm text-[#94A3B8] leading-relaxed">
+                  <span className="text-[#475569] text-xs">Prompt: </span>
+                  {gap.prompt_text}
+                </p>
+              )}
+
+              {/* Score breakdown */}
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { label: 'Severity', value: gap.severity_score, tip: 'How far below 50% visibility' },
+                  { label: 'Opportunity', value: gap.opportunity_score, tip: 'How many AI models affected' },
+                  { label: 'Recency', value: gap.recency_score, tip: 'Days since last content for this prompt' },
+                ].map(({ label, value, tip }) => (
+                  <div key={label} className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg px-2.5 py-2" title={tip}>
+                    <p className="text-[10px] text-[#475569] uppercase tracking-wide mb-1">{label}</p>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex-1 h-1 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{ width: `${value}%`, backgroundColor: value > 60 ? '#f87171' : value > 30 ? '#fbbf24' : '#10b981' }}
+                        />
+                      </div>
+                      <span className="text-xs text-[#64748B] tabular-nums w-8 text-right">{Math.round(value)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Platforms lacking */}
+              {gap.platforms_lacking.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] text-[#475569] uppercase tracking-wide">No recent content on:</span>
+                  {gap.platforms_lacking.map((p) => (
+                    <span key={p} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.20)] text-[#818cf8] capitalize">
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Competitor mentions */}
+              {competitorEntries.length > 0 && (
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] text-[#475569] uppercase tracking-wide">AI mentions instead:</span>
+                  {competitorEntries.slice(0, 4).map(([name, count]) => (
+                    <span key={name} className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(251,146,60,0.08)] border border-[rgba(251,146,60,0.18)] text-[#fb923c]">
+                      {name} ×{count}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Quora questions */}
+              {gap.quora_questions.length > 0 && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[10px] text-[#475569] uppercase tracking-wide">Relevant Quora questions:</span>
+                  {gap.quora_questions.slice(0, 3).map((q, qi) => (
+                    <a
+                      key={qi}
+                      href={q.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-start gap-1.5 text-xs text-[#818cf8] hover:text-[#a5b4fc] transition-colors group"
+                    >
+                      <ArrowRight size={10} className="mt-0.5 shrink-0 text-[#475569] group-hover:text-[#818cf8] transition-colors" />
+                      <span className="line-clamp-1">{q.title}</span>
+                    </a>
+                  ))}
+                </div>
+              )}
+
+              {/* Generate draft action */}
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
+                <div className="grid grid-cols-4 gap-1.5">
+                  {DRAFT_PLATFORMS.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setGapPlatform(gap.id, p)}
+                      disabled={isGenerating}
+                      className={`py-1.5 rounded-lg text-[10px] font-medium capitalize transition-colors border ${
+                        platform === p
+                          ? 'bg-[#6366f1]/20 border-[#6366f1]/50 text-[#6366f1]'
+                          : 'bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.08)] text-[#475569] hover:text-[#64748B]'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  onClick={() => handleGapDraft(gap)}
+                  disabled={isGenerating || generatingGapDraft !== null}
+                  className="flex items-center gap-1.5 text-xs bg-[#6366f1]/15 hover:bg-[#6366f1]/25 border border-[#6366f1]/30 text-[#818cf8] hover:text-[#a5b4fc] rounded-lg px-3 py-1.5 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? (
+                    <><Loader2 size={11} className="animate-spin" />Generating…</>
+                  ) : (
+                    <><Sparkles size={11} />Generate {platform} draft</>
+                  )}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   function renderPostedTab() {
     if (postedItems.length === 0) {
       return (
@@ -1847,6 +2498,7 @@ export default function ContentHubPage() {
     { key: 'scheduled', label: 'Scheduled' },
     ...(redditEnabled ? [{ key: 'opportunities' as QueueTab, label: 'Live Reddit Opportunities' }] : []),
     { key: 'posted', label: 'Posted' },
+    { key: 'gaps', label: 'Visibility Gaps' },
   ];
 
   return (
@@ -1899,209 +2551,209 @@ export default function ContentHubPage() {
         </HelpModal>
       )}
 
-      {/* Posting Guide full-screen modal */}
+      {/* Posting Guide modal */}
       {postingGuideOpen && (
         <div className="fixed inset-0 z-50 flex">
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/60" onClick={() => setPostingGuideOpen(false)} />
-          {/* Panel */}
-          <div className="relative ml-auto w-full sm:max-w-2xl h-full bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border-l border-[rgba(99,102,241,0.15)] flex flex-col shadow-2xl">
-            {/* Panel header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(99,102,241,0.15)] shrink-0">
-              <div className="flex items-center gap-2">
-                <BookOpen size={16} className="text-[#6366f1]" />
-                <h2 className="text-base font-semibold text-[#F0F4F8]">Posting Guide</h2>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setPostingGuideOpen(false)} />
+          <div className="relative ml-auto w-full sm:max-w-xl h-full bg-[#0d1117] border-l border-[rgba(99,102,241,0.18)] flex flex-col shadow-2xl">
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[rgba(255,255,255,0.06)] shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-[rgba(99,102,241,0.15)] flex items-center justify-center">
+                  <BookOpen size={14} className="text-[#818cf8]" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-semibold text-[#F0F4F8]">Posting Guide</h2>
+                  <p className="text-[11px] text-[#475569]">How to publish your drafts on each platform</p>
+                </div>
               </div>
-              <button onClick={() => setPostingGuideOpen(false)} aria-label="Close posting guide" className="text-[#475569] hover:text-[#94A3B8] transition-colors">
-                <X size={18} />
+              <button onClick={() => setPostingGuideOpen(false)} aria-label="Close" className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] hover:text-[#94A3B8] hover:bg-[rgba(255,255,255,0.05)] transition-all">
+                <X size={15} />
               </button>
             </div>
+
             {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-8 text-sm text-[#94A3B8]">
+            <div className="flex-1 overflow-y-auto">
 
               {/* Reddit */}
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#ff4500]/15 text-[#ff6a33] border border-[#ff4500]/30">Reddit</span>
-                  <div className="flex-1 h-px bg-[rgba(99,102,241,0.06)]" />
+              <div className="border-b border-[rgba(255,255,255,0.05)]">
+                <div className="px-5 pt-5 pb-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#ff4500]/12 text-[#ff6a33] border border-[#ff4500]/25">Reddit</span>
+                    <span className="text-[11px] text-[#475569]">Discussion posts & comments</span>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">Find the right subreddit</p>
+                      <div className="space-y-1.5">
+                        {[
+                          'Search your industry keywords — r/entrepreneur, r/investing, etc.',
+                          'Target subreddits with 10k+ members and daily activity',
+                          'Read the rules first — many ban self-promotion outright',
+                        ].map((t, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#374151] mt-1.5 shrink-0" />
+                            <span className="text-xs text-[#64748B] leading-relaxed">{t}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">How to post</p>
+                      <div className="space-y-1.5">
+                        {[
+                          ['Click + Create Post', 'in the subreddit, choose Text'],
+                          ['Write a title', 'that frames a genuine question or insight'],
+                          ['Paste your draft', 'then remove anything that sounds like an ad'],
+                          ['Stay for the first hour', 'reply to every comment'],
+                        ].map(([bold, rest], i) => (
+                          <div key={i} className="flex items-start gap-2.5">
+                            <span className="shrink-0 w-4 h-4 rounded-full bg-[#ff4500]/12 text-[#ff6a33] text-[10px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                            <span className="text-xs text-[#64748B] leading-relaxed"><span className="text-[#94A3B8]">{bold}</span> {rest}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-[rgba(255,180,0,0.05)] border border-[rgba(255,180,0,0.12)] rounded-lg px-3 py-2.5">
+                      <p className="text-[11px] text-[#f59e0b] font-medium mb-0.5">Disclosure required</p>
+                      <p className="text-[11px] text-[#64748B]">Add <span className="text-[#94A3B8] italic">"Disclosure: I work at [Brand]."</span> — Reddit rewards honesty and penalizes deception.</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Finding the right subreddit</p>
-                    <ul className="space-y-1 list-disc list-inside text-[#64748B]">
-                      <li>Search Reddit for your industry keywords (e.g. r/entrepreneur, r/investing)</li>
-                      <li>Look for subreddits with 10k+ members and active daily posts</li>
-                      <li>Read the subreddit rules — many ban self-promotion outright</li>
-                      <li>Check recent posts to match the community&apos;s tone and format</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">How to post</p>
-                    <ol className="space-y-1 list-decimal list-inside text-[#64748B]">
-                      <li>Click <span className="text-[#94A3B8]">+ Create Post</span> in the subreddit</li>
-                      <li>Choose <span className="text-[#94A3B8]">Text</span> for discussion posts</li>
-                      <li>Write a title that frames a question or shares a genuine insight</li>
-                      <li>Paste your draft, then read it again — remove anything that sounds like an ad</li>
-                      <li>Submit and stay to reply to comments for the first hour</li>
-                    </ol>
-                  </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Community rules</p>
-                    <ul className="space-y-1 list-disc list-inside text-[#64748B]">
-                      <li>Never post the same content to multiple subreddits simultaneously</li>
-                      <li>Don&apos;t upvote your own posts or ask others to</li>
-                      <li>Engage genuinely — comments should add value, not just promote</li>
-                      <li>Wait until you have karma before posting in stricter communities</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Disclosure</p>
-                    <p className="text-[#64748B]">If you&apos;re affiliated with the brand, say so. Add a note like: <span className="text-[#94A3B8] italic">"Disclosure: I work at [Brand]."</span> Reddit users reward honesty and penalize deception.</p>
-                  </div>
-                </div>
-              </section>
+              </div>
 
               {/* Quora */}
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#b92b27]/15 text-[#e05a56] border border-[#b92b27]/30">Quora</span>
-                  <div className="flex-1 h-px bg-[rgba(99,102,241,0.06)]" />
+              <div className="border-b border-[rgba(255,255,255,0.05)]">
+                <div className="px-5 pt-5 pb-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#b92b27]/12 text-[#e05a56] border border-[#b92b27]/25">Quora</span>
+                    <span className="text-[11px] text-[#475569]">Q&A answers</span>
+                  </div>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">Find the right question</p>
+                      <div className="space-y-1.5">
+                        {[
+                          'Search using the exact phrasing of your tracked prompts',
+                          'Target questions with 1k+ views but fewer than 5 answers',
+                          'Follow relevant topics so Quora surfaces more opportunities',
+                        ].map((t, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-[#374151] mt-1.5 shrink-0" />
+                            <span className="text-xs text-[#64748B] leading-relaxed">{t}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">Writing your answer</p>
+                      <div className="space-y-1.5">
+                        {[
+                          ['Lead with the answer', "— don't bury the point"],
+                          ['Use short paragraphs', 'and bold headers for scannability'],
+                          ['Mention your brand naturally', 'in context, never as the opening line'],
+                          ['End with a clear takeaway', 'or a single call to action'],
+                        ].map(([bold, rest], i) => (
+                          <div key={i} className="flex items-start gap-2.5">
+                            <span className="shrink-0 w-4 h-4 rounded-full bg-[#b92b27]/12 text-[#e05a56] text-[10px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                            <span className="text-xs text-[#64748B] leading-relaxed"><span className="text-[#94A3B8]">{bold}</span> {rest}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-[rgba(255,180,0,0.05)] border border-[rgba(255,180,0,0.12)] rounded-lg px-3 py-2.5">
+                      <p className="text-[11px] text-[#f59e0b] font-medium mb-0.5">Disclosure required</p>
+                      <p className="text-[11px] text-[#64748B]">Add to your profile bio and state in the answer: <span className="text-[#94A3B8] italic">"I&apos;m on the team at [Brand]."</span></p>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Finding relevant questions</p>
-                    <ul className="space-y-1 list-disc list-inside text-[#64748B]">
-                      <li>Search for questions matching your tracked prompts — copy the exact phrasing</li>
-                      <li>Filter by <span className="text-[#94A3B8]">Most Answered</span> to find high-traffic questions</li>
-                      <li>Target questions with 1k+ views but fewer than 5 answers for best impact</li>
-                      <li>Follow relevant topics so Quora surfaces opportunities automatically</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Writing a good answer</p>
-                    <ol className="space-y-1 list-decimal list-inside text-[#64748B]">
-                      <li>Start with a direct answer to the question — don&apos;t bury the lede</li>
-                      <li>Use short paragraphs and bold headers for scannability</li>
-                      <li>Include one concrete example or data point</li>
-                      <li>Mention your brand naturally, in context — never as the opening line</li>
-                      <li>End with a clear takeaway or call to action</li>
-                    </ol>
-                  </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Getting upvotes</p>
-                    <ul className="space-y-1 list-disc list-inside text-[#64748B]">
-                      <li>Answer quickly — first answers on active questions get more exposure</li>
-                      <li>Add an image or simple diagram if it clarifies your point</li>
-                      <li>Respond to comments to boost engagement signals</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Disclosure</p>
-                    <p className="text-[#64748B]">Quora requires disclosure of affiliations. Add to your profile bio and state it in the answer: <span className="text-[#94A3B8] italic">"I&apos;m on the team at [Brand]."</span></p>
-                  </div>
-                </div>
-              </section>
+              </div>
 
               {/* Medium */}
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[rgba(255,255,255,0.06)] text-[#94A3B8] border border-[rgba(255,255,255,0.10)]">Medium</span>
-                  <div className="flex-1 h-px bg-[rgba(99,102,241,0.06)]" />
-                </div>
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Publishing a story</p>
-                    <ol className="space-y-1 list-decimal list-inside text-[#64748B]">
-                      <li>Go to <span className="text-[#94A3B8]">medium.com/new-story</span> and paste your draft</li>
-                      <li>Add a compelling title and subtitle — these appear in search results</li>
-                      <li>Insert a header image (use Unsplash for free photos)</li>
-                      <li>Click <span className="text-[#94A3B8]">Publish</span> → review the story preview</li>
-                      <li>Set the publish date or post immediately</li>
-                    </ol>
+              <div className="border-b border-[rgba(255,255,255,0.05)]">
+                <div className="px-5 pt-5 pb-4">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[rgba(255,255,255,0.07)] text-[#94A3B8] border border-[rgba(255,255,255,0.10)]">Medium</span>
+                    <span className="text-[11px] text-[#475569]">Long-form articles</span>
                   </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Tags for discoverability</p>
-                    <ul className="space-y-1 list-disc list-inside text-[#64748B]">
-                      <li>Add up to 5 tags — choose the most specific ones first</li>
-                      <li>Use tags that match existing Medium topics (e.g. &quot;Startup&quot;, &quot;Health&quot;, &quot;AI&quot;)</li>
-                      <li>Avoid overly generic tags like &quot;Technology&quot; — too competitive</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Adding to a publication</p>
-                    <ul className="space-y-1 list-disc list-inside text-[#64748B]">
-                      <li>Find publications in your niche (e.g. <span className="text-[#94A3B8]">Towards Data Science</span>, <span className="text-[#94A3B8]">The Startup</span>)</li>
-                      <li>Submit your story to the publication before publishing independently</li>
-                      <li>Publications review submissions — expect 1–5 days</li>
-                      <li>Publication placement dramatically increases reach</li>
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Disclosure</p>
-                    <p className="text-[#64748B]">Add a disclosure at the end of the article: <span className="text-[#94A3B8] italic">"Disclosure: The author is affiliated with [Brand]."</span> Medium&apos;s guidelines require transparency about conflicts of interest.</p>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">Publishing steps</p>
+                      <div className="space-y-1.5">
+                        {[
+                          ['Go to medium.com/new-story', 'and paste your draft'],
+                          ['Add a strong title & subtitle', '— these appear in search results'],
+                          ['Insert a header image', '(Unsplash for free photos)'],
+                          ['Add up to 5 specific tags', 'e.g. "Startup", "AI", "Health"'],
+                          ['Publish or submit to a publication', 'for greater reach'],
+                        ].map(([bold, rest], i) => (
+                          <div key={i} className="flex items-start gap-2.5">
+                            <span className="shrink-0 w-4 h-4 rounded-full bg-[rgba(255,255,255,0.06)] text-[#64748B] text-[10px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                            <span className="text-xs text-[#64748B] leading-relaxed"><span className="text-[#94A3B8]">{bold}</span> {rest}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-[rgba(255,180,0,0.05)] border border-[rgba(255,180,0,0.12)] rounded-lg px-3 py-2.5">
+                      <p className="text-[11px] text-[#f59e0b] font-medium mb-0.5">Disclosure required</p>
+                      <p className="text-[11px] text-[#64748B]">End with: <span className="text-[#94A3B8] italic">"Disclosure: The author is affiliated with [Brand]."</span></p>
+                    </div>
                   </div>
                 </div>
-              </section>
+              </div>
 
               {/* Wikipedia */}
-              <section>
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-[#64748b]/15 text-[#94A3B8] border border-[#64748b]/30">Wikipedia</span>
-                  <div className="flex-1 h-px bg-[rgba(99,102,241,0.06)]" />
-                </div>
-                <div className="space-y-5">
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Finding the right article to edit</p>
-                    <ul className="space-y-1 list-disc list-inside text-[#64748B]">
-                      <li>Target category or topic articles — not your brand&apos;s own page</li>
-                      <li>Look for articles tagged <span className="text-[#94A3B8]">stub</span> or <span className="text-[#94A3B8]">needs expansion</span> in your industry</li>
-                      <li>Avoid articles with active edit wars or protection flags</li>
-                      <li>Your edit should add context to the topic, with your brand as one example among several</li>
-                    </ul>
+              <div>
+                <div className="px-5 pt-5 pb-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#64748b]/12 text-[#94A3B8] border border-[#64748b]/25">Wikipedia</span>
+                    <span className="text-[11px] text-[#475569]">Article edits — handle with care</span>
                   </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">COI disclosure (step by step)</p>
-                    <ol className="space-y-1 list-decimal list-inside text-[#64748B]">
-                      <li>Go to your Wikipedia user talk page</li>
-                      <li>Add the <span className="text-[#94A3B8]">&#123;&#123;connected contributor&#125;&#125;</span> template with your affiliation</li>
-                      <li>On the article&apos;s <span className="text-[#94A3B8]">Talk</span> tab, post a note: <span className="text-[#94A3B8] italic">"I have a COI with [Brand] and propose the following addition: [your text]. Please review."</span></li>
-                      <li>Wait for another editor to review and add it — do not self-publish COI edits</li>
-                    </ol>
-                  </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">What Wikipedia will and won&apos;t accept</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <p className="text-[#10b981] text-xs font-semibold mb-1">✓ Accepted</p>
-                        <ul className="space-y-1 list-disc list-inside text-[#64748B] text-xs">
-                          <li>Neutral, factual statements</li>
-                          <li>Cited sources (news, research)</li>
-                          <li>Adding your brand as one of several examples</li>
-                          <li>Correcting factual errors</li>
-                        </ul>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">COI process (required)</p>
+                      <div className="space-y-1.5">
+                        {[
+                          ['Go to your user talk page', 'and add the {{connected contributor}} template'],
+                          ['Open the article\'s Talk tab', 'and post a note proposing your addition'],
+                          ['Wait for a volunteer editor', 'to review — do not self-publish COI edits'],
+                          ['If declined', 'ask for feedback and revise before re-submitting'],
+                        ].map(([bold, rest], i) => (
+                          <div key={i} className="flex items-start gap-2.5">
+                            <span className="shrink-0 w-4 h-4 rounded-full bg-[#64748b]/15 text-[#94A3B8] text-[10px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
+                            <span className="text-xs text-[#64748B] leading-relaxed"><span className="text-[#94A3B8]">{bold}</span> {rest}</span>
+                          </div>
+                        ))}
                       </div>
-                      <div>
-                        <p className="text-[#ef4444] text-xs font-semibold mb-1">✗ Not accepted</p>
-                        <ul className="space-y-1 list-disc list-inside text-[#64748B] text-xs">
-                          <li>Promotional language or superlatives</li>
-                          <li>Uncited claims</li>
-                          <li>Creating a new article for your brand without notability</li>
-                          <li>Removing competitors from articles</li>
-                        </ul>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-[rgba(16,185,129,0.05)] border border-[rgba(16,185,129,0.15)] rounded-lg px-3 py-2.5">
+                        <p className="text-[11px] text-[#10b981] font-medium mb-1.5">Accepted</p>
+                        <div className="space-y-1">
+                          {['Neutral, factual statements', 'Cited sources', 'Your brand as one of several examples', 'Correcting factual errors'].map((t, i) => (
+                            <div key={i} className="flex items-start gap-1.5">
+                              <span className="text-[#10b981] text-[10px] mt-0.5">✓</span>
+                              <span className="text-[11px] text-[#64748B]">{t}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="bg-[rgba(239,68,68,0.05)] border border-[rgba(239,68,68,0.15)] rounded-lg px-3 py-2.5">
+                        <p className="text-[11px] text-[#ef4444] font-medium mb-1.5">Not accepted</p>
+                        <div className="space-y-1">
+                          {['Promotional language', 'Uncited claims', 'Creating a brand article without notability', 'Removing competitors'].map((t, i) => (
+                            <div key={i} className="flex items-start gap-1.5">
+                              <span className="text-[#ef4444] text-[10px] mt-0.5">✗</span>
+                              <span className="text-[11px] text-[#64748B]">{t}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-[#F0F4F8] font-medium mb-1.5">Using the talk page</p>
-                    <ul className="space-y-1 list-disc list-inside text-[#64748B]">
-                      <li>The talk page is your primary tool when you have a COI — always use it</li>
-                      <li>Frame requests as improvements to the article, not promotions for your brand</li>
-                      <li>Be patient — volunteer editors may take days or weeks to respond</li>
-                      <li>If your edit is declined, ask for specific feedback and revise</li>
-                    </ul>
-                  </div>
                 </div>
-              </section>
+              </div>
 
             </div>
           </div>
@@ -2213,6 +2865,7 @@ export default function ContentHubPage() {
               {activeTab === 'scheduled' && renderScheduledTab()}
               {activeTab === 'opportunities' && renderOpportunitiesTab()}
               {activeTab === 'posted' && renderPostedTab()}
+              {activeTab === 'gaps' && renderGapsTab()}
             </>
           </div>
 

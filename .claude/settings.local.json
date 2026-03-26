@@ -14,7 +14,10 @@
       "Bash(find /Users/ken/Desktop/clarity-ai/backend/app -type f \\\\\\( -name \"*.py\" -o -name \"*.sql\" \\\\\\) 2>/dev/null | sort)",
       "Bash(grep -n \"router = APIRouter\" /Users/ken/Desktop/clarity-ai/backend/app/routers/*.py)",
       "Bash(cd /Users/ken/Desktop/clarity-ai/backend && python -c \"\nimport ast, sys\nfiles = [\n    'app/routers/dashboard.py',\n    'app/routers/tracking.py', \n    'app/services/tracking_service.py',\n    'app/services/sentiment_service.py',\n]\nfor f in files:\n    try:\n        with open\\(f\\) as fh:\n            ast.parse\\(fh.read\\(\\)\\)\n        print\\(f'OK  {f}'\\)\n    except SyntaxError as e:\n        print\\(f'ERR {f}: {e}'\\)\n        sys.exit\\(1\\)\n\")",
-      "Bash(cd /Users/ken/Desktop/clarity-ai/backend && python3 -c \"\nimport ast, sys\nfiles = ['app/routers/dashboard.py','app/routers/tracking.py','app/services/tracking_service.py','app/services/sentiment_service.py']\nfor f in files:\n    try:\n        ast.parse\\(open\\(f\\).read\\(\\)\\)\n        print\\('OK ', f\\)\n    except SyntaxError as e:\n        print\\('ERR', f, e\\)\n        sys.exit\\(1\\)\n\")"
+      "Bash(cd /Users/ken/Desktop/clarity-ai/backend && python3 -c \"\nimport ast, sys\nfiles = ['app/routers/dashboard.py','app/routers/tracking.py','app/services/tracking_service.py','app/services/sentiment_service.py']\nfor f in files:\n    try:\n        ast.parse\\(open\\(f\\).read\\(\\)\\)\n        print\\('OK ', f\\)\n    except SyntaxError as e:\n        print\\('ERR', f, e\\)\n        sys.exit\\(1\\)\n\")",
+      "Bash(grep -n \"def \\\\|async def \" /Users/ken/Desktop/clarity-ai/backend/app/routers/*.py)",
+      "Bash(grep -E \"from app.models import|from app.schemas import\" /Users/ken/Desktop/clarity-ai/backend/app/routers/*.py)",
+      "Bash(grep -h \"@router\\\\.\\\\|@app\\\\.\" /Users/ken/Desktop/clarity-ai/backend/app/routers/*.py)"
     ]
   }
 }

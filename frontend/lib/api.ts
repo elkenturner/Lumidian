@@ -8,6 +8,19 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// ── Request deduplication ─────────────────────────────────────────────────────
+// Prevents duplicate concurrent GET requests for the same URL.
+// If the same GET is fired twice before the first resolves, both callers share
+// the same Promise. The entry is removed once the request settles.
+const _inflight = new Map<string, Promise<any>>();
+
+function dedupedGet<T>(url: string): Promise<T> {
+  if (_inflight.has(url)) return _inflight.get(url) as Promise<T>;
+  const p = api.get<T>(url).then((r) => r.data).finally(() => _inflight.delete(url));
+  _inflight.set(url, p);
+  return p;
+}
+
 export interface Brand {
   id: number;
   name: string;
@@ -169,8 +182,7 @@ export interface ApiKeyStatus {
 // ── Brand / Prompt / Run functions ──────────────────────────────────────────
 
 export async function getBrands(): Promise<Brand[]> {
-  const res = await api.get<Brand[]>('/brands');
-  return res.data;
+  return dedupedGet<Brand[]>('/brands');
 }
 
 export async function getBrand(id: number): Promise<BrandDetail> {
@@ -310,7 +322,13 @@ export async function getDrafts(
 
 export async function generateDraft(
   brandId: number,
-  data: { platform: string; prompt_id?: number; custom_brief?: string }
+  data: {
+    platform: string;
+    prompt_id?: number;
+    custom_brief?: string;
+    quora_question_url?: string;
+    quora_question_title?: string;
+  }
 ): Promise<ContentDraft> {
   const res = await api.post<ContentDraft>(`/content/${brandId}/draft`, data);
   return res.data;
@@ -663,6 +681,12 @@ export async function updateBrandProfile(
 
 // ── Content Gap functions ─────────────────────────────────────────────────────
 
+export interface QuoraQuestion {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
 export interface ContentGap {
   id: number;
   brand_id: number;
@@ -676,6 +700,7 @@ export interface ContentGap {
   gap_score: number;
   competitor_mentions: Record<string, number>;
   platforms_lacking: string[];
+  quora_questions: QuoraQuestion[];
   prompt_visibility: number | null;
   last_content_at: string | null;
   identified_at: string;
@@ -749,6 +774,11 @@ export async function authGoogle(idToken: string): Promise<AuthUser> {
   return res.data;
 }
 
+export async function getGoogleAuthUrl(redirectTo: string = '/dashboard'): Promise<string> {
+  const res = await api.get<{ url: string }>('/auth/google/url', { params: { redirect_to: redirectTo } });
+  return res.data.url;
+}
+
 export async function forgotPassword(email: string): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>('/auth/forgot-password', { email });
   return res.data;
@@ -767,6 +797,7 @@ export async function resetPassword(token: string, newPassword: string): Promise
 export interface BillingStatus {
   subscription_tier: 'starter' | 'pro' | null;
   subscription_status: string | null;
+  subscription_trial_end: string | null;
   prompt_limit: number;
   brand_limits: { standard: number; pitch: number };
   is_admin: boolean;
@@ -813,8 +844,10 @@ export interface AdminUser {
   subscription_tier: string | null;
   subscription_status: string | null;
   is_admin: boolean;
+  is_paused: boolean;
   created_at: string | null;
   brand_count: number;
+  brands: { id: number; name: string; brand_type: string }[];
   last_active: string | null;
 }
 
@@ -862,6 +895,16 @@ export async function adminTriggerRun(brandId: number): Promise<{ run_id: number
 
 export async function adminGetLogs(lines = 100): Promise<{ lines: string[]; exists: boolean }> {
   const res = await api.get<{ lines: string[]; exists: boolean }>(`/analytics/admin/logs?lines=${lines}`);
+  return res.data;
+}
+
+export async function adminPauseUser(userId: number): Promise<{ user_id: number; is_paused: boolean; action: string }> {
+  const res = await api.post<{ user_id: number; is_paused: boolean; action: string }>(`/analytics/admin/users/${userId}/pause`);
+  return res.data;
+}
+
+export async function adminRemoveUser(userId: number): Promise<{ user_id: number; deleted: boolean }> {
+  const res = await api.delete<{ user_id: number; deleted: boolean }>(`/analytics/admin/users/${userId}`);
   return res.data;
 }
 
@@ -936,4 +979,55 @@ export async function removeTeamMember(memberId: number): Promise<void> {
 export async function acceptTeamInvite(token: string): Promise<{ message: string; account_owner_id: number }> {
   const res = await api.get<{ message: string; account_owner_id: number }>(`/team/accept?token=${token}`);
   return res.data;
+}
+
+// ── Notifications ─────────────────────────────────────────────────────────────
+
+export interface AppNotification {
+  id: number;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  read: boolean;
+  created_at: string;
+}
+
+export interface NotificationsResponse {
+  notifications: AppNotification[];
+  unread_count: number;
+}
+
+export async function getNotifications(): Promise<NotificationsResponse> {
+  const res = await api.get<NotificationsResponse>('/notifications');
+  return res.data;
+}
+
+export async function markAllNotificationsRead(): Promise<NotificationsResponse> {
+  const res = await api.post<NotificationsResponse>('/notifications/read-all');
+  return res.data;
+}
+
+export async function markNotificationRead(id: number): Promise<AppNotification> {
+  const res = await api.post<AppNotification>(`/notifications/${id}/read`);
+  return res.data;
+}
+
+// ── Quora question search ──────────────────────────────────────────────────────
+
+export interface QuoraQuestion {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
+export async function getQuoraQuestions(
+  brandId: number,
+  promptId: number
+): Promise<QuoraQuestion[]> {
+  const res = await api.get<{ questions: QuoraQuestion[] }>(
+    `/brands/${brandId}/quora-questions`,
+    { params: { prompt_id: promptId } }
+  );
+  return res.data.questions;
 }

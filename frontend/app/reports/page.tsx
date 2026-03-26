@@ -8,9 +8,11 @@ import {
   Loader2,
   RefreshCw,
   Download,
+  Search,
+  ArrowUpDown,
+  GitCompare,
 } from 'lucide-react';
 import {
-  getBrands,
   getBrand,
   getTrends,
   getResponses,
@@ -26,6 +28,7 @@ import {
   CompetitorAnalysis,
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
+import { useBrand } from '@/contexts/BrandContext';
 import { format, parseISO } from 'date-fns';
 
 const parseUTCISO = (s: string) => parseISO(s.endsWith('Z') ? s : s + 'Z');
@@ -132,14 +135,19 @@ function extractGapMentions(group: PromptGroup, brandName: string): string {
 
 const MODEL_ORDER_REPORT = ['chatgpt', 'claude', 'perplexity', 'gemini'];
 
+type SortBy = 'visibility' | 'alpha' | 'change';
+
 export default function ReportsPage() {
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [selectedBrandId, setSelectedBrandId] = useState<number | null>(null);
-  const [loadingBrands, setLoadingBrands] = useState(true);
+  const { brands, activeBrandId: selectedBrandId, loading: loadingBrands, setActiveBrandId: setSelectedBrandId } = useBrand();
   const [brandDetail, setBrandDetail] = useState<BrandDetail | null>(null);
   const [trends, setTrends] = useState<(TrendPoint & { formattedDate: string; score: number })[]>([]);
   const [responses, setResponses] = useState<QueryResult[]>([]);
   const [prevResponses, setPrevResponses] = useState<QueryResult[]>([]);
+  const [allRuns, setAllRuns] = useState<TrackingRun[]>([]);
+  const [compareRunId, setCompareRunId] = useState<number | null>(null);
+  const [loadingCompare, setLoadingCompare] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortBy>('visibility');
   const [loading, setLoading] = useState(false);
   const [expandedPromptId, setExpandedPromptId] = useState<number | null>(null);
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
@@ -162,25 +170,19 @@ export default function ReportsPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  useEffect(() => {
-    getBrands().then((b) => {
-      setBrands(b);
-      if (b.length > 0) setSelectedBrandId(b[0].id);
-      setLoadingBrands(false);
-    }).catch(() => setLoadingBrands(false));
-  }, []);
 
   const loadData = useCallback(async (brandId: number, signal?: AbortSignal) => {
     setLoading(true);
     setTrends([]);
     setResponses([]);
     setPrevResponses([]);
+    setAllRuns([]);
+    setCompareRunId(null);
     setExpandedPromptId(null);
     setBrandDetail(null);
     setCompetitorAnalysis(null);
+    setSearchQuery('');
     try {
-      // Chain response/competitor fetches off getRecentRuns immediately so they
-      // start as soon as run IDs are known, overlapping with getTrends/getBrand.
       const runsPromise = getRecentRuns(brandId);
       const runsDataPromise = runsPromise.then((runs) => {
         const completedRuns = [...(Array.isArray(runs) ? runs : [])]
@@ -188,19 +190,19 @@ export default function ReportsPage() {
           .sort((a: TrackingRun, b: TrackingRun) => b.id - a.id);
         const latestCompleted = completedRuns[0];
         const prevCompleted = completedRuns[1];
-        if (!latestCompleted) return { resps: [], prevResps: [], compAnalysis: null };
+        if (!latestCompleted) return { resps: [], prevResps: [], compAnalysis: null, completedRuns };
         return Promise.all([
           getResponses(brandId, latestCompleted.id),
           prevCompleted ? getResponses(brandId, prevCompleted.id) : Promise.resolve([]),
           getCompetitorAnalysis(brandId, latestCompleted.id).catch(() => null),
-        ]).then(([resps, prevResps, compAnalysis]) => ({ resps, prevResps, compAnalysis }));
+        ]).then(([resps, prevResps, compAnalysis]) => ({ resps, prevResps, compAnalysis, completedRuns }));
       });
 
-      const [tr, runs, detail, runData] = await Promise.all([
+      const [tr, , detail, runData] = await Promise.all([
         getTrends(brandId),
         runsPromise,
         getBrand(brandId).catch(() => null),
-        runsDataPromise.catch(() => ({ resps: [], prevResps: [], compAnalysis: null })),
+        runsDataPromise.catch(() => ({ resps: [], prevResps: [], compAnalysis: null, completedRuns: [] })),
       ]);
 
       if (signal?.aborted) return;
@@ -213,14 +215,28 @@ export default function ReportsPage() {
         }))
       );
       setBrandDetail(detail);
-      const { resps, prevResps, compAnalysis } = runData;
-      setResponses(Array.isArray(resps) ? resps.filter((r) => r.response_text) : []);
-      setPrevResponses(Array.isArray(prevResps) ? prevResps.filter((r) => r.response_text) : []);
+      const { resps, prevResps, compAnalysis, completedRuns } = runData as any;
+      setAllRuns(completedRuns ?? []);
+      if ((completedRuns ?? []).length >= 2) setCompareRunId((completedRuns[1] as TrackingRun).id);
+      setResponses(Array.isArray(resps) ? resps.filter((r: QueryResult) => r.response_text) : []);
+      setPrevResponses(Array.isArray(prevResps) ? prevResps.filter((r: QueryResult) => r.response_text) : []);
       if (compAnalysis?.has_data) setCompetitorAnalysis(compAnalysis);
     } catch { /* ignore */ } finally {
       if (!signal?.aborted) setLoading(false);
     }
   }, []);
+
+  // When compare run changes, fetch its responses
+  useEffect(() => {
+    if (!selectedBrandId || compareRunId === null) return;
+    // Check if already loaded (prev run on initial load)
+    setLoadingCompare(true);
+    getResponses(selectedBrandId, compareRunId)
+      .then((r) => setPrevResponses(r.filter((x: QueryResult) => x.response_text)))
+      .catch((err) => { console.error('[Reports] Failed to load compare run responses:', err); })
+      .finally(() => setLoadingCompare(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compareRunId]);
 
   useEffect(() => {
     if (!selectedBrandId) return;
@@ -261,7 +277,7 @@ export default function ReportsPage() {
       const modelCols = MODEL_ORDER.flatMap((mk) => {
         const ms = g.modelStats.get(mk);
         if (!ms) return ['', '', ''];
-        return [ms.mentioned, ms.total, ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : 0];
+        return [String(ms.mentioned), String(ms.total), String(ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : 0)];
       });
       rows.push([`"${g.promptText.replace(/"/g, '""')}"`, overallPct, ...modelCols].join(','));
     }
@@ -276,13 +292,24 @@ export default function ReportsPage() {
     URL.revokeObjectURL(url);
   }
 
-  const promptGroups = buildPromptGroups(responses).sort((a, b) => {
-    const pctA = a.total > 0 ? a.mentioned / a.total : -1;
-    const pctB = b.total > 0 ? b.mentioned / b.total : -1;
-    return pctB - pctA;
-  });
-
+  const allPromptGroups = buildPromptGroups(responses);
   const prevGroups = buildPromptGroups(prevResponses);
+
+  const promptGroups = allPromptGroups
+    .filter((g) => !searchQuery || g.promptText.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
+      if (sortBy === 'alpha') return a.promptText.localeCompare(b.promptText);
+      const pctA = a.total > 0 ? a.mentioned / a.total : -1;
+      const pctB = b.total > 0 ? b.mentioned / b.total : -1;
+      if (sortBy === 'visibility') return pctB - pctA;
+      // biggest change
+      const prevPctA = prevGroups.find((g) => g.promptId === a.promptId);
+      const prevPctB = prevGroups.find((g) => g.promptId === b.promptId);
+      const dA = prevPctA ? Math.abs(pctA * 100 - (prevPctA.total > 0 ? prevPctA.mentioned / prevPctA.total * 100 : 0)) : 0;
+      const dB = prevPctB ? Math.abs(pctB * 100 - (prevPctB.total > 0 ? prevPctB.mentioned / prevPctB.total * 100 : 0)) : 0;
+      return dB - dA;
+    });
+
   const prevScoreMap = new Map(prevGroups.map((g) => [g.promptId, g.total > 0 ? Math.round((g.mentioned / g.total) * 100) : 0]));
   // Per-model previous scores: promptId → modelKey → pct
   const prevModelScoreMap = new Map(prevGroups.map((g) => {
@@ -397,13 +424,63 @@ export default function ReportsPage() {
             Reports update automatically twice daily at 8:00 AM and 8:00 PM UTC.
           </p>
 
+          {/* Search + sort + compare controls */}
+          {!loading && responses.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[180px]">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#475569] pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search prompts…"
+                  className="w-full bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] text-[#94A3B8] placeholder:text-[#475569] rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-[#6366f1] transition-colors"
+                />
+              </div>
+              {/* Sort */}
+              <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5">
+                <ArrowUpDown size={11} className="text-[#475569] ml-1.5" />
+                {(['visibility', 'alpha', 'change'] as SortBy[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setSortBy(s)}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all capitalize ${sortBy === s ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+                  >
+                    {s === 'visibility' ? 'Visibility %' : s === 'alpha' ? 'A–Z' : 'Biggest Δ'}
+                  </button>
+                ))}
+              </div>
+              {/* Compare run picker */}
+              {allRuns.length >= 2 && (
+                <div className="flex items-center gap-1.5 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-lg px-2.5 py-1.5">
+                  <GitCompare size={11} className="text-[#6366f1] flex-shrink-0" />
+                  <span className="text-[10px] text-[#475569] font-medium">Compare to:</span>
+                  <select
+                    value={compareRunId ?? ''}
+                    onChange={(e) => setCompareRunId(e.target.value ? Number(e.target.value) : null)}
+                    className="bg-transparent text-[#94A3B8] text-[10px] focus:outline-none cursor-pointer"
+                  >
+                    <option value="">None</option>
+                    {allRuns.slice(1).map((r) => (
+                      <option key={r.id} value={r.id}>
+                        Run #{r.id} — {r.completed_at ? format(parseUTCISO(r.completed_at), 'MMM d, HH:mm') : '?'}
+                      </option>
+                    ))}
+                  </select>
+                  {loadingCompare && <Loader2 size={10} className="animate-spin text-[#6366f1]" />}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Prompt visibility list */}
           <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
             <div className="px-5 py-3.5 border-b border-[rgba(99,102,241,0.12)] bg-[rgba(99,102,241,0.05)] flex items-center justify-between">
               <h3 className="text-sm font-semibold text-[#F0F4F8]">Prompt Visibility</h3>
               {!loading && (promptGroups.length + untrackedPrompts.length) > 0 && (
                 <span className="text-xs text-[#64748B]">
-                  {promptGroups.length + untrackedPrompts.length} prompt{(promptGroups.length + untrackedPrompts.length) !== 1 ? 's' : ''}
+                  {searchQuery ? `${promptGroups.length} of ${allPromptGroups.length}` : `${promptGroups.length + untrackedPrompts.length}`} prompt{(promptGroups.length + untrackedPrompts.length) !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
@@ -474,22 +551,21 @@ export default function ReportsPage() {
                           </div>
                         </div>
 
-                        {/* Model breakdown badges */}
+                        {/* Model breakdown badges — always show all 4 models */}
                         <div className="flex items-center gap-2 flex-wrap">
                           {MODEL_ORDER.map(modelKey => {
                             const ms = g.modelStats.get(modelKey);
-                            if (!ms) return null;
                             const cfg = getModelCfg(modelKey);
-                            const pct = ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : 0;
-                            const mentionColor = pct >= 60 ? '#10b981' : pct >= 30 ? '#f59e0b' : '#ef4444';
+                            const pct = ms && ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : null;
+                            const mentionColor = pct === null ? '#334155' : pct >= 60 ? '#10b981' : pct >= 30 ? '#f59e0b' : '#ef4444';
                             return (
                               <div
                                 key={modelKey}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[rgba(99,102,241,0.15)] bg-[rgba(99,102,241,0.06)]"
                               >
-                                <span className="text-xs font-semibold" style={{ color: cfg.text }}>{cfg.label}</span>
-                                <span className="text-[rgba(255,255,255,0.15)]">·</span>
-                                <span className="text-xs font-bold tabular-nums" style={{ color: mentionColor }}>{pct}%</span>
+                                <span className="text-xs font-semibold" style={{ color: pct === null ? '#334155' : cfg.text }}>{cfg.label}</span>
+                                <span className="text-[rgba(255,255,255,0.10)]">·</span>
+                                <span className="text-xs font-bold tabular-nums" style={{ color: mentionColor }}>{pct !== null ? `${pct}%` : '—'}</span>
                               </div>
                             );
                           })}

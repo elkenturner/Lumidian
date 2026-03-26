@@ -27,6 +27,7 @@ from app.models import (
     ContentDraft,
     ContentPost,
     ContentAttribution,
+    utcnow as _utcnow,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,10 +89,6 @@ PLATFORM_GUIDELINES: dict[str, dict] = {
         "workflow": "article",
     },
 }
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -274,6 +271,8 @@ async def generate_draft(
     platform: str,
     prompt_id: Optional[int] = None,
     custom_brief: Optional[str] = None,
+    quora_question_url: Optional[str] = None,
+    quora_question_title: Optional[str] = None,
 ) -> ContentDraft:
     """
     Generate a content draft using Claude (claude-haiku-4-5-20251001).
@@ -290,7 +289,7 @@ async def generate_draft(
 
     # Load brand
     brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-    brand: Brand | None = brand_result.scalar_one_or_none()
+    brand: Optional[Brand] = brand_result.scalar_one_or_none()
     if brand is None:
         raise ValueError(f"Brand {brand_id} not found")
 
@@ -299,7 +298,7 @@ async def generate_draft(
         prompt_result = await db.execute(
             select(Prompt).where(Prompt.id == prompt_id, Prompt.brand_id == brand_id)
         )
-        prompt: Prompt | None = prompt_result.scalar_one_or_none()
+        prompt: Optional[Prompt] = prompt_result.scalar_one_or_none()
         if prompt is None:
             raise ValueError(f"Prompt {prompt_id} not found for brand {brand_id}")
     else:
@@ -318,13 +317,25 @@ async def generate_draft(
 
     # Build guidelines and prompt for Claude
     guidelines = PLATFORM_GUIDELINES[platform]
+
+    # For Quora with a targeted question, inject the question into the brief
+    effective_brief = custom_brief
+    if platform == "quora" and quora_question_title and quora_question_url:
+        question_context = (
+            f"Write a Quora answer to this specific question: "
+            f"{quora_question_title} ({quora_question_url}). "
+            f"The answer should directly address this question while naturally "
+            f"incorporating relevant information about {brand.name}."
+        )
+        effective_brief = question_context + (f"\n\n{custom_brief}" if custom_brief else "")
+
     claude_prompt = _build_claude_prompt(
         brand_name=brand.name,
         platform=platform,
         target_query=prompt.text,
         visibility_score=visibility_score,
         guidelines=guidelines,
-        custom_brief=custom_brief,
+        custom_brief=effective_brief,
     )
 
     # Call Claude
@@ -356,14 +367,17 @@ async def generate_draft(
             title = first_line.lstrip("#").strip()
             content_body = lines[1].strip() if len(lines) > 1 else generated_text.strip()
 
-    # Build content brief
-    brief = custom_brief or (
-        f"Auto-generated to improve visibility for prompt: \"{prompt.text}\" "
-        f"(current score: {visibility_score:.1f}%)"
-    )
-
-    # Store applied guidelines as JSON
-    guidelines_applied = json.dumps(guidelines["rules"])
+    # Build content brief — for Quora targeted drafts, store question URL in brief
+    # and question title in platform_guidelines_applied so the card can render a link
+    if platform == "quora" and quora_question_url and quora_question_title:
+        brief = quora_question_url
+        guidelines_applied = quora_question_title
+    else:
+        brief = custom_brief or (
+            f"Auto-generated to improve visibility for prompt: \"{prompt.text}\" "
+            f"(current score: {visibility_score:.1f}%)"
+        )
+        guidelines_applied = json.dumps(guidelines["rules"])
 
     draft = ContentDraft(
         brand_id=brand_id,
@@ -420,7 +434,7 @@ async def post_draft(
     draft_result = await db.execute(
         select(ContentDraft).where(ContentDraft.id == draft_id)
     )
-    draft: ContentDraft | None = draft_result.scalar_one_or_none()
+    draft: Optional[ContentDraft] = draft_result.scalar_one_or_none()
     if draft is None:
         raise ValueError(f"ContentDraft {draft_id} not found")
 
@@ -488,7 +502,7 @@ async def calculate_attribution(
 
     # Load the tracking run
     run_result = await db.execute(select(TrackingRun).where(TrackingRun.id == tracking_run_id))
-    run: TrackingRun | None = run_result.scalar_one_or_none()
+    run: Optional[TrackingRun] = run_result.scalar_one_or_none()
     if run is None:
         raise ValueError(f"TrackingRun {tracking_run_id} not found")
 
@@ -520,7 +534,7 @@ async def calculate_attribution(
         draft_result = await db.execute(
             select(ContentDraft).where(ContentDraft.id == post.draft_id)
         )
-        draft: ContentDraft | None = draft_result.scalar_one_or_none()
+        draft: Optional[ContentDraft] = draft_result.scalar_one_or_none()
         if draft is None or draft.prompt_id is None:
             continue
 

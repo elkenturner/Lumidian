@@ -8,6 +8,7 @@ PUT    /api/brands/{brand_id}/profile   — update brand profile fields
 """
 
 import json
+import logging
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -20,6 +21,7 @@ from app.models import Brand, BrandProfile
 from app.schemas import BrandProfileResponse, BrandProfileUpdate, Publication
 
 router = APIRouter(prefix="/brands", tags=["brand-profile"])
+logger = logging.getLogger(__name__)
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
@@ -44,7 +46,7 @@ def _compute_completion(profile: BrandProfile) -> float:
             if stats:
                 filled += 1
         except Exception:
-            pass
+            logger.warning("Failed to parse key_stats for brand_profile %d", profile.id)
     if profile.tone_of_voice and profile.tone_of_voice.strip():
         filled += 1
     if profile.what_not_to_say:
@@ -53,7 +55,7 @@ def _compute_completion(profile: BrandProfile) -> float:
             if items:
                 filled += 1
         except Exception:
-            pass
+            logger.warning("Failed to parse what_not_to_say for brand_profile %d", profile.id)
     if profile.target_audience and profile.target_audience.strip():
         filled += 1
     if profile.approved_language:
@@ -62,14 +64,14 @@ def _compute_completion(profile: BrandProfile) -> float:
             if items:
                 filled += 1
         except Exception:
-            pass
+            logger.warning("Failed to parse approved_language for brand_profile %d", profile.id)
     if profile.publications:
         try:
             pubs = json.loads(profile.publications)
             if pubs:
                 filled += 1
         except Exception:
-            pass
+            logger.warning("Failed to parse publications for brand_profile %d", profile.id)
     return round((filled / len(ALL_FIELDS)) * 100, 1)
 
 

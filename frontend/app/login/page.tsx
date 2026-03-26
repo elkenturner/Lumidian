@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, Eye, EyeOff, ArrowRight } from 'lucide-react';
 import OceanLogo from '@/components/OceanLogo';
 import { useAuth } from '@/contexts/AuthContext';
-import { authGoogle } from '@/lib/api';
+import { getGoogleAuthUrl } from '@/lib/api';
 
 const NOISE_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`;
 
@@ -20,47 +20,27 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
-  const [gsiReady, setGsiReady] = useState(false);
   const [error, setError] = useState('');
 
   const from = searchParams.get('from') || '/dashboard';
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID ?? '';
 
   useEffect(() => { document.title = 'Sign In — ClarityAI'; }, []);
 
   useEffect(() => {
-    if (!googleClientId) return;
-    const script = document.createElement('script');
-    script.src = 'https://accounts.google.com/gsi/client';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => setGsiReady(true);
-    document.head.appendChild(script);
-    return () => { document.head.removeChild(script); };
-  }, [googleClientId]);
+    const oauthError = searchParams.get('error');
+    if (oauthError) setError('Google sign-in failed. Please try again.');
+  }, [searchParams]);
 
-  async function handleGoogleCredential(credential: string) {
+  async function handleGoogleClick() {
     setGoogleLoading(true);
     setError('');
     try {
-      await authGoogle(credential);
-      await refresh();
-      router.push(from);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Google sign-in failed. Please try again.');
+      const url = await getGoogleAuthUrl(from);
+      window.location.href = url;
+    } catch {
+      setError('Could not start Google sign-in. Please try again.');
       setGoogleLoading(false);
     }
-  }
-
-  function handleGoogleClick() {
-    if (!gsiReady || !googleClientId) return;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const google = (window as any).google;
-    google.accounts.id.initialize({
-      client_id: googleClientId,
-      callback: (response: { credential: string }) => handleGoogleCredential(response.credential),
-    });
-    google.accounts.id.prompt();
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -218,7 +198,7 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={handleGoogleClick}
-            disabled={!gsiReady || !googleClientId || googleLoading}
+            disabled={googleLoading}
             style={{
               width: '100%',
               display: 'flex',
@@ -232,8 +212,8 @@ export default function LoginPage() {
               fontSize: 14,
               fontWeight: 500,
               color: '#374151',
-              cursor: (!gsiReady || !googleClientId || googleLoading) ? 'not-allowed' : 'pointer',
-              opacity: (!gsiReady || !googleClientId || googleLoading) ? 0.5 : 1,
+              cursor: googleLoading ? 'not-allowed' : 'pointer',
+              opacity: googleLoading ? 0.5 : 1,
               transition: 'border-color 0.15s, box-shadow 0.15s',
               fontFamily: 'inherit',
             }}

@@ -90,8 +90,8 @@ async def list_brands_with_stats(db: DbDep, user: CurrentUser):
 
     brand_ids = [b.id for b, _ in brand_rows]
 
-    # Fetch the last 3 completed runs per brand using a subquery
-    # We'll load all recent completed runs and process in Python
+    # Fetch the last 3 completed runs per brand.
+    # Cap total loaded rows to avoid runaway queries on large datasets.
     runs_result = await db.execute(
         select(TrackingRun)
         .where(
@@ -100,6 +100,7 @@ async def list_brands_with_stats(db: DbDep, user: CurrentUser):
             TrackingRun.overall_score.isnot(None),
         )
         .order_by(TrackingRun.brand_id, TrackingRun.completed_at.desc())
+        .limit(len(brand_ids) * 10)
     )
     all_runs = runs_result.scalars().all()
 
@@ -212,7 +213,7 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
 
     pitch_expires_at = None
     if payload.brand_type == "pitch":
-        pitch_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=7)
+        pitch_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30)
 
     brand = Brand(
         name=payload.name,
@@ -848,3 +849,32 @@ async def get_content_attribution(
         ))
 
     return output
+
+
+# ── Quora question search ──────────────────────────────────────────────────────
+
+@router.get("/{brand_id}/quora-questions")
+async def get_quora_questions(
+    brand_id: int,
+    prompt_id: int,
+    db: DbDep,
+    user: CurrentUser,
+):
+    """
+    Return real Quora questions related to the given prompt via Google CSE.
+    Results are cached per prompt_id for 24 hours to preserve API quota.
+    Returns {questions: [...]} — empty list if CSE is not configured.
+    """
+    await get_brand_for_user(brand_id, db, user)
+
+    prompt_result = await db.execute(
+        select(Prompt).where(Prompt.id == prompt_id, Prompt.brand_id == brand_id)
+    )
+    prompt = prompt_result.scalar_one_or_none()
+    if prompt is None:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    from app.services.quora_search_service import extract_keywords, search_quora_questions
+    keywords = extract_keywords(prompt.text)
+    questions = search_quora_questions(keywords, num_results=5, cache_key=prompt_id)
+    return {"questions": questions}

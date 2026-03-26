@@ -20,6 +20,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
 from app.models import Brand, TrackingRun, QueryResult, RunModelScore, Prompt, ContentAttribution
+from app.utils import normalise_model, MODEL_ORDER
 from app.schemas import (
     OverviewResponse,
     TrendPoint,
@@ -32,15 +33,6 @@ from app.schemas import (
 )
 
 router = APIRouter(prefix="/results", tags=["results"])
-
-MODEL_ORDER = ["chatgpt", "claude", "perplexity", "gemini"]
-
-def _normalise_model(model: str) -> str:
-    key = model.lower().replace("-", "").replace("_", "").replace(" ", "")
-    for m in MODEL_ORDER:
-        if m in key:
-            return m
-    return model
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
@@ -72,7 +64,7 @@ async def get_overview(brand_id: int, db: DbDep, user: CurrentUser):
         .order_by(TrackingRun.completed_at.desc())
         .limit(1)
     )
-    latest_run: TrackingRun | None = run_result.scalar_one_or_none()
+    latest_run: Optional[TrackingRun] = run_result.scalar_one_or_none()
 
     model_breakdown: list[ModelScoreResponse] = []
     if latest_run is not None:
@@ -119,7 +111,12 @@ async def get_overview(brand_id: int, db: DbDep, user: CurrentUser):
 # ── Trends ────────────────────────────────────────────────────────────────────
 
 @router.get("/{brand_id}/trends", response_model=TrendsResponse)
-async def get_trends(brand_id: int, db: DbDep, user: CurrentUser):
+async def get_trends(
+    brand_id: int,
+    db: DbDep,
+    user: CurrentUser,
+    limit: int = Query(90, ge=10, le=365, description="Max runs to return (most recent)"),
+):
     brand = await get_brand_for_user(brand_id, db, user)
 
     runs_result = await db.execute(
@@ -128,9 +125,10 @@ async def get_trends(brand_id: int, db: DbDep, user: CurrentUser):
             TrackingRun.brand_id == brand_id,
             TrackingRun.status == "completed",
         )
-        .order_by(TrackingRun.created_at.asc())
+        .order_by(TrackingRun.created_at.desc())
+        .limit(limit)
     )
-    runs = runs_result.scalars().all()
+    runs = list(reversed(runs_result.scalars().all()))
 
     # Fetch all per-model scores for these runs in one query
     run_ids = [r.id for r in runs]
@@ -145,7 +143,7 @@ async def get_trends(brand_id: int, db: DbDep, user: CurrentUser):
     from collections import defaultdict as _dd
     scores_by_run: dict[int, dict[str, float]] = _dd(dict)
     for ms in all_model_scores:
-        key = _normalise_model(ms.model)
+        key = normalise_model(ms.model)
         scores_by_run[ms.tracking_run_id][key] = round(ms.score, 1)
 
     trend_data = [

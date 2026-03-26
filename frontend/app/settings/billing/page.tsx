@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CreditCard, Check, Loader2, Zap, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { getBillingStatus, createCheckoutSession, createPortalSession, BillingStatus } from '@/lib/api';
+import { CreditCard, Check, Loader2, Zap, AlertTriangle, CheckCircle2, Clock, X } from 'lucide-react';
+import { getBillingStatus, createCheckoutSession, createPortalSession, cancelSubscription, BillingStatus } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 const TIER_FEATURES: Record<string, string[]> = {
-  starter: ['25 tracked prompts', '4 AI models', 'Twice-daily reports', 'Gap analysis', 'Content drafts'],
-  pro: ['100 tracked prompts', '4 AI models', 'Twice-daily reports', 'Advanced gap analysis', 'Priority content drafts', 'Competitor comparison', 'Priority support'],
+  starter: ['25 tracked prompts', '1 standard brand', '2 pitch brands (30-day each)', '4 AI models', 'Twice-daily reports', 'Gap analysis', 'Content drafts'],
+  pro: ['100 tracked prompts', '5 standard brands', '4 pitch brands (30-day each)', '4 AI models', 'Twice-daily reports', 'Advanced gap analysis', 'Priority content drafts', 'Priority support'],
 };
 
 export default function BillingPage() {
@@ -18,13 +18,16 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true);
   const [upgrading, setUpgrading] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const successParam = searchParams.get('success');
 
   useEffect(() => {
     getBillingStatus()
       .then(setStatus)
-      .catch(() => {})
+      .catch(() => setLoadError('Could not load billing status. Please refresh the page.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -34,7 +37,7 @@ export default function BillingPage() {
       const { checkout_url } = await createCheckoutSession(tier);
       window.location.href = checkout_url;
     } catch (err: any) {
-      alert(err?.response?.data?.detail || 'Failed to create checkout session. Check Stripe configuration.');
+      alert(err?.response?.data?.detail || 'Unable to start checkout. Please try again or contact support.');
     } finally {
       setUpgrading(null);
     }
@@ -46,9 +49,24 @@ export default function BillingPage() {
       const { portal_url } = await createPortalSession();
       window.location.href = portal_url;
     } catch (err: any) {
-      alert(err?.response?.data?.detail || 'Failed to open billing portal.');
+      alert(err?.response?.data?.detail || 'Unable to open the billing portal. Please try again.');
     } finally {
       setPortalLoading(false);
+    }
+  }
+
+  async function handleCancel() {
+    setCancelLoading(true);
+    try {
+      await cancelSubscription();
+      setShowCancelConfirm(false);
+      // Reload billing status to show updated state
+      const updated = await getBillingStatus();
+      setStatus(updated);
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Unable to cancel subscription. Please try again or contact support.');
+    } finally {
+      setCancelLoading(false);
     }
   }
 
@@ -61,6 +79,43 @@ export default function BillingPage() {
         <h1 className="text-2xl font-bold text-[#e2e8f0]">Billing & Plan</h1>
         <p className="text-sm text-[#64748b] mt-1">Manage your subscription and prompt limits</p>
       </div>
+
+      {/* Cancel confirmation modal */}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowCancelConfirm(false)} />
+          <div className="relative bg-[#111118] border border-[#2a2a3a] rounded-2xl p-6 max-w-sm w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h3 className="text-sm font-semibold text-[#e2e8f0] mb-2">Cancel subscription?</h3>
+            {status?.subscription_status === 'trialing' && status.subscription_trial_end ? (
+              <p className="text-xs text-[#64748b] mb-4">
+                You are currently in your free trial. Cancelling now means you won&apos;t be charged on{' '}
+                <span className="text-[#e2e8f0] font-medium">{new Date(status.subscription_trial_end + 'Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>{' '}
+                and your account will revert to the free plan.
+              </p>
+            ) : (
+              <p className="text-xs text-[#64748b] mb-4">
+                Your plan will remain active until the end of the current billing period, then revert to the free plan.
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 py-2 text-xs text-[#64748b] hover:text-[#94a3b8] border border-[#2a2a3a] rounded-lg transition-colors"
+              >
+                Keep plan
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={cancelLoading}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-[#f87171] bg-[#f87171]/10 hover:bg-[#f87171]/20 border border-[#f87171]/25 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {cancelLoading && <Loader2 size={11} className="animate-spin" />}
+                Confirm cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Success banner */}
       {successParam === 'true' && (
@@ -75,6 +130,13 @@ export default function BillingPage() {
         <div className="flex items-center gap-3 bg-[#6366f1]/10 border border-[#6366f1]/20 rounded-xl px-4 py-3 mb-6">
           <Zap size={16} className="text-[#818cf8] flex-shrink-0" />
           <p className="text-sm text-[#818cf8]">Admin account — unlimited prompts, all billing checks bypassed.</p>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="flex items-center gap-3 bg-[#7f1d1d]/20 border border-[#991b1b]/30 rounded-xl px-4 py-3 mb-6">
+          <AlertTriangle size={16} className="text-[#f87171] flex-shrink-0" />
+          <p className="text-sm text-[#f87171]">{loadError}</p>
         </div>
       )}
 
@@ -112,20 +174,56 @@ export default function BillingPage() {
                   </p>
                 </div>
                 <p className="text-xs text-[#475569]">
-                  {currentTier === 'starter' ? '25 prompts included' : currentTier === 'pro' ? '100 prompts included' : '25 prompts on free plan'}
+                  {currentTier === 'starter' ? '25 prompts included' : currentTier === 'pro' ? '100 prompts included' : '25 prompts on free plan — upgrade to Pro for 100'}
                 </p>
               </div>
             )}
 
+            {/* Trial status */}
+            {status?.subscription_status === 'trialing' && status.subscription_trial_end && (
+              <div className="flex items-start gap-2 bg-[#10b981]/10 border border-[#10b981]/20 rounded-lg px-3 py-2.5 mt-3">
+                <Clock size={13} className="text-[#10b981] flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-medium text-[#10b981]">Free trial active</p>
+                  <p className="text-xs text-[#64748b] mt-0.5">
+                    Trial ends{' '}
+                    <span className="text-[#94a3b8] font-medium">
+                      {new Date(status.subscription_trial_end + 'Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                    </span>
+                    . Your card will be charged automatically unless you cancel before then.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Canceling notice */}
+            {status?.subscription_status === 'canceling' && (
+              <div className="flex items-center gap-2 bg-[#f59e0b]/10 border border-[#f59e0b]/20 rounded-lg px-3 py-2.5 mt-3">
+                <AlertTriangle size={13} className="text-[#f59e0b] flex-shrink-0" />
+                <p className="text-xs text-[#f59e0b]">Subscription canceling — access continues until the end of the billing period.</p>
+              </div>
+            )}
+
             {currentTier && !isAdmin && (
-              <button
-                onClick={handlePortal}
-                disabled={portalLoading}
-                className="mt-4 flex items-center gap-2 text-sm text-[#64748b] hover:text-[#94a3b8] transition-colors"
-              >
-                {portalLoading ? <Loader2 size={13} className="animate-spin" /> : null}
-                Manage billing in Stripe →
-              </button>
+              <div className="flex items-center gap-4 mt-4">
+                <button
+                  onClick={handlePortal}
+                  disabled={portalLoading}
+                  className="flex items-center gap-2 text-sm text-[#64748b] hover:text-[#94a3b8] transition-colors"
+                >
+                  {portalLoading ? <Loader2 size={13} className="animate-spin" /> : null}
+                  Manage billing in Stripe →
+                </button>
+                {status?.subscription_status !== 'canceling' && (
+                  <button
+                    onClick={() => setShowCancelConfirm(true)}
+                    className="flex items-center gap-1 text-xs text-[#475569] hover:text-[#f87171] transition-colors"
+                  >
+                    <X size={11} />
+                    Cancel plan
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
@@ -187,14 +285,16 @@ export default function BillingPage() {
             </div>
           )}
 
-          {/* Stripe test mode notice */}
-          <div className="flex items-start gap-2 mt-6 px-1">
-            <AlertTriangle size={13} className="text-[#f59e0b] flex-shrink-0 mt-0.5" />
-            <p className="text-xs text-[#475569]">
-              Stripe is in <span className="text-[#f59e0b]">test mode</span>. No real charges will occur.
-              Use card 4242 4242 4242 4242 with any future date and CVC.
-            </p>
-          </div>
+          {/* Stripe test mode notice — dev only */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="flex items-start gap-2 mt-6 px-1">
+              <AlertTriangle size={13} className="text-[#f59e0b] flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-[#475569]">
+                Stripe is in <span className="text-[#f59e0b]">test mode</span>. No real charges will occur.
+                Use card 4242 4242 4242 4242 with any future date and CVC.
+              </p>
+            </div>
+          )}
         </>
       )}
     </div>

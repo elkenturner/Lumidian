@@ -20,21 +20,18 @@ import asyncio
 import logging
 import re
 from datetime import datetime, timezone
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
-from app.models import Brand, Prompt, TrackingRun, QueryResult, RunModelScore
+from app.models import Brand, Prompt, TrackingRun, QueryResult, RunModelScore, utcnow as _utcnow
 from app.services.llm_service import query_model, SUPPORTED_MODELS, TIER_RUNS
 
 logger = logging.getLogger(__name__)
 
 MAX_CONCURRENT = 10
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def _normalize(text: str) -> str:
@@ -44,8 +41,8 @@ def _normalize(text: str) -> str:
 
 def _detect_mention(
     brand_name: str,
-    response_text: str | None,
-    error: str | None,
+    response_text: Optional[str],
+    error: Optional[str],
     model: str,
 ) -> bool:
     if not response_text or error == "api_key_not_configured":
@@ -78,7 +75,7 @@ def _detect_mention(
 async def run_tracking(
     brand_id: int,
     run_type: str = "manual",
-    schedule_slot: str | None = None,
+    schedule_slot: Optional[str] = None,
 ) -> int:
     """
     Execute a complete tracking run for the given brand.
@@ -97,7 +94,7 @@ async def run_tracking(
     async with AsyncSessionLocal() as db:
         # ── 1. Load brand ────────────────────────────────────────────────────
         brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-        brand: Brand | None = brand_result.scalar_one_or_none()
+        brand: Optional[Brand] = brand_result.scalar_one_or_none()
         if brand is None:
             raise ValueError(f"Brand {brand_id} not found")
 
@@ -381,6 +378,51 @@ async def run_tracking(
         logger.warning(
             "Gap analysis failed for run %d (non-fatal): %s", run_id, exc
         )
+
+    # ── 10. Create in-app notifications ──────────────────────────────────────
+    try:
+        from app.models import Notification, Brand as BrandModel
+
+        async with AsyncSessionLocal() as notif_db:
+            brand_res = await notif_db.execute(select(BrandModel).where(BrandModel.id == brand_id))
+            brand_obj = brand_res.scalar_one_or_none()
+            if brand_obj and brand_obj.user_id:
+                uid = brand_obj.user_id
+
+                notif_db.add(Notification(
+                    user_id=uid,
+                    type="report_ready",
+                    title=f"Run complete — {brand_name}",
+                    body=f"Score: {round(overall_score, 1)}% ({overall_mentions}/{overall_queries} mentions)",
+                    link=f"/tracker/{brand_id}/results",
+                ))
+
+                # Score-drop alert vs previous completed run
+                prev_res = await notif_db.execute(
+                    select(TrackingRun)
+                    .where(
+                        TrackingRun.brand_id == brand_id,
+                        TrackingRun.status == "completed",
+                        TrackingRun.id != run_id,
+                    )
+                    .order_by(TrackingRun.completed_at.desc())
+                    .limit(1)
+                )
+                prev_run = prev_res.scalar_one_or_none()
+                if prev_run and prev_run.overall_score is not None:
+                    drop = prev_run.overall_score - overall_score
+                    if drop >= 10.0:
+                        notif_db.add(Notification(
+                            user_id=uid,
+                            type="visibility_drop",
+                            title=f"Visibility dropped {drop:.1f}pp — {brand_name}",
+                            body=f"Previous: {prev_run.overall_score:.1f}% → Now: {overall_score:.1f}%",
+                            link=f"/tracker/{brand_id}/results",
+                        ))
+
+                await notif_db.commit()
+    except Exception as exc:
+        logger.warning("Notification creation failed for run %d (non-fatal): %s", run_id, exc)
 
     # ── 9. Send report-ready email ────────────────────────────────────────────
     try:

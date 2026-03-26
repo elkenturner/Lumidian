@@ -267,9 +267,43 @@ def get_relevant_subreddits(
 
 # ── Relevance scoring ─────────────────────────────────────────────────────────
 
-_STOP = frozenset(
-    "a an the is are was were be to of and or in on at for with by from".split()
-)
+_STOP = frozenset("""
+    a an the is are was were be to of and or in on at for with by from
+    this that these those it its
+    i me my we our you your he she they them their
+    do does did can could would should may might will
+    what which who when where why how
+    have has had been being
+    about up out some any all also just now get got
+    more most very really quite too so then than
+    new best good great latest current available most using used use
+    top leading popular common known major important key high
+    many much such only also even still yet both
+    here there since while before after during between
+    make makes made look looks give gives take takes need needs want wants
+    know knows think thinks help helps tell tells say says
+    company companies people business work works come comes day days
+    year years time times way ways type types kind kinds
+    based across among against without within around through across
+    recently previously currently generally specifically
+""".split())
+
+# Subreddits that are creative writing / fiction / entertainment — never valid
+# content-marketing opportunities regardless of keyword overlap.
+_FICTION_SUBS = frozenset({
+    "nosleep", "hfy", "writingprompts", "shortscarystories", "creativewriting",
+    "shivers", "twosentencehorror", "thetruthishere", "glitch_in_the_matrix",
+    "paranormal", "supernatural", "fanfiction", "fffp",
+    "anime", "manga", "animesuggest", "isekai", "lightnovels",
+    "fantasy", "scifi", "sciencefiction", "tolkienfans", "dndnext", "dnd",
+    "worldbuilding", "magicbuilding", "printsforsale",
+    "books", "booksuggestions", "suggestmeabook",
+    "gaming", "games", "pcgaming", "truegaming", "gamedesign",
+    "movies", "television", "netflixbestof", "marvelstudios", "dc_cinematic",
+    "music", "musictheory", "spotify", "hiphopheads",
+    "sports", "nfl", "nba", "soccer", "mls", "baseball", "hockey",
+    "amateurradio", "memes", "dankmemes", "funny", "humor",
+})
 
 
 # Family member references that are NEVER good reply opportunities regardless of title framing.
@@ -303,6 +337,25 @@ _PERSONAL_STORY_SIGNALS = frozenset([
     "hair loss", "nausea", "fatigue", "pain management",
     "emotional support", "crying", "praying", "prayers",
 ])
+
+# Spam / SEO listicle titles — promotional posts masquerading as content
+_SPAM_TITLE_RE = re.compile(
+    r"^\s*\d+\s+(best|top|leading|greatest|recommended)\b|"
+    r"\btop[\s-]\d+\b|"
+    r"\b\d+[\s-](best|top|leading)\b|"
+    r"\b(app|software|company|companies|agency|agencies|services?|solutions?)\s+(development|provider|company)\b|"
+    r"\bdigital\s+transformation\b.*\b(agency|company|service)\b|"
+    r"\b(nearshore|offshore|outsourc)\b",
+    re.IGNORECASE,
+)
+
+# Spam subreddit name patterns (SEO link farms)
+_SPAM_SUB_RE = re.compile(
+    r"(AppDev|AppInnovation|AIDevelop|FutureTech|AppDevelop|AIApp|AISolution|"
+    r"DevSolution|TechSolution|SoftwareDev|DigitalAgency|WebAgency)",
+    re.IGNORECASE,
+)
+
 
 # Titles that are almost always personal celebration/update/support posts
 _PERSONAL_TITLE_RE = re.compile(
@@ -354,7 +407,20 @@ def _score_thread(
     prompt_text: str,
     created_utc: float,
     upvotes: int = 0,
+    subreddit: str = "",
 ) -> float:
+    # Fiction / entertainment subs are never valid opportunities
+    if subreddit.lower() in _FICTION_SUBS:
+        return 0.0
+
+    # SEO link-farm / promotional subreddits
+    if _SPAM_SUB_RE.search(subreddit):
+        return 0.0
+
+    # Listicle / promotional spam titles
+    if _SPAM_TITLE_RE.search(title):
+        return 0.0
+
     # Personal support stories aren't actionable content opportunities
     if _is_personal_story(title, body):
         return 0.0
@@ -366,8 +432,17 @@ def _score_thread(
     if not prompt_words:
         return 0.0
 
-    matches = sum(1 for w in prompt_words if w in combined)
+    # Use whole-word matching to avoid false substring hits (e.g. "can" in "scanner")
+    matches = sum(
+        1 for w in prompt_words
+        if re.search(r"\b" + re.escape(w) + r"\b", combined)
+    )
     relevance = min(1.0, matches / len(prompt_words))
+
+    # Hard minimum: post must share at least 45% of prompt keywords AND at least 2 matches.
+    # This prevents high-recency/engagement posts from passing on 1–2 coincidental word hits.
+    if relevance < 0.45 or matches < 2:
+        return 0.0
 
     now_ts = datetime.now(timezone.utc).timestamp()
     age_s = now_ts - created_utc
@@ -531,27 +606,23 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             q = urllib.parse.quote(prompt.text)
 
             # 1. Search within topically relevant subreddits (high precision)
-            sub_posts: list[dict] = []
-            for sub in subreddits[:6]:
+            all_posts: list[dict] = []
+            for sub in subreddits[:8]:
                 sub_url = (
                     f"{_REDDIT_BASE}/r/{sub}/search.json"
-                    f"?q={q}&restrict_sr=1&sort=new&t=month&limit=15"
+                    f"?q={q}&restrict_sr=1&sort=relevance&t=month&limit=15"
                 )
-                sub_posts.extend(_extract_posts(await _fetch(sub_url)))
-                await asyncio.sleep(0.8)
+                all_posts.extend(_extract_posts(await _fetch(sub_url)))
+                await asyncio.sleep(1.0)
 
-            # 2. Global Reddit search — finds relevant threads in ANY subreddit
-            #    that we haven't explicitly mapped. Sorted by relevance then recency.
-            global_posts: list[dict] = []
-            for sort in ("relevance", "new"):
-                global_url = (
-                    f"{_REDDIT_BASE}/search.json"
-                    f"?q={q}&sort={sort}&t=month&limit=25"
-                )
-                global_posts.extend(_extract_posts(await _fetch(global_url)))
-                await asyncio.sleep(0.8)
-
-            all_posts = sub_posts + global_posts
+            # 2. Global search — catches relevant threads in unmapped subreddits.
+            #    Uses spam/fiction filters in _score_thread to block low-quality results.
+            global_url = (
+                f"{_REDDIT_BASE}/search.json"
+                f"?q={q}&sort=relevance&t=month&limit=15"
+            )
+            all_posts.extend(_extract_posts(await _fetch(global_url)))
+            await asyncio.sleep(1.0)
 
             for post in all_posts:
                 permalink = post.get("permalink", "")
@@ -573,11 +644,12 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 if not title:
                     continue
 
-                score = _score_thread(title, body, prompt.text, created_utc, upvotes)
-                # Raised threshold to filter low-quality matches for niche brands.
-                # Also require at least 35% word-overlap (relevance component > 0.35*55 = ~19)
-                # so generic finance/industry posts don't bleed through.
-                if score < 45.0:
+                score = _score_thread(
+                    title, body, prompt.text, created_utc, upvotes,
+                    subreddit=subreddit_name,
+                )
+                # Require 55+ to avoid low-relevance posts inflated by recency/engagement
+                if score < 55.0:
                     continue
 
                 posted_dt = (

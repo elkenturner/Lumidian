@@ -78,17 +78,6 @@ export default function TrackerPage() {
       setBrandCards([]);
       setLoading(false);
       setShowModal(true);
-
-      const overviews = await Promise.allSettled(brands.map((b) => getOverview(b.id)));
-      setBrandCards(
-        brands.map((b, i) => ({
-          brand: b,
-          overview:
-            overviews[i].status === 'fulfilled'
-              ? (overviews[i] as PromiseFulfilledResult<OverviewData>).value
-              : null,
-        }))
-      );
     } catch {
       setLoading(false);
     }

@@ -53,10 +53,12 @@ class User(Base):
     google_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True)
     name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     subscription_tier: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 'starter' | 'pro' | None
-    subscription_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 'active' | 'canceled' | None
+    subscription_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 'active' | 'trialing' | 'canceled' | None
+    subscription_trial_end: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # trial end date (UTC, naive)
     stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_paused: Mapped[bool] = mapped_column(Boolean, default=False)  # admin-controlled account pause
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -97,7 +99,7 @@ class Brand(Base):
         default=TierEnum.basic.value,
     )
     website_url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
-    # "standard" | "pitch" — pitch brands expire after 7 days and cap at 10 prompts
+    # "standard" | "pitch" — pitch brands expire after 30 days and cap at 10 prompts
     brand_type: Mapped[str] = mapped_column(String(20), nullable=False, default="standard")
     pitch_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -466,6 +468,7 @@ class ContentGap(Base):
     gap_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     competitor_mentions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON dict {name: count}
     platforms_lacking: Mapped[Optional[str]] = mapped_column(Text, nullable=True)    # JSON array
+    quora_questions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)      # JSON array [{title, url, snippet}]
     prompt_visibility: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     last_content_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     identified_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
@@ -548,4 +551,21 @@ class AnalyticsEvent(Base):
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON blob
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # notification type: "report_ready", "visibility_drop", "draft_ready", "info"
+    type: Mapped[str] = mapped_column(String(50), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # optional link target (e.g. /reports, /content)
+    link: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)

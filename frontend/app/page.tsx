@@ -173,9 +173,10 @@ const FAQ_ITEMS = [
 
 // Pricing comparison data
 const COMPARISON_FEATURES = [
-  { label: 'Brands tracked',           free: '1 pitch deck',  starter: '1 standard',   pro: '5 standard' },
+  { label: 'Standard brands',          free: '0',             starter: '2',            pro: '4' },
+  { label: 'Pitch decks',             free: '1',             starter: '3',            pro: 'Unlimited' },
   { label: 'Prompts per brand',         free: '10',            starter: '25',           pro: '100' },
-  { label: 'Pitch brands',             free: '1',             starter: '2',            pro: '4' },
+  { label: 'Manual runs per day',       free: '1',             starter: '1',            pro: 'Unlimited' },
   { label: 'Pitch duration',           free: '30 days',       starter: '30 days',      pro: '30 days' },
   { label: 'AI models monitored',      free: '4',             starter: '4',            pro: '4' },
   { label: 'Twice-daily tracking',     free: true,            starter: true,           pro: true },
@@ -717,7 +718,7 @@ export default function LandingPage() {
                     Get started
                   </Link>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {['1 pitch brand (10 prompts, 30-day)', 'No credit card required', '4 AI models (ChatGPT, Claude, Perplexity, Gemini)', 'Visibility score & report'].map((f) => (
+                    {['1 pitch deck (10 prompts, 30-day)', 'No credit card required', '4 AI models (ChatGPT, Claude, Perplexity, Gemini)', 'Visibility score & report', '1 manual run per day'].map((f) => (
                       <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                         <Check size={15} color="#10b981" style={{ flexShrink: 0, marginTop: 2 }} />
                         <span style={{ fontSize: 14, color: '#4B5563' }}>{f}</span>
@@ -738,14 +739,17 @@ export default function LandingPage() {
                     <span style={{ fontSize: 48, fontWeight: 800, color: '#0F0F12', letterSpacing: '-0.04em', lineHeight: 1 }}>$300</span>
                     <span style={{ fontSize: 15, color: '#9CA3AF', paddingBottom: 4 }}>/mo</span>
                   </div>
-                  <p style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 28 }}>Billed monthly · 30 days free</p>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(99,102,241,0.10)', border: '1px solid rgba(99,102,241,0.20)', borderRadius: 100, padding: '3px 10px', marginBottom: 6 }}>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#6366F1', letterSpacing: '0.04em' }}>30-DAY FREE TRIAL</span>
+                  </div>
+                  <p style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 28 }}>No charge for 30 days · cancel anytime</p>
                   <Link href="/register" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14, color: '#fff', background: '#4F46E5', border: '1.5px solid #4F46E5', borderRadius: 100, padding: '12px 20px', textDecoration: 'none', marginBottom: 28, transition: 'background 0.15s', boxShadow: '0 2px 12px rgba(79,70,229,0.30)' }}
                     onMouseEnter={(e) => { e.currentTarget.style.background = '#4338CA'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = '#4F46E5'; }}>
                     Start Free Trial
                   </Link>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {['1 standard brand (25 prompts)', '2 pitch brands (10 prompts each, 30-day)', 'Content Hub & gap analysis', 'Brand profile & voice settings', 'Reddit opportunity scanner', 'Email support'].map((f) => (
+                    {['2 standard brands (25 prompts each)', '3 pitch decks (30-day each)', '1 manual run per day', 'Content Hub & gap analysis', 'Brand profile & voice settings', 'Reddit opportunity scanner', 'Email support'].map((f) => (
                       <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                         <Check size={15} color="#6366F1" style={{ flexShrink: 0, marginTop: 2 }} />
                         <span style={{ fontSize: 14, color: '#4B5563' }}>{f}</span>
@@ -766,14 +770,14 @@ export default function LandingPage() {
                     <span style={{ fontSize: 48, fontWeight: 800, color: '#0F0F12', letterSpacing: '-0.04em', lineHeight: 1 }}>$500</span>
                     <span style={{ fontSize: 15, color: '#9CA3AF', paddingBottom: 4 }}>/mo</span>
                   </div>
-                  <p style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 28 }}>Billed monthly · 30 days free</p>
+                  <p style={{ fontSize: 13, color: '#9CA3AF', marginBottom: 28 }}>No charge for 30 days · cancel anytime</p>
                   <Link href="/register" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14, color: '#fff', background: '#10B981', border: '1.5px solid #10B981', borderRadius: 100, padding: '12px 20px', textDecoration: 'none', marginBottom: 28, transition: 'background 0.15s' }}
                     onMouseEnter={(e) => { e.currentTarget.style.background = '#059669'; }}
                     onMouseLeave={(e) => { e.currentTarget.style.background = '#10B981'; }}>
                     Start Free Trial
                   </Link>
                   <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-                    {['5 standard brands (100 prompts each)', '4 pitch brands (10 prompts each, 30-day)', 'Content Hub & gap analysis', 'Brand profile & voice settings', 'Priority support'].map((f) => (
+                    {['4 standard brands (100 prompts each)', 'Unlimited pitch decks', 'Unlimited manual runs', 'Content Hub & gap analysis', 'Brand profile & voice settings', 'Priority support'].map((f) => (
                       <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
                         <Check size={15} color="#10B981" style={{ flexShrink: 0, marginTop: 2 }} />
                         <span style={{ fontSize: 14, color: '#4B5563' }}>{f}</span>

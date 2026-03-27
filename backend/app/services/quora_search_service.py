@@ -1,11 +1,10 @@
 """
-Quora question search — uses Google Custom Search Engine to find real Quora questions.
+Quora question search — uses Serper.dev to find real Quora questions.
 
-Environment variables required:
-  GOOGLE_CSE_API_KEY — Google API key with Custom Search API enabled
-  GOOGLE_CSE_ID      — Custom Search Engine ID (cx parameter)
+Environment variable required:
+  SERPER_API_KEY — API key from https://serper.dev (2,500 free searches/month)
 
-If either is not set, search_quora_questions() returns [] and logs a warning.
+If not set, search_quora_questions() returns [] and logs a warning.
 Results are cached in-process for 24 hours per cache key to preserve quota.
 """
 from __future__ import annotations
@@ -45,6 +44,8 @@ _QUESTION_PATTERNS = (
 _cache: dict[int, tuple[float, list[dict]]] = {}  # key → (expires_at, results)
 _CACHE_TTL = 86_400.0  # 24 hours
 
+_SERPER_URL = "https://google.serper.dev/search"
+
 
 # ── Public API ─────────────────────────────────────────────────────────────────
 
@@ -64,7 +65,7 @@ def search_quora_questions(
     cache_key: Optional[int] = None,
 ) -> list[dict]:
     """
-    Search for real Quora question pages matching *query* via Google CSE.
+    Search for real Quora question pages matching *query* via Serper.dev.
 
     Returns a list of dicts: {title, url, snippet}
     Returns [] gracefully on missing credentials, API errors, or no matches.
@@ -76,26 +77,23 @@ def search_quora_questions(
             logger.debug("quora_search: cache hit for key=%s", cache_key)
             return entry[1]
 
-    api_key = os.getenv('GOOGLE_CSE_API_KEY', '').strip()
-    cse_id = os.getenv('GOOGLE_CSE_ID', '').strip()
-
-    if not api_key or not cse_id:
+    api_key = os.getenv('SERPER_API_KEY', '').strip()
+    if not api_key:
         logger.warning(
-            "quora_search: GOOGLE_CSE_API_KEY or GOOGLE_CSE_ID not configured — "
+            "quora_search: SERPER_API_KEY not configured — "
             "Quora question finder disabled, returning empty list"
         )
         return []
 
     try:
         with httpx.Client(timeout=8.0) as client:
-            resp = client.get(
-                'https://www.googleapis.com/customsearch/v1',
-                params={
-                    'key': api_key,
-                    'cx': cse_id,
-                    'q': f"{query} site:quora.com",
-                    'num': 10,
+            resp = client.post(
+                _SERPER_URL,
+                headers={
+                    "X-API-KEY": api_key,
+                    "Content-Type": "application/json",
                 },
+                json={"q": f"site:quora.com {query}", "num": 10},
             )
             resp.raise_for_status()
             data = resp.json()
@@ -105,7 +103,7 @@ def search_quora_questions(
         except Exception:
             error_body = exc.response.text
         logger.error(
-            "quora_search: HTTP %s from Google CSE — full response: %s",
+            "quora_search: HTTP %s from Serper.dev — response: %s",
             exc.response.status_code, error_body,
         )
         return []
@@ -113,7 +111,7 @@ def search_quora_questions(
         logger.error("quora_search: request failed — %s", exc)
         return []
 
-    items = data.get('items', [])
+    items = data.get('organic', [])
     results: list[dict] = []
 
     for item in items:
@@ -135,7 +133,7 @@ def search_quora_questions(
             break
 
     logger.info(
-        "quora_search: %d questions found for query=%r (%d raw CSE results)",
+        "quora_search: %d questions found for query=%r (%d raw Serper results)",
         len(results), query, len(items),
     )
 

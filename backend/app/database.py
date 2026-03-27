@@ -251,6 +251,8 @@ async def run_migrations():
         # Admin user management — pause and trial-end tracking
         "ALTER TABLE users ADD COLUMN is_paused INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE users ADD COLUMN subscription_trial_end DATETIME",
+        # Index for efficient daily manual run count query (used in plan enforcement)
+        "CREATE INDEX IF NOT EXISTS idx_tracking_runs_manual_daily ON tracking_runs(brand_id, run_type, created_at)",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

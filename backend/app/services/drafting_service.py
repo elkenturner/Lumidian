@@ -17,6 +17,7 @@ auto_draft_top_gaps(db, brand_id, max_gaps=3)         -> list[ContentDraft]
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -77,16 +78,17 @@ PLATFORM_SPECS: dict[str, dict] = {
     },
     "quora": {
         "format": "answer",
-        "word_range": (200, 500),
-        "tone": "expert but accessible — the very first sentence delivers the direct answer",
+        "word_range": (250, 550),
+        "tone": "practitioner — direct, specific, written like a knowledgeable person explaining something they've actually done or seen, not a brand spokesperson",
         "rules": [
-            "The FIRST SENTENCE must directly and concretely answer the question — absolutely no preamble, no context-setting, no 'great question'",
-            "Write a standalone expert answer — do NOT write, invent, or reference any question in your response",
-            "Expert but accessible tone — explain clearly without jargon, unless the audience is clearly technical",
-            "Zero corporate language, buzzwords, or marketing-speak — write as an informed human being, not a brand representative",
-            "Expand on the direct answer with context, evidence, or real examples after the opening sentence",
-            "Brand mentions must arise naturally from the answer — not be tacked on",
-            "Focus entirely on delivering value to the reader",
+            "The VERY FIRST SENTENCE must state the direct answer concretely — no 'great question', no setup, no 'it depends'. If the question is 'what tool should I use for X?', sentence 1 names the tool or approach, not background on X.",
+            "Structure: (1) one clear direct-answer sentence, (2) 2–4 short paragraphs with concrete supporting evidence or examples, (3) one practical takeaway sentence at the end",
+            "Write as a practitioner who has solved this problem, not as a brand representative writing copy. No corporate voice, no superlatives, no buzzwords",
+            "Every claim must be specific and concrete — replace vague statements ('it's very effective') with precise ones ('it reduced false-positive alerts by cutting noise from 300 to under 20 per day')",
+            "Vary sentence length: short punchy sentences for key points, longer ones for explanation. Never three sentences in a row of similar length.",
+            "Brand mentions: only include if the brand is a direct, specific answer to the question. If mentioned, do so in a concrete context ('X uses this approach to do Y') — never as a recommendation or pitch",
+            "Do NOT re-state or paraphrase the question anywhere in the answer",
+            "No parenthetical asides, no hedging, no qualifications that undermine the answer",
         ],
         "disclaimer": "Disclose any brand affiliation in your Quora credentials.",
         "posting_tip": "Find a relevant question on Quora and post this as your answer.",
@@ -134,7 +136,7 @@ CONTENT_PLATFORMS = [p for p in ALL_PLATFORMS if p != "reddit_reply"]
 # Per-platform max_tokens for gap drafts (opportunity reply uses its own limit)
 PLATFORM_MAX_TOKENS: dict[str, int] = {
     "reddit": 1200,
-    "quora": 1500,
+    "quora": 1800,
     "medium": 3500,
     "wikipedia": 900,  # handled in separate branch, kept here for reference
 }
@@ -644,7 +646,15 @@ def _build_prompt(
 
     opportunity_section = ""
     if opportunity_context:
-        opportunity_section = f"""
+        if platform == "quora":
+            opportunity_section = f"""
+QUORA QUESTION TO ANSWER:
+{opportunity_context}
+
+Your task: write an answer to this specific Quora question. If existing answers are shown above, study them carefully and write from a DIFFERENT angle — add concrete value that is not already covered. Do not summarise what others said. Go straight to the answer.
+"""
+        else:
+            opportunity_section = f"""
 THREAD/QUESTION TO RESPOND TO:
 {opportunity_context}
 
@@ -888,6 +898,7 @@ async def generate_gap_draft(
     custom_brief: Optional[str] = None,
     quora_question_url: Optional[str] = None,
     quora_question_title: Optional[str] = None,
+    quora_question_snippet: Optional[str] = None,
 ) -> ContentDraft:
     """
     Generate a draft targeting a specific prompt/platform gap.
@@ -1031,18 +1042,65 @@ async def generate_gap_draft(
 
     spec = PLATFORM_SPECS[platform]
 
-    # For Quora targeted drafts, prepend the specific question to the opportunity context
+    # For Quora targeted drafts, build context from the question.
+    # Tier 1 (always available): snippet from Serper search results.
+    # Tier 2 (best-effort):      full page content via Jina Reader.
+    # If both are unavailable, fall back to title + URL only.
     effective_opportunity_context = custom_brief
-    if platform == "quora" and quora_question_title and quora_question_url:
-        question_context = (
-            f"Write a Quora answer to this specific question: "
-            f"{quora_question_title} ({quora_question_url}). "
-            f"The answer should directly address this question while naturally "
-            f"incorporating relevant information about {brand.name}."
-        )
-        effective_opportunity_context = (
-            question_context + (f"\n\n{custom_brief}" if custom_brief else "")
-        )
+    if platform == "quora" and quora_question_url and quora_question_title:
+        # Attempt Jina page fetch for richer context (full question + existing answers)
+        _quora_page_content: Optional[str] = None
+        try:
+            from app.services.jina_service import fetch_website_context
+            _raw = await fetch_website_context(quora_question_url)
+            _blocked_markers = ("verify you are human", "enable javascript", "please wait", "just a moment")
+            _is_blocked = any(m in _raw.lower() for m in _blocked_markers)
+            if len(_raw) > 400 and not _is_blocked:
+                _MAX = 4_000
+                if len(_raw) > _MAX:
+                    # Snap to last sentence boundary before the limit
+                    _cut = _raw[:_MAX]
+                    _boundary = max(_cut.rfind(". "), _cut.rfind(".\n"), _cut.rfind("\n\n"))
+                    _quora_page_content = (_cut[:_boundary + 1] if _boundary > _MAX // 2 else _cut) + "\n[…]"
+                else:
+                    _quora_page_content = _raw
+                logger.info(
+                    "Quora page fetched via Jina for draft: %d chars from %s",
+                    len(_quora_page_content), quora_question_url,
+                )
+        except Exception as _je:
+            logger.debug("Quora Jina fetch skipped (%s): %s", quora_question_url, _je)
+
+        if _quora_page_content:
+            # Best case: full page content with existing answers
+            effective_opportunity_context = (
+                f"QUESTION: {quora_question_title}\n"
+                f"URL: {quora_question_url}\n\n"
+                f"PAGE CONTENT (question details and existing answers — "
+                f"your answer MUST add new value not already covered below):\n"
+                f"{_quora_page_content}"
+                + (f"\n\nADDITIONAL CONTEXT: {custom_brief}" if custom_brief else "")
+            )
+        elif quora_question_snippet:
+            # Reliable fallback: snippet from Serper search (always present if question was found)
+            effective_opportunity_context = (
+                f"QUESTION: {quora_question_title}\n"
+                f"URL: {quora_question_url}\n\n"
+                f"QUESTION CONTEXT (excerpt from the page):\n"
+                f"{quora_question_snippet}\n\n"
+                f"Write a Quora answer that directly addresses this question and naturally "
+                f"incorporates relevant information about {brand.name}."
+                + (f"\n\nADDITIONAL CONTEXT: {custom_brief}" if custom_brief else "")
+            )
+        else:
+            # Minimal fallback: title + URL only
+            effective_opportunity_context = (
+                f"Write a Quora answer to this specific question: "
+                f"{quora_question_title} ({quora_question_url}). "
+                f"The answer should directly address this question while naturally "
+                f"incorporating relevant information about {brand.name}."
+                + (f"\n\n{custom_brief}" if custom_brief else "")
+            )
 
     claude_prompt = _build_prompt(
         brand_name=brand.name,
@@ -1304,6 +1362,7 @@ async def auto_draft_top_gaps(
     # remaining prompt. This ensures e.g. 4 platforms × 5 rounds = 20 evenly
     # spread drafts rather than front-loading the first prompt/platform.
     created: list[ContentDraft] = []
+    last_error: Optional[Exception] = None  # track first hard failure for diagnostics
     n_platforms = len(enabled_platforms)
     prompt_idx = 0
     platform_idx = 0  # absolute index, wraps via modulo
@@ -1312,12 +1371,53 @@ async def auto_draft_top_gaps(
         platform = enabled_platforms[platform_idx % n_platforms]
         prompt = ordered_prompts[prompt_idx]
 
+        # For Quora, resolve a real question first so the draft is targeted
+        quora_url: Optional[str] = None
+        quora_title: Optional[str] = None
+        quora_snippet: Optional[str] = None
+        if platform == "quora":
+            from app.services.quora_search_service import extract_keywords, search_quora_questions
+            # 1. Use questions stored on the gap (already fetched during gap analysis)
+            _gap = best_gap_by_prompt.get(prompt.id)
+            _stored: list[dict] = []
+            if _gap and _gap.quora_questions:
+                try:
+                    _stored = json.loads(_gap.quora_questions)
+                except Exception:
+                    pass
+            if _stored:
+                _q = _stored[0]
+                quora_url = _q.get("url")
+                quora_title = _q.get("title")
+                quora_snippet = _q.get("snippet")
+            else:
+                # 2. Fetch live from Serper (non-fatal — falls back to generic draft)
+                try:
+                    _keywords = extract_keywords(prompt.text)
+                    if _keywords:
+                        _questions = await asyncio.to_thread(
+                            search_quora_questions, _keywords, 3, prompt.id
+                        )
+                        if _questions:
+                            _q = _questions[0]
+                            quora_url = _q.get("url")
+                            quora_title = _q.get("title")
+                            quora_snippet = _q.get("snippet")
+                except Exception as _qe:
+                    logger.debug(
+                        "auto_draft_top_gaps: Quora question lookup skipped for prompt %d: %s",
+                        prompt.id, _qe,
+                    )
+
         try:
             draft = await generate_gap_draft(
                 db=db,
                 brand_id=brand_id,
                 prompt_id=prompt.id,
                 platform=platform,
+                quora_question_url=quora_url,
+                quora_question_title=quora_title,
+                quora_question_snippet=quora_snippet,
             )
             created.append(draft)
         except ValueError as exc:
@@ -1332,7 +1432,9 @@ async def auto_draft_top_gaps(
                 "auto_draft_top_gaps: skipped brand=%d prompt=%d platform=%s: %s",
                 brand_id, prompt.id, platform, exc,
             )
-        except Exception:
+        except Exception as exc:
+            if last_error is None:
+                last_error = exc
             logger.exception(
                 "auto_draft_top_gaps: failed for brand=%d prompt=%d platform=%s",
                 brand_id, prompt.id, platform,
@@ -1346,4 +1448,9 @@ async def auto_draft_top_gaps(
     logger.info(
         "auto_draft_top_gaps: created %d drafts for brand_id=%d", len(created), brand_id,
     )
+
+    # If nothing was created and we have prompts, surface the root cause
+    if not created and ordered_prompts and last_error is not None:
+        raise last_error
+
     return created

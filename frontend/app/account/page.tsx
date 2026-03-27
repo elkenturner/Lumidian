@@ -31,7 +31,7 @@ const PLANS = [
     key: null,
     label: 'Free',
     price: '$0/mo',
-    features: ['1 pitch brand (10 prompts)', 'Pitch expires after 30 days', '4 AI models tracked', 'Visibility scoring'],
+    features: ['1 pitch deck (10 prompts, 30-day)', 'No credit card required', '4 AI models tracked', 'Visibility scoring', '1 manual run per day'],
   },
   {
     key: 'starter',
@@ -39,8 +39,9 @@ const PLANS = [
     price: '$300/mo',
     trial: true,
     features: [
-      '1 standard brand (25 prompts)',
-      '2 pitch brands (10 prompts each, 30-day)',
+      '2 standard brands (25 prompts each)',
+      '3 pitch decks (30-day each)',
+      '1 manual run per day',
       'Content Hub & gap analysis',
       'Brand profile & voice',
       'Email support',
@@ -52,9 +53,9 @@ const PLANS = [
     price: '$500/mo',
     trial: true,
     features: [
-      '5 standard brands (100 prompts each)',
-      '4 pitch brands (10 prompts each, 30-day)',
-      '30-day free trial',
+      '4 standard brands (100 prompts each)',
+      'Unlimited pitch decks',
+      'Unlimited manual runs',
       'Content Hub & gap analysis',
       'Priority support',
     ],
@@ -278,7 +279,7 @@ export default function AccountPage() {
                     </li>
                   ))}
                 </ul>
-                {!isCurrent && plan.key !== null && (
+                {!isCurrent && plan.key !== null && !billing?.is_admin && (
                   <button
                     onClick={() => handleUpgrade(plan.key!)}
                     disabled={!!upgradeLoading}
@@ -307,7 +308,7 @@ export default function AccountPage() {
 
             {!isCanceling && (
               <>
-                <span className="text-[#334155]">·</span>
+                <span className="text-[#475569]">·</span>
                 {showCancelConfirm ? (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-[#64748B]">Cancel at period end?</span>
@@ -364,7 +365,7 @@ export default function AccountPage() {
           </div>
           <div className="px-4 py-10 text-center">
             <p className="text-sm text-[#475569]">No billing history yet</p>
-            <p className="text-xs text-[#334155] mt-1">Invoices will appear here after your first payment</p>
+            <p className="text-xs text-[#475569] mt-1">Invoices will appear here after your first payment</p>
           </div>
         </div>
       </section>

@@ -62,6 +62,7 @@ import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import { formatDistanceToNow, parseISO } from 'date-fns';
+import Link from 'next/link';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -263,7 +264,77 @@ function runQualityChecks(
     ];
   }
 
-  // ── Generic checks (Reddit, Quora, Medium) ─────────────────────────────────
+  // ── Quora-specific checks ──────────────────────────────────────────────────
+  if (platform === 'quora') {
+    const quoraChecks: QualityCheck[] = [];
+
+    // Word count: 250–550 words
+    const inRange = wordCount >= 250 && wordCount <= 550;
+    quoraChecks.push({
+      label: `Length (${wordCount} words)`,
+      passed: inRange ? true : 'warning',
+      detail: !inRange
+        ? wordCount < 250
+          ? 'Too short — aim for at least 250 words for a useful Quora answer'
+          : 'Getting long — consider trimming below 550 words'
+        : undefined,
+    });
+
+    // First sentence must not start with filler
+    const firstSentence = text.trim().split(/[.!?\n]/)[0].toLowerCase().trim();
+    const FILLER_OPENERS = [
+      'great question', 'good question', 'interesting question', 'that\'s a great',
+      'i think', 'i believe', 'well,', 'so,', 'yes,', 'no,',
+      'this is a', 'this is an', 'there are many', 'there are several',
+      'it depends', 'it really depends', 'to answer this',
+    ];
+    const fillerFound = FILLER_OPENERS.find((f) => firstSentence.startsWith(f));
+    quoraChecks.push({
+      label: 'Direct opening sentence',
+      passed: fillerFound ? false : true,
+      detail: fillerFound
+        ? `Starts with filler: "${fillerFound}" — first sentence must state the direct answer`
+        : undefined,
+    });
+
+    // Quora-specific brand mention (soft warning, same threshold as generic but separate label)
+    if (brandName) {
+      const escaped = brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const occurrences = (lower.match(new RegExp(escaped, 'gi')) ?? []).length;
+      quoraChecks.push({
+        label: 'Brand mention',
+        passed: occurrences > 3 ? 'warning' : true,
+        detail: occurrences > 3
+          ? `Mentioned ${occurrences}× — keep it to 1–2 natural mentions`
+          : occurrences === 0 ? undefined : undefined,
+      });
+    }
+
+    // Prohibited phrases + stats (shared checks, still apply)
+    if (profile && profile.what_not_to_say.length > 0) {
+      const found = profile.what_not_to_say
+        .map((p) => p.trim())
+        .filter((p) => p && lower.includes(p.toLowerCase()));
+      quoraChecks.push({
+        label: 'No prohibited phrases',
+        passed: found.length === 0,
+        detail: found.length > 0 ? `Found: "${found[0]}"` : undefined,
+      });
+    }
+    if (profile && profile.key_stats.length > 0) {
+      const textNums = text.match(/\d+(?:[.,]\d+)?%/g) ?? [];
+      const unapproved = textNums.filter((n) => !profile.key_stats.some((s) => s.includes(n)));
+      quoraChecks.push({
+        label: 'Only approved statistics',
+        passed: unapproved.length === 0,
+        detail: unapproved.length > 0 ? `Unverified stat: ${unapproved[0]}` : undefined,
+      });
+    }
+
+    return quoraChecks;
+  }
+
+  // ── Generic checks (Reddit, Medium) ────────────────────────────────────────
   const checks: QualityCheck[] = [];
 
   // 1. No prohibited phrases — compare against Brand Profile "What NOT to Say" (case-insensitive)
@@ -471,6 +542,7 @@ function DraftCard({
         prompt_id: draft.prompt_id ?? undefined,
         quora_question_url: question?.url,
         quora_question_title: question?.title,
+        quora_question_snippet: question?.snippet,
       });
       onRegenerated(fresh);
     } catch {
@@ -1132,6 +1204,9 @@ function QuoraQuestionPicker({
           >
             {selected.title}
           </a>
+          {selected.snippet && (
+            <p className="text-[10px] text-[#475569] mt-1 line-clamp-2 leading-relaxed">{selected.snippet}</p>
+          )}
         </div>
         <button
           onClick={() => onSelect(null)}
@@ -1164,9 +1239,16 @@ function QuoraQuestionPicker({
           className="w-full text-left flex items-start gap-2.5 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(99,102,241,0.08)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(99,102,241,0.25)] rounded-lg px-3 py-2.5 transition-colors group"
         >
           <span className="text-[#6366f1] text-xs mt-0.5 flex-shrink-0">Q</span>
-          <span className="text-xs text-[#CBD5E1] group-hover:text-[#F0F4F8] transition-colors line-clamp-2 flex-1">
-            {q.title}
-          </span>
+          <div className="flex-1 min-w-0">
+            <span className="text-xs text-[#CBD5E1] group-hover:text-[#F0F4F8] transition-colors line-clamp-2 block">
+              {q.title}
+            </span>
+            {q.snippet && (
+              <span className="text-[10px] text-[#475569] line-clamp-1 block mt-0.5 leading-relaxed">
+                {q.snippet}
+              </span>
+            )}
+          </div>
           <span className="text-[10px] text-[#475569] group-hover:text-[#6366f1] flex-shrink-0 mt-0.5 transition-colors">
             Select →
           </span>
@@ -1220,6 +1302,7 @@ function RequestDraftModal({
         custom_brief: brief,
         quora_question_url: selectedQuestion?.url,
         quora_question_title: selectedQuestion?.title,
+        quora_question_snippet: selectedQuestion?.snippet,
       });
       onCreated(draft);
       onClose();
@@ -1826,13 +1909,9 @@ export default function ContentHubPage() {
 
   // ── Load data ──────────────────────────────────────────────────────────────
 
-  const loadingRef = useRef(false);
   const loadAbortRef = useRef<AbortController | null>(null);
 
   const loadAll = useCallback(async (brandId: number, signal?: AbortSignal) => {
-    // Prevent concurrent loads — double-clicking nav can trigger 16+ simultaneous requests
-    if (loadingRef.current) return;
-    loadingRef.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -1880,7 +1959,6 @@ export default function ContentHubPage() {
       if (signal?.aborted) return;
       setError('Failed to load content data. Check that the backend is running.');
     } finally {
-      loadingRef.current = false;
       if (!signal?.aborted) setLoading(false);
     }
   }, []);
@@ -1927,7 +2005,11 @@ export default function ContentHubPage() {
 
   async function handleDelete(id: number) {
     await deleteDraft(id);
-    if (selectedBrandId) loadAll(selectedBrandId);
+    setDraftItems((prev) => prev.filter((d) => d.id !== id));
+    setScheduledItems((prev) => prev.filter((d) => d.id !== id));
+    setDraftStatus((prev) =>
+      prev ? { ...prev, draft_count: Math.max(0, prev.draft_count - 1) } : prev
+    );
   }
 
   function handleSaved(updated: ContentDraft) {
@@ -1985,12 +2067,8 @@ export default function ContentHubPage() {
       // Reload drafts — some may have been created before the error
       loadAll(selectedBrandId);
       setActiveTab('drafts');
-      // Only surface the error if it's a genuine API key / config problem
-      const status = e?.response?.status;
-      const detail = e?.response?.data?.detail ?? '';
-      if (status === 400 || detail.toLowerCase().includes('api key')) {
-        alert(detail || 'Draft generation failed. Check that API keys are configured.');
-      }
+      const detail = e?.response?.data?.detail ?? e?.message ?? 'Draft generation failed. Check that API keys are configured.';
+      alert(detail);
     } finally {
       setGenerating(false);
     }
@@ -2063,10 +2141,10 @@ export default function ContentHubPage() {
     return (
       <div className="flex flex-col gap-3">
         {filterBar}
-        <div className="flex items-start gap-2 bg-[#1a1a24] border border-[#2a2a3a] rounded-lg px-3 py-2.5">
+        <div className="flex items-start gap-2 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] rounded-lg px-3 py-2.5">
           <RefreshCw size={12} className="text-[#475569] flex-shrink-0 mt-0.5" />
           <p className="text-xs text-[#475569]">
-            Unreviewed drafts are <span className="text-[#64748b]">automatically replaced</span> each time new drafts are generated. Move anything you want to keep to <span className="text-[#64748b]">Scheduled</span> first.
+            Unreviewed drafts are replaced when new drafts are generated. Move anything you want to keep to <span className="text-[#94A3B8]">Scheduled</span> first.
           </p>
         </div>
         {sorted.map((d) =>
@@ -2241,10 +2319,15 @@ export default function ContentHubPage() {
       if (!selectedBrandId) return;
       const platform = gapPlatforms[gap.id] ?? gap.platforms_lacking[0] ?? 'reddit';
       setGeneratingGapDraft(gap.id);
+      // Auto-select the best Quora question when generating a Quora draft from a gap card
+      const quoraQ = platform === 'quora' ? (gap.quora_questions[0] ?? null) : null;
       try {
         const draft = await generateDraft(selectedBrandId, {
           platform,
           prompt_id: gap.prompt_id,
+          quora_question_url: quoraQ?.url,
+          quora_question_title: quoraQ?.title,
+          quora_question_snippet: quoraQ?.snippet,
         });
         setDraftItems((prev) => [draft, ...prev]);
         setActiveTab('drafts');
@@ -2468,7 +2551,7 @@ export default function ContentHubPage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  if (error && brands.length === 0) {
+  if (error) {
     return (
       <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl">
         <h1 className="text-2xl font-bold text-[#F0F4F8] mb-8">Content Hub</h1>
@@ -2476,8 +2559,15 @@ export default function ContentHubPage() {
           <div className="w-14 h-14 bg-[#7f1d1d]/15 border border-[#991b1b]/25 rounded-2xl flex items-center justify-center mb-4">
             <X size={24} className="text-[#f87171]" />
           </div>
-          <p className="text-base font-medium text-[#F0F4F8] mb-1">Unable to connect</p>
-          <p className="text-sm text-[#64748B]">{error}</p>
+          <p className="text-base font-medium text-[#F0F4F8] mb-1">Unable to load content</p>
+          <p className="text-sm text-[#64748B] mb-4">{error}</p>
+          <button
+            onClick={() => selectedBrandId && loadAll(selectedBrandId)}
+            className="flex items-center gap-1.5 text-xs bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.25)] border border-[rgba(99,102,241,0.25)] text-[#818cf8] rounded-lg px-3 py-1.5 transition-colors"
+          >
+            <RefreshCw size={12} />
+            Try again
+          </button>
         </div>
       </div>
     );
@@ -2555,201 +2645,163 @@ export default function ContentHubPage() {
       {postingGuideOpen && (
         <div className="fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setPostingGuideOpen(false)} />
-          <div className="relative ml-auto w-full sm:max-w-xl h-full bg-[#0d1117] border-l border-[rgba(99,102,241,0.18)] flex flex-col shadow-2xl">
+          <div className="relative ml-auto w-full sm:max-w-lg h-full bg-[#0a0e1a] border-l border-[rgba(99,102,241,0.15)] flex flex-col shadow-2xl">
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-[rgba(255,255,255,0.06)] shrink-0">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(255,255,255,0.06)] shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-[rgba(99,102,241,0.15)] flex items-center justify-center">
-                  <BookOpen size={14} className="text-[#818cf8]" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-[#F0F4F8]">Posting Guide</h2>
-                  <p className="text-[11px] text-[#475569]">How to publish your drafts on each platform</p>
-                </div>
+                <BookOpen size={16} className="text-[#6366f1]" />
+                <h2 className="text-sm font-semibold text-[#F0F4F8]">Posting Guide</h2>
               </div>
-              <button onClick={() => setPostingGuideOpen(false)} aria-label="Close" className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] hover:text-[#94A3B8] hover:bg-[rgba(255,255,255,0.05)] transition-all">
-                <X size={15} />
+              <button onClick={() => setPostingGuideOpen(false)} aria-label="Close" className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] hover:text-[#94A3B8] hover:bg-[rgba(255,255,255,0.06)] transition-all">
+                <X size={14} />
               </button>
             </div>
 
             {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto">
+            <div className="flex-1 overflow-y-auto divide-y divide-[rgba(255,255,255,0.05)]">
 
               {/* Reddit */}
-              <div className="border-b border-[rgba(255,255,255,0.05)]">
-                <div className="px-5 pt-5 pb-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#ff4500]/12 text-[#ff6a33] border border-[#ff4500]/25">Reddit</span>
-                    <span className="text-[11px] text-[#475569]">Discussion posts & comments</span>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">Find the right subreddit</p>
-                      <div className="space-y-1.5">
-                        {[
-                          'Search your industry keywords — r/entrepreneur, r/investing, etc.',
-                          'Target subreddits with 10k+ members and daily activity',
-                          'Read the rules first — many ban self-promotion outright',
-                        ].map((t, i) => (
-                          <div key={i} className="flex items-start gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#374151] mt-1.5 shrink-0" />
-                            <span className="text-xs text-[#64748B] leading-relaxed">{t}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">How to post</p>
-                      <div className="space-y-1.5">
-                        {[
-                          ['Click + Create Post', 'in the subreddit, choose Text'],
-                          ['Write a title', 'that frames a genuine question or insight'],
-                          ['Paste your draft', 'then remove anything that sounds like an ad'],
-                          ['Stay for the first hour', 'reply to every comment'],
-                        ].map(([bold, rest], i) => (
-                          <div key={i} className="flex items-start gap-2.5">
-                            <span className="shrink-0 w-4 h-4 rounded-full bg-[#ff4500]/12 text-[#ff6a33] text-[10px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
-                            <span className="text-xs text-[#64748B] leading-relaxed"><span className="text-[#94A3B8]">{bold}</span> {rest}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="bg-[rgba(255,180,0,0.05)] border border-[rgba(255,180,0,0.12)] rounded-lg px-3 py-2.5">
-                      <p className="text-[11px] text-[#f59e0b] font-medium mb-0.5">Disclosure required</p>
-                      <p className="text-[11px] text-[#64748B]">Add <span className="text-[#94A3B8] italic">"Disclosure: I work at [Brand]."</span> — Reddit rewards honesty and penalizes deception.</p>
-                    </div>
+              <div className="px-6 py-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-8 rounded-full bg-[#ff4500] shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-[#F0F4F8]">Reddit</p>
+                    <p className="text-[11px] text-[#475569]">Discussion posts &amp; replies</p>
                   </div>
                 </div>
+                <div className="space-y-2.5 mb-4">
+                  {[
+                    ['Pick a subreddit', 'Search your niche — r/entrepreneur, r/investing, etc. Target 10k+ member subs with active daily threads. Read the rules before posting; many ban all promotion.'],
+                    ['Write a real title', 'Frame a genuine question or insight, not a product pitch.'],
+                    ['Paste & clean the draft', 'Remove anything that reads like an ad before submitting.'],
+                    ['Engage in the first hour', 'Reply to every comment — early engagement determines ranking.'],
+                  ].map(([label, detail], i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-[#ff4500]/10 border border-[#ff4500]/20 text-[#ff6a33] text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                      <div>
+                        <span className="text-xs font-medium text-[#C4CDD8]">{label}</span>
+                        <span className="text-xs text-[#64748B]"> — </span>
+                        <span className="text-xs text-[#64748B]">{detail}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-[#64748B] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] rounded-lg px-3 py-2">
+                  <span className="text-[#94A3B8] font-medium">Disclosure: </span>Add <span className="italic">"Disclosure: I work at [Brand]"</span> at the end of your post.
+                </p>
               </div>
 
               {/* Quora */}
-              <div className="border-b border-[rgba(255,255,255,0.05)]">
-                <div className="px-5 pt-5 pb-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#b92b27]/12 text-[#e05a56] border border-[#b92b27]/25">Quora</span>
-                    <span className="text-[11px] text-[#475569]">Q&A answers</span>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">Find the right question</p>
-                      <div className="space-y-1.5">
-                        {[
-                          'Search using the exact phrasing of your tracked prompts',
-                          'Target questions with 1k+ views but fewer than 5 answers',
-                          'Follow relevant topics so Quora surfaces more opportunities',
-                        ].map((t, i) => (
-                          <div key={i} className="flex items-start gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#374151] mt-1.5 shrink-0" />
-                            <span className="text-xs text-[#64748B] leading-relaxed">{t}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">Writing your answer</p>
-                      <div className="space-y-1.5">
-                        {[
-                          ['Lead with the answer', "— don't bury the point"],
-                          ['Use short paragraphs', 'and bold headers for scannability'],
-                          ['Mention your brand naturally', 'in context, never as the opening line'],
-                          ['End with a clear takeaway', 'or a single call to action'],
-                        ].map(([bold, rest], i) => (
-                          <div key={i} className="flex items-start gap-2.5">
-                            <span className="shrink-0 w-4 h-4 rounded-full bg-[#b92b27]/12 text-[#e05a56] text-[10px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
-                            <span className="text-xs text-[#64748B] leading-relaxed"><span className="text-[#94A3B8]">{bold}</span> {rest}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="bg-[rgba(255,180,0,0.05)] border border-[rgba(255,180,0,0.12)] rounded-lg px-3 py-2.5">
-                      <p className="text-[11px] text-[#f59e0b] font-medium mb-0.5">Disclosure required</p>
-                      <p className="text-[11px] text-[#64748B]">Add to your profile bio and state in the answer: <span className="text-[#94A3B8] italic">"I&apos;m on the team at [Brand]."</span></p>
-                    </div>
+              <div className="px-6 py-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-8 rounded-full bg-[#b92b27] shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-[#F0F4F8]">Quora</p>
+                    <p className="text-[11px] text-[#475569]">Q&amp;A answers</p>
                   </div>
                 </div>
+                <div className="space-y-2.5 mb-4">
+                  {[
+                    ['Find the right question', 'Search with the exact phrasing of your tracked prompts. Favor questions with 1k+ views and fewer than 5 existing answers.'],
+                    ['Lead with the answer', 'State your main point in the first sentence — don\'t bury the takeaway.'],
+                    ['Use structure', 'Short paragraphs and bold sub-headers make answers scannable and rank better.'],
+                    ['Mention your brand in context', 'Never as the opening line. Weave it in naturally where it adds value.'],
+                  ].map(([label, detail], i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-[#b92b27]/10 border border-[#b92b27]/20 text-[#e05a56] text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                      <div>
+                        <span className="text-xs font-medium text-[#C4CDD8]">{label}</span>
+                        <span className="text-xs text-[#64748B]"> — </span>
+                        <span className="text-xs text-[#64748B]">{detail}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-[#64748B] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] rounded-lg px-3 py-2">
+                  <span className="text-[#94A3B8] font-medium">Disclosure: </span>Add <span className="italic">"I&apos;m on the team at [Brand]"</span> in your Quora bio and in the answer itself.
+                </p>
               </div>
 
               {/* Medium */}
-              <div className="border-b border-[rgba(255,255,255,0.05)]">
-                <div className="px-5 pt-5 pb-4">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[rgba(255,255,255,0.07)] text-[#94A3B8] border border-[rgba(255,255,255,0.10)]">Medium</span>
-                    <span className="text-[11px] text-[#475569]">Long-form articles</span>
-                  </div>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">Publishing steps</p>
-                      <div className="space-y-1.5">
-                        {[
-                          ['Go to medium.com/new-story', 'and paste your draft'],
-                          ['Add a strong title & subtitle', '— these appear in search results'],
-                          ['Insert a header image', '(Unsplash for free photos)'],
-                          ['Add up to 5 specific tags', 'e.g. "Startup", "AI", "Health"'],
-                          ['Publish or submit to a publication', 'for greater reach'],
-                        ].map(([bold, rest], i) => (
-                          <div key={i} className="flex items-start gap-2.5">
-                            <span className="shrink-0 w-4 h-4 rounded-full bg-[rgba(255,255,255,0.06)] text-[#64748B] text-[10px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
-                            <span className="text-xs text-[#64748B] leading-relaxed"><span className="text-[#94A3B8]">{bold}</span> {rest}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="bg-[rgba(255,180,0,0.05)] border border-[rgba(255,180,0,0.12)] rounded-lg px-3 py-2.5">
-                      <p className="text-[11px] text-[#f59e0b] font-medium mb-0.5">Disclosure required</p>
-                      <p className="text-[11px] text-[#64748B]">End with: <span className="text-[#94A3B8] italic">"Disclosure: The author is affiliated with [Brand]."</span></p>
-                    </div>
+              <div className="px-6 py-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-8 rounded-full bg-[#94A3B8] shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-[#F0F4F8]">Medium</p>
+                    <p className="text-[11px] text-[#475569]">Long-form articles</p>
                   </div>
                 </div>
+                <div className="space-y-2.5 mb-4">
+                  {[
+                    ['Open a new story', 'Go to medium.com/new-story and paste your draft.'],
+                    ['Title & subtitle', 'Both appear in search results — make them specific and search-friendly.'],
+                    ['Header image', 'Add a relevant image from Unsplash (free, no attribution needed).'],
+                    ['Tags', 'Add up to 5 specific tags, e.g. "Startup", "AI", "SaaS".'],
+                    ['Publish or pitch a publication', 'Submitting to a publication multiplies your reach significantly.'],
+                  ].map(([label, detail], i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#64748B] text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                      <div>
+                        <span className="text-xs font-medium text-[#C4CDD8]">{label}</span>
+                        <span className="text-xs text-[#64748B]"> — </span>
+                        <span className="text-xs text-[#64748B]">{detail}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[11px] text-[#64748B] bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] rounded-lg px-3 py-2">
+                  <span className="text-[#94A3B8] font-medium">Disclosure: </span>End the article with <span className="italic">"Disclosure: The author is affiliated with [Brand]."</span>
+                </p>
               </div>
 
               {/* Wikipedia */}
-              <div>
-                <div className="px-5 pt-5 pb-6">
-                  <div className="flex items-center gap-2 mb-4">
-                    <span className="px-2 py-0.5 rounded-md text-[11px] font-semibold bg-[#64748b]/12 text-[#94A3B8] border border-[#64748b]/25">Wikipedia</span>
-                    <span className="text-[11px] text-[#475569]">Article edits — handle with care</span>
+              <div className="px-6 py-5 pb-6">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-1 h-8 rounded-full bg-[#64748b] shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-[#F0F4F8]">Wikipedia</p>
+                    <p className="text-[11px] text-[#475569]">Article edits — handle with care</p>
                   </div>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-xs font-medium text-[#94A3B8] uppercase tracking-wide mb-2">COI process (required)</p>
-                      <div className="space-y-1.5">
-                        {[
-                          ['Go to your user talk page', 'and add the {{connected contributor}} template'],
-                          ['Open the article\'s Talk tab', 'and post a note proposing your addition'],
-                          ['Wait for a volunteer editor', 'to review — do not self-publish COI edits'],
-                          ['If declined', 'ask for feedback and revise before re-submitting'],
-                        ].map(([bold, rest], i) => (
-                          <div key={i} className="flex items-start gap-2.5">
-                            <span className="shrink-0 w-4 h-4 rounded-full bg-[#64748b]/15 text-[#94A3B8] text-[10px] font-bold flex items-center justify-center mt-0.5">{i + 1}</span>
-                            <span className="text-xs text-[#64748B] leading-relaxed"><span className="text-[#94A3B8]">{bold}</span> {rest}</span>
-                          </div>
-                        ))}
+                </div>
+                <div className="space-y-2.5 mb-4">
+                  {[
+                    ['Declare your COI', 'On your user talk page, add the {{connected contributor}} template before doing anything else.'],
+                    ['Propose on the Talk page', 'Open the article\'s Talk tab and post your suggested addition with sources. Do not self-publish COI edits directly.'],
+                    ['Wait for review', 'A volunteer editor will review and merge (or decline) your suggestion.'],
+                    ['Iterate if declined', 'Ask for specific feedback, revise, and re-submit. Patience is essential.'],
+                  ].map(([label, detail], i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <span className="shrink-0 mt-0.5 w-5 h-5 rounded-full bg-[#64748b]/12 border border-[#64748b]/25 text-[#94A3B8] text-[10px] font-bold flex items-center justify-center">{i + 1}</span>
+                      <div>
+                        <span className="text-xs font-medium text-[#C4CDD8]">{label}</span>
+                        <span className="text-xs text-[#64748B]"> — </span>
+                        <span className="text-xs text-[#64748B]">{detail}</span>
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-[rgba(16,185,129,0.05)] border border-[rgba(16,185,129,0.15)] rounded-lg px-3 py-2.5">
-                        <p className="text-[11px] text-[#10b981] font-medium mb-1.5">Accepted</p>
-                        <div className="space-y-1">
-                          {['Neutral, factual statements', 'Cited sources', 'Your brand as one of several examples', 'Correcting factual errors'].map((t, i) => (
-                            <div key={i} className="flex items-start gap-1.5">
-                              <span className="text-[#10b981] text-[10px] mt-0.5">✓</span>
-                              <span className="text-[11px] text-[#64748B]">{t}</span>
-                            </div>
-                          ))}
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-[rgba(16,185,129,0.04)] border border-[rgba(16,185,129,0.12)] rounded-lg px-3 py-2.5">
+                    <p className="text-[11px] text-[#10b981] font-semibold mb-2">Editors accept</p>
+                    <div className="space-y-1.5">
+                      {['Neutral, factual statements', 'Cited sources', 'Brand as one of several examples', 'Correcting factual errors'].map((t, i) => (
+                        <div key={i} className="flex items-start gap-1.5">
+                          <span className="text-[#10b981] text-[10px] mt-0.5 shrink-0">✓</span>
+                          <span className="text-[11px] text-[#64748B] leading-snug">{t}</span>
                         </div>
-                      </div>
-                      <div className="bg-[rgba(239,68,68,0.05)] border border-[rgba(239,68,68,0.15)] rounded-lg px-3 py-2.5">
-                        <p className="text-[11px] text-[#ef4444] font-medium mb-1.5">Not accepted</p>
-                        <div className="space-y-1">
-                          {['Promotional language', 'Uncited claims', 'Creating a brand article without notability', 'Removing competitors'].map((t, i) => (
-                            <div key={i} className="flex items-start gap-1.5">
-                              <span className="text-[#ef4444] text-[10px] mt-0.5">✗</span>
-                              <span className="text-[11px] text-[#64748B]">{t}</span>
-                            </div>
-                          ))}
+                      ))}
+                    </div>
+                  </div>
+                  <div className="bg-[rgba(239,68,68,0.04)] border border-[rgba(239,68,68,0.12)] rounded-lg px-3 py-2.5">
+                    <p className="text-[11px] text-[#ef4444] font-semibold mb-2">Editors reject</p>
+                    <div className="space-y-1.5">
+                      {['Promotional language', 'Uncited claims', 'Brand article without notability', 'Removing competitors'].map((t, i) => (
+                        <div key={i} className="flex items-start gap-1.5">
+                          <span className="text-[#ef4444] text-[10px] mt-0.5 shrink-0">✗</span>
+                          <span className="text-[11px] text-[#64748B] leading-snug">{t}</span>
                         </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -2837,10 +2889,10 @@ export default function ContentHubPage() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+                  className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-[3px] -mb-px transition-all ${
                     activeTab === tab.key
-                      ? 'text-[#818CF8] border-[#6366f1] bg-[rgba(255,255,255,0.06)]'
-                      : 'text-[#64748B] border-transparent hover:text-[#94A3B8]'
+                      ? 'text-[#818CF8] border-[#6366f1] bg-[rgba(99,102,241,0.08)]'
+                      : 'text-[#64748B] border-transparent hover:text-[#94A3B8] hover:bg-[rgba(255,255,255,0.03)]'
                   }`}
                 >
                   {tab.label}
@@ -2873,61 +2925,92 @@ export default function ContentHubPage() {
           <div className="w-full md:w-72 shrink-0 flex flex-col gap-4">
             {/* Generate now */}
             <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-              {draftStatus?.draft_queue_full ? (
-                <div className="bg-[#7f1d1d]/15 border border-[#991b1b]/30 rounded-lg px-3 py-2.5 mb-3">
-                  <p className="text-xs text-[#f87171] font-medium leading-relaxed">
-                    Draft queue full ({draftStatus.draft_cap}/{draftStatus.draft_cap}) — approve or dismiss drafts to generate new ones.
-                  </p>
+              {!user?.subscription_tier && !user?.is_admin ? (
+                <div className="flex flex-col items-center text-center gap-3">
+                  <div className="w-10 h-10 bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] rounded-xl flex items-center justify-center">
+                    <Zap size={16} className="text-[#6366f1]/50" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-[#94A3B8]">On-demand drafts</p>
+                    <p className="text-xs text-[#475569] mt-1 leading-relaxed">Available on Starter and Pro plans. Drafts are generated automatically on free.</p>
+                  </div>
+                  <Link
+                    href="/settings/billing"
+                    className="w-full flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[#818cf8] hover:text-[#a5b4fc] rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150"
+                  >
+                    Upgrade to unlock
+                  </Link>
                 </div>
-              ) : null}
-              <button
-                onClick={handleGenerateNow}
-                disabled={generating || !!draftStatus?.draft_queue_full}
-                className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150"
-              >
-                {generating ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" />
-                    Generating…
-                  </>
-                ) : (
-                  <>
-                    <Zap size={14} />
-                    Generate Drafts Now
-                  </>
-                )}
-              </button>
-              <p className="text-xs text-[#475569] mt-2 text-center">
-                Drafts for your top 3 visibility gaps
-              </p>
+              ) : (
+                <>
+                  {draftStatus?.draft_queue_full ? (
+                    <div className="bg-[#7f1d1d]/15 border border-[#991b1b]/30 rounded-lg px-3 py-2.5 mb-3">
+                      <p className="text-xs text-[#f87171] font-medium leading-relaxed">
+                        Draft queue full ({draftStatus.draft_cap}/{draftStatus.draft_cap}) — approve or dismiss drafts to generate new ones.
+                      </p>
+                    </div>
+                  ) : null}
+                  <button
+                    onClick={handleGenerateNow}
+                    disabled={generating || !!draftStatus?.draft_queue_full}
+                    className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150"
+                  >
+                    {generating ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        Generating…
+                      </>
+                    ) : (
+                      <>
+                        <Zap size={14} />
+                        Generate Drafts Now
+                      </>
+                    )}
+                  </button>
+                  <p className="text-xs text-[#475569] mt-2 text-center">
+                    Drafts for your top 3 visibility gaps
+                  </p>
+                </>
+              )}
             </div>
 
             {/* Queue stats */}
             <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-              <div className="space-y-2.5">
+              <div className="space-y-3">
                 {draftStatus ? (
                   <>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-[#64748B]">Drafts</span>
-                      <span className={`text-xs font-semibold ${draftStatus.draft_queue_full ? 'text-[#f87171]' : 'text-[#94A3B8]'}`}>
-                        {draftStatus.draft_count}/{draftStatus.draft_cap}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-[#64748B]">Scheduled</span>
-                      <span className={`text-xs font-semibold ${draftStatus.scheduled_queue_full ? 'text-[#f87171]' : 'text-[#94A3B8]'}`}>
-                        {draftStatus.scheduled_count}/{draftStatus.scheduled_cap}
-                      </span>
-                    </div>
+                    {([
+                      { label: 'Drafts', count: draftStatus.draft_count, cap: draftStatus.draft_cap },
+                      { label: 'Scheduled', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
+                    ] as Array<{ label: string; count: number; cap: number }>).map(({ label, count, cap }) => {
+                      const pct = cap > 0 ? count / cap : 0;
+                      const barColor = pct >= 1 ? '#f87171' : pct >= 0.6 ? '#f59e0b' : '#10b981';
+                      const textColor = pct >= 1 ? '#f87171' : pct >= 0.6 ? '#f59e0b' : '#94A3B8';
+                      return (
+                        <div key={label}>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-[#64748B]">{label}</span>
+                            <span className="text-xs font-semibold tabular-nums" style={{ color: textColor }}>
+                              {count}/{cap}
+                            </span>
+                          </div>
+                          <div className="h-1 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(pct * 100, 100)}%`, backgroundColor: barColor }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </>
                 ) : (
-                  <div className="h-8 bg-[rgba(99,102,241,0.06)] rounded animate-pulse" />
-                )}
-                <div className="border-t border-[rgba(255,255,255,0.06)] pt-2.5 space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#475569]">Generation schedule</span>
-                    <span className="text-xs text-[#475569]">Updated weekly</span>
+                  <div className="space-y-3 animate-pulse">
+                    <div className="h-8 bg-[rgba(99,102,241,0.06)] rounded" />
+                    <div className="h-8 bg-[rgba(99,102,241,0.06)] rounded" />
                   </div>
+                )}
+                <div className="border-t border-[rgba(255,255,255,0.06)] pt-2.5">
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-[#475569]">Reddit scan</span>
                     <span className="text-xs text-[#475569]">
@@ -2940,14 +3023,14 @@ export default function ContentHubPage() {
               </div>
             </div>
 
-            {/* Weekly refresh note */}
+            {/* Queue refresh note */}
             <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
               <p className="text-xs text-[#475569] leading-relaxed">
-                Draft queue refreshes weekly. Approve drafts before they are replaced.
+                Draft queue refreshes on your configured schedule. Approve drafts before they are replaced.
               </p>
               <p className="text-xs text-[#475569] mt-2 leading-relaxed">
                 Configure platforms and frequency in{' '}
-                <span className="text-[#6366f1]">Brand Settings</span>.
+                <Link href="/settings" className="text-[#6366f1] hover:text-[#818cf8] transition-colors">Brand Settings</Link>.
               </p>
             </div>
           </div>
@@ -2971,8 +3054,8 @@ function EmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-10 h-10 bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] rounded-xl flex items-center justify-center mb-3">
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="w-10 h-10 bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] rounded-xl flex items-center justify-center mb-3">
         {icon}
       </div>
       <p className="text-sm font-medium text-[#F0F4F8] mb-1">{title}</p>

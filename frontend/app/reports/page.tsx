@@ -487,18 +487,25 @@ export default function ReportsPage() {
 
             {loading ? (
               <div className="divide-y divide-[rgba(99,102,241,0.10)]">
-                {[1, 2, 3].map(i => (
+                {[1, 2, 3, 4].map(i => (
                   <div key={i} className="px-5 py-5 animate-pulse">
-                    <div className="h-4 bg-[rgba(255,255,255,0.06)] rounded w-3/4 mb-3" />
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="h-4 bg-[rgba(255,255,255,0.06)] rounded flex-1" style={{ width: `${55 + (i * 11) % 30}%` }} />
+                      <div className="h-5 w-10 bg-[rgba(255,255,255,0.06)] rounded flex-shrink-0" />
+                    </div>
                     <div className="flex gap-2">
-                      {[1, 2, 3, 4].map(j => <div key={j} className="h-7 w-28 bg-[rgba(255,255,255,0.06)] rounded-lg" />)}
+                      {[1, 2, 3, 4].map(j => <div key={j} className="h-7 w-24 bg-[rgba(255,255,255,0.06)] rounded-lg" />)}
                     </div>
                   </div>
                 ))}
               </div>
             ) : promptGroups.length === 0 && untrackedPrompts.length === 0 ? (
-              <div className="px-5 py-12 text-center text-[#475569] text-sm">
-                No report data yet. Run a report from the Dashboard to see prompt visibility.
+              <div className="px-5 py-12 text-center">
+                <div className="w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] flex items-center justify-center mx-auto mb-3">
+                  <BarChart2 size={18} className="text-[#475569]" />
+                </div>
+                <p className="text-sm font-medium text-[#94A3B8] mb-1">No report data yet</p>
+                <p className="text-sm text-[#475569]">Run a report from the Dashboard to see prompt visibility.</p>
               </div>
             ) : (
               <div className="divide-y divide-[rgba(99,102,241,0.10)]">
@@ -557,13 +564,13 @@ export default function ReportsPage() {
                             const ms = g.modelStats.get(modelKey);
                             const cfg = getModelCfg(modelKey);
                             const pct = ms && ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : null;
-                            const mentionColor = pct === null ? '#334155' : pct >= 60 ? '#10b981' : pct >= 30 ? '#f59e0b' : '#ef4444';
+                            const mentionColor = pct === null ? '#475569' : pct >= 60 ? '#10b981' : pct >= 30 ? '#f59e0b' : '#ef4444';
                             return (
                               <div
                                 key={modelKey}
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[rgba(99,102,241,0.15)] bg-[rgba(99,102,241,0.06)]"
                               >
-                                <span className="text-xs font-semibold" style={{ color: pct === null ? '#334155' : cfg.text }}>{cfg.label}</span>
+                                <span className="text-xs font-semibold" style={{ color: pct === null ? '#475569' : cfg.text }}>{cfg.label}</span>
                                 <span className="text-[rgba(255,255,255,0.10)]">·</span>
                                 <span className="text-xs font-bold tabular-nums" style={{ color: mentionColor }}>{pct !== null ? `${pct}%` : '—'}</span>
                               </div>

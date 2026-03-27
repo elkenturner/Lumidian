@@ -134,6 +134,11 @@ async def list_drafts(
 @router.post("/{brand_id}/draft", response_model=ContentDraftSchema, status_code=status.HTTP_201_CREATED)
 async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, user: CurrentUser):
     """Generate a new content draft using Claude for the given brand and platform."""
+    if not user.is_admin and not user.subscription_tier:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Content drafting requires a Starter or Pro plan. Upgrade to unlock this feature.",
+        )
     check_rate_limit(user.id, limit=10)  # 10 manual drafts per minute per user
     await get_brand_for_user(brand_id, db, user)
 
@@ -163,6 +168,7 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
             custom_brief=request.custom_brief,
             quora_question_url=request.quora_question_url,
             quora_question_title=request.quora_question_title,
+            quora_question_snippet=request.quora_question_snippet,
         )
     except ValueError as exc:
         raise HTTPException(
@@ -377,6 +383,11 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
     across all enabled platforms. Returns all newly created drafts.
     """
     require_active_subscription(user)
+    if not user.is_admin and not user.subscription_tier:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="On-demand draft generation is available on Starter and Pro plans. Upgrade to unlock this feature.",
+        )
     check_rate_limit(user.id, limit=2)  # 2 bulk generate-now calls per minute per user
     await get_brand_for_user(brand_id, db, user)
     try:
@@ -450,6 +461,11 @@ async def create_gap_draft(brand_id: int, request: CreateDraftRequest, db: DbDep
     Generate a high-quality gap-targeted draft using the Phase 2 drafting engine
     (full BrandProfile context + LLM response analysis).
     """
+    if not user.is_admin and not user.subscription_tier:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Content drafting requires a Starter or Pro plan. Upgrade to unlock this feature.",
+        )
     await get_brand_for_user(brand_id, db, user)
 
     if request.platform not in ALL_DRAFT_PLATFORMS:
@@ -472,6 +488,7 @@ async def create_gap_draft(brand_id: int, request: CreateDraftRequest, db: DbDep
             custom_brief=request.custom_brief,
             quora_question_url=request.quora_question_url,
             quora_question_title=request.quora_question_title,
+            quora_question_snippet=request.quora_question_snippet,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))

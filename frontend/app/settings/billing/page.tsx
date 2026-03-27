@@ -7,8 +7,8 @@ import { getBillingStatus, createCheckoutSession, createPortalSession, cancelSub
 import { useAuth } from '@/contexts/AuthContext';
 
 const TIER_FEATURES: Record<string, string[]> = {
-  starter: ['25 tracked prompts', '1 standard brand', '2 pitch brands (30-day each)', '4 AI models', 'Twice-daily reports', 'Gap analysis', 'Content drafts'],
-  pro: ['100 tracked prompts', '5 standard brands', '4 pitch brands (30-day each)', '4 AI models', 'Twice-daily reports', 'Advanced gap analysis', 'Priority content drafts', 'Priority support'],
+  starter: ['25 tracked prompts per brand', '2 standard brands', '3 pitch decks (30-day each)', '1 manual run per day', '4 AI models', 'Twice-daily reports', 'Gap analysis', 'Content drafts', 'Email support'],
+  pro: ['100 tracked prompts per brand', '4 standard brands', 'Unlimited pitch decks', 'Unlimited manual runs', '4 AI models', 'Twice-daily reports', 'Advanced gap analysis', 'Priority content drafts', 'Priority support'],
 };
 
 export default function BillingPage() {
@@ -23,6 +23,7 @@ export default function BillingPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const successParam = searchParams.get('success');
+  const trialParam = searchParams.get('trial');
 
   useEffect(() => {
     getBillingStatus()
@@ -117,8 +118,19 @@ export default function BillingPage() {
         </div>
       )}
 
+      {/* Trial started banner */}
+      {trialParam === 'true' && (
+        <div className="flex items-start gap-3 bg-[#064e3b]/20 border border-[#065f46]/40 rounded-xl px-4 py-3 mb-6">
+          <CheckCircle2 size={16} className="text-[#10b981] flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-[#10b981] font-medium">Free trial started!</p>
+            <p className="text-xs text-[#34d399]/70 mt-0.5">You won&apos;t be charged for 30 days. Cancel any time before your trial ends to avoid being billed.</p>
+          </div>
+        </div>
+      )}
+
       {/* Success banner */}
-      {successParam === 'true' && (
+      {successParam === 'true' && trialParam !== 'true' && (
         <div className="flex items-center gap-3 bg-[#064e3b]/20 border border-[#065f46]/40 rounded-xl px-4 py-3 mb-6">
           <CheckCircle2 size={16} className="text-[#10b981] flex-shrink-0" />
           <p className="text-sm text-[#10b981] font-medium">Subscription activated! Your plan has been updated.</p>
@@ -170,11 +182,11 @@ export default function BillingPage() {
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-[#64748b]">Prompt limit</p>
                   <p className="text-xs font-semibold text-[#94a3b8]">
-                    {status?.prompt_limit ?? user?.prompt_limit ?? 25} max
+                    {status?.prompt_limit ?? user?.prompt_limit ?? 10} max
                   </p>
                 </div>
                 <p className="text-xs text-[#475569]">
-                  {currentTier === 'starter' ? '25 prompts included' : currentTier === 'pro' ? '100 prompts included' : '25 prompts on free plan — upgrade to Pro for 100'}
+                  {currentTier === 'starter' ? '25 prompts per brand' : currentTier === 'pro' ? '100 prompts per brand' : '10 prompts on free plan — upgrade for more'}
                 </p>
               </div>
             )}

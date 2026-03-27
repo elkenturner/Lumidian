@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Annotated
+from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -37,11 +37,20 @@ TIER_PRICES = {
 TRIAL_TIERS = {"starter", "pro"}
 TRIAL_DAYS = 30
 # Brand limits per tier: {"standard": N, "pitch": M}
+# 999 = effectively unlimited (frontend hides usage bars at >= 999)
 BRAND_LIMITS = {
-    None: {"standard": 1, "pitch": 1},      # free: 1 standard + 1 pitch
-    "": {"standard": 1, "pitch": 1},
-    "starter": {"standard": 1, "pitch": 2},  # 1 standard + 2 pitch
-    "pro": {"standard": 5, "pitch": 4},      # 5 standard + 4 pitch
+    None: {"standard": 0, "pitch": 1},       # free: 1 pitch deck, no standard brands
+    "": {"standard": 0, "pitch": 1},
+    "starter": {"standard": 2, "pitch": 3},  # 2 standard + 3 pitch decks
+    "pro": {"standard": 4, "pitch": 999},    # 4 standard + unlimited pitch decks
+}
+# Manual run limits per tier (per day, UTC). None = unlimited.
+# Only free-plan users (no subscription_tier) are limited to 1 run/day.
+DAILY_RUN_LIMITS: dict = {
+    None: 1,
+    "": 1,
+    "starter": None,
+    "pro": None,
 }
 
 
@@ -61,18 +70,92 @@ def get_stripe():
 
 @router.get("/status")
 async def billing_status(user: Annotated[User, Depends(get_current_user)]):
-    limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier or "", 25)
+    from datetime import datetime, timezone
+    limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier or "", 10)
     brand_limits = BRAND_LIMITS.get(user.subscription_tier or "", BRAND_LIMITS[None])
-    trial_end = user.subscription_trial_end.isoformat() if getattr(user, "subscription_trial_end", None) else None
+    trial_end_dt = getattr(user, "subscription_trial_end", None)
+    trial_end = trial_end_dt.isoformat() if trial_end_dt else None
+    # Days remaining in trial (None when not in trial or no end date stored)
+    days_remaining: Optional[int] = None
+    if user.subscription_status == "trialing" and trial_end_dt:
+        delta = trial_end_dt - datetime.now(timezone.utc).replace(tzinfo=None)
+        days_remaining = max(0, delta.days)
     return {
         "subscription_tier": user.subscription_tier,
         "subscription_status": user.subscription_status,
         "subscription_trial_end": trial_end,
+        "days_remaining": days_remaining,
         "prompt_limit": limit,
         "brand_limits": brand_limits,
         "is_admin": user.is_admin,
         "stripe_customer_id": user.stripe_customer_id,
         "stripe_subscription_id": user.stripe_subscription_id,
+    }
+
+
+# ── Usage ─────────────────────────────────────────────────────────────────────
+
+@router.get("/usage")
+async def billing_usage(user: Annotated[User, Depends(get_current_user)], db: DbDep):
+    """Returns today's manual run count and prompt/brand counts vs tier limits."""
+    from datetime import datetime, timezone
+    from sqlalchemy import select as sa_select, func
+    from app.models import TrackingRun, Brand, Prompt
+
+    tier = user.subscription_tier or ""
+    is_admin = user.is_admin
+
+    # Manual runs today (UTC midnight boundary)
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0, tzinfo=None
+    )
+    runs_today_result = await db.execute(
+        sa_select(func.count(TrackingRun.id)).where(
+            TrackingRun.brand_id.in_(
+                sa_select(Brand.id).where(Brand.user_id == user.id)
+            ),
+            TrackingRun.run_type == "manual",
+            TrackingRun.created_at >= today_start,
+        )
+    )
+    manual_runs_today = runs_today_result.scalar_one()
+
+    manual_run_limit = DAILY_RUN_LIMITS.get(tier, 1) if not is_admin else None
+
+    # Total prompts across all standard brands
+    prompt_count_result = await db.execute(
+        sa_select(func.count(Prompt.id)).where(
+            Prompt.brand_id.in_(
+                sa_select(Brand.id).where(
+                    Brand.user_id == user.id,
+                    Brand.brand_type == "standard",
+                )
+            )
+        )
+    )
+    prompt_count = prompt_count_result.scalar_one()
+
+    # Brand counts by type
+    from sqlalchemy import case
+    brand_counts_result = await db.execute(
+        sa_select(Brand.brand_type, func.count(Brand.id))
+        .where(Brand.user_id == user.id)
+        .group_by(Brand.brand_type)
+    )
+    brand_counts = {row[0]: row[1] for row in brand_counts_result.all()}
+
+    prompt_limit = 999999 if is_admin else TIER_LIMITS.get(tier, 10)
+    brand_limits = BRAND_LIMITS.get(tier, BRAND_LIMITS[None])
+
+    return {
+        "manual_runs_today": manual_runs_today,
+        "manual_run_limit": manual_run_limit,
+        "prompt_count": prompt_count,
+        "prompt_limit": prompt_limit,
+        "standard_brand_count": brand_counts.get("standard", 0),
+        "standard_brand_limit": brand_limits["standard"],
+        "pitch_brand_count": brand_counts.get("pitch", 0),
+        "pitch_brand_limit": brand_limits["pitch"],
     }
 
 
@@ -110,12 +193,18 @@ async def create_checkout(
         user.updated_at = utcnow()
         await db.commit()
 
+    # Append trial=true to the success URL so the frontend can display the right message
+    success_url = request.success_url
+    if request.tier in TRIAL_TIERS:
+        sep = "&" if "?" in success_url else "?"
+        success_url = f"{success_url}{sep}trial=true"
+
     session_kwargs: dict = dict(
         customer=customer_id,
         payment_method_types=["card"],
         line_items=[{"price": price_id, "quantity": 1}],
         mode="subscription",
-        success_url=request.success_url,
+        success_url=success_url,
         cancel_url=request.cancel_url,
         # Always collect payment method upfront — required for trials
         payment_method_collection="always",
@@ -220,7 +309,45 @@ async def stripe_webhook(request: Request, db: DbDep):
     event_type = event.get("type", "")
     data_obj = event.get("data", {}).get("object", {})
 
-    if event_type in ("customer.subscription.created", "customer.subscription.updated"):
+    if event_type == "checkout.session.completed":
+        # Fires immediately when the user finishes checkout.
+        # customer.subscription.created fires around the same time and carries the
+        # precise Stripe trial_end timestamp, so we only fill in trial_end here
+        # if it hasn't been set yet (belt-and-suspenders).
+        customer_id = data_obj.get("customer")
+        sub_id = data_obj.get("subscription")
+        result = await db.execute(
+            sa_select(UserModel).where(UserModel.stripe_customer_id == customer_id)
+        )
+        user = result.scalar_one_or_none()
+        if user:
+            from datetime import datetime, timedelta, timezone
+            changed = False
+            if sub_id and not user.stripe_subscription_id:
+                user.stripe_subscription_id = sub_id
+                changed = True
+            if not user.subscription_trial_end:
+                # Compute trial end as now + TRIAL_DAYS; will be overwritten with
+                # Stripe's precise timestamp when customer.subscription.created arrives.
+                user.subscription_trial_end = (
+                    datetime.now(timezone.utc).replace(tzinfo=None)
+                    + timedelta(days=TRIAL_DAYS)
+                )
+                changed = True
+            if not user.subscription_status:
+                user.subscription_status = "trialing"
+                changed = True
+            if changed:
+                user.updated_at = utcnow()
+                await db.commit()
+            logger.info(
+                "checkout.session.completed for user %s (customer=%s, subscription=%s)",
+                user.email, customer_id, sub_id,
+            )
+            from app.services.analytics_service import log_event
+            await log_event("checkout_completed", {"customer_id": customer_id}, user_id=user.id)
+
+    elif event_type in ("customer.subscription.created", "customer.subscription.updated"):
         customer_id = data_obj.get("customer")
         sub_status = data_obj.get("status")
         sub_id = data_obj.get("id")
@@ -280,6 +407,18 @@ async def stripe_webhook(request: Request, db: DbDep):
                 {"old_plan": old_tier, "customer_id": customer_id},
                 user_id=user.id,
             )
+
+    elif event_type == "customer.subscription.trial_will_end":
+        # Stripe fires this 3 days before trial end
+        customer_id = data_obj.get("customer")
+        result = await db.execute(
+            sa_select(UserModel).where(UserModel.stripe_customer_id == customer_id)
+        )
+        user = result.scalar_one_or_none()
+        if user:
+            logger.info("Trial ending soon for user %s (customer=%s)", user.email, customer_id)
+            from app.services.analytics_service import log_event
+            await log_event("trial_ending_soon", {"customer_id": customer_id}, user_id=user.id)
 
     elif event_type == "invoice.payment_failed":
         # invoice object is at data.object; customer is top-level field

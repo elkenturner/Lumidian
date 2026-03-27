@@ -38,8 +38,31 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 )
 async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDep, user: CurrentUser):
     require_active_subscription(user)
-    check_rate_limit(user.id, limit=3)  # 3 manual runs per minute per user
+    check_rate_limit(user.id, limit=3)  # 3 manual runs per minute per user (burst protection)
     await get_brand_for_user(brand_id, db, user)
+
+    # Enforce daily manual run limit for free-plan users only
+    if not user.is_admin and not user.subscription_tier:
+        from datetime import datetime, timezone
+        from sqlalchemy import func
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
+        )
+        runs_today_result = await db.execute(
+            select(func.count(TrackingRun.id)).where(
+                TrackingRun.brand_id.in_(
+                    select(Brand.id).where(Brand.user_id == user.id)
+                ),
+                TrackingRun.run_type == "manual",
+                TrackingRun.created_at >= today_start,
+            )
+        )
+        runs_today = runs_today_result.scalar_one()
+        if runs_today >= 1:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Free plan includes 1 report run per day. Your limit resets at midnight UTC. Upgrade to Starter or Pro for unlimited runs.",
+            )
 
     # Pre-create the TrackingRun record so we can return its ID immediately.
     tracking_run = TrackingRun(

@@ -82,16 +82,17 @@ COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 TIER_LIMITS = {
     "starter": 25,
     "pro": 100,
-    None: 25,   # free: same prompt limit as starter
-    "": 25,
+    None: 10,   # free: pitch-brand prompt limit (standard brands not allowed on free)
+    "": 10,
 }
 
 # How many brands of each type a user may own
+# Must stay in sync with BRAND_LIMITS in billing.py
 BRAND_TYPE_LIMITS: dict = {
-    None: {"standard": 1, "pitch": 1},      # free: 1 standard + 1 pitch brand
-    "": {"standard": 1, "pitch": 1},
-    "starter": {"standard": 1, "pitch": 2}, # starter: 1 standard + 2 pitch brands
-    "pro": {"standard": 5, "pitch": 4},     # pro: up to 5 standard + 4 pitch brands
+    None: {"standard": 0, "pitch": 1},       # free: 1 pitch deck only, no standard brands
+    "": {"standard": 0, "pitch": 1},
+    "starter": {"standard": 2, "pitch": 3},  # 2 standard + 3 pitch decks
+    "pro": {"standard": 4, "pitch": 999},    # 4 standard + unlimited pitch decks
 }
 
 
@@ -131,7 +132,7 @@ def clear_auth_cookies(response: Response) -> None:
 
 
 def user_to_dict(user: User) -> dict:
-    limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier or "", 25)
+    limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier or "", 10)
     return {
         "id": user.id,
         "email": user.email,

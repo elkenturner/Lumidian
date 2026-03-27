@@ -55,6 +55,7 @@ export default function OnboardingPage() {
       const brand = await createBrand({
         name: brandName.trim(),
         tier: 'basic',
+        brand_type: 'pitch',
         prompts: [],
         website_url: normalisedUrl ?? undefined,
       });
@@ -186,7 +187,7 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div>
             <h2 className="text-xl font-bold text-[#e2e8f0] mb-1">What&apos;s your brand?</h2>
-            <p className="text-sm text-[#64748b] mb-6">Enter the name of the brand you want to track across AI models.</p>
+            <p className="text-sm text-[#64748b] mb-6">We&apos;ll set up a 30-day pitch deck to track how AI models mention your brand. No credit card needed.</p>
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-[#94a3b8] mb-1.5">Brand Name</label>

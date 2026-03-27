@@ -336,6 +336,7 @@ class CreateDraftRequest(BaseModel):
     custom_brief: Optional[str] = None
     quora_question_url: Optional[str] = None
     quora_question_title: Optional[str] = None
+    quora_question_snippet: Optional[str] = None
 
 
 class GenerateNowRequest(BaseModel):

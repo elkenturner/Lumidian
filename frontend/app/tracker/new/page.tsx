@@ -168,7 +168,13 @@ export default function NewBrandPage() {
         brand_type: brandType,
         prompts: prompts.map((p) => p.text),
       });
-      await triggerRun(brand.id);
+      // Trigger initial run — non-fatal if it fails (e.g. daily run limit hit).
+      // The brand was created successfully either way, so always redirect.
+      try {
+        await triggerRun(brand.id);
+      } catch {
+        // Run trigger failed (plan limit, etc.) — dashboard will handle it.
+      }
       router.push(`/dashboard?newBrand=true&brandId=${brand.id}`);
     } catch (e: unknown) {
       const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
@@ -399,7 +405,7 @@ export default function NewBrandPage() {
                 <Tag size={10} className="text-[#f59e0b]" />
                 <span className="text-[#f59e0b] font-medium">Pitch</span> — demo / proposal set
               </span>
-              <span className="text-[#334155]">Click label to toggle</span>
+              <span className="text-[#475569]">Click label to toggle</span>
             </div>
           )}
 

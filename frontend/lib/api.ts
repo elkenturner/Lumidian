@@ -328,6 +328,7 @@ export async function generateDraft(
     custom_brief?: string;
     quora_question_url?: string;
     quora_question_title?: string;
+    quora_question_snippet?: string;
   }
 ): Promise<ContentDraft> {
   const res = await api.post<ContentDraft>(`/content/${brandId}/draft`, data);
@@ -798,6 +799,7 @@ export interface BillingStatus {
   subscription_tier: 'starter' | 'pro' | null;
   subscription_status: string | null;
   subscription_trial_end: string | null;
+  days_remaining: number | null;
   prompt_limit: number;
   brand_limits: { standard: number; pitch: number };
   is_admin: boolean;
@@ -805,8 +807,24 @@ export interface BillingStatus {
   stripe_subscription_id: string | null;
 }
 
+export interface BillingUsage {
+  manual_runs_today: number;
+  manual_run_limit: number | null;  // null = unlimited (Pro / admin)
+  prompt_count: number;
+  prompt_limit: number;
+  standard_brand_count: number;
+  standard_brand_limit: number;
+  pitch_brand_count: number;
+  pitch_brand_limit: number;
+}
+
 export async function getBillingStatus(): Promise<BillingStatus> {
   const res = await api.get<BillingStatus>('/billing/status');
+  return res.data;
+}
+
+export async function getBillingUsage(): Promise<BillingUsage> {
+  const res = await api.get<BillingUsage>('/billing/usage');
   return res.data;
 }
 
@@ -815,10 +833,11 @@ export async function createCheckoutSession(
   successUrl?: string,
   cancelUrl?: string,
 ): Promise<{ checkout_url: string }> {
+  // Backend appends trial=true to the success URL for trial tiers — just pass the base URL
   const res = await api.post<{ checkout_url: string }>('/billing/create-checkout', {
     tier,
-    success_url: successUrl ?? `${window.location.origin}/account?upgraded=true`,
-    cancel_url: cancelUrl ?? `${window.location.origin}/account`,
+    success_url: successUrl ?? `${window.location.origin}/settings/billing?success=true`,
+    cancel_url: cancelUrl ?? `${window.location.origin}/settings/billing`,
   });
   return res.data;
 }
@@ -1014,12 +1033,6 @@ export async function markNotificationRead(id: number): Promise<AppNotification>
 }
 
 // ── Quora question search ──────────────────────────────────────────────────────
-
-export interface QuoraQuestion {
-  title: string;
-  url: string;
-  snippet: string;
-}
 
 export async function getQuoraQuestions(
   brandId: number,

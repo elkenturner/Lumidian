@@ -171,7 +171,7 @@ function NotificationPanel({
       <div className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <Bell size={24} className="text-[#334155]" />
+            <Bell size={24} className="text-[#475569]" />
             <p className="text-sm text-[#475569]">No notifications yet</p>
           </div>
         ) : (
@@ -206,7 +206,7 @@ function NotificationPanel({
                     {n.body && (
                       <p className="text-[11px] text-[#475569] mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
                     )}
-                    <p className="text-[10px] text-[#334155] mt-1">{relTime(n.created_at)}</p>
+                    <p className="text-[10px] text-[#475569] mt-1">{relTime(n.created_at)}</p>
                   </div>
                 </div>
               </div>
@@ -550,16 +550,33 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
           >
             {expanded ? (
               <>
-                <Link
-                  href="/settings"
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors"
-                  style={{ color: '#475569' }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  <CreditCard size={12} className="flex-shrink-0" />
-                  <span className="text-xs whitespace-nowrap">{planLabel} Plan</span>
-                </Link>
+                <div className="flex items-center gap-1.5 px-3 py-1.5">
+                  <CreditCard size={12} className="flex-shrink-0 text-[#475569]" />
+                  <Link
+                    href="/settings/billing"
+                    className="text-xs whitespace-nowrap text-[#475569] hover:text-[#64748b] transition-colors"
+                  >
+                    {planLabel} Plan
+                  </Link>
+                  {user?.subscription_status === 'trialing' && (
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#166534]/30 text-[#4ade80] border border-[#166534]/40 leading-none">
+                      TRIAL
+                    </span>
+                  )}
+                  {(user?.subscription_status === 'past_due' || user?.subscription_status === 'unpaid') && (
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#7f1d1d]/30 text-[#f87171] border border-[#7f1d1d]/40 leading-none">
+                      PAST DUE
+                    </span>
+                  )}
+                  {!user?.is_admin && (!user?.subscription_tier || user.subscription_tier === 'starter') && user?.subscription_status !== 'trialing' && (
+                    <Link
+                      href="/settings/billing"
+                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#6366f1]/20 text-[#818cf8] border border-[#6366f1]/30 hover:bg-[#6366f1]/30 transition-colors leading-none whitespace-nowrap"
+                    >
+                      Upgrade
+                    </Link>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg">
                   <div
@@ -580,7 +597,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="text-[#334155] hover:text-[#64748B] transition-colors flex-shrink-0 p-1 rounded-md"
+                    className="text-[#475569] hover:text-[#94A3B8] transition-colors flex-shrink-0 p-1 rounded-md"
                     aria-label="Sign out"
                     title="Sign out"
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}

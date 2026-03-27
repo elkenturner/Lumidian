@@ -720,10 +720,10 @@ export default function SettingsPage() {
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={clsx(
-              'px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-2 -mb-px transition-colors',
+              'px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-[3px] -mb-px transition-all',
               activeTab === tab
-                ? 'text-[#818CF8] border-[#6366f1] bg-[rgba(255,255,255,0.06)]'
-                : 'text-[#64748B] border-transparent hover:text-[#94A3B8]'
+                ? 'text-[#818CF8] border-[#6366f1] bg-[rgba(99,102,241,0.08)]'
+                : 'text-[#64748B] border-transparent hover:text-[#94A3B8] hover:bg-[rgba(255,255,255,0.03)]'
             )}
           >
             {tab === 'general' ? 'General' : tab === 'profile' ? 'Brand Profile' : 'Team'}
@@ -839,8 +839,10 @@ export default function SettingsPage() {
             </div>
 
             {brand.prompts.length === 0 ? (
-              <div className="text-center py-8 text-[#64748B] text-sm border border-dashed border-[rgba(99,102,241,0.15)] rounded-lg bg-[rgba(255,255,255,0.03)]">
-                No prompts yet. Add one above.
+              <div className="flex flex-col items-center py-8 text-center border border-dashed border-[rgba(99,102,241,0.15)] rounded-lg bg-[rgba(255,255,255,0.03)]">
+                <MessageSquare size={18} className="text-[#475569] mb-2" />
+                <p className="text-sm text-[#475569]">No prompts yet</p>
+                <p className="text-xs text-[#475569] mt-0.5">Add your first prompt above</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-80 overflow-y-auto">
@@ -936,8 +938,10 @@ export default function SettingsPage() {
               </button>
             </div>
             {competitors.length === 0 ? (
-              <div className="text-center py-8 text-[#64748B] text-sm border border-dashed border-[rgba(99,102,241,0.15)] rounded-lg bg-[rgba(255,255,255,0.03)]">
-                No competitors tracked. Add one above.
+              <div className="flex flex-col items-center py-8 text-center border border-dashed border-[rgba(99,102,241,0.15)] rounded-lg bg-[rgba(255,255,255,0.03)]">
+                <Building2 size={18} className="text-[#475569] mb-2" />
+                <p className="text-sm text-[#475569]">No competitors tracked</p>
+                <p className="text-xs text-[#475569] mt-0.5 opacity-60">Add one above to unlock Share of Voice</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -1068,8 +1072,8 @@ export default function SettingsPage() {
 
       {activeTab === 'general' && !brand && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-11 h-11 rounded-xl bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] flex items-center justify-center mb-4">
-            <Building2 size={18} className="text-[#475569]" />
+          <div className="w-12 h-12 rounded-xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] flex items-center justify-center mb-4">
+            <Building2 size={20} className="text-[#6366f1]/50" />
           </div>
           <p className="text-sm font-medium text-[#F0F4F8] mb-1">No brand yet</p>
           <p className="text-xs text-[#64748B] mb-4">Add your first brand to start tracking AI visibility.</p>
@@ -1275,7 +1279,11 @@ export default function SettingsPage() {
             ) : teamLoadError ? (
               <p className="text-sm text-[#f87171]">{teamLoadError}</p>
             ) : teamMembers.length === 0 ? (
-              <p className="text-sm text-[#475569]">No team members yet. Invite someone above.</p>
+              <div className="flex flex-col items-center py-6 text-center">
+                <Users size={18} className="text-[#475569] mb-2" />
+                <p className="text-sm text-[#475569]">No team members yet</p>
+                <p className="text-xs text-[#475569] mt-0.5">Invite someone above to collaborate</p>
+              </div>
             ) : (
               <div className="divide-y divide-[rgba(255,255,255,0.06)]">
                 {teamMembers.map((m) => (

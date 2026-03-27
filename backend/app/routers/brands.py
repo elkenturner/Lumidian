@@ -351,10 +351,9 @@ async def add_prompt(
             )
             total_prompts = count_result.scalar_one()
             if total_prompts >= limit:
-                tier_name = user.subscription_tier or "free"
                 raise HTTPException(
                     status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                    detail=f"Prompt limit reached ({total_prompts}/{limit} for {tier_name} plan). Upgrade to add more prompts.",
+                    detail="Prompt limit reached. Upgrade to Pro for up to 100 prompts.",
                 )
 
     prompt = Prompt(brand_id=brand_id, text=text)

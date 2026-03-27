@@ -37,6 +37,8 @@ import {
   addCompetitor,
   removeCompetitor,
   getBrandProfile,
+  getBillingStatus,
+  getBillingUsage,
   Brand,
   BrandDetail,
   OverviewData,
@@ -49,6 +51,8 @@ import {
   BrandProfile,
   CompetitorStat,
   ModelStat,
+  BillingStatus,
+  BillingUsage,
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
@@ -70,6 +74,28 @@ import { format, parseISO } from 'date-fns';
 
 const parseUTCISO = (s: string) => parseISO(s.endsWith('Z') ? s : s + 'Z');
 
+// ── Usage bar sub-component ────────────────────────────────────────────────────
+function UsageBar({ label, used, limit }: { label: string; used: number; limit: number | null }) {
+  if (limit === null) return null; // unlimited (Pro / admin) — don't render
+  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
+  const color = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#6366f1';
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-[#64748b]">{label}</span>
+        <span className="text-xs font-semibold tabular-nums" style={{ color }}>
+          {used}/{limit}
+        </span>
+      </div>
+      <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+        <div
+          className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: color }}
+        />
+      </div>
+    </div>
+  );
+}
 
 const MODEL_ORDER = ['chatgpt', 'claude', 'perplexity', 'gemini'];
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
@@ -494,7 +520,11 @@ function ManagePromptsModal({
         {/* Current prompts */}
         <div className="flex-1 overflow-y-auto space-y-2 mb-4">
           {localPrompts.length === 0 ? (
-            <p className="text-sm text-[#475569] text-center py-4">No prompts yet</p>
+            <div className="flex flex-col items-center py-6 text-center">
+              <MessageSquare size={18} className="text-[#475569] mb-2" />
+              <p className="text-sm text-[#475569]">No prompts yet</p>
+              <p className="text-xs text-[#475569] mt-0.5">Add your first prompt below</p>
+            </div>
           ) : (
             localPrompts.map((p) => (
               <div key={p.id} className="flex items-start gap-3 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] rounded-lg px-3 py-2.5">
@@ -635,7 +665,11 @@ function CompetitorModal({
 
         <div className="space-y-2 mb-4 min-h-[40px]">
           {local.length === 0 ? (
-            <p className="text-sm text-[#475569] text-center py-3">No competitors added yet</p>
+            <div className="flex flex-col items-center py-5 text-center">
+              <Building2 size={18} className="text-[#475569] mb-2" />
+              <p className="text-sm text-[#475569]">No competitors added yet</p>
+              <p className="text-xs text-[#475569] mt-0.5">Add competitor names below to track share of voice</p>
+            </div>
           ) : local.map((c) => {
             const rate = rateByName.get(c.name.toLowerCase());
             return (
@@ -733,6 +767,12 @@ export default function DashboardPage() {
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [competitorModalOpen, setCompetitorModalOpen] = useState(false);
 
+  // Billing and usage state
+  const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
+  const [usage, setUsage] = useState<BillingUsage | null>(null);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeModalReason, setUpgradeModalReason] = useState('');
+
   // Run state
   const [triggering, setTriggering] = useState(false);
   const [activeRunId, setActiveRunId] = useState<number | null>(null);
@@ -751,6 +791,13 @@ export default function DashboardPage() {
   const loadAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => { document.title = 'Dashboard — ClarityAI'; }, []);
+
+  // Fetch billing status and usage on mount (non-admin only)
+  useEffect(() => {
+    if (!user || user.is_admin) return;
+    getBillingStatus().then(setBillingStatus).catch(() => {});
+    getBillingUsage().then(setUsage).catch(() => {});
+  }, [user]);
 
   // If ?brandId=X is in the URL (new-brand onboarding), override the active brand
   useEffect(() => {
@@ -963,7 +1010,19 @@ export default function DashboardPage() {
     try {
       const result = await triggerRun(selectedBrandId);
       setActiveRunId(result.run_id);
-    } catch { /* ignore */ } finally {
+      // Refresh usage after a successful run
+      getBillingUsage().then(setUsage).catch(() => {});
+    } catch (err: any) {
+      const httpStatus = err?.response?.status;
+      if (httpStatus === 429 || httpStatus === 402) {
+        const detail = err?.response?.data?.detail ?? 'Upgrade your plan to continue.';
+        setUpgradeModalReason(detail);
+        setUpgradeModalOpen(true);
+      } else if (httpStatus === 403) {
+        const detail = err?.response?.data?.detail ?? 'Access denied. Your account may be paused.';
+        setToast({ message: detail, type: 'info' });
+      }
+    } finally {
       setTriggering(false);
     }
   }
@@ -1039,6 +1098,9 @@ export default function DashboardPage() {
     (p) => !trackedPromptIds.has(p.id)
   );
 
+  // Free-plan daily run limit
+  const isAtRunLimit = !user?.is_admin && usage !== null && usage.manual_run_limit !== null && usage.manual_runs_today >= usage.manual_run_limit;
+
   // Quick stats
   const totalPrompts = (brandDetail?.prompts ?? []).length;
   const totalRuns = trends.length;
@@ -1049,10 +1111,59 @@ export default function DashboardPage() {
 
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl">
-      {/* Subscription status banner */}
-      {user?.subscription_status && ['past_due', 'canceled', 'unpaid'].includes(user.subscription_status) && (
+      {/* Subscription status / trial banner */}
+      {user?.subscription_status && ['past_due', 'canceled', 'unpaid', 'trialing'].includes(user.subscription_status) && (
         <div className="-mx-8 -mt-8 mb-6">
-          <SubscriptionBanner status={user.subscription_status} />
+          <SubscriptionBanner
+            status={user.subscription_status}
+            daysRemaining={billingStatus?.days_remaining ?? null}
+            trialEnd={billingStatus?.subscription_trial_end ?? null}
+          />
+        </div>
+      )}
+
+      {/* Usage indicator (non-admin, Starter plan) */}
+      {usage && !user?.is_admin && (usage.manual_run_limit !== null || usage.prompt_limit < 999999) && (
+        <div className="flex items-center gap-4 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] rounded-xl px-4 py-3 mb-6">
+          <UsageBar label="Prompts" used={usage.prompt_count} limit={usage.prompt_limit < 999999 ? usage.prompt_limit : null} />
+          {usage.manual_run_limit !== null && (
+            <>
+              <div className="w-px h-8 bg-[rgba(255,255,255,0.08)] flex-shrink-0" />
+              <UsageBar label="Manual runs today" used={usage.manual_runs_today} limit={usage.manual_run_limit} />
+            </>
+          )}
+          {usage.standard_brand_limit < 999 && (
+            <>
+              <div className="w-px h-8 bg-[rgba(255,255,255,0.08)] flex-shrink-0" />
+              <UsageBar label="Brands" used={usage.standard_brand_count} limit={usage.standard_brand_limit} />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Upgrade modal — shown when a plan limit is hit */}
+      {upgradeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setUpgradeModalOpen(false)} />
+          <div className="relative bg-[#111118] border border-[#2a2a3a] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <Zap size={20} className="text-[#6366f1] mb-3" />
+            <h3 className="text-sm font-semibold text-[#e2e8f0] mb-2">Upgrade your plan</h3>
+            <p className="text-xs text-[#64748b] mb-4">{upgradeModalReason}</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setUpgradeModalOpen(false)}
+                className="flex-1 py-2 text-xs text-[#64748b] border border-[#2a2a3a] rounded-lg hover:text-[#94a3b8] transition-colors"
+              >
+                Dismiss
+              </button>
+              <Link
+                href="/settings/billing"
+                className="flex-1 flex items-center justify-center py-2 text-xs font-semibold bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg transition-colors"
+              >
+                View plans
+              </Link>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1115,27 +1226,50 @@ export default function DashboardPage() {
           <button
             onClick={() => selectedBrandId && loadData(selectedBrandId)}
             aria-label="Refresh dashboard"
-            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-all duration-150"
+            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.15)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-all duration-150"
           >
             <RefreshCw size={14} />
           </button>
-          <button
-            onClick={handleRunReport}
-            disabled={triggering || isRunning || !selectedBrandId}
-            className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150"
-          >
-            {triggering || isRunning ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                {isRunning ? 'Running...' : 'Starting...'}
-              </>
-            ) : (
-              <>
-                <Play size={14} />
-                Run Report Now
-              </>
+          <div className="flex flex-col items-end gap-1">
+            <button
+              onClick={isAtRunLimit ? () => { setUpgradeModalReason("You've used your 1 daily report run. Upgrade to run reports any time."); setUpgradeModalOpen(true); } : handleRunReport}
+              disabled={triggering || isRunning || !selectedBrandId}
+              title={isAtRunLimit ? 'Daily run limit reached — resets at midnight UTC' : undefined}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 ${
+                isAtRunLimit
+                  ? 'bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] text-[#475569] cursor-default'
+                  : 'bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white'
+              }`}
+            >
+              {triggering || isRunning ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  {isRunning ? 'Running...' : 'Starting...'}
+                </>
+              ) : isAtRunLimit ? (
+                <>
+                  <Zap size={14} className="text-[#6366f1]/60" />
+                  1 run / day
+                </>
+              ) : (
+                <>
+                  <Play size={14} />
+                  Run Report Now
+                </>
+              )}
+            </button>
+            {isAtRunLimit && (
+              <p className="text-[11px] text-[#475569]">
+                Resets midnight UTC ·{' '}
+                <button
+                  onClick={() => { setUpgradeModalReason("You've used your 1 daily report run. Upgrade to run reports any time."); setUpgradeModalOpen(true); }}
+                  className="text-[#6366f1] hover:text-[#818cf8] transition-colors"
+                >
+                  Upgrade
+                </button>
+              </p>
             )}
-          </button>
+          </div>
         </div>
       </div>
 
@@ -1543,7 +1677,7 @@ export default function DashboardPage() {
                       return (
                         <div key={conv.id}>
                           <button
-                            className="w-full px-5 py-4 hover:bg-[rgba(255,255,255,0.06)] transition-colors text-left"
+                            className="w-full px-5 py-4 hover:bg-[rgba(99,102,241,0.05)] transition-colors text-left"
                             onClick={() => setExpandedConvId(expandedConvId === conv.id ? null : conv.id)}
                           >
                             <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -1593,9 +1727,13 @@ export default function DashboardPage() {
                     })}
                   </div>
                 ) : (
-                  <p className="text-sm text-[#475569] text-center py-10">
-                    No conversation data yet. Run a report to start tracking.
-                  </p>
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] flex items-center justify-center mb-3">
+                      <MessageSquare size={18} className="text-[#475569]" />
+                    </div>
+                    <p className="text-sm font-medium text-[#94A3B8] mb-1">No conversations yet</p>
+                    <p className="text-xs text-[#64748B]">Run a report to start tracking AI responses.</p>
+                  </div>
                 )}
               </div>
             </>

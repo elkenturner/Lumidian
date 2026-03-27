@@ -101,7 +101,8 @@ export default function TrackerPage() {
     setCreating(true);
     try {
       const brand = await createBrand({ name: formName.trim(), tier: formTier, prompts: formPrompts });
-      await triggerRun(brand.id);
+      // Trigger initial run — non-fatal if it fails (plan limit, etc.)
+      try { await triggerRun(brand.id); } catch { /* dashboard will surface the status */ }
       router.push('/dashboard');
     } catch {
       setError('Failed to create brand. Please try again.');

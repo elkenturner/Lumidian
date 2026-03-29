@@ -37,8 +37,9 @@ export default function BillingPage() {
     try {
       const { checkout_url } = await createCheckoutSession(tier);
       window.location.href = checkout_url;
-    } catch (err: any) {
-      alert(err?.response?.data?.detail || 'Unable to start checkout. Please try again or contact support.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      alert(e?.response?.data?.detail || 'Unable to start checkout. Please try again or contact support.');
     } finally {
       setUpgrading(null);
     }
@@ -49,8 +50,9 @@ export default function BillingPage() {
     try {
       const { portal_url } = await createPortalSession();
       window.location.href = portal_url;
-    } catch (err: any) {
-      alert(err?.response?.data?.detail || 'Unable to open the billing portal. Please try again.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      alert(e?.response?.data?.detail || 'Unable to open the billing portal. Please try again.');
     } finally {
       setPortalLoading(false);
     }
@@ -64,8 +66,9 @@ export default function BillingPage() {
       // Reload billing status to show updated state
       const updated = await getBillingStatus();
       setStatus(updated);
-    } catch (err: any) {
-      alert(err?.response?.data?.detail || 'Unable to cancel subscription. Please try again or contact support.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      alert(e?.response?.data?.detail || 'Unable to cancel subscription. Please try again or contact support.');
     } finally {
       setCancelLoading(false);
     }
@@ -78,14 +81,14 @@ export default function BillingPage() {
     <div className="px-8 py-8 max-w-3xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#e2e8f0]">Billing & Plan</h1>
-        <p className="text-sm text-[#64748b] mt-1">Manage your subscription and prompt limits</p>
+        <p className="text-[13px] text-[#64748b] mt-1.5">Manage your subscription and prompt limits</p>
       </div>
 
       {/* Cancel confirmation modal */}
       {showCancelConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowCancelConfirm(false)} />
-          <div className="relative bg-[#111118] border border-[#2a2a3a] rounded-2xl p-6 max-w-sm w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-[rgba(10,14,24,0.97)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl p-6 max-w-sm w-full shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-sm font-semibold text-[#e2e8f0] mb-2">Cancel subscription?</h3>
             {status?.subscription_status === 'trialing' && status.subscription_trial_end ? (
               <p className="text-xs text-[#64748b] mb-4">
@@ -101,7 +104,7 @@ export default function BillingPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowCancelConfirm(false)}
-                className="flex-1 py-2 text-xs text-[#64748b] hover:text-[#94a3b8] border border-[#2a2a3a] rounded-lg transition-colors"
+                className="flex-1 py-2 text-xs text-[#64748b] hover:text-[#94a3b8] border border-[rgba(99,102,241,0.22)] rounded-lg transition-colors"
               >
                 Keep plan
               </button>
@@ -159,7 +162,7 @@ export default function BillingPage() {
       ) : (
         <>
           {/* Current plan card */}
-          <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6 mb-6">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-xs text-[#64748b] uppercase tracking-wide mb-1">Current Plan</p>
@@ -178,7 +181,7 @@ export default function BillingPage() {
             </div>
 
             {!isAdmin && (
-              <div className="bg-[#0d0d14] rounded-lg px-4 py-3">
+              <div className="bg-[rgba(99,102,241,0.04)] rounded-lg px-4 py-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-[#64748b]">Prompt limit</p>
                   <p className="text-xs font-semibold text-[#94a3b8]">
@@ -251,8 +254,8 @@ export default function BillingPage() {
                 return (
                   <div
                     key={tier}
-                    className={`bg-[#111118] rounded-xl p-6 border-2 transition-colors ${
-                      isCurrent ? 'border-[#6366f1]' : 'border-[#1e1e2e]'
+                    className={`bg-[rgba(99,102,241,0.06)] backdrop-blur-md rounded-xl p-6 border-2 transition-colors ${
+                      isCurrent ? 'border-[#6366f1]' : 'border-[rgba(99,102,241,0.22)]'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-3">
@@ -274,7 +277,7 @@ export default function BillingPage() {
                       ))}
                     </ul>
                     {isCurrent ? (
-                      <button disabled className="w-full bg-[#1a1a24] border border-[#2a2a3a] text-[#475569] rounded-lg py-2 text-sm font-medium">
+                      <button disabled className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[#475569] rounded-lg py-2 text-sm font-medium">
                         Current plan
                       </button>
                     ) : (
@@ -284,7 +287,7 @@ export default function BillingPage() {
                         className={`w-full flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors ${
                           isUpgrade
                             ? 'bg-[#6366f1] hover:bg-[#4f46e5] text-white'
-                            : 'bg-[#1a1a24] hover:bg-[#2a2a3a] border border-[#2a2a3a] text-[#94a3b8]'
+                            : 'bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8]'
                         } disabled:opacity-50`}
                       >
                         {upgrading === tier ? <Loader2 size={13} className="animate-spin" /> : null}

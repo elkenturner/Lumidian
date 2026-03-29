@@ -65,7 +65,7 @@ interface PromptEntry {
 
 export default function NewBrandPage() {
   const router = useRouter();
-  useEffect(() => { document.title = 'Add Brand — ClarityAI'; }, []);
+  useEffect(() => { document.title = 'Add Brand — Lumidian'; }, []);
   const [step, setStep] = useState(0);
 
   // Form data
@@ -220,7 +220,7 @@ export default function NewBrandPage() {
             </span>
           ))}
         </div>
-        <div className="h-1.5 bg-[#1a1a24] rounded-full overflow-hidden">
+        <div className="h-1.5 bg-[rgba(99,102,241,0.12)] rounded-full overflow-hidden">
           <div
             className="h-full bg-gradient-to-r from-[#6366f1] to-[#818cf8] rounded-full transition-all duration-500"
             style={{ width: `${progress}%` }}
@@ -231,7 +231,7 @@ export default function NewBrandPage() {
 
       {/* Step 0: Brand Info */}
       {step === 0 && (
-        <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6 space-y-6">
+        <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 space-y-6">
           <div>
             <h2 className="text-lg font-semibold text-[#e2e8f0] mb-1">Brand Information</h2>
             <p className="text-sm text-[#64748b]">Tell us about the brand you want to track</p>
@@ -249,7 +249,7 @@ export default function NewBrandPage() {
               onKeyDown={(e) => e.key === 'Enter' && goNext()}
               placeholder="e.g. Acme Corp, Notion, Linear..."
               autoFocus
-              className="w-full bg-[#1a1a24] border border-[#1e1e2e] text-[#e2e8f0] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#64748b]"
+              className="w-full bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] text-[#e2e8f0] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#64748b]"
             />
           </div>
 
@@ -263,7 +263,7 @@ export default function NewBrandPage() {
                   'border rounded-xl p-4 text-left transition-all duration-150',
                   brandType === 'standard'
                     ? 'border-[#6366f1] bg-[#6366f1]/8'
-                    : 'border-[#1e1e2e] bg-[#1a1a24] hover:border-[#2a2a3e]'
+                    : 'border-[rgba(99,102,241,0.18)] bg-[rgba(99,102,241,0.04)] hover:border-[rgba(99,102,241,0.35)]'
                 )}
               >
                 <div className="text-xs font-bold px-2 py-1 rounded-md inline-block mb-2 bg-[#6366f1]/20 text-[#818cf8]">
@@ -281,7 +281,7 @@ export default function NewBrandPage() {
                   'border rounded-xl p-4 text-left transition-all duration-150 relative',
                   brandType === 'pitch'
                     ? 'border-[#f59e0b] bg-[#f59e0b]/5'
-                    : 'border-[#1e1e2e] bg-[#1a1a24] hover:border-[#2a2a3e]'
+                    : 'border-[rgba(99,102,241,0.18)] bg-[rgba(99,102,241,0.04)] hover:border-[rgba(99,102,241,0.35)]'
                 )}
               >
                 <span className="absolute -top-2.5 right-3 bg-[#f59e0b] text-[#0a0a0f] text-xs font-bold px-2 py-0.5 rounded-full">
@@ -313,7 +313,7 @@ export default function NewBrandPage() {
                       'relative border rounded-xl p-4 text-left transition-all duration-150',
                       tier === t.value
                         ? `${t.activeBorder} ${t.activeBg}`
-                        : 'border-[#1e1e2e] bg-[#1a1a24] hover:border-[#2a2a3e]'
+                        : 'border-[rgba(99,102,241,0.18)] bg-[rgba(99,102,241,0.04)] hover:border-[rgba(99,102,241,0.35)]'
                     )}
                   >
                     {t.popular && (
@@ -373,7 +373,7 @@ export default function NewBrandPage() {
 
       {/* Step 1: Add Prompts */}
       {step === 1 && (
-        <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6 space-y-5">
+        <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 space-y-5">
           <div>
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-[#e2e8f0] mb-1">Tracking Prompts</h2>
@@ -471,7 +471,7 @@ export default function NewBrandPage() {
                 onKeyDown={(e) => e.key === 'Enter' && canAddMore && addPrompt()}
                 placeholder="What is the best project management tool?"
                 disabled={!canAddMore}
-                className="flex-1 bg-[#1a1a24] border border-[#1e1e2e] text-[#e2e8f0] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#64748b] disabled:opacity-50"
+                className="flex-1 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] text-[#e2e8f0] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#64748b] disabled:opacity-50"
               />
               <button
                 onClick={() => addPrompt()}
@@ -496,7 +496,7 @@ export default function NewBrandPage() {
               </div>
               <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                 {prompts.map((p, i) => (
-                  <div key={i} className="flex items-start gap-3 bg-[#1a1a24] border border-[#1e1e2e] rounded-lg px-4 py-3 group hover:border-[#2a2a3e] transition-colors">
+                  <div key={i} className="flex items-start gap-3 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] rounded-lg px-4 py-3 group hover:border-[rgba(99,102,241,0.35)] transition-colors">
                     <span className="text-xs font-mono text-[#6366f1] flex-shrink-0 mt-0.5 w-5 text-right">{i + 1}.</span>
                     <span className="text-sm text-[#94a3b8] flex-1 leading-relaxed">{p.text}</span>
                     {/* Prompt type toggle */}
@@ -526,7 +526,7 @@ export default function NewBrandPage() {
           )}
 
           {prompts.length === 0 && !loadingSuggestions && suggestions.length === 0 && (
-            <div className="border border-dashed border-[#1e1e2e] rounded-xl py-10 text-center">
+            <div className="border border-dashed border-[rgba(99,102,241,0.22)] rounded-xl py-10 text-center">
               <p className="text-sm text-[#64748b]">No prompts added yet</p>
               <p className="text-xs text-[#4a5568] mt-1">Add prompts above or use AI suggestions</p>
             </div>
@@ -539,7 +539,7 @@ export default function NewBrandPage() {
           )}
 
           <div className="flex justify-between pt-2">
-            <button onClick={goBack} className="flex items-center gap-2 bg-[#1a1a24] hover:bg-[#222232] border border-[#1e1e2e] text-[#94a3b8] rounded-lg px-5 py-2.5 text-sm font-medium transition-colors">
+            <button onClick={goBack} className="flex items-center gap-2 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94a3b8] rounded-lg px-5 py-2.5 text-sm font-medium transition-colors">
               <ArrowLeft size={15} />
               Back
             </button>
@@ -557,13 +557,13 @@ export default function NewBrandPage() {
 
       {/* Step 2: Review */}
       {step === 2 && (
-        <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6 space-y-5">
+        <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 space-y-5">
           <div>
             <h2 className="text-lg font-semibold text-[#e2e8f0] mb-1">Review &amp; Launch</h2>
             <p className="text-sm text-[#64748b]">Confirm your setup before starting the first report</p>
           </div>
 
-          <div className="bg-[#1a1a24] border border-[#1e1e2e] rounded-xl p-5 space-y-4">
+          <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] rounded-xl p-5 space-y-4">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-[#6366f1]/10 border border-[#6366f1]/20 flex items-center justify-center flex-shrink-0">
                 <span className="text-lg font-bold text-[#6366f1]">{name.charAt(0).toUpperCase()}</span>
@@ -591,7 +591,7 @@ export default function NewBrandPage() {
               </div>
             )}
 
-            <div className="h-px bg-[#1e1e2e]" />
+            <div className="h-px bg-[rgba(99,102,241,0.15)]" />
 
             <div>
               <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-2">
@@ -613,12 +613,12 @@ export default function NewBrandPage() {
               </div>
             </div>
 
-            <div className="h-px bg-[#1e1e2e]" />
+            <div className="h-px bg-[rgba(99,102,241,0.15)]" />
 
             <div className="bg-[#6366f1]/5 border border-[#6366f1]/20 rounded-lg p-3">
               <p className="text-xs text-[#94a3b8] leading-relaxed">
                 <span className="text-[#818cf8] font-medium">What happens next: </span>
-                ClarityAI will immediately send your prompts to ChatGPT, Claude, Perplexity, and Gemini,
+                Lumidian will immediately send your prompts to ChatGPT, Claude, Perplexity, and Gemini,
                 checking each response for mentions of <strong className="text-[#e2e8f0]">{name}</strong>. Results will be available in seconds.
               </p>
             </div>
@@ -634,7 +634,7 @@ export default function NewBrandPage() {
             <button
               onClick={goBack}
               disabled={creating}
-              className="flex items-center gap-2 bg-[#1a1a24] hover:bg-[#222232] border border-[#1e1e2e] text-[#94a3b8] rounded-lg px-5 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94a3b8] rounded-lg px-5 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
             >
               <ArrowLeft size={15} />
               Back

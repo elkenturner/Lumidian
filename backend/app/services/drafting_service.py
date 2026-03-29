@@ -739,7 +739,7 @@ async def _call_claude(prompt: str, max_tokens: int = 2500) -> str:
     import anthropic
     client = anthropic.AsyncAnthropic(api_key=api_key)
     response = await client.messages.create(
-        model="claude-haiku-4-5-20251001",
+        model="claude-sonnet-4-6",
         max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -862,6 +862,7 @@ async def _store_draft(
         platform_guidelines_applied=guidelines_applied,
         visibility_score_at_draft=round(visibility_pct, 2),
         estimated_impact=round(estimated_impact, 1),
+        source=source,
     )
     db.add(draft)
     await db.commit()
@@ -899,6 +900,7 @@ async def generate_gap_draft(
     quora_question_url: Optional[str] = None,
     quora_question_title: Optional[str] = None,
     quora_question_snippet: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> ContentDraft:
     """
     Generate a draft targeting a specific prompt/platform gap.
@@ -1001,6 +1003,7 @@ async def generate_gap_draft(
             platform_guidelines_applied=insert_location or section or "",
             visibility_score_at_draft=round(visibility_pct, 2),
             estimated_impact=round(estimated_impact, 1),
+            source=source,
         )
         db.add(draft)
         await db.commit()
@@ -1277,6 +1280,7 @@ async def auto_draft_top_gaps(
     brand_id: int,
     max_gaps: int = 20,
     clear_existing: bool = False,
+    source: Optional[str] = None,
 ) -> list[ContentDraft]:
     """
     Generate up to max_gaps total drafts for a brand across all enabled platforms.
@@ -1418,6 +1422,7 @@ async def auto_draft_top_gaps(
                 quora_question_url=quora_url,
                 quora_question_title=quora_title,
                 quora_question_snippet=quora_snippet,
+                source=source,
             )
             created.append(draft)
         except ValueError as exc:

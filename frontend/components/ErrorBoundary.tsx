@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import OceanLogo from '@/components/OceanLogo';
+import LumidianLogo from '@/components/LumidianLogo';
 
 interface Props {
   children: React.ReactNode;
@@ -79,24 +79,8 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           textAlign: 'center',
         }}>
           {/* Logo */}
-          <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
-            <OceanLogo size={36} withCircle />
-            <span style={{ fontSize: '20px', fontWeight: 700, color: '#e2e8f0', letterSpacing: '-0.02em' }}>
-              ClarityAI
-            </span>
-          </div>
-
-          {/* Error icon */}
-          <div style={{
-            width: '64px', height: '64px',
-            borderRadius: '50%',
-            background: 'rgba(239,68,68,0.12)',
-            border: '1px solid rgba(239,68,68,0.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 24px',
-            fontSize: '28px',
-          }}>
-            ⚠️
+          <div style={{ marginBottom: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <LumidianLogo size={36} withWordmark />
           </div>
 
           <h1 style={{

@@ -18,6 +18,7 @@ import {
   X,
   Trash2,
   Sparkles,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   getBrand,
@@ -25,6 +26,7 @@ import {
   getTrends,
   getDashboardAnalytics,
   getResponses,
+  getDrafts,
   getRecentRuns,
   triggerRun,
   getRunStatus,
@@ -39,7 +41,6 @@ import {
   getBrandProfile,
   getBillingStatus,
   getBillingUsage,
-  Brand,
   BrandDetail,
   OverviewData,
   TrendPoint,
@@ -56,6 +57,9 @@ import {
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import {
@@ -137,7 +141,7 @@ function HelpTooltip({ text }: { text: string }) {
         ?
       </span>
       {open && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[rgba(15,20,40,0.95)] border border-[rgba(99,102,241,0.15)] rounded-lg p-3 text-xs text-[#94A3B8] leading-relaxed shadow-lg z-50 pointer-events-none whitespace-normal">
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[rgba(15,20,40,0.95)] border border-[rgba(99,102,241,0.22)] rounded-lg p-3 text-xs text-[#94A3B8] leading-relaxed shadow-lg z-50 pointer-events-none whitespace-normal">
           {text}
         </span>
       )}
@@ -151,7 +155,7 @@ function SparklineTooltip({ active, payload }: { active?: boolean; payload?: Arr
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="bg-[rgba(15,20,40,0.95)] border border-[rgba(99,102,241,0.15)] rounded-lg p-2 shadow-lg text-xs">
+    <div className="bg-[rgba(15,20,40,0.95)] border border-[rgba(99,102,241,0.22)] rounded-lg p-2 shadow-lg text-xs">
       <p className="text-[#64748B]">{d.formattedDate}</p>
       <p className="text-[#6366f1] font-bold">{Math.round(d.score)}%</p>
     </div>
@@ -391,7 +395,7 @@ function BestPromptCard({ responses, loading, onAddCompetitors }: { responses: Q
   })();
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] flex flex-col">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] flex flex-col">
       <div className="flex items-start justify-between mb-2">
         <p className="text-sm font-medium text-[#94A3B8] flex items-center">
           Best Performing Prompt
@@ -433,7 +437,7 @@ function BestPromptCard({ responses, loading, onAddCompetitors }: { responses: Q
       )}
       <button
         onClick={onAddCompetitors}
-        className="text-[10px] text-[#6366f1] hover:text-[#818cf8] mt-3 pt-2 border-t border-[rgba(99,102,241,0.15)] w-full text-left transition-colors"
+        className="text-[10px] text-[#6366f1] hover:text-[#818cf8] mt-3 pt-2 border-t border-[rgba(99,102,241,0.22)] w-full text-left transition-colors"
       >
         + Add competitors to enable Share of Voice →
       </button>
@@ -460,12 +464,6 @@ function ManagePromptsModal({
   const [suggesting, setSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
 
   async function handleAdd() {
     if (!newText.trim()) return;
@@ -504,18 +502,12 @@ function ManagePromptsModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-lg w-full shadow-2xl max-h-[80vh] flex flex-col">
-        <div className="flex items-center justify-between mb-5 shrink-0">
-          <div>
-            <h3 className="text-base font-semibold text-[#F0F4F8]">Manage Prompts</h3>
-            <p className="text-xs text-[#64748B] mt-0.5">Add or remove the prompts AI models are queried with</p>
-          </div>
-          <button onClick={onClose} aria-label="Close" className="text-[#475569] hover:text-[#94A3B8] transition-colors">
-            <X size={16} />
-          </button>
-        </div>
+    <Dialog open={true} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+        <DialogHeader className="shrink-0">
+          <DialogTitle>Manage Prompts</DialogTitle>
+          <p className="text-xs text-[#64748B] mt-0.5">Add or remove the prompts AI models are queried with</p>
+        </DialogHeader>
 
         {/* Current prompts */}
         <div className="flex-1 overflow-y-auto space-y-2 mb-4">
@@ -546,9 +538,9 @@ function ManagePromptsModal({
         {suggestions.length > 0 && (
           <div className="mb-4 space-y-1.5 shrink-0">
             <p className="text-xs text-[#64748B] font-medium uppercase tracking-wide">Suggested prompts</p>
-            {suggestions.map((s, i) => (
+            {suggestions.map((s) => (
               <button
-                key={i}
+                key={s}
                 onClick={() => { setNewText(s); setSuggestions([]); }}
                 className="w-full text-left text-xs text-[#94A3B8] bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] hover:border-[rgba(99,102,241,0.25)] rounded-lg px-3 py-2 transition-colors"
               >
@@ -587,8 +579,8 @@ function ManagePromptsModal({
             {suggesting ? 'Generating suggestions…' : 'Suggest prompts with AI'}
           </button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -615,12 +607,6 @@ function CompetitorModal({
 
   // Build a map of name -> mention_rate from last run analytics
   const rateByName = new Map(competitorStats.filter((s) => !s.is_primary).map((s) => [s.name.toLowerCase(), s.mention_rate]));
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
 
   async function handleAdd() {
     if (!newName.trim()) return;
@@ -650,18 +636,12 @@ function CompetitorModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative bg-[rgba(10,14,24,0.96)] backdrop-blur-xl border border-[rgba(99,102,241,0.15)] rounded-2xl p-6 max-w-md w-full shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h3 className="text-base font-semibold text-[#F0F4F8]">Competitors</h3>
-            <p className="text-xs text-[#64748B] mt-0.5">Track competitor mentions to unlock Share of Voice</p>
-          </div>
-          <button onClick={onClose} aria-label="Close" className="text-[#475569] hover:text-[#94A3B8] transition-colors">
-            <X size={16} />
-          </button>
-        </div>
+    <Dialog open={true} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Competitors</DialogTitle>
+          <p className="text-xs text-[#64748B] mt-0.5">Track competitor mentions to unlock Share of Voice</p>
+        </DialogHeader>
 
         <div className="space-y-2 mb-4 min-h-[40px]">
           {local.length === 0 ? (
@@ -729,8 +709,8 @@ function CompetitorModal({
         {local.length > 0 && (
           <p className="text-xs text-[#475569] mt-3">Run a new report to see updated Share of Voice data.</p>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -753,6 +733,7 @@ export default function DashboardPage() {
   const [responses, setResponses] = useState<QueryResult[]>([]);
   const [loadingResponses, setLoadingResponses] = useState(false);
   const [brandDetail, setBrandDetail] = useState<BrandDetail | null>(null);
+  const [publishedCount, setPublishedCount] = useState(0);
 
   // Toast
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
@@ -790,7 +771,7 @@ export default function DashboardPage() {
   // AbortController ref to cancel in-flight brand-specific fetches on brand switch
   const loadAbortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => { document.title = 'Dashboard — ClarityAI'; }, []);
+  useEffect(() => { document.title = 'Dashboard — Lumidian'; }, []);
 
   // Fetch billing status and usage on mount (non-admin only)
   useEffect(() => {
@@ -851,6 +832,7 @@ export default function DashboardPage() {
       setCompetitors(Array.isArray(comps) ? comps : []);
       setLoadingAnalytics(false);
       setResponses(Array.isArray(resps) ? resps.filter((r) => r.response_text) : []);
+      getDrafts(brandId, undefined, 'posted').then((d) => setPublishedCount(d.length)).catch(() => {});
     } catch {
       if (signal?.aborted) return;
       setLoadingAnalytics(false);
@@ -1012,14 +994,15 @@ export default function DashboardPage() {
       setActiveRunId(result.run_id);
       // Refresh usage after a successful run
       getBillingUsage().then(setUsage).catch(() => {});
-    } catch (err: any) {
-      const httpStatus = err?.response?.status;
+    } catch (err: unknown) {
+      const e = err as { response?: { status?: number; data?: { detail?: string } } };
+      const httpStatus = e?.response?.status;
       if (httpStatus === 429 || httpStatus === 402) {
-        const detail = err?.response?.data?.detail ?? 'Upgrade your plan to continue.';
+        const detail = e?.response?.data?.detail ?? 'Upgrade your plan to continue.';
         setUpgradeModalReason(detail);
         setUpgradeModalOpen(true);
       } else if (httpStatus === 403) {
-        const detail = err?.response?.data?.detail ?? 'Access denied. Your account may be paused.';
+        const detail = e?.response?.data?.detail ?? 'Access denied. Your account may be paused.';
         setToast({ message: detail, type: 'info' });
       }
     } finally {
@@ -1042,19 +1025,14 @@ export default function DashboardPage() {
     ? sparkData[sparkData.length - 1].score - sparkData[sparkData.length - 2].score
     : null;
 
-  // Next auto-report: scheduled at 08:00 and 20:00 UTC daily, regardless of manual runs
+  // Next auto-report: scheduled once daily at 08:00 UTC
   const nextReportHours: number | null = (() => {
     const now = new Date();
-    let minMs = Infinity;
-    for (const h of [8, 20]) {
-      let next = new Date(Date.UTC(
-        now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), h, 0, 0, 0
-      ));
-      if (next.getTime() <= now.getTime()) next = new Date(next.getTime() + 86400000);
-      const diff = next.getTime() - now.getTime();
-      if (diff < minMs) minMs = diff;
-    }
-    const h = Math.round(minMs / 3600000);
+    let next = new Date(Date.UTC(
+      now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 8, 0, 0, 0
+    ));
+    if (next.getTime() <= now.getTime()) next = new Date(next.getTime() + 86400000);
+    const h = Math.round((next.getTime() - now.getTime()) / 3600000);
     return h > 0 ? h : null;
   })();
 
@@ -1105,6 +1083,23 @@ export default function DashboardPage() {
   const totalPrompts = (brandDetail?.prompts ?? []).length;
   const totalRuns = trends.length;
   const totalResponses = trends.reduce((acc, t) => acc + (t.total_queries ?? 0), 0);
+
+  // Live vs Index sub-scores — derived from analytics.model_breakdown (all-time aggregate)
+  // so they stay consistent with the Performance by Model section.
+  const liveScore = (() => {
+    const mods = (analytics?.model_breakdown ?? []).filter(m => m.model === 'perplexity' || m.model === 'gemini');
+    if (!mods.length) return null;
+    const mentions = mods.reduce((s, m) => s + m.mention_count, 0);
+    const total = mods.reduce((s, m) => s + m.total, 0);
+    return total > 0 ? Math.round(mentions / total * 100) : null;
+  })();
+  const indexScore = (() => {
+    const mods = (analytics?.model_breakdown ?? []).filter(m => m.model === 'chatgpt' || m.model === 'claude');
+    if (!mods.length) return null;
+    const mentions = mods.reduce((s, m) => s + m.mention_count, 0);
+    const total = mods.reduce((s, m) => s + m.total, 0);
+    return total > 0 ? Math.round(mentions / total * 100) : null;
+  })();
   const daysSinceFirst = trends.length > 0 && trends[0].completed_at
     ? Math.max(0, Math.floor((Date.now() - parseUTCISO(trends[0].completed_at).getTime()) / 86_400_000))
     : null;
@@ -1142,30 +1137,33 @@ export default function DashboardPage() {
       )}
 
       {/* Upgrade modal — shown when a plan limit is hit */}
-      {upgradeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setUpgradeModalOpen(false)} />
-          <div className="relative bg-[#111118] border border-[#2a2a3a] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
-            <Zap size={20} className="text-[#6366f1] mb-3" />
-            <h3 className="text-sm font-semibold text-[#e2e8f0] mb-2">Upgrade your plan</h3>
-            <p className="text-xs text-[#64748b] mb-4">{upgradeModalReason}</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setUpgradeModalOpen(false)}
-                className="flex-1 py-2 text-xs text-[#64748b] border border-[#2a2a3a] rounded-lg hover:text-[#94a3b8] transition-colors"
-              >
-                Dismiss
-              </button>
-              <Link
-                href="/settings/billing"
-                className="flex-1 flex items-center justify-center py-2 text-xs font-semibold bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg transition-colors"
-              >
-                View plans
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog open={upgradeModalOpen} onOpenChange={(o) => !o && setUpgradeModalOpen(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <Zap size={20} className="text-[#6366f1] mb-1" />
+            <DialogTitle>Upgrade your plan</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-[#64748b]">{upgradeModalReason}</p>
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setUpgradeModalOpen(false)}
+              className="flex-1"
+            >
+              Dismiss
+            </Button>
+            <Button
+              asChild
+              size="sm"
+              variant="default"
+              className="flex-1"
+            >
+              <Link href="/settings/billing">View plans</Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* New brand onboarding progress banner */}
       {newBrandMode && (
@@ -1212,13 +1210,13 @@ export default function DashboardPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-[#F0F4F8]">
             {selectedBrand ? selectedBrand.name : 'Dashboard'}
           </h1>
-          <p className="text-sm text-[#64748B] mt-1">AI visibility analytics</p>
+          <p className="text-[13px] text-[#64748B] mt-1.5">AI visibility analytics</p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setPromptModalOpen(true)}
             disabled={!selectedBrandId}
-            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.09)] border border-[rgba(99,102,241,0.15)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 text-xs transition-all duration-150"
+            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.09)] border border-[rgba(99,102,241,0.22)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 text-xs transition-all duration-150"
           >
             <MessageSquare size={14} />
             Prompts
@@ -1226,7 +1224,7 @@ export default function DashboardPage() {
           <button
             onClick={() => selectedBrandId && loadData(selectedBrandId)}
             aria-label="Refresh dashboard"
-            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.15)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-all duration-150"
+            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.22)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-all duration-150"
           >
             <RefreshCw size={14} />
           </button>
@@ -1235,10 +1233,10 @@ export default function DashboardPage() {
               onClick={isAtRunLimit ? () => { setUpgradeModalReason("You've used your 1 daily report run. Upgrade to run reports any time."); setUpgradeModalOpen(true); } : handleRunReport}
               disabled={triggering || isRunning || !selectedBrandId}
               title={isAtRunLimit ? 'Daily run limit reached — resets at midnight UTC' : undefined}
-              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 ${
+              className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                 isAtRunLimit
                   ? 'bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] text-[#475569] cursor-default'
-                  : 'bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white'
+                  : 'bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-50 text-white shadow-lg shadow-[#6366f1]/25 hover:shadow-[#6366f1]/40 hover:shadow-xl'
               }`}
             >
               {triggering || isRunning ? (
@@ -1295,7 +1293,7 @@ export default function DashboardPage() {
       {loadingBrands ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1,2,3,4].map(i => (
-            <div key={i} className="h-28 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl animate-pulse" />
+            <div key={i} className="h-28 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl animate-pulse" />
           ))}
         </div>
       ) : brands.length === 0 ? (
@@ -1314,7 +1312,7 @@ export default function DashboardPage() {
               { n: '2', title: 'Auto-run report', body: 'We instantly query ChatGPT, Claude, Perplexity, and Gemini.' },
               { n: '3', title: 'Get content drafts', body: 'AI-generated posts targeting your top visibility gaps.' },
             ].map(({ n, title, body }) => (
-              <div key={n} className="flex-1 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl p-4">
+              <div key={n} className="flex-1 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl p-4">
                 <div className="w-6 h-6 rounded-full bg-[rgba(99,102,241,0.20)] text-[#818cf8] text-xs font-bold flex items-center justify-center mb-2">{n}</div>
                 <p className="text-sm font-semibold text-[#F0F4F8] mb-1">{title}</p>
                 <p className="text-xs text-[#64748B] leading-relaxed">{body}</p>
@@ -1335,7 +1333,7 @@ export default function DashboardPage() {
           <>
               {/* Brand profile completeness nudge */}
               {brandProfile && brandProfile.completion_pct < 100 && (
-                <div className="mb-4 flex items-center gap-4 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl px-5 py-3">
+                <div className="mb-4 flex items-center gap-4 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl px-5 py-3">
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1.5">
                       <p className="text-xs font-medium text-[#94A3B8]">Brand Profile — {brandProfile.completion_pct}% complete</p>
@@ -1351,20 +1349,29 @@ export default function DashboardPage() {
 
               {/* Quick stats row */}
               {!loadingAnalytics && totalRuns > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                  {[
-                    { label: 'Prompts tracked', value: totalPrompts || '—', icon: MessageSquare },
-                    { label: 'Runs completed', value: totalRuns || '—', icon: RefreshCw },
-                    { label: 'Responses analyzed', value: totalResponses >= 1000 ? `${(totalResponses / 1000).toFixed(1)}k` : totalResponses || '—', icon: BarChart2 },
-                    { label: 'Days tracking', value: daysSinceFirst != null ? daysSinceFirst : '—', icon: TrendingUp },
-                  ].map(({ label, value, icon: Icon }) => (
-                    <div key={label} className="bg-[rgba(99,102,241,0.04)] border border-[rgba(99,102,241,0.12)] rounded-xl px-4 py-3 flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-[rgba(99,102,241,0.10)] flex items-center justify-center flex-shrink-0">
-                        <Icon size={14} className="text-[#6366f1]" />
+                <div className="grid grid-cols-3 gap-3 mb-4">
+                  {([
+                    { label: 'Prompts Tracked',   value: totalPrompts || '—',   icon: MessageSquare, accent: '#60a5fa', iconBg: 'rgba(96,165,250,0.12)',  borderTop: '#3b82f6', sub: null, subColor: '' },
+                    { label: 'Days Tracking',     value: daysSinceFirst != null ? daysSinceFirst : '—', icon: TrendingUp, accent: '#fbbf24', iconBg: 'rgba(251,191,36,0.12)', borderTop: '#f59e0b', sub: null, subColor: '' },
+                    { label: 'Content Published', value: publishedCount || '—', icon: CheckCircle2, accent: '#34d399', iconBg: 'rgba(52,211,153,0.12)', borderTop: '#10b981', sub: null, subColor: '' },
+                  ] as Array<{ label: string; value: string | number; icon: React.ElementType; accent: string; iconBg: string; borderTop: string; sub: string | null; subColor: string }>).map(({ label, value, icon: Icon, accent, iconBg, borderTop, sub, subColor }) => (
+                    <div
+                      key={label}
+                      className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] rounded-xl px-4 py-4 flex items-center gap-3"
+                      style={{ borderTopColor: borderTop, borderTopWidth: 2 }}
+                    >
+                      <div
+                        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ background: iconBg, border: `1px solid ${accent}33` }}
+                      >
+                        <Icon size={15} style={{ color: accent }} />
                       </div>
-                      <div>
-                        <p className="text-lg font-bold text-[#F0F4F8] leading-tight">{value}</p>
-                        <p className="text-[11px] text-[#475569] mt-0.5">{label}</p>
+                      <div className="min-w-0">
+                        <p className="text-xl font-bold text-[#F0F4F8] leading-tight tabular-nums">{value}</p>
+                        {sub && (
+                          <p className="text-[10px] font-medium leading-tight mt-0.5" style={{ color: subColor }}>{sub}</p>
+                        )}
+                        <p className="text-[11px] text-[#64748b] mt-0.5 truncate">{label}</p>
                       </div>
                     </div>
                   ))}
@@ -1374,10 +1381,10 @@ export default function DashboardPage() {
               {/* Row 1: visibility + SOV + sentiment */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 {/* Visibility score + sparkline */}
-                <div className="col-span-2 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] border-t-2 border-t-[#6366f1] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="col-span-2 bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.28)] border-t-2 border-t-[#6366f1] rounded-xl p-6 shadow-[0_8px_32px_rgba(0,0,0,0.25),0_0_40px_rgba(99,102,241,0.10),inset_0_1px_0_rgba(255,255,255,0.07)]">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <p className="text-sm font-medium text-[#94A3B8]">Visibility Score</p>
+                      <p className="text-[13px] font-medium text-[#94A3B8] uppercase tracking-wider">Visibility Score</p>
                       {loadingAnalytics ? (
                         <div className="h-14 w-28 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-2" />
                       ) : (
@@ -1407,7 +1414,7 @@ export default function DashboardPage() {
                           </linearGradient>
                         </defs>
                         <Tooltip content={<SparklineTooltip />} />
-                        <Area type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2} fill="url(#sparkGrad)" dot={false} />
+                        <Area type="monotone" dataKey="score" stroke="#6366f1" strokeWidth={2.5} fill="url(#sparkGrad)" dot={false} />
                       </AreaChart>
                     </ResponsiveContainer>
                   ) : (
@@ -1420,13 +1427,50 @@ export default function DashboardPage() {
                       Next report in {nextReportHours}h
                     </p>
                   )}
+
+                  {/* Live / Index sub-score breakdown */}
+                  {!loadingAnalytics && score !== null && (liveScore !== null || indexScore !== null) && (
+                    <div className="mt-3 space-y-2 border-t border-[rgba(255,255,255,0.06)] pt-3">
+                      {([
+                        { label: 'Live Search', s: liveScore,  models: 'Perplexity · Gemini',  color: '#10b981' },
+                        { label: 'AI Index',    s: indexScore, models: 'GPT-4o-mini · Claude', color: '#818cf8' },
+                      ] as Array<{ label: string; s: number | null; models: string; color: string }>).map(({ label, s, models, color }) => (
+                        <div key={label}>
+                          <div className="flex items-center gap-3 mb-0.5">
+                            <div className="flex items-center gap-1.5 w-24 flex-shrink-0">
+                              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
+                              <span className="text-[11px] font-medium text-[#64748B] truncate">{label}</span>
+                            </div>
+                            <div className="flex-1 h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
+                              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${s ?? 0}%`, background: color }} />
+                            </div>
+                            <span className="text-xs font-bold tabular-nums w-9 text-right flex-shrink-0" style={{ color }}>
+                              {s !== null ? `${s}%` : '—'}
+                            </span>
+                          </div>
+                          <p className="text-[9px] text-[#475569] pl-[108px] truncate">{models}</p>
+                        </div>
+                      ))}
+                      {liveScore !== null && indexScore !== null && (
+                        <p className="text-[10px] text-[#64748B] italic pt-0.5">
+                          {liveScore >= 50 && indexScore >= 50
+                            ? 'Strong across live search and AI knowledge.'
+                            : liveScore >= 50 && indexScore < 50
+                              ? 'Trending online — not yet embedded in AI training data.'
+                              : liveScore < 50 && indexScore >= 50
+                                ? 'AI-recognized brand — boost recent content for live visibility.'
+                                : 'Low visibility across channels — more content and coverage needed.'}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Best Performing Prompt — always shown */}
                 <BestPromptCard responses={responses} loading={loadingAnalytics} onAddCompetitors={() => setCompetitorModalOpen(true)} />
 
                 {/* Sentiment */}
-                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
                   <div className="flex items-start justify-between mb-2">
                     <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                       Sentiment
@@ -1463,7 +1507,7 @@ export default function DashboardPage() {
 
               {/* Share of Voice — shown separately when competitors are tracked */}
               {analytics?.sov.has_competitors && (
-                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] mb-4">
+                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] mb-4">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                       Share of Voice
@@ -1524,7 +1568,7 @@ export default function DashboardPage() {
               {/* Row 2: Avg Position + Top Domains */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 {/* Avg Position */}
-                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                       Avg Position
@@ -1559,7 +1603,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Top Domains */}
-                <div className="lg:col-span-2 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] flex flex-col">
+                <div className="lg:col-span-2 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] flex flex-col">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                       Top Cited Domains (across all tracked prompts)
@@ -1583,10 +1627,10 @@ export default function DashboardPage() {
 
               {/* Row 3: Model breakdown */}
               <div className="mb-4">
-                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
                   <div className="flex items-center gap-2 mb-4">
                     <BarChart2 size={15} className="text-[#6366f1]" />
-                    <h3 className="text-sm font-semibold text-[#F0F4F8]">Performance by Model</h3>
+                    <h3 className="text-[15px] font-medium text-[#F0F4F8]">Performance by Model</h3>
                     <HelpTooltip text="How often each AI model mentions your brand when answering relevant prompts." />
                   </div>
                   {loadingAnalytics ? (
@@ -1600,11 +1644,11 @@ export default function DashboardPage() {
               </div>
 
               {/* Recent Conversations */}
-              <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-                <div className="px-5 py-4 border-b border-[rgba(99,102,241,0.15)] flex items-center justify-between bg-[rgba(99,102,241,0.06)]">
+              <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="px-5 py-4 border-b border-[rgba(99,102,241,0.22)] flex items-center justify-between bg-[rgba(99,102,241,0.06)]">
                   <div className="flex items-center gap-2">
                     <MessageSquare size={16} className="text-[#6366f1]" />
-                    <h3 className="text-base font-semibold text-[#F0F4F8]">Recent Conversations</h3>
+                    <h3 className="text-[15px] font-medium text-[#F0F4F8]">Recent Conversations</h3>
                     {analytics && (
                       <span className="text-xs text-[#64748B] bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] px-2 py-0.5 rounded-full">
                         {analytics.total_responses_analyzed.toLocaleString()} analyzed
@@ -1685,21 +1729,12 @@ export default function DashboardPage() {
                                 {conv.prompt_text.length > 80 ? conv.prompt_text.slice(0, 80) + '…' : conv.prompt_text}
                               </span>
                               <div className="flex items-center gap-1.5 flex-shrink-0">
-                                <span
-                                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
-                                  style={{ backgroundColor: mc.bg, color: mc.text }}
-                                >
+                                <Badge style={{ backgroundColor: mc.bg, color: mc.text, borderColor: 'transparent' }}>
                                   {label}
-                                </span>
-                                <span
-                                  className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                                    conv.mentioned
-                                      ? 'bg-[#064e3b]/30 text-[#10b981]'
-                                      : 'bg-[rgba(99,102,241,0.06)] text-[#64748B]'
-                                  }`}
-                                >
+                                </Badge>
+                                <Badge variant={conv.mentioned ? "success" : "secondary"}>
                                   {conv.mentioned ? 'Mentioned' : 'Not mentioned'}
-                                </span>
+                                </Badge>
                                 <ChevronDown
                                   size={12}
                                   className={`text-[#475569] transition-transform ${expandedConvId === conv.id ? 'rotate-180' : ''}`}
@@ -1716,7 +1751,7 @@ export default function DashboardPage() {
                             )}
                           </button>
                           {expandedConvId === conv.id && conv.response_text && (
-                            <div className="px-5 pb-4 pt-3 border-t border-[rgba(99,102,241,0.15)] bg-[rgba(99,102,241,0.06)]">
+                            <div className="px-5 pb-4 pt-3 border-t border-[rgba(99,102,241,0.22)] bg-[rgba(99,102,241,0.06)]">
                               <p className="text-xs text-[#64748B] leading-relaxed whitespace-pre-wrap">
                                 {conv.response_text}
                               </p>
@@ -1728,11 +1763,18 @@ export default function DashboardPage() {
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div className="w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] flex items-center justify-center mb-3">
-                      <MessageSquare size={18} className="text-[#475569]" />
+                    <div
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(124,58,237,0.09))',
+                        border: '1px solid rgba(99,102,241,0.26)',
+                        boxShadow: '0 0 28px rgba(99,102,241,0.10)',
+                      }}
+                    >
+                      <MessageSquare size={24} className="text-[#818cf8]" />
                     </div>
-                    <p className="text-sm font-medium text-[#94A3B8] mb-1">No conversations yet</p>
-                    <p className="text-xs text-[#64748B]">Run a report to start tracking AI responses.</p>
+                    <p className="text-base font-semibold text-[#F0F4F8] mb-1.5">No conversations yet</p>
+                    <p className="text-[13px] text-[#64748B] max-w-xs leading-relaxed">Run a report to start tracking how AI models respond to your prompts.</p>
                   </div>
                 )}
               </div>

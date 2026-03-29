@@ -1,13 +1,12 @@
 """
-APScheduler-based scheduler for ClarityAI.
+APScheduler-based scheduler for Lumidian.
 
 Jobs:
   • 02:00 UTC        — Reddit opportunity scanner (daily) + SQLite backup
-  • 03:00 UTC        — Auto-draft scheduler (daily, respects per-brand frequency settings)
+  • 03:00 UTC Mon    — Auto-draft scheduler (weekly on Monday)
   • 04:00 UTC, day 1 — Monthly website context refresh via Jina Reader
   • 06:00 UTC        — Pitch brand expiry: warn users 24 h before expiry, delete expired brands
-  • 08:00 UTC        — Morning tracking sweep
-  • 20:00 UTC        — Evening tracking sweep
+  • 08:00 UTC        — Morning tracking sweep (once daily)
   • 21:00 UTC        — Visibility drop alerts (email if score drops ≥ 15 pts vs previous run)
 
 Pitch brand lifecycle:
@@ -127,23 +126,22 @@ async def _reddit_scanner_sweep() -> None:
 
 async def _auto_draft_sweep() -> None:
     """
-    Daily auto-draft job (03:00 UTC).
+    Weekly auto-draft job (03:00 UTC, Monday).
     Skipped when the scheduler is paused.
 
-    For each brand, checks whether today is a drafting day based on its
-    platform settings, then calls auto_draft_top_gaps for brands that are due.
+    Generates fresh drafts for every brand that has at least one enabled
+    platform in BrandContentSettings.
     """
     if await _is_scheduler_paused():
         logger.info("Scheduler paused — skipping auto-draft sweep")
         return
 
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timezone
     from app.database import AsyncSessionLocal
-    from app.models import Brand, BrandContentSettings, ContentDraft
-    from app.services.drafting_service import auto_draft_top_gaps
-    from sqlalchemy import select, func
+    from app.models import Brand, BrandContentSettings
+    from sqlalchemy import select
 
-    logger.info("Scheduler: starting auto-draft sweep")
+    logger.info("Scheduler: starting weekly auto-draft sweep")
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Brand))
@@ -161,52 +159,22 @@ async def _auto_draft_sweep() -> None:
 
         try:
             async with AsyncSessionLocal() as db:
-                # Load enabled platform settings
                 settings_result = await db.execute(
                     select(BrandContentSettings).where(
                         BrandContentSettings.brand_id == brand.id,
                         BrandContentSettings.enabled == True,
                     )
                 )
-                settings = list(settings_result.scalars().all())
+                has_enabled = settings_result.scalar_one_or_none() is not None
 
-                if not settings:
-                    continue
+            if not has_enabled:
+                continue
 
-                # Determine if any platform is due for a draft today
-                # based on the most frequent drafting_frequency among enabled platforms
-                freq_priority = {"daily": 1, "every_3_days": 3, "weekly": 7, "manual": 9999}
-                min_days = min(
-                    freq_priority.get(s.drafting_frequency, 9999) for s in settings
-                )
-
-                if min_days >= 9999:
-                    continue  # all manual
-
-                # Find when the last auto-draft was created for this brand
-                last_draft_result = await db.execute(
-                    select(func.max(ContentDraft.created_at)).where(
-                        ContentDraft.brand_id == brand.id,
-                        ContentDraft.content_brief.like("%Gap draft%"),
-                    )
-                )
-                last_draft_at = last_draft_result.scalar_one_or_none()
-
-                if last_draft_at is not None:
-                    now = datetime.now(timezone.utc).replace(tzinfo=None)
-                    days_since = (now - last_draft_at).days
-                    if days_since < min_days:
-                        logger.debug(
-                            "Scheduler: brand %d skipping auto-draft (%d days since last, need %d)",
-                            brand.id, days_since, min_days,
-                        )
-                        continue
-
-                logger.info("Scheduler: auto-drafting for brand %d (%s)", brand.id, brand.name)
-                asyncio.create_task(
-                    _safe_auto_draft(brand.id),
-                    name=f"auto-draft-{brand.id}",
-                )
+            logger.info("Scheduler: auto-drafting for brand %d (%s)", brand.id, brand.name)
+            asyncio.create_task(
+                _safe_auto_draft(brand.id),
+                name=f"auto-draft-{brand.id}",
+            )
         except Exception:
             logger.exception("Scheduler: auto-draft sweep error for brand %d", brand.id)
 
@@ -302,7 +270,7 @@ async def _safe_auto_draft(brand_id: int) -> None:
     try:
         async with AsyncSessionLocal() as db:
             # clear_existing=True: weekly scheduler replaces pending drafts with fresh ones
-            drafts = await auto_draft_top_gaps(db=db, brand_id=brand_id, max_gaps=20, clear_existing=True)
+            drafts = await auto_draft_top_gaps(db=db, brand_id=brand_id, max_gaps=20, clear_existing=True, source="scheduled")
         logger.info(
             "Scheduler: auto-draft created %d drafts for brand_id=%d (weekly refresh)",
             len(drafts), brand_id,
@@ -510,16 +478,6 @@ def start_scheduler() -> None:
     )
 
     scheduler.add_job(
-        _run_all_brands,
-        trigger=CronTrigger(hour=20, minute=0, timezone="UTC"),
-        args=["evening"],
-        id="evening_sweep",
-        name="Evening tracking sweep (20:00 UTC)",
-        replace_existing=True,
-        misfire_grace_time=300,
-    )
-
-    scheduler.add_job(
         _reddit_scanner_sweep,
         trigger=CronTrigger(hour=2, minute=0, timezone="UTC"),
         id="reddit_scanner",
@@ -530,11 +488,11 @@ def start_scheduler() -> None:
 
     scheduler.add_job(
         _auto_draft_sweep,
-        trigger=CronTrigger(hour=3, minute=0, timezone="UTC"),
+        trigger=CronTrigger(day_of_week="mon", hour=3, minute=0, timezone="UTC"),
         id="auto_draft",
-        name="Auto-draft scheduler (03:00 UTC)",
+        name="Auto-draft scheduler (Monday 03:00 UTC)",
         replace_existing=True,
-        misfire_grace_time=600,
+        misfire_grace_time=3600,
     )
 
     scheduler.add_job(

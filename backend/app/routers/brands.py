@@ -203,13 +203,41 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
 
     slug = _slugify(payload.name)
 
-    # Ensure slug uniqueness
+    # Ensure slug uniqueness (global namespace)
     existing = await db.execute(select(Brand).where(Brand.slug == slug))
     if existing.scalar_one_or_none():
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"A brand with slug '{slug}' already exists",
         )
+
+    # Per-user deduplication: prevent the same brand occupying multiple slots
+    # (blocks cycling pitch brands or double-tracking via standard + pitch)
+    dup_name_result = await db.execute(
+        select(func.count(Brand.id)).where(
+            Brand.user_id == user.id,
+            Brand.slug == slug,
+        )
+    )
+    if (dup_name_result.scalar_one() or 0) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Your account is already tracking a brand with this name.",
+        )
+
+    if payload.website_url:
+        norm_url = payload.website_url.rstrip("/").lower()
+        dup_url_result = await db.execute(
+            select(func.count(Brand.id)).where(
+                Brand.user_id == user.id,
+                func.lower(Brand.website_url) == norm_url,
+            )
+        )
+        if (dup_url_result.scalar_one() or 0) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Your account is already tracking a brand at this website.",
+            )
 
     pitch_expires_at = None
     if payload.brand_type == "pitch":

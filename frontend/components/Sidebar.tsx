@@ -13,6 +13,7 @@ import {
   BarChart2,
   Shield,
   Bell,
+  HelpCircle,
   X,
   ExternalLink,
   CheckCheck,
@@ -20,13 +21,16 @@ import {
   Building2,
   Plus,
   Check,
+  Send,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
-import OceanLogo from '@/components/OceanLogo';
+import LumidianLogo from '@/components/LumidianLogo';
+import BrandAvatar from '@/components/BrandAvatar';
 import {
   getNotifications,
   markAllNotificationsRead,
+  submitSupportRequest,
   AppNotification,
 } from '@/lib/api';
 import { formatDistanceToNow, parseISO } from 'date-fns';
@@ -59,30 +63,30 @@ const NavLink = memo(function NavLink({
       aria-label={item.label}
       title={!expanded ? item.label : undefined}
       className={[
-        'flex items-center gap-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 relative overflow-hidden',
-        expanded ? 'px-3' : 'px-0 justify-center',
+        'flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden',
+        expanded ? 'px-3.5' : 'px-0 justify-center',
         isActive
           ? 'text-[#818CF8]'
           : 'text-[#64748B] hover:text-[#94A3B8]',
       ].join(' ')}
       style={isActive ? {
-        background: 'rgba(99,102,241,0.18)',
+        background: 'rgba(99,102,241,0.15)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 0 18px rgba(99,102,241,0.10)',
       } : undefined}
       onMouseEnter={(e) => {
-        if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)';
+        if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
       }}
       onMouseLeave={(e) => {
         if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent';
       }}
     >
       {isActive && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-[#6366F1] rounded-r-full" />
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[18px] rounded-r-full" style={{ background: 'linear-gradient(180deg, #c7d2fe, #6366F1)' }} />
       )}
       <Icon
-        size={16}
+        size={17}
         className={`flex-shrink-0 ${isActive ? 'text-[#818CF8]' : 'text-[#475569]'}`}
         strokeWidth={isActive ? 2 : 1.75}
       />
@@ -122,7 +126,7 @@ function NotificationPanel({
     <div
       className="fixed z-[200]"
       style={{
-        left: 228,
+        left: 248,
         bottom: 16,
         width: 320,
         maxHeight: '80vh',
@@ -193,15 +197,6 @@ function NotificationPanel({
                       <p className={`text-xs font-semibold leading-snug ${n.read ? 'text-[#64748B]' : 'text-[#E2E8F0]'}`}>
                         {n.title}
                       </p>
-                      {n.link && (
-                        <Link
-                          href={n.link}
-                          className="text-[#6366f1] hover:text-[#818cf8] flex-shrink-0 transition-colors"
-                          onClick={onClose}
-                        >
-                          <ExternalLink size={11} />
-                        </Link>
-                      )}
                     </div>
                     {n.body && (
                       <p className="text-[11px] text-[#475569] mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
@@ -212,6 +207,133 @@ function NotificationPanel({
               </div>
             );
           })
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Support panel ──────────────────────────────────────────────────────────────
+
+function SupportPanel({ onClose }: { onClose: () => void }) {
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!subject.trim() || !message.trim()) return;
+    setSending(true);
+    setError('');
+    try {
+      await submitSupportRequest(subject.trim(), message.trim());
+      setSent(true);
+    } catch {
+      setError('Failed to send. Please email support@lumidian.ai directly.');
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed z-[200]"
+      style={{
+        left: 248,
+        bottom: 16,
+        width: 320,
+        background: 'rgba(10,14,24,0.97)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        border: '1px solid rgba(99,102,241,0.18)',
+        borderRadius: 16,
+        boxShadow: '0 16px 48px rgba(0,0,0,0.50)',
+      }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.07)]">
+        <div className="flex items-center gap-2">
+          <HelpCircle size={14} className="text-[#6366f1]" />
+          <span className="text-sm font-semibold text-[#F0F4F8]">Contact Support</span>
+        </div>
+        <button
+          onClick={onClose}
+          className="text-[#475569] hover:text-[#94A3B8] transition-colors p-1 rounded-md hover:bg-[rgba(255,255,255,0.05)]"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      <div className="p-4">
+        {sent ? (
+          <div className="flex flex-col items-center gap-3 py-6 text-center">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
+              <Send size={16} className="text-[#10b981]" />
+            </div>
+            <p className="text-sm font-semibold text-[#E2E8F0]">Message sent</p>
+            <p className="text-xs text-[#64748B]">We'll get back to you as soon as possible.</p>
+            <button
+              onClick={onClose}
+              className="mt-1 text-xs text-[#6366f1] hover:text-[#818cf8] transition-colors"
+            >
+              Close
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <div>
+              <label className="block text-[11px] font-medium text-[#64748B] mb-1">Subject</label>
+              <input
+                type="text"
+                value={subject}
+                onChange={(e) => setSubject(e.target.value)}
+                placeholder="What can we help with?"
+                maxLength={200}
+                required
+                className="w-full px-3 py-2 text-xs text-[#E2E8F0] placeholder-[#475569] rounded-lg outline-none transition-colors"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.50)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; }}
+              />
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-[#64748B] mb-1">Message</label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Describe your question or issue..."
+                maxLength={5000}
+                required
+                rows={5}
+                className="w-full px-3 py-2 text-xs text-[#E2E8F0] placeholder-[#475569] rounded-lg outline-none transition-colors resize-none"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.10)',
+                }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.50)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; }}
+              />
+            </div>
+            {error && (
+              <p className="text-[11px] text-[#f87171]">{error}</p>
+            )}
+            <button
+              type="submit"
+              disabled={sending || !subject.trim() || !message.trim()}
+              className="flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'rgba(99,102,241,0.85)', color: '#fff' }}
+              onMouseEnter={(e) => { if (!sending) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,1)'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.85)'; }}
+            >
+              <Send size={11} />
+              {sending ? 'Sending…' : 'Send message'}
+            </button>
+          </form>
         )}
       </div>
     </div>
@@ -252,6 +374,10 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
   const [panelOpen, setPanelOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // Support
+  const [supportOpen, setSupportOpen] = useState(false);
+  const supportRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     getNotifications()
       .then((r) => { setNotifications(r.notifications); setUnreadCount(r.unread_count); })
@@ -265,7 +391,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
     return () => clearInterval(interval);
   }, []);
 
-  // Close panel on outside click
+  // Close notification panel on outside click
   useEffect(() => {
     if (!panelOpen) return;
     function handler(e: MouseEvent) {
@@ -276,6 +402,18 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [panelOpen]);
+
+  // Close support panel on outside click
+  useEffect(() => {
+    if (!supportOpen) return;
+    function handler(e: MouseEvent) {
+      if (supportRef.current && !supportRef.current.contains(e.target as Node)) {
+        setSupportOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [supportOpen]);
 
   async function handleMarkAllRead() {
     const r = await markAllNotificationsRead().catch(() => null);
@@ -306,8 +444,8 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
       <aside
         className="fixed left-0 top-0 h-screen flex flex-col z-50 overflow-hidden"
         style={{
-          width: expanded ? 220 : 56,
-          transition: 'width 0.2s ease',
+          width: expanded ? 240 : 64,
+          transition: 'width 0.22s ease',
           background: 'linear-gradient(180deg, rgba(10,14,24,0.90) 0%, rgba(5,8,16,0.95) 100%)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
@@ -321,22 +459,18 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
         <div
           className="flex-shrink-0"
           style={{
-            padding: expanded ? '20px' : '14px 0',
+            padding: expanded ? '22px 20px 20px' : '20px 0 18px',
             display: 'flex',
             justifyContent: expanded ? 'flex-start' : 'center',
-            transition: 'padding 0.2s ease',
-            borderBottom: '1px solid rgba(255,255,255,0.07)',
+            transition: 'padding 0.22s ease',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
           }}
         >
           <Link href="/dashboard" className="flex items-center gap-3">
-            <OceanLogo size={40} withCircle />
-            {expanded && (
-              <span
-                className="whitespace-nowrap"
-                style={{ fontSize: '15px', fontWeight: 600, letterSpacing: '0.01em', color: '#e2e8f0' }}
-              >
-                ClarityAI
-              </span>
+            {expanded ? (
+              <LumidianLogo size={28} withWordmark />
+            ) : (
+              <LumidianLogo size={28} />
             )}
           </Link>
         </div>
@@ -347,8 +481,8 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
             ref={brandRef}
             className="flex-shrink-0 relative"
             style={{
-              padding: expanded ? '10px 12px' : '10px 8px',
-              borderBottom: '1px solid rgba(255,255,255,0.07)',
+              padding: expanded ? '12px 14px' : '12px 10px',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
             }}
           >
             <button
@@ -357,7 +491,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
               aria-label="Switch brand"
               className="w-full flex items-center gap-2.5 rounded-lg transition-all duration-150"
               style={{
-                padding: expanded ? '7px 10px' : '7px 0',
+                padding: expanded ? '8px 10px' : '8px 0',
                 justifyContent: expanded ? 'flex-start' : 'center',
                 background: brandOpen ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.07)',
@@ -421,18 +555,19 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                         onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
                         onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                       >
-                        <div
-                          className="flex-shrink-0 flex items-center justify-center rounded-md"
+                        <BrandAvatar
+                          name={brand.name}
+                          websiteUrl={brand.website_url}
+                          size={24}
+                          className="rounded-md"
                           style={{
-                            width: 24, height: 24,
                             background: isActive ? 'rgba(99,102,241,0.25)' : 'rgba(255,255,255,0.06)',
                             border: `1px solid ${isActive ? 'rgba(99,102,241,0.40)' : 'rgba(255,255,255,0.08)'}`,
+                            padding: 3,
                           }}
-                        >
-                          <span className="text-[10px] font-bold" style={{ color: isActive ? '#818CF8' : '#64748B' }}>
-                            {brand.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
+                          textClassName="text-[10px] font-bold"
+                          textStyle={{ color: isActive ? '#818CF8' : '#64748B' }}
+                        />
                         <div className="flex-1 min-w-0">
                           <p className={`text-[12px] font-medium truncate leading-tight ${isActive ? 'text-[#E2E8F0]' : 'text-[#94A3B8]'}`}>
                             {brand.name}
@@ -467,8 +602,8 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
 
         {/* ── Navigation ── */}
         <nav
-          className="flex-1 space-y-0.5 overflow-y-auto"
-          style={{ padding: expanded ? '16px 12px' : '16px 8px', transition: 'padding 0.2s ease' }}
+          className="flex-1 space-y-1 overflow-y-auto"
+          style={{ padding: expanded ? '14px 10px' : '14px 8px', transition: 'padding 0.22s ease' }}
         >
           {navItems.map((item) => (
             <NavLink
@@ -501,6 +636,33 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
             </div>
           )}
 
+          {/* ── Support button ── */}
+          <div>
+            <button
+              onClick={(e) => { e.stopPropagation(); setPanelOpen(false); setSupportOpen((v) => !v); }}
+              title="Contact Support"
+              aria-label="Contact Support"
+              className={[
+                'w-full flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative',
+                expanded ? 'px-3.5' : 'px-0 justify-center',
+                supportOpen ? 'text-[#818CF8] bg-[rgba(99,102,241,0.15)]' : 'text-[#64748B] hover:text-[#94A3B8]',
+              ].join(' ')}
+              onMouseEnter={(e) => {
+                if (!supportOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)';
+              }}
+              onMouseLeave={(e) => {
+                if (!supportOpen) (e.currentTarget as HTMLElement).style.background = 'transparent';
+              }}
+            >
+              <HelpCircle
+                size={16}
+                className={supportOpen ? 'text-[#818CF8]' : 'text-[#475569]'}
+                strokeWidth={supportOpen ? 2 : 1.75}
+              />
+              {expanded && <span className="truncate">Support</span>}
+            </button>
+          </div>
+
           {/* ── Bell button ── */}
           <div className="pt-1">
             <button
@@ -508,9 +670,9 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
               title="Notifications"
               aria-label="Notifications"
               className={[
-                'w-full flex items-center gap-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 relative',
-                expanded ? 'px-3' : 'px-0 justify-center',
-                panelOpen ? 'text-[#818CF8] bg-[rgba(99,102,241,0.18)]' : 'text-[#64748B] hover:text-[#94A3B8]',
+                'w-full flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative',
+                expanded ? 'px-3.5' : 'px-0 justify-center',
+                panelOpen ? 'text-[#818CF8] bg-[rgba(99,102,241,0.15)]' : 'text-[#64748B] hover:text-[#94A3B8]',
               ].join(' ')}
               onMouseEnter={(e) => {
                 if (!panelOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)';
@@ -543,14 +705,14 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
           <div
             className="space-y-1 flex-shrink-0"
             style={{
-              padding: expanded ? '16px 12px' : '16px 8px',
-              transition: 'padding 0.2s ease',
-              borderTop: '1px solid rgba(255,255,255,0.07)',
+              padding: expanded ? '16px 10px' : '16px 8px',
+              transition: 'padding 0.22s ease',
+              borderTop: '1px solid rgba(255,255,255,0.06)',
             }}
           >
             {expanded ? (
               <>
-                <div className="flex items-center gap-1.5 px-3 py-1.5">
+                <div className="flex items-center gap-1.5 px-3.5 py-2">
                   <CreditCard size={12} className="flex-shrink-0 text-[#475569]" />
                   <Link
                     href="/settings/billing"
@@ -578,7 +740,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg">
+                <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl">
                   <div
                     className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
                     style={{ background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.30)' }}
@@ -633,6 +795,13 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
             onMarkAllRead={handleMarkAllRead}
             onClose={() => setPanelOpen(false)}
           />
+        </div>
+      )}
+
+      {/* Support panel */}
+      {supportOpen && (
+        <div ref={supportRef}>
+          <SupportPanel onClose={() => setSupportOpen(false)} />
         </div>
       )}
     </>

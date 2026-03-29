@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Loader2, Eye, EyeOff, ArrowLeft } from 'lucide-react';
-import OceanLogo from '@/components/OceanLogo';
+import LumidianLogo from '@/components/LumidianLogo';
 import { resetPassword } from '@/lib/api';
 
 const NOISE_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`;
@@ -47,9 +47,10 @@ export default function ResetPasswordPage() {
       await resetPassword(token, password);
       setSuccess(true);
       setTimeout(() => router.push('/login'), 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
       setError(
-        err?.response?.data?.detail || 'This reset link is invalid or has expired. Please request a new one.'
+        e?.response?.data?.detail || 'This reset link is invalid or has expired. Please request a new one.'
       );
     } finally {
       setLoading(false);
@@ -82,8 +83,7 @@ export default function ResetPasswordPage() {
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 36 }}>
-          <OceanLogo size={40} withCircle />
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#0F0F12', letterSpacing: '-0.02em' }}>ClarityAI</span>
+          <LumidianLogo size={40} withWordmark variant="light" />
         </div>
 
         {/* Card */}

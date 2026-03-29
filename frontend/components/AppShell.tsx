@@ -57,7 +57,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const now = performance.now();
     if (navTimerRef.current > 0) {
       const elapsed = (now - navTimerRef.current).toFixed(0);
-      console.debug(`[ClarityAI] Route rendered in ${elapsed}ms`);
+      console.debug(`[Lumidian] Route rendered in ${elapsed}ms`);
     }
     navTimerRef.current = now;
   }, [pathname]);

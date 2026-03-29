@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
 from app.models import Brand, BrandProfile
-from app.schemas import BrandProfileResponse, BrandProfileUpdate, Publication
+from app.schemas import AiFillProfileResponse, BrandProfileResponse, BrandProfileUpdate, Publication
 
 router = APIRouter(prefix="/brands", tags=["brand-profile"])
 logger = logging.getLogger(__name__)
@@ -165,3 +165,84 @@ async def update_brand_profile(brand_id: int, payload: BrandProfileUpdate, db: D
     await db.commit()
     await db.refresh(profile)
     return _profile_to_response(profile)
+
+
+@router.post("/{brand_id}/profile/ai-fill", response_model=AiFillProfileResponse)
+async def ai_fill_profile(brand_id: int, db: DbDep, user: CurrentUser):
+    """
+    Scan the brand's website and return AI-generated suggestions for profile fields.
+    Does NOT save anything — the frontend applies suggestions and user saves manually.
+    """
+    import json
+    import os
+    from app.schemas import AiFillProfileResponse
+
+    brand = await get_brand_for_user(brand_id, db, user)
+    if not brand.website_url:
+        raise HTTPException(status_code=400, detail="Brand has no website URL. Add one in Brand Settings first.")
+
+    profile = await _get_or_create_profile(db, brand_id)
+
+    # Use cached context if available, else fetch now
+    context = profile.internal_brand_context
+    if not context:
+        from app.services.jina_service import fetch_website_context
+        try:
+            context = await fetch_website_context(brand.website_url)
+            from datetime import datetime, timezone
+            profile.internal_brand_context = context
+            profile.website_context_last_fetched = datetime.now(timezone.utc).replace(tzinfo=None)
+            await db.commit()
+        except Exception as exc:
+            logger.warning("AI fill: Jina fetch failed for brand %d: %s", brand_id, exc)
+            raise HTTPException(status_code=422, detail="Could not read website content. Check that the URL is publicly accessible.")
+
+    if not context or not context.strip():
+        raise HTTPException(status_code=422, detail="Website content appears empty. Try refreshing or updating the URL.")
+
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise HTTPException(status_code=503, detail="AI service not configured.")
+
+    prompt = f"""You are a brand analyst. Based on the website content below, extract structured brand profile information.
+
+Website content for brand "{brand.name}":
+---
+{context[:8000]}
+---
+
+Return a JSON object with exactly these keys (use null for anything you cannot determine):
+{{
+  "company_description": "2-3 sentence description of what the company does, its products/services, and what makes it unique",
+  "target_audience": "1-2 sentence description of who the primary customers/users are",
+  "tone_of_voice": "1-2 sentence description of the brand's communication style and personality",
+  "key_stats": ["list", "of", "up to 5 specific facts, numbers, or claims found on the site"]
+}}
+
+Return ONLY the JSON object, no markdown, no explanation."""
+
+    try:
+        import anthropic
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=1024,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = response.content[0].text.strip()
+        # Strip markdown code fences if present
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+        data = json.loads(raw)
+    except Exception as exc:
+        logger.warning("AI fill: LLM call failed for brand %d: %s", brand_id, exc)
+        raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
+
+    return AiFillProfileResponse(
+        company_description=data.get("company_description") or None,
+        target_audience=data.get("target_audience") or None,
+        tone_of_voice=data.get("tone_of_voice") or None,
+        key_stats=[s for s in (data.get("key_stats") or []) if isinstance(s, str)],
+    )

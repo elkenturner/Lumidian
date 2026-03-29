@@ -2,17 +2,19 @@
 
 import { memo, useState, useMemo } from 'react';
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  ReferenceLine,
 } from 'recharts';
 import { format, parseISO, subDays } from 'date-fns';
+import { Activity } from 'lucide-react';
 import { TrendPoint } from '@/lib/api';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const parseUTCISO = (s: string) => parseISO(s.endsWith('Z') ? s : s + 'Z');
 
@@ -57,19 +59,38 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
   const avg = payload.find((p) => p.dataKey === 'score');
   const models = payload.filter((p) => p.dataKey !== 'score' && p.value != null);
   return (
-    <div className="bg-[#111118] border border-[#1e1e2e] rounded-lg p-3 shadow-lg min-w-[140px]">
-      <p className="text-xs text-[#64748b] mb-2">{label}</p>
+    <div style={{
+      background: 'rgba(8,12,20,0.96)',
+      backdropFilter: 'blur(20px)',
+      WebkitBackdropFilter: 'blur(20px)',
+      border: '1px solid rgba(99,102,241,0.22)',
+      borderRadius: 10,
+      padding: '10px 14px',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.50), 0 0 0 1px rgba(99,102,241,0.06)',
+      minWidth: 155,
+    }}>
+      <p style={{ fontSize: 11, color: '#475569', marginBottom: 8, fontWeight: 500 }}>{label}</p>
       {avg && (
-        <p className="text-xs font-bold mb-1.5" style={{ color: AVG_COLOR }}>
-          Avg {Math.round(avg.value)}%
+        <p style={{
+          fontSize: 14,
+          fontWeight: 700,
+          marginBottom: 7,
+          color: AVG_COLOR,
+          fontFamily: 'var(--font-fira-code, monospace)',
+          letterSpacing: '-0.01em',
+        }}>
+          ⌀ {Math.round(avg.value)}%
         </p>
       )}
       {models.map((m) => {
         const cfg = MODEL_LINES.find((ml) => ml.key === m.dataKey);
         return (
-          <p key={m.dataKey} className="text-xs" style={{ color: cfg?.color ?? '#94a3b8' }}>
-            {cfg?.label ?? m.dataKey}: {Math.round(m.value)}%
-          </p>
+          <div key={m.dataKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20, marginTop: 3 }}>
+            <span style={{ fontSize: 11, color: cfg?.color ?? '#94a3b8' }}>{cfg?.label ?? m.dataKey}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: cfg?.color ?? '#94a3b8', fontFamily: 'var(--font-fira-code, monospace)' }}>
+              {Math.round(m.value)}%
+            </span>
+          </div>
         );
       })}
     </div>
@@ -117,58 +138,56 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
     );
   }, [data, timeframe]);
 
-  // Which model lines actually have data
   const activeModels = MODEL_LINES.filter((ml) =>
     chartData.some((pt) => pt[ml.key] != null)
   );
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
         <h3 className="text-base font-semibold text-[#e2e8f0] mb-4">Visibility Trend</h3>
-        <div className="flex items-center justify-center h-48 text-[#64748b] text-sm">
-          No trend data available yet. Run a report to start tracking.
+        <div className="empty-state">
+          <div className="empty-state-icon">
+            <Activity size={22} />
+          </div>
+          <p className="empty-state-title">No trend data yet</p>
+          <p className="empty-state-body">Run your first report to start tracking visibility over time.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-semibold text-[#e2e8f0]">Visibility Trend</h3>
-        <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5">
-          {TIMEFRAME_OPTIONS.map(({ label, value }) => (
-            <button
-              key={value}
-              onClick={() => setTimeframe(value)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                timeframe === value
-                  ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8] shadow-sm'
-                  : 'text-[#475569] hover:text-[#94A3B8]'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Tabs value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}>
+          <TabsList className="bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 h-auto gap-0 border-b-0">
+            {TIMEFRAME_OPTIONS.map(({ label, value }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="px-2.5 py-1 rounded-md text-xs font-medium h-auto border-b-0 data-[state=active]:bg-[rgba(99,102,241,0.25)] data-[state=active]:text-[#818cf8] data-[state=active]:border-transparent data-[state=inactive]:text-[#475569]"
+              >
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Legend — clickable to toggle lines */}
       {activeModels.length > 0 && (
         <div className="flex items-center gap-4 mb-4 flex-wrap">
-          <button
-            className="flex items-center gap-1.5 text-xs"
-            onClick={() => {/* average always shown */}}
-          >
+          <div className="flex items-center gap-1.5 text-xs">
             <span className="w-5 h-0.5 rounded-full inline-block" style={{ background: AVG_COLOR }} />
             <span className="text-[#818cf8] font-medium">Average</span>
-          </button>
+          </div>
           {activeModels.map((ml) => (
             <button
               key={ml.key}
               onClick={() => toggleModel(ml.key)}
-              className="flex items-center gap-1.5 text-xs transition-opacity"
+              className="flex items-center gap-1.5 text-xs transition-opacity cursor-pointer"
               style={{ opacity: hiddenModels.has(ml.key) ? 0.35 : 1 }}
             >
               <span className="w-5 h-0.5 rounded-full inline-block" style={{ background: ml.color }} />
@@ -184,7 +203,14 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={240}>
-          <LineChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+          <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+            <defs>
+              <linearGradient id="avgAreaGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.18} />
+                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.10)" vertical={false} />
             <XAxis
               dataKey="shortDate"
@@ -199,17 +225,25 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
               tickLine={false}
               tickFormatter={(v) => `${v}%`}
             />
-            <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'rgba(99,102,241,0.20)', strokeWidth: 1 }} />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ stroke: 'rgba(99,102,241,0.20)', strokeWidth: 1 }}
+            />
 
-            {/* Average line */}
-            <Line
+            {/* Average line with gradient area fill */}
+            <Area
               type="monotone"
               dataKey="score"
               name="Average"
               stroke={AVG_COLOR}
               strokeWidth={2.5}
+              fill="url(#avgAreaGradient)"
+              fillOpacity={1}
               dot={false}
               activeDot={{ fill: AVG_COLOR, r: 5, strokeWidth: 2, stroke: 'rgba(99,102,241,0.30)' }}
+              isAnimationActive={true}
+              animationDuration={1200}
+              animationEasing="ease-out"
             />
 
             {/* Per-model lines */}
@@ -226,9 +260,12 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
                 activeDot={{ fill: ml.color, r: 4, strokeWidth: 0 }}
                 hide={hiddenModels.has(ml.key)}
                 connectNulls
+                isAnimationActive={true}
+                animationDuration={1400}
+                animationEasing="ease-out"
               />
             ))}
-          </LineChart>
+          </ComposedChart>
         </ResponsiveContainer>
       )}
     </div>

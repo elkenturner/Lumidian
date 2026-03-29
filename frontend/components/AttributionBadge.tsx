@@ -33,7 +33,7 @@ export default function AttributionBadge({ attribution }: AttributionBadgeProps)
       </button>
 
       {expanded && (
-        <div className="absolute z-10 mt-1 w-64 bg-[#111118] border border-[#1e1e2e] rounded-xl p-4 shadow-xl space-y-2">
+        <div className="absolute z-10 mt-1 w-64 bg-[rgba(10,14,24,0.97)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 shadow-[0_8px_32px_rgba(0,0,0,0.40)] space-y-2">
           <div className="flex justify-between text-xs text-[#64748b]">
             {attribution.visibility_before != null && (
               <span>

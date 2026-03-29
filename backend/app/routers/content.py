@@ -56,6 +56,44 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 SUPPORTED_PLATFORMS = list(PLATFORM_GUIDELINES.keys())
 ALL_DRAFT_PLATFORMS = list(PLATFORM_SPECS.keys())
 
+# Weekly manual draft limits per brand type
+_WEEKLY_MANUAL_LIMIT_STANDARD = 10
+_WEEKLY_MANUAL_LIMIT_PITCH = 1
+
+
+async def _check_weekly_manual_draft_limit(db: AsyncSession, brand: Brand) -> int:
+    """
+    Enforce per-brand weekly manual draft limits.
+    Returns the number of manual draft slots remaining this week.
+    Raises HTTP 429 if the limit is already reached.
+    """
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import func as sqlfunc
+
+    is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
+    weekly_limit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else _WEEKLY_MANUAL_LIMIT_STANDARD
+
+    week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+    count_result = await db.execute(
+        select(sqlfunc.count(ContentDraft.id)).where(
+            ContentDraft.brand_id == brand.id,
+            ContentDraft.source == "manual",
+            ContentDraft.created_at >= week_ago,
+        )
+    )
+    used = count_result.scalar_one_or_none() or 0
+    remaining = weekly_limit - used
+    if remaining <= 0:
+        label = "pitch deck" if is_pitch else "brand"
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                f"Weekly manual draft limit reached ({weekly_limit}/{weekly_limit} for this {label}). "
+                "Resets 7 days after your first manual draft this week."
+            ),
+        )
+    return remaining
+
 
 async def _get_brand_or_404(db: AsyncSession, brand_id: int) -> Brand:
     result = await db.execute(select(Brand).where(Brand.id == brand_id))
@@ -139,8 +177,10 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Content drafting requires a Starter or Pro plan. Upgrade to unlock this feature.",
         )
-    check_rate_limit(user.id, limit=10)  # 10 manual drafts per minute per user
-    await get_brand_for_user(brand_id, db, user)
+    check_rate_limit(user.id, limit=10)  # burst guard (per minute)
+    brand = await get_brand_for_user(brand_id, db, user)
+    if not user.is_admin:
+        await _check_weekly_manual_draft_limit(db, brand)
 
     if request.platform not in ALL_DRAFT_PLATFORMS:
         raise HTTPException(
@@ -169,6 +209,7 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
             quora_question_url=request.quora_question_url,
             quora_question_title=request.quora_question_title,
             quora_question_snippet=request.quora_question_snippet,
+            source="manual",
         )
     except ValueError as exc:
         raise HTTPException(
@@ -388,14 +429,20 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="On-demand draft generation is available on Starter and Pro plans. Upgrade to unlock this feature.",
         )
-    check_rate_limit(user.id, limit=2)  # 2 bulk generate-now calls per minute per user
-    await get_brand_for_user(brand_id, db, user)
+    check_rate_limit(user.id, limit=2)  # burst guard (per minute)
+    brand = await get_brand_for_user(brand_id, db, user)
+    remaining = 0
+    if not user.is_admin:
+        remaining = await _check_weekly_manual_draft_limit(db, brand)
+    else:
+        remaining = 20
     try:
         drafts = await auto_draft_top_gaps(
             db=db,
             brand_id=brand_id,
-            max_gaps=min(request.max_gaps, 20),  # allow filling up to the full cap
+            max_gaps=min(request.max_gaps, remaining),
             clear_existing=True,  # discard unreviewed drafts before regenerating
+            source="manual",
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -466,7 +513,9 @@ async def create_gap_draft(brand_id: int, request: CreateDraftRequest, db: DbDep
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Content drafting requires a Starter or Pro plan. Upgrade to unlock this feature.",
         )
-    await get_brand_for_user(brand_id, db, user)
+    brand = await get_brand_for_user(brand_id, db, user)
+    if not user.is_admin:
+        await _check_weekly_manual_draft_limit(db, brand)
 
     if request.platform not in ALL_DRAFT_PLATFORMS:
         raise HTTPException(
@@ -489,6 +538,7 @@ async def create_gap_draft(brand_id: int, request: CreateDraftRequest, db: DbDep
             quora_question_url=request.quora_question_url,
             quora_question_title=request.quora_question_title,
             quora_question_snippet=request.quora_question_snippet,
+            source="manual",
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
@@ -564,15 +614,6 @@ async def update_brand_settings(
     if setting is None:
         setting = BrandContentSettings(brand_id=brand_id, platform=platform)
         db.add(setting)
-
-    if request.drafting_frequency is not None:
-        allowed_freq = {"daily", "every_3_days", "weekly", "manual"}
-        if request.drafting_frequency not in allowed_freq:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid drafting_frequency. Must be one of {allowed_freq}",
-            )
-        setting.drafting_frequency = request.drafting_frequency
 
     if request.auto_post is not None:
         setting.auto_post = request.auto_post

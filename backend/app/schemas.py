@@ -248,7 +248,6 @@ class BrandContentSettingsSchema(BaseModel):
     brand_id: int
     platform: str
     enabled: bool
-    drafting_frequency: str
     auto_post: bool
     created_at: datetime
     updated_at: datetime
@@ -361,7 +360,6 @@ class ConnectAccountRequest(BaseModel):
 
 
 class UpdateContentSettingsRequest(BaseModel):
-    drafting_frequency: Optional[str] = None
     auto_post: Optional[bool] = None
     enabled: Optional[bool] = None
 
@@ -554,6 +552,13 @@ class BrandProfileResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class AiFillProfileResponse(BaseModel):
+    company_description: Optional[str] = None
+    target_audience: Optional[str] = None
+    tone_of_voice: Optional[str] = None
+    key_stats: list[str] = []
 
 
 # ── Brand with stats (for brand switcher) ─────────────────────────────────────

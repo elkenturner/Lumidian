@@ -41,16 +41,16 @@ TRIAL_DAYS = 30
 BRAND_LIMITS = {
     None: {"standard": 0, "pitch": 1},       # free: 1 pitch deck, no standard brands
     "": {"standard": 0, "pitch": 1},
-    "starter": {"standard": 2, "pitch": 3},  # 2 standard + 3 pitch decks
-    "pro": {"standard": 4, "pitch": 999},    # 4 standard + unlimited pitch decks
+    "starter": {"standard": 2, "pitch": 1},  # 2 standard + 1 pitch deck
+    "pro": {"standard": 2, "pitch": 3},      # 2 standard + 3 pitch decks
 }
 # Manual run limits per tier (per day, UTC). None = unlimited.
 # Only free-plan users (no subscription_tier) are limited to 1 run/day.
 DAILY_RUN_LIMITS: dict = {
     None: 1,
     "": 1,
-    "starter": None,
-    "pro": None,
+    "starter": 3,
+    "pro": None,  # unlimited
 }
 
 
@@ -161,10 +161,21 @@ async def billing_usage(user: Annotated[User, Depends(get_current_user)], db: Db
 
 # ── Create checkout ───────────────────────────────────────────────────────────
 
+def _frontend_url() -> str:
+    return os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+
 class CheckoutRequest(BaseModel):
     tier: str  # 'starter' | 'pro'
-    success_url: str = "http://localhost:3000/settings/billing?success=true"
-    cancel_url: str = "http://localhost:3000/settings/billing"
+    success_url: str = ""
+    cancel_url: str = ""
+
+    def model_post_init(self, __context: object) -> None:
+        base = _frontend_url()
+        if not self.success_url:
+            self.success_url = f"{base}/settings/billing?success=true"
+        if not self.cancel_url:
+            self.cancel_url = f"{base}/settings/billing"
 
 
 @router.post("/create-checkout")
@@ -226,7 +237,11 @@ async def create_checkout(
 # ── Customer portal ────────────────────────────────────────────────────────────
 
 class PortalRequest(BaseModel):
-    return_url: str = "http://localhost:3000/settings/billing"
+    return_url: str = ""
+
+    def model_post_init(self, __context: object) -> None:
+        if not self.return_url:
+            self.return_url = f"{_frontend_url()}/account"
 
 
 @router.post("/portal")
@@ -242,6 +257,77 @@ async def customer_portal(
         return_url=request.return_url,
     )
     return {"portal_url": session.url}
+
+
+# ── Change plan ───────────────────────────────────────────────────────────────
+
+class ChangePlanRequest(BaseModel):
+    tier: str  # 'starter' | 'pro'
+
+
+@router.post("/change-plan")
+async def change_plan(
+    request: ChangePlanRequest,
+    user: Annotated[User, Depends(get_current_user)],
+    db: DbDep,
+):
+    """Switch the user's subscription tier with no proration. Billing adjusts at next renewal."""
+    if request.tier not in TIER_PRICES:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid tier")
+    if not user.stripe_subscription_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No active subscription found. Use checkout to start a new subscription.",
+        )
+    if user.subscription_tier == request.tier:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already on this plan")
+
+    price_id = TIER_PRICES[request.tier]
+    if not price_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Stripe price ID for '{request.tier}' not configured",
+        )
+
+    stripe = get_stripe()
+
+    try:
+        subscription = stripe.Subscription.retrieve(user.stripe_subscription_id)
+        items_data = subscription.get("items", {}).get("data", [])
+        if not items_data:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not retrieve subscription items from Stripe",
+            )
+        item_id = items_data[0]["id"]
+
+        stripe.Subscription.modify(
+            user.stripe_subscription_id,
+            items=[{"id": item_id, "price": price_id}],
+            proration_behavior="none",
+            metadata={"tier": request.tier, "user_id": str(user.id)},
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Could not switch plan: {exc}",
+        )
+
+    old_tier = user.subscription_tier
+    user.subscription_tier = request.tier
+    user.updated_at = utcnow()
+    await db.commit()
+
+    from app.services.analytics_service import log_event
+    await log_event(
+        "plan_switched",
+        {"old_plan": old_tier, "new_plan": request.tier},
+        user_id=user.id,
+    )
+
+    return {"message": f"Plan switched to {request.tier}. Billing adjusts at your next renewal."}
 
 
 # ── Cancel subscription ────────────────────────────────────────────────────────

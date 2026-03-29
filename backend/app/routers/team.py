@@ -90,15 +90,8 @@ async def invite_team_member(request: InviteTeamMemberRequest, db: DbDep, user: 
     invite_link = f"/team/accept?token={token}"
     full_invite_link = f"{frontend_url}{invite_link}"
 
-    try:
-        from app.services.email_service import send_team_invite_email
-        send_team_invite_email(
-            invited_email=email,
-            invite_link=full_invite_link,
-            inviter_name=user.name,
-        )
-    except Exception as exc:
-        logger.warning("Team invite email failed (non-fatal): %s", exc)
+    from app.services.email_service import send_team_invite_email, send_email_background
+    send_email_background(send_team_invite_email, invited_email=email, invite_link=full_invite_link, inviter_name=user.name)
 
     return {"id": member.id, "invite_link": invite_link, "message": "Invitation created"}
 

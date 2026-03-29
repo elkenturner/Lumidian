@@ -1,5 +1,5 @@
 """
-Shared pytest fixtures for ClarityAI backend tests.
+Shared pytest fixtures for Lumidian backend tests.
 
 Env vars are set BEFORE any app module is imported so that:
   - app.database creates its engine pointing at the test DB
@@ -22,7 +22,7 @@ _db_fd, _db_path = tempfile.mkstemp(suffix=".test.db")
 os.close(_db_fd)
 
 os.environ.setdefault("DATABASE_URL", f"sqlite+aiosqlite:///{_db_path}")
-os.environ["JWT_SECRET"] = "test-jwt-secret-minimum-32-chars-clarity-ai-test"
+os.environ["JWT_SECRET"] = "test-jwt-secret-minimum-32-chars-lumidian-test"
 os.environ["ENVIRONMENT"] = "development"
 os.environ["ADMIN_EMAILS"] = "admin@test.com"
 os.environ["STRIPE_SECRET_KEY"] = "sk_test_placeholder"

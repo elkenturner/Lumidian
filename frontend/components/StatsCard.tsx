@@ -1,4 +1,6 @@
-import { ReactNode } from 'react';
+'use client';
+
+import { ReactNode, useEffect, useRef, useState } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -12,6 +14,41 @@ interface StatsCardProps {
   loading?: boolean;
   compact?: boolean;
   accent?: boolean;
+  accentColor?: string; // top-border accent color, e.g. '#3b82f6'
+}
+
+function useCountUp(target: number, duration = 700): number {
+  const [count, setCount] = useState(0);
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      setCount(target);
+      return;
+    }
+
+    let startTime: number | null = null;
+
+    const animate = (timestamp: number) => {
+      if (!startTime) startTime = timestamp;
+      const elapsed = timestamp - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
+      setCount(Math.round(target * eased));
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    setCount(0);
+    rafRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [target, duration]);
+
+  return count;
 }
 
 export default function StatsCard({
@@ -24,33 +61,47 @@ export default function StatsCard({
   loading = false,
   compact = false,
   accent = false,
+  accentColor,
 }: StatsCardProps) {
+  const isNumeric = typeof value === 'number';
+  const animatedValue = useCountUp(isNumeric ? (value as number) : 0, 700);
+
   if (loading) {
     return (
-      <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6 animate-pulse">
-        <div className="h-4 bg-[#1a1a24] rounded w-24 mb-4" />
-        <div className="h-8 bg-[#1a1a24] rounded w-16 mb-2" />
-        <div className="h-3 bg-[#1a1a24] rounded w-32" />
+      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+        <div className="skeleton h-3 rounded w-24 mb-4" />
+        <div className="skeleton h-8 rounded w-16 mb-2" />
+        <div className="skeleton h-3 rounded w-32" />
       </div>
     );
   }
 
+  const borderTopStyle = accentColor
+    ? { borderTopColor: accentColor, borderTopWidth: 2 }
+    : accent
+      ? { borderTopColor: '#6366f1', borderTopWidth: 2 }
+      : undefined;
+
   return (
-    <div className={clsx(
-      'bg-[#111118] border border-[#1e1e2e] rounded-xl p-6 hover:border-[#2a2a3a] transition-colors',
-      accent && 'border-t-2 border-t-[#6366f1]'
-    )}>
+    <div
+      className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] hover:border-[rgba(99,102,241,0.35)] hover:bg-[rgba(99,102,241,0.09)] transition-all duration-200"
+      style={borderTopStyle}
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-[#94a3b8]">{title}</p>
-          <p className={compact
-            ? "mt-2 text-lg font-semibold text-[#e2e8f0] leading-snug"
-            : "mt-2 text-3xl font-bold text-[#e2e8f0] tracking-tight"
-          }>
-            {value}
+          <p className="text-[13px] font-medium text-[#94A3B8]">{title}</p>
+          <p className={clsx(
+            compact
+              ? 'mt-2 text-lg font-semibold leading-snug'
+              : 'mt-2 text-3xl font-bold tracking-tight',
+            isNumeric
+              ? 'font-mono bg-gradient-to-r from-[#f0f4ff] to-[#a5b4fc] bg-clip-text text-transparent'
+              : 'text-[#F0F4F8]'
+          )}>
+            {isNumeric ? animatedValue : value}
           </p>
           {subtitle && (
-            <p className="mt-1 text-sm text-[#64748b]">{subtitle}</p>
+            <p className="mt-1 text-xs text-[#64748B]">{subtitle}</p>
           )}
           {trend !== undefined && (
             <div
@@ -72,7 +123,7 @@ export default function StatsCard({
           )}
         </div>
         {icon && (
-          <div className="ml-4 w-11 h-11 rounded-xl bg-[#1a1a24] flex items-center justify-center text-[#6366f1] flex-shrink-0">
+          <div className="ml-4 w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.22)] flex items-center justify-center text-[#818CF8] flex-shrink-0">
             {icon}
           </div>
         )}

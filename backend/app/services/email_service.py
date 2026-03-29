@@ -16,6 +16,7 @@ Environment variables:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import smtplib
@@ -74,7 +75,7 @@ def _send(to: str, subject: str, body: str) -> None:
     else:
         # Console fallback for development
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        from_display = _FROM or "hello@clarityai.com"
+        from_display = _FROM or "hello@lumidian.ai"
         logger.info(
             "\n"
             "╔══════════════════════════════════════════════════════════════╗\n"
@@ -92,6 +93,32 @@ def _send(to: str, subject: str, body: str) -> None:
         )
 
 
+# ── Async fire-and-forget helper ──────────────────────────────────────────────
+
+def send_email_background(fn, *args, **kwargs) -> None:
+    """
+    Run a synchronous email function in a thread-pool executor so it doesn't
+    block the async event loop.  Exceptions are caught and logged non-fatally.
+    """
+    import functools
+
+    async def _run():
+        loop = asyncio.get_running_loop()
+        try:
+            await loop.run_in_executor(None, functools.partial(fn, *args, **kwargs))
+        except Exception as exc:
+            logger.warning("Background email failed (%s): %s", fn.__name__, exc)
+
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(_run())
+        else:
+            fn(*args, **kwargs)   # fallback for non-async callers (tests, CLI)
+    except Exception as exc:
+        logger.warning("send_email_background setup failed (%s): %s", fn.__name__, exc)
+
+
 # ── Public email functions ────────────────────────────────────────────────────
 
 def send_welcome_email(email: str, name: Optional[str]) -> None:
@@ -103,7 +130,7 @@ def send_welcome_email(email: str, name: Optional[str]) -> None:
     body = f"""\
 Hi {display},
 
-Welcome to ClarityAI! 🎉
+Welcome to Lumidian! 🎉
 
 You're now set up to track how often your brand appears in AI-generated
 responses across ChatGPT, Claude, Perplexity, and Gemini.
@@ -126,11 +153,11 @@ Log in any time at:
 
 If you have questions, just reply to this email.
 
-— The ClarityAI Team
+— The Lumidian Team
 """
     _send(
         to=email,
-        subject="Welcome to ClarityAI — let's track your AI visibility",
+        subject="Welcome to Lumidian — let's track your AI visibility",
         body=body,
     )
 
@@ -142,7 +169,7 @@ def send_password_reset_email(email: str, name: Optional[str], reset_link: str) 
     body = f"""\
 Hi {display},
 
-We received a request to reset your ClarityAI password.
+We received a request to reset your Lumidian password.
 
 Click the link below to set a new password. This link expires in 1 hour.
 
@@ -151,11 +178,11 @@ Click the link below to set a new password. This link expires in 1 hour.
 If you didn't request a password reset, you can safely ignore this email.
 Your password will not change.
 
-— The ClarityAI Team
+— The Lumidian Team
 """
     _send(
         to=email,
-        subject="Reset your ClarityAI password",
+        subject="Reset your Lumidian password",
         body=body,
     )
 
@@ -166,13 +193,13 @@ def send_team_invite_email(
     inviter_name: Optional[str],
 ) -> None:
     """Sent when a user is invited to join a team workspace."""
-    inviter = inviter_name or "A ClarityAI user"
+    inviter = inviter_name or "A Lumidian user"
     login_url = f"{_FRONTEND_URL}/login"
 
     body = f"""\
 Hi,
 
-{inviter} has invited you to access their ClarityAI workspace.
+{inviter} has invited you to access their Lumidian workspace.
 
 As a team member you'll have read-only access to their brand tracking
 data, reports, and content drafts.
@@ -181,15 +208,15 @@ Accept your invitation here (link expires in 48 hours):
 
   {invite_link}
 
-You'll need a ClarityAI account to accept. If you don't have one,
+You'll need a Lumidian account to accept. If you don't have one,
 you can register for free at:
   {login_url}
 
-— The ClarityAI Team
+— The Lumidian Team
 """
     _send(
         to=invited_email,
-        subject=f"{inviter} invited you to ClarityAI",
+        subject=f"{inviter} invited you to Lumidian",
         body=body,
     )
 
@@ -209,7 +236,7 @@ def send_pitch_expiry_warning_email(
     body = f"""\
 Hi {display},
 
-Your pitch deck brand "{brand_name}" on ClarityAI expires in about 24 hours.
+Your pitch deck brand "{brand_name}" on Lumidian expires in about 24 hours.
 
   Expires: {expiry_str}
 
@@ -224,11 +251,11 @@ View your dashboard:
 
 If you have questions, just reply to this email.
 
-— The ClarityAI Team
+— The Lumidian Team
 """
     _send(
         to=email,
-        subject=f'Your ClarityAI pitch deck "{brand_name}" expires tomorrow',
+        subject=f'Your Lumidian pitch deck "{brand_name}" expires tomorrow',
         body=body,
     )
 
@@ -262,11 +289,42 @@ and sentiment data — in your dashboard:
 
 Run ID: #{run_id}
 
-— The ClarityAI Team
+— The Lumidian Team
 """
     _send(
         to=email,
-        subject=f"Your ClarityAI report for {brand_name} is ready ({overall_score:.1f}%)",
+        subject=f"Your Lumidian report for {brand_name} is ready ({overall_score:.1f}%)",
+        body=body,
+    )
+
+
+def send_support_request_email(
+    from_name: Optional[str],
+    from_email: str,
+    subject: str,
+    message: str,
+) -> None:
+    """Forward a user support request to the support inbox."""
+    support_inbox = os.getenv("SUPPORT_EMAIL", "ken@lumidian.ai")
+    display = from_name or from_email
+
+    body = f"""\
+New support request received via Lumidian.
+
+From:    {display}
+Email:   {from_email}
+Subject: {subject}
+
+────────────────────────────────────────
+
+{message}
+
+────────────────────────────────────────
+Reply directly to {from_email} to respond.
+"""
+    _send(
+        to=support_inbox,
+        subject=f"[Support] {subject}",
         body=body,
     )
 
@@ -298,7 +356,7 @@ It's worth reviewing your recent conversations to understand what changed.
 View the full breakdown here:
   {report_url}
 
-— The ClarityAI Team
+— The Lumidian Team
 """
     _send(
         to=email,

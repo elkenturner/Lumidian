@@ -4,6 +4,8 @@ import { format, parseISO } from 'date-fns';
 import { Edit2, CheckCircle2, Send, Trash2, BarChart2 } from 'lucide-react';
 import { ContentDraft } from '@/lib/api';
 import PlatformBadge from './PlatformBadge';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface ContentDraftCardProps {
   draft: ContentDraft;
@@ -13,11 +15,13 @@ interface ContentDraftCardProps {
   onDelete: (id: number) => void;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: 'bg-[#1e1e2e] text-[#94a3b8] border-[#2a2a3a]',
-  approved: 'bg-[#064e3b]/30 text-[#10b981] border-[#065f46]/40',
-  posted: 'bg-[#172554]/40 text-[#60a5fa] border-[#1d4ed8]/30',
-  failed: 'bg-[#7f1d1d]/20 text-[#f87171] border-[#991b1b]/30',
+type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'outline';
+
+const STATUS_BADGE_VARIANTS: Record<string, BadgeVariant> = {
+  draft: 'secondary',
+  approved: 'success',
+  posted: 'default',
+  failed: 'destructive',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -34,7 +38,7 @@ export default function ContentDraftCard({
   onPost,
   onDelete,
 }: ContentDraftCardProps) {
-  const statusStyle = STATUS_STYLES[draft.status] ?? STATUS_STYLES.draft;
+  const badgeVariant = STATUS_BADGE_VARIANTS[draft.status] ?? 'secondary';
   const statusLabel = STATUS_LABELS[draft.status] ?? draft.status;
 
   const preview = draft.title
@@ -44,15 +48,11 @@ export default function ContentDraftCard({
     : draft.content_text;
 
   return (
-    <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-5 flex flex-col gap-3 hover:border-[#2a2a3a] transition-colors">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(99,102,241,0.35)] hover:bg-[rgba(99,102,241,0.09)] transition-all duration-200 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       {/* Top row: platform + status */}
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={draft.platform} />
-        <span
-          className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full border ${statusStyle}`}
-        >
-          {statusLabel}
-        </span>
+        <Badge variant={badgeVariant}>{statusLabel}</Badge>
       </div>
 
       {/* Title or preview */}
@@ -85,41 +85,46 @@ export default function ContentDraftCard({
 
       {/* Action buttons */}
       <div className="flex items-center gap-2 pt-1 flex-wrap">
-        <button
+        <Button
+          size="sm"
+          variant="outline"
           onClick={() => onEdit(draft)}
-          className="flex items-center gap-1.5 text-xs bg-[#1a1a24] hover:bg-[#2a2a3a] border border-[#2a2a3a] text-[#94a3b8] hover:text-[#e2e8f0] rounded-lg px-3 py-1.5 transition-colors"
         >
           <Edit2 size={12} />
           Edit
-        </button>
+        </Button>
 
         {draft.status === 'draft' && (
-          <button
+          <Button
+            size="sm"
+            variant="success"
             onClick={() => onApprove(draft.id)}
-            className="flex items-center gap-1.5 text-xs bg-[#064e3b]/30 hover:bg-[#064e3b]/50 border border-[#065f46]/40 text-[#10b981] rounded-lg px-3 py-1.5 transition-colors"
           >
             <CheckCircle2 size={12} />
             Approve
-          </button>
+          </Button>
         )}
 
         {draft.status === 'approved' && (
-          <button
+          <Button
+            size="sm"
+            variant="default"
             onClick={() => onPost(draft.id)}
-            className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-3 py-1.5 transition-colors"
           >
             <Send size={12} />
             Post
-          </button>
+          </Button>
         )}
 
-        <button
+        <Button
+          size="sm"
+          variant="destructive"
+          className="ml-auto"
           onClick={() => onDelete(draft.id)}
-          className="flex items-center gap-1.5 text-xs bg-[#7f1d1d]/20 hover:bg-[#7f1d1d]/30 border border-[#991b1b]/30 text-[#f87171] rounded-lg px-3 py-1.5 transition-colors ml-auto"
         >
           <Trash2 size={12} />
           Delete
-        </button>
+        </Button>
       </div>
     </div>
   );

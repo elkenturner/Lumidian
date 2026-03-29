@@ -16,7 +16,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 // Mirrored from middleware.ts — paths that don't require authentication
-const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password'];
+const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/team/accept'];
 
 // Set/clear the JS-accessible session flag that Next.js middleware reads.
 // (The httponly clarity_token is set by the backend; this companion cookie
@@ -56,8 +56,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   async function login(email: string, password: string) {
-    const u = await authLogin(email, password);
-    setUser(u);
+    const result = await authLogin(email, password);
+    // If server requires 2FA, propagate the challenge so the login page can show the TOTP step.
+    if ('requires_2fa' in result && result.requires_2fa) {
+      throw Object.assign(new Error('2fa_required'), { challenge_token: result.challenge_token });
+    }
+    setUser(result as import('@/lib/api').AuthUser);
     setSessionCookie();
   }
 

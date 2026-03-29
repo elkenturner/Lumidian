@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.routers.billing import DAILY_RUN_LIMITS
 from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_active_subscription
 from app.models import Brand, TrackingRun
 from app.schemas import ManualRunResponse, TrackingRunStatus, TrackingRunSummary
@@ -41,8 +42,10 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
     check_rate_limit(user.id, limit=3)  # 3 manual runs per minute per user (burst protection)
     await get_brand_for_user(brand_id, db, user)
 
-    # Enforce daily manual run limit for free-plan users only
-    if not user.is_admin and not user.subscription_tier:
+    # Enforce daily manual run limits by tier (source of truth: billing.DAILY_RUN_LIMITS)
+    tier = user.subscription_tier or None
+    daily_limit = DAILY_RUN_LIMITS.get(tier) if not user.is_admin else None
+    if daily_limit is not None:
         from datetime import datetime, timezone
         from sqlalchemy import func
         today_start = datetime.now(timezone.utc).replace(
@@ -58,10 +61,11 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
             )
         )
         runs_today = runs_today_result.scalar_one()
-        if runs_today >= 1:
+        if runs_today >= daily_limit:
+            plan_label = "Free plan" if not tier else "Starter plan"
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Free plan includes 1 report run per day. Your limit resets at midnight UTC. Upgrade to Starter or Pro for unlimited runs.",
+                detail=f"{plan_label} includes {daily_limit} manual run{'s' if daily_limit > 1 else ''} per day. Your limit resets at midnight UTC. Upgrade to Pro for unlimited runs.",
             )
 
     # Pre-create the TrackingRun record so we can return its ID immediately.

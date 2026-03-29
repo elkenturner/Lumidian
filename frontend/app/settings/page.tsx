@@ -21,10 +21,8 @@ import {
   Shield,
   BarChart2,
   BookOpen,
-  ToggleLeft,
-  ToggleRight,
-  Radio,
   Sparkles,
+  Wand2,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -39,10 +37,9 @@ import {
   removeCompetitor,
   getBrandProfile,
   updateBrandProfile,
+  aiFillProfile,
   refreshWebsiteContext,
   normaliseWebsiteUrl,
-  getContentSettings,
-  updateContentSettings,
   getSuggestedPrompts,
   getSchedulerStatus,
   setSchedulerStatus,
@@ -54,7 +51,6 @@ import {
   Prompt,
   Competitor,
   BrandProfile,
-  BrandContentSettings,
   Publication,
   TeamMember,
 } from '@/lib/api';
@@ -118,14 +114,14 @@ function EditableList({
         {items.map((item, idx) => (
           <span
             key={idx}
-            className="flex items-center gap-1.5 px-3 py-1 bg-[#6366f1]/10 border border-[#6366f1]/30 rounded-full text-sm text-[#6366f1]"
+            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 bg-[#6366f1]/10 border border-[#6366f1]/30 rounded-md text-xs text-[#818cf8] leading-snug"
           >
             {item}
             <button
               onClick={() => onChange(items.filter((_, i) => i !== idx))}
-              className="text-[#6366f1]/60 hover:text-[#6366f1] transition-colors"
+              className="shrink-0 text-[#6366f1]/50 hover:text-[#f87171] transition-colors"
             >
-              <X size={12} />
+              <X size={11} />
             </button>
           </span>
         ))}
@@ -183,7 +179,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       <div className="flex items-start gap-3 mb-4">
         <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] flex items-center justify-center shrink-0 mt-0.5">
           <Icon size={15} className="text-[#6366f1]" />
@@ -223,7 +219,7 @@ function PublicationsEditor({
   return (
     <div className="space-y-3">
       {items.map((pub, idx) => (
-        <div key={idx} className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-lg p-3 space-y-2">
+        <div key={idx} className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-lg p-3 space-y-2">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-[#64748B] font-medium">Publication {idx + 1}</span>
             <button onClick={() => remove(idx)} className="text-[#475569] hover:text-[#f87171] transition-colors">
@@ -265,7 +261,7 @@ function PublicationsEditor({
       <button
         type="button"
         onClick={add}
-        className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#6366f1] border border-dashed border-[rgba(99,102,241,0.15)] hover:border-[#6366f1]/40 rounded-lg px-3 py-2 transition-colors w-full justify-center"
+        className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#6366f1] border border-dashed border-[rgba(99,102,241,0.22)] hover:border-[#6366f1]/40 rounded-lg px-3 py-2 transition-colors w-full justify-center"
       >
         <Plus size={13} />
         Add publication
@@ -295,6 +291,7 @@ export default function SettingsPage() {
   const [contextFailed, setContextFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [newPromptText, setNewPromptText] = useState('');
   const [addingPrompt, setAddingPrompt] = useState(false);
   const [deletingPromptId, setDeletingPromptId] = useState<number | null>(null);
@@ -305,7 +302,6 @@ export default function SettingsPage() {
   const [newCompetitorName, setNewCompetitorName] = useState('');
   const [addingCompetitor, setAddingCompetitor] = useState(false);
   const [deletingCompetitorId, setDeletingCompetitorId] = useState<number | null>(null);
-  const [draftSettings, setDraftSettings] = useState<BrandContentSettings[]>([]);
   const [showDeleteBrandConfirm, setShowDeleteBrandConfirm] = useState(false);
   const [deletingBrand, setDeletingBrand] = useState(false);
 
@@ -320,6 +316,9 @@ export default function SettingsPage() {
   const [publications, setPublications] = useState<Publication[]>([]);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState<string | null>(null);
+  const [aiFilling, setAiFilling] = useState(false);
+  const [aiFillError, setAiFillError] = useState<string | null>(null);
 
   // Account tab state
   const [displayName, setDisplayName] = useState('');
@@ -327,8 +326,6 @@ export default function SettingsPage() {
   const [schedulerPaused, setSchedulerPaused] = useState(false);
   const [schedulerLoading, setSchedulerLoading] = useState(true);
   const [schedulerError, setSchedulerError] = useState<string | null>(null);
-  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
-  const [deleteAccountInput, setDeleteAccountInput] = useState('');
 
   // Team tab state
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
@@ -340,7 +337,7 @@ export default function SettingsPage() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
 
-  useEffect(() => { document.title = 'Settings — ClarityAI'; }, []);
+  useEffect(() => { document.title = 'Settings — Lumidian'; }, []);
 
   useEffect(() => {
     async function load() {
@@ -355,7 +352,6 @@ export default function SettingsPage() {
             getBrand(brands[0].id),
             getCompetitors(brands[0].id),
             getBrandProfile(brands[0].id).catch(() => null),
-            getContentSettings(brands[0].id).catch(() => [] as BrandContentSettings[]),
           ]);
         });
 
@@ -378,18 +374,16 @@ export default function SettingsPage() {
         const firstBrand = brands[0];
         setBrandId(firstBrand.id);
 
-        const [brandDetail, comps, prof, settings] = (details ?? await Promise.all([
+        const [brandDetail, comps, prof] = (details ?? await Promise.all([
           getBrand(firstBrand.id),
           getCompetitors(firstBrand.id),
           getBrandProfile(firstBrand.id).catch(() => null),
-          getContentSettings(firstBrand.id).catch(() => [] as BrandContentSettings[]),
-        ])) as [BrandDetail, Competitor[], BrandProfile | null, BrandContentSettings[]];
+        ])) as [BrandDetail, Competitor[], BrandProfile | null];
 
         setBrand(brandDetail);
         setEditName(brandDetail.name);
         setEditWebsiteUrl(brandDetail.website_url ?? '');
         setCompetitors(comps);
-        setDraftSettings(settings);
 
         if (prof) {
           setProfile(prof);
@@ -443,8 +437,9 @@ export default function SettingsPage() {
       setInviteEmail('');
       const updated = await getTeamMembers();
       setTeamMembers(updated);
-    } catch (e: any) {
-      setInviteError(e?.response?.data?.detail ?? 'Failed to send invite');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      setInviteError(err?.response?.data?.detail ?? 'Failed to send invite');
     } finally {
       setInviting(false);
     }
@@ -464,6 +459,7 @@ export default function SettingsPage() {
   async function handleSave() {
     if (!brandId || !editName.trim()) return;
     setSaving(true);
+    setSaveError(null);
     const normalisedUrl = normaliseWebsiteUrl(editWebsiteUrl);
     const urlChanged = normalisedUrl !== (brand?.website_url ?? '');
     try {
@@ -474,6 +470,9 @@ export default function SettingsPage() {
       setBrand((prev) => prev ? { ...prev, ...updated } : null);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 2000);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      setSaveError(err?.response?.data?.detail ?? 'Failed to save changes. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -614,24 +613,6 @@ export default function SettingsPage() {
     }
   }
 
-  async function handleToggleDraftPlatform(platform: string, enabled: boolean) {
-    if (!brandId) return;
-    const updated = await updateContentSettings(brandId, platform, { enabled });
-    setDraftSettings((prev) =>
-      prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))
-    );
-  }
-
-  async function handleDraftFreqChange(platform: string, freq: string) {
-    if (!brandId) return;
-    const updated = await updateContentSettings(brandId, platform, {
-      drafting_frequency: freq as BrandContentSettings['drafting_frequency'],
-    });
-    setDraftSettings((prev) =>
-      prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))
-    );
-  }
-
   async function handleDeleteBrand() {
     if (!brandId) return;
     setDeletingBrand(true);
@@ -645,9 +626,31 @@ export default function SettingsPage() {
 
   // ── Profile handlers ────────────────────────────────────────────────────────
 
+  async function handleAiFill() {
+    if (!brandId) return;
+    setAiFilling(true);
+    setAiFillError(null);
+    try {
+      const result = await aiFillProfile(brandId);
+      if (result.company_description) setCompanyDescription(result.company_description);
+      if (result.target_audience) setTargetAudience(result.target_audience);
+      if (result.tone_of_voice) setToneOfVoice(result.tone_of_voice);
+      if (result.key_stats.length > 0) setKeyStats((prev) => {
+        const combined = [...prev, ...result.key_stats.filter((s) => !prev.includes(s))];
+        return combined;
+      });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setAiFillError(e?.response?.data?.detail || 'AI fill failed. Please try again.');
+    } finally {
+      setAiFilling(false);
+    }
+  }
+
   async function handleProfileSave() {
     if (!brandId) return;
     setProfileSaving(true);
+    setProfileSaveError(null);
     try {
       const updated = await updateBrandProfile(brandId, {
         company_description: companyDescription,
@@ -661,6 +664,9 @@ export default function SettingsPage() {
       setProfile(updated);
       setProfileSaved(true);
       setTimeout(() => setProfileSaved(false), 2500);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      setProfileSaveError(err?.response?.data?.detail ?? 'Failed to save profile. Please try again.');
     } finally {
       setProfileSaving(false);
     }
@@ -691,11 +697,11 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 max-w-3xl">
+      <div className="p-4 sm:p-8 max-w-5xl">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-32" />
           <div className="h-10 bg-[rgba(255,255,255,0.06)] rounded w-64" />
-          <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl" />
+          <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
         </div>
       </div>
     );
@@ -704,17 +710,17 @@ export default function SettingsPage() {
   const completionPct = profile?.completion_pct ?? 0;
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-3xl">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#F0F4F8]">Settings</h1>
-        <p className="text-sm text-[#64748B] mt-1">
+        <p className="text-[13px] text-[#64748B] mt-1.5">
           {brand ? `Managing settings for ${brand.name}` : 'Manage your account preferences'}
         </p>
       </div>
 
       {/* Tab navigation */}
-      <div className="flex gap-1 border-b border-[rgba(99,102,241,0.15)] mb-6">
+      <div className="flex gap-1 border-b border-[rgba(99,102,241,0.22)] mb-6">
         {(['general', 'profile', 'team'] as SettingsTab[]).map((tab) => (
           <button
             key={tab}
@@ -733,10 +739,12 @@ export default function SettingsPage() {
 
       {/* ── GENERAL TAB ──────────────────────────────────────────────────────── */}
       {activeTab === 'general' && brand && (
-        <div className="space-y-5">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+          {/* Left column */}
+          <div className="space-y-6">
           {/* Brand Settings */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-            <h2 className="text-base font-semibold text-[#F0F4F8] mb-5">Brand Settings</h2>
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <h2 className="text-[15px] font-semibold text-[#F0F4F8] pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">Brand Settings</h2>
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-[#94A3B8] mb-2">Brand Name</label>
@@ -783,7 +791,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 mt-5 pt-5 border-t border-[rgba(99,102,241,0.15)]">
+            <div className="flex items-center gap-3 mt-5 pt-5 border-t border-[rgba(99,102,241,0.22)]">
               <button
                 onClick={handleSave}
                 disabled={saving || saveSuccess}
@@ -797,16 +805,23 @@ export default function SettingsPage() {
                   <><Save size={14} />Save Changes</>
                 )}
               </button>
+              {saveError && (
+                <p className="text-xs text-[#f87171]">{saveError}</p>
+              )}
             </div>
           </div>
 
           {/* Tracking Prompts */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-            <div className="flex items-center justify-between mb-5">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="flex items-center justify-between pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">
               <div>
-                <h2 className="text-base font-semibold text-[#F0F4F8]">Tracking Prompts</h2>
+                <h2 className="text-[15px] font-semibold text-[#F0F4F8]">Tracking Prompts</h2>
                 <p className="text-xs text-[#64748B] mt-0.5">
-                  {brand.prompts.length} prompt{brand.prompts.length !== 1 ? 's' : ''} configured
+                  {(() => {
+                    const limit = brand.brand_type === 'pitch' ? 10 : (user?.prompt_limit ?? 25);
+                    const color = brand.prompts.length >= limit ? '#f87171' : brand.prompts.length >= limit * 0.8 ? '#f59e0b' : '#64748B';
+                    return <span style={{ color }}>{brand.prompts.length}/{limit} prompts</span>;
+                  })()}
                 </p>
               </div>
               <button
@@ -839,7 +854,7 @@ export default function SettingsPage() {
             </div>
 
             {brand.prompts.length === 0 ? (
-              <div className="flex flex-col items-center py-8 text-center border border-dashed border-[rgba(99,102,241,0.15)] rounded-lg bg-[rgba(255,255,255,0.03)]">
+              <div className="flex flex-col items-center py-8 text-center border border-dashed border-[rgba(99,102,241,0.22)] rounded-lg bg-[rgba(255,255,255,0.03)]">
                 <MessageSquare size={18} className="text-[#475569] mb-2" />
                 <p className="text-sm text-[#475569]">No prompts yet</p>
                 <p className="text-xs text-[#475569] mt-0.5">Add your first prompt above</p>
@@ -872,7 +887,7 @@ export default function SettingsPage() {
 
             {showSuggestions && (
               <div className="mt-4 border border-[rgba(255,255,255,0.10)] rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-[rgba(255,255,255,0.06)] border-b border-[rgba(99,102,241,0.15)]">
+                <div className="flex items-center justify-between px-4 py-2.5 bg-[rgba(255,255,255,0.06)] border-b border-[rgba(99,102,241,0.22)]">
                   <div className="flex items-center gap-2">
                     <Sparkles size={13} className="text-[#6366f1]" />
                     <span className="text-xs font-semibold text-[#F0F4F8]">Suggested Prompts</span>
@@ -897,9 +912,9 @@ export default function SettingsPage() {
                   </div>
                 ) : (
                   <div className="divide-y divide-[rgba(255,255,255,0.08)] max-h-72 overflow-y-auto">
-                    {suggestions.map((s, i) => (
+                    {suggestions.map((s) => (
                       <button
-                        key={i}
+                        key={s}
                         onClick={() => handleAddSuggestion(s)}
                         className="w-full text-left px-4 py-2.5 flex items-start gap-2.5 hover:bg-[rgba(255,255,255,0.06)] transition-colors group"
                       >
@@ -912,11 +927,13 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
+          </div>
 
+          <div className="space-y-6">
           {/* Competitors */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-            <div className="mb-5">
-              <h2 className="text-base font-semibold text-[#F0F4F8]">Competitors</h2>
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">
+              <h2 className="text-[15px] font-semibold text-[#F0F4F8]">Competitors</h2>
               <p className="text-xs text-[#64748B] mt-0.5">Track competitor mention rates alongside your brand</p>
             </div>
             <div className="flex gap-2 mb-4">
@@ -938,7 +955,7 @@ export default function SettingsPage() {
               </button>
             </div>
             {competitors.length === 0 ? (
-              <div className="flex flex-col items-center py-8 text-center border border-dashed border-[rgba(99,102,241,0.15)] rounded-lg bg-[rgba(255,255,255,0.03)]">
+              <div className="flex flex-col items-center py-8 text-center border border-dashed border-[rgba(99,102,241,0.22)] rounded-lg bg-[rgba(255,255,255,0.03)]">
                 <Building2 size={18} className="text-[#475569] mb-2" />
                 <p className="text-sm text-[#475569]">No competitors tracked</p>
                 <p className="text-xs text-[#475569] mt-0.5 opacity-60">Add one above to unlock Share of Voice</p>
@@ -970,109 +987,13 @@ export default function SettingsPage() {
             )}
           </div>
 
-          {/* Drafting / Platform Toggles */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-            <div className="flex items-center gap-2 mb-5">
-              <Radio size={16} className="text-[#6366f1]" />
-              <div>
-                <h2 className="text-base font-semibold text-[#F0F4F8]">Drafting Platforms</h2>
-                <p className="text-xs text-[#64748B] mt-0.5">
-                  Toggle platforms on/off and set auto-draft frequency. Changes save immediately.
-                </p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((platform) => {
-                const setting = draftSettings.find((s) => s.platform === platform);
-                const enabled = setting?.enabled ?? true;
-                const freq = setting?.drafting_frequency ?? 'weekly';
-                const FREQ_OPTIONS = [
-                  { value: 'daily', label: 'Daily' },
-                  { value: 'every_3_days', label: 'Every 3 days' },
-                  { value: 'weekly', label: 'Weekly' },
-                  { value: 'manual', label: 'Manual only' },
-                ];
-                return (
-                  <div key={platform} className="flex items-center gap-3 py-2 border-b border-[rgba(99,102,241,0.15)] last:border-0">
-                    <button
-                      onClick={() => handleToggleDraftPlatform(platform, !enabled)}
-                      className="text-[#475569] hover:text-[#94A3B8] transition-colors shrink-0"
-                      title={enabled ? 'Disable platform' : 'Enable platform'}
-                    >
-                      {enabled ? (
-                        <ToggleRight size={20} className="text-[#6366f1]" />
-                      ) : (
-                        <ToggleLeft size={20} />
-                      )}
-                    </button>
-                    <span className="text-sm text-[#94A3B8] capitalize w-24 shrink-0">{platform}</span>
-                    {enabled ? (
-                      <select
-                        value={freq}
-                        onChange={(e) => handleDraftFreqChange(platform, e.target.value)}
-                        className="flex-1 appearance-none bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-[#6366f1]"
-                      >
-                        {FREQ_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <span className="flex-1 text-xs text-[#475569]">Disabled</span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Delete Brand */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-red-900/40 rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-            <h2 className="text-base font-semibold text-red-400 mb-2 flex items-center gap-2">
-              <AlertTriangle size={16} />
-              Delete Brand
-            </h2>
-            <p className="text-sm text-[#64748B] mb-5">
-              Permanently removes all tracking data, runs, and results for this brand. Cannot be undone.
-            </p>
-            {!showDeleteBrandConfirm ? (
-              <button
-                onClick={() => setShowDeleteBrandConfirm(true)}
-                className="flex items-center gap-2 bg-red-900/20 hover:bg-red-900/30 border border-red-900/50 text-red-400 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-              >
-                <Trash2 size={14} />
-                Delete Brand
-              </button>
-            ) : (
-              <div className="bg-red-900/10 border border-red-900/40 rounded-lg p-4">
-                <p className="text-sm font-medium text-[#F0F4F8] mb-3">
-                  Are you sure you want to delete &quot;{brand.name}&quot;?
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowDeleteBrandConfirm(false)}
-                    disabled={deletingBrand}
-                    className="bg-[rgba(255,255,255,0.06)] border border-[rgba(99,102,241,0.15)] text-[#94A3B8] rounded-lg px-4 py-2 text-sm font-medium hover:bg-[rgba(255,255,255,0.10)] transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleDeleteBrand}
-                    disabled={deletingBrand}
-                    className="flex items-center gap-2 bg-red-700 hover:bg-red-600 disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-                  >
-                    {deletingBrand ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-                    Yes, Delete Brand
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
 
       {activeTab === 'general' && !brand && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-12 h-12 rounded-xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] flex items-center justify-center mb-4">
+          <div className="w-12 h-12 rounded-xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] flex items-center justify-center mb-4">
             <Building2 size={20} className="text-[#6366f1]/50" />
           </div>
           <p className="text-sm font-medium text-[#F0F4F8] mb-1">No brand yet</p>
@@ -1087,7 +1008,7 @@ export default function SettingsPage() {
       {activeTab === 'profile' && (
         <div>
           {profile && (
-            <div className="mb-5 p-4 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="mb-5 p-4 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-[#94A3B8]">Profile Completion</span>
                 <span className="text-xs text-[#64748B]">
@@ -1098,12 +1019,29 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div className="flex justify-end mb-4">
+          <div className="flex items-center justify-between mb-4 gap-3">
+            {/* AI Fill button — only shown when website is set */}
+            <div className="flex items-center gap-3">
+              {editWebsiteUrl ? (
+                <button
+                  onClick={handleAiFill}
+                  disabled={aiFilling || profileSaving}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.18)] border border-[rgba(99,102,241,0.28)] text-[#818cf8] disabled:opacity-50 transition-all"
+                  title="Scan website and auto-fill profile fields"
+                >
+                  {aiFilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+                  {aiFilling ? 'Scanning website…' : 'Fill from website'}
+                </button>
+              ) : (
+                <p className="text-xs text-[#475569]">Add a website URL in Brand Settings to enable AI fill.</p>
+              )}
+              {aiFillError && <p className="text-xs text-[#f87171]">{aiFillError}</p>}
+            </div>
             <button
               onClick={handleProfileSave}
               disabled={profileSaving}
               className={clsx(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shrink-0',
                 profileSaved
                   ? 'bg-[#064e3b]/30 text-[#10b981] border border-[#065f46]/40'
                   : 'bg-[#6366f1] text-white hover:bg-[#4f46e5] disabled:opacity-50'
@@ -1204,7 +1142,10 @@ export default function SettingsPage() {
             </SectionCard>
           </div>
 
-          <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex items-center justify-end gap-3">
+            {profileSaveError && (
+              <p className="text-xs text-[#f87171]">{profileSaveError}</p>
+            )}
             <button
               onClick={handleProfileSave}
               disabled={profileSaving}
@@ -1228,7 +1169,7 @@ export default function SettingsPage() {
       {/* ── TEAM TAB ─────────────────────────────────────────────────────────── */}
       {activeTab === 'team' && (
         <div className="space-y-5">
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <h2 className="text-base font-semibold text-[#F0F4F8] mb-1">Invite Team Members</h2>
             <p className="text-sm text-[#64748B] mb-4">Team members get read-only access to your brands, reports, and drafts. They cannot trigger runs or change settings.</p>
 
@@ -1272,7 +1213,7 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <h2 className="text-base font-semibold text-[#F0F4F8] mb-4">Team Members</h2>
             {teamLoading ? (
               <div className="flex items-center gap-2 text-[#64748B] text-sm"><Loader2 size={14} className="animate-spin" />Loading…</div>
@@ -1315,6 +1256,55 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* Delete brand confirmation modal */}
+      {showDeleteBrandConfirm && brand && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowDeleteBrandConfirm(false)} />
+          <div className="relative bg-[rgba(10,14,24,0.97)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+            <h3 className="text-sm font-semibold text-[#F0F4F8] mb-2">Are you sure?</h3>
+            <p className="text-xs text-[#64748B] mb-5 leading-relaxed">
+              This will permanently delete all tracking data, runs, and results for <span className="text-[#F0F4F8] font-medium">{brand.name}</span>. This cannot be undone.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowDeleteBrandConfirm(false)}
+                disabled={deletingBrand}
+                className="flex-1 py-2 text-xs text-[#64748B] hover:text-[#94A3B8] border border-[rgba(99,102,241,0.22)] rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteBrand}
+                disabled={deletingBrand}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium text-white bg-red-600 hover:bg-red-500 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {deletingBrand ? <Loader2 size={11} className="animate-spin" /> : null}
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete brand — visible but not alarming */}
+      {brand && (
+        <div className="mt-8 pt-5 border-t border-[rgba(255,255,255,0.06)]">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-[#94A3B8]">Delete brand</p>
+              <p className="text-xs text-[#475569] mt-0.5">Permanently removes this brand and all its tracking data</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowDeleteBrandConfirm(true)}
+              className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#f87171] border border-[rgba(255,255,255,0.10)] hover:border-red-900/40 rounded-lg px-3 py-1.5 transition-colors shrink-0"
+            >
+              <Trash2 size={12} />
+              Delete brand
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -156,7 +156,7 @@ async def run_migrations():
         "ALTER TABLE content_drafts ADD COLUMN time_to_approve_seconds INTEGER",
         # Multi-user isolation: assign orphaned brands to the admin user
         """UPDATE brands SET user_id = (
-            SELECT id FROM users WHERE email = 'ken@clarityai.com' LIMIT 1
+            SELECT id FROM users WHERE email = 'ken@lumidian.ai' LIMIT 1
         ) WHERE user_id IS NULL""",
         # Website scraping: website_url on brands
         "ALTER TABLE brands ADD COLUMN website_url TEXT",
@@ -253,6 +253,12 @@ async def run_migrations():
         "ALTER TABLE users ADD COLUMN subscription_trial_end DATETIME",
         # Index for efficient daily manual run count query (used in plan enforcement)
         "CREATE INDEX IF NOT EXISTS idx_tracking_runs_manual_daily ON tracking_runs(brand_id, run_type, created_at)",
+        # Track whether a draft was created by the scheduler or by a user manually
+        "ALTER TABLE content_drafts ADD COLUMN source TEXT",
+        "CREATE INDEX IF NOT EXISTS idx_content_drafts_source ON content_drafts(brand_id, source, created_at)",
+        # Two-factor authentication (TOTP)
+        "ALTER TABLE users ADD COLUMN totp_secret TEXT",
+        "ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

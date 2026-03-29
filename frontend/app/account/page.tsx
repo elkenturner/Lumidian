@@ -5,45 +5,47 @@ import {
   User,
   Save,
   AlertTriangle,
-  Calendar,
-  Pause,
-  Play,
   Loader2,
   Trash2,
   CreditCard,
   ReceiptText,
   Zap,
   X,
+  ShieldCheck,
+  ShieldOff,
+  QrCode,
 } from 'lucide-react';
 import {
-  getSchedulerStatus,
-  setSchedulerStatus,
   getBillingStatus,
   createCheckoutSession,
   createPortalSession,
   cancelSubscription,
+  changePlan,
+  setup2fa,
+  enable2fa,
+  disable2fa,
   BillingStatus,
+  TotpSetupData,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 const PLANS = [
   {
     key: null,
-    label: 'Free',
-    price: '$0/mo',
-    features: ['1 pitch deck (10 prompts, 30-day)', 'No credit card required', '4 AI models tracked', 'Visibility scoring', '1 manual run per day'],
+    label: 'Free Trial',
+    price: '$0 for 30 days',
+    features: ['1 pitch brand (10 prompts)', 'No credit card required', '4 AI models tracked', 'Visibility scoring', '1 manual run per day', 'No content drafting'],
   },
   {
     key: 'starter',
     label: 'Starter',
     price: '$300/mo',
-    trial: true,
     features: [
       '2 standard brands (25 prompts each)',
-      '3 pitch decks (30-day each)',
-      '1 manual run per day',
+      '1 pitch deck (30 days)',
+      '3 manual runs per day',
+      '10 content drafts per week',
       'Content Hub & gap analysis',
-      'Brand profile & voice',
       'Email support',
     ],
   },
@@ -51,11 +53,11 @@ const PLANS = [
     key: 'pro',
     label: 'Pro',
     price: '$500/mo',
-    trial: true,
     features: [
-      '4 standard brands (100 prompts each)',
-      'Unlimited pitch decks',
+      '2 standard brands (100 prompts each)',
+      '3 pitch decks (30 days each)',
       'Unlimited manual runs',
+      '10 content drafts per week',
       'Content Hub & gap analysis',
       'Priority support',
     ],
@@ -76,18 +78,30 @@ export default function AccountPage() {
   const [portalLoading, setPortalLoading] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [switchLoading, setSwitchLoading] = useState<string | null>(null);
+  const [switchSuccess, setSwitchSuccess] = useState<string | null>(null);
   const [billingError, setBillingError] = useState<string | null>(null);
 
-  // Scheduler
-  const [schedulerPaused, setSchedulerPaused] = useState(false);
-  const [schedulerLoading, setSchedulerLoading] = useState(true);
-  const [schedulerError, setSchedulerError] = useState<string | null>(null);
+  // 2FA
+  const [twoFaEnabled, setTwoFaEnabled] = useState(false);
+  const [totpSetup, setTotpSetup] = useState<TotpSetupData | null>(null);
+  const [totpConfirmCode, setTotpConfirmCode] = useState('');
+  const [totpDisablePassword, setTotpDisablePassword] = useState('');
+  const [showDisable2fa, setShowDisable2fa] = useState(false);
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
+  const [twoFaError, setTwoFaError] = useState<string | null>(null);
+  const [twoFaSuccess, setTwoFaSuccess] = useState<string | null>(null);
 
   // Danger zone
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [deleteAccountInput, setDeleteAccountInput] = useState('');
 
-  useEffect(() => { document.title = 'Account — ClarityAI'; }, []);
+  useEffect(() => { document.title = 'Account — Lumidian'; }, []);
+
+  // Sync 2FA state from user object once loaded
+  useEffect(() => {
+    if (user) setTwoFaEnabled(user.totp_enabled ?? false);
+  }, [user]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -104,10 +118,6 @@ export default function AccountPage() {
       .then(setBilling)
       .catch(() => setBillingError('Could not load billing status'))
       .finally(() => setBillingLoading(false));
-
-    getSchedulerStatus()
-      .then((s) => { setSchedulerPaused(s.paused); setSchedulerLoading(false); })
-      .catch(() => setSchedulerLoading(false));
   }, []);
 
   function handleAccountSave() {
@@ -144,6 +154,23 @@ export default function AccountPage() {
     }
   }
 
+  async function handleSwitch(tier: string) {
+    setSwitchLoading(tier);
+    setBillingError(null);
+    setSwitchSuccess(null);
+    try {
+      await changePlan(tier);
+      const updated = await getBillingStatus();
+      setBilling(updated);
+      setSwitchSuccess(`Switched to ${tier.charAt(0).toUpperCase() + tier.slice(1)}. Billing adjusts at your next renewal.`);
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setBillingError(msg ?? 'Could not switch plan. Please try again.');
+    } finally {
+      setSwitchLoading(null);
+    }
+  }
+
   async function handleCancel() {
     setCancelLoading(true);
     setBillingError(null);
@@ -159,16 +186,55 @@ export default function AccountPage() {
     }
   }
 
-  async function handleToggleScheduler() {
-    setSchedulerLoading(true);
-    setSchedulerError(null);
+  function handleDeleteAccount() {
+    window.location.href = 'mailto:support@lumidian.ai?subject=Account%20Deletion%20Request&body=Please%20delete%20my%20account%20and%20all%20associated%20data.';
+  }
+
+  async function handleSetup2fa() {
+    setTwoFaLoading(true);
+    setTwoFaError(null);
+    setTwoFaSuccess(null);
     try {
-      const result = await setSchedulerStatus(!schedulerPaused);
-      setSchedulerPaused(result.paused);
+      const data = await setup2fa();
+      setTotpSetup(data);
     } catch {
-      setSchedulerError('Failed to update scheduler. Check that the backend is running.');
+      setTwoFaError('Could not start 2FA setup. Please try again.');
     } finally {
-      setSchedulerLoading(false);
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleEnable2fa() {
+    setTwoFaLoading(true);
+    setTwoFaError(null);
+    try {
+      await enable2fa(totpConfirmCode.trim());
+      setTwoFaEnabled(true);
+      setTotpSetup(null);
+      setTotpConfirmCode('');
+      setTwoFaSuccess('Two-factor authentication is now enabled.');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setTwoFaError(msg ?? 'Invalid code. Please try again.');
+    } finally {
+      setTwoFaLoading(false);
+    }
+  }
+
+  async function handleDisable2fa() {
+    setTwoFaLoading(true);
+    setTwoFaError(null);
+    try {
+      await disable2fa(totpDisablePassword);
+      setTwoFaEnabled(false);
+      setShowDisable2fa(false);
+      setTotpDisablePassword('');
+      setTwoFaSuccess('Two-factor authentication has been disabled.');
+    } catch (e: unknown) {
+      const msg = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setTwoFaError(msg ?? 'Incorrect password.');
+    } finally {
+      setTwoFaLoading(false);
     }
   }
 
@@ -178,49 +244,19 @@ export default function AccountPage() {
   const isCanceling = subStatus === 'canceling';
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-3xl space-y-6">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
       {/* Header */}
-      <div className="mb-2">
+      <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#F0F4F8]">Account</h1>
-        <p className="text-sm text-[#64748B] mt-1">Manage your profile, subscription, and account settings</p>
+        <p className="text-[13px] text-[#64748B] mt-1.5">Manage your profile, subscription, and account settings</p>
       </div>
 
-      {/* Profile */}
-      <section className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 space-y-5 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
-        <div className="flex items-center gap-2 mb-1">
-          <User className="w-4 h-4 text-[#6366f1]" />
-          <h2 className="text-sm font-semibold text-[#F0F4F8]">Profile</h2>
-        </div>
-
-        {user && (
-          <div className="space-y-1">
-            <p className="text-xs text-[#64748B] uppercase tracking-wide">Email</p>
-            <p className="text-sm text-[#94A3B8]">{user.email}</p>
-          </div>
-        )}
-
-        <div>
-          <label className="block text-xs text-[#64748B] uppercase tracking-wide mb-1.5">Display Name</label>
-          <input
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="e.g. Acme Corp"
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.18)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#6366f1] placeholder-[#475569]"
-          />
-        </div>
-
-        <button
-          onClick={handleAccountSave}
-          className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
-        >
-          <Save className="w-4 h-4" />
-          {accountSaved ? 'Saved!' : 'Save Changes'}
-        </button>
-      </section>
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 items-start">
+        {/* Left column — billing */}
+        <div className="space-y-6">
 
       {/* Subscription */}
-      <section className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <section className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <CreditCard className="w-4 h-4 text-[#6366f1]" />
@@ -233,6 +269,13 @@ export default function AccountPage() {
           <div className="mb-4 flex items-center gap-2 text-xs text-[#fb923c] bg-[#451a03]/20 border border-[#78350f]/30 rounded-lg px-3 py-2.5">
             <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
             {billingError}
+          </div>
+        )}
+
+        {switchSuccess && (
+          <div className="mb-4 flex items-center gap-2 text-xs text-[#34d399] bg-[#022c22]/30 border border-[#064e3b]/40 rounded-lg px-3 py-2.5">
+            <Zap className="w-3.5 h-3.5 shrink-0" />
+            {switchSuccess}
           </div>
         )}
 
@@ -257,18 +300,11 @@ export default function AccountPage() {
               >
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-sm font-semibold text-[#F0F4F8]">{plan.label}</p>
-                  <div className="flex items-center gap-1">
-                    {plan.trial && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(16,185,129,0.15)] text-[#34d399] border border-[rgba(16,185,129,0.25)]">
-                        30-day trial
-                      </span>
-                    )}
-                    {isCurrent && (
-                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(99,102,241,0.25)] text-[#818CF8]">
-                        Current
-                      </span>
-                    )}
-                  </div>
+                  {isCurrent && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(99,102,241,0.25)] text-[#818CF8]">
+                      Current
+                    </span>
+                  )}
                 </div>
                 <p className="text-base font-bold text-[#6366f1] mb-3">{plan.price}</p>
                 <ul className="space-y-1 mb-4">
@@ -280,14 +316,25 @@ export default function AccountPage() {
                   ))}
                 </ul>
                 {!isCurrent && plan.key !== null && !billing?.is_admin && (
-                  <button
-                    onClick={() => handleUpgrade(plan.key!)}
-                    disabled={!!upgradeLoading}
-                    className="w-full py-1.5 text-xs font-medium rounded-lg bg-[#6366f1] hover:bg-[#4f46e5] text-white border-transparent border transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
-                  >
-                    {upgradeLoading === plan.key ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-                    {plan.trial ? 'Start Free Trial' : 'Upgrade'}
-                  </button>
+                  hasActiveSub ? (
+                    <button
+                      onClick={() => handleSwitch(plan.key!)}
+                      disabled={!!switchLoading}
+                      className="w-full py-1.5 text-xs font-medium rounded-lg bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.25)] text-[#818CF8] border border-[rgba(99,102,241,0.30)] transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {switchLoading === plan.key ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                      Switch to {plan.label}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleUpgrade(plan.key!)}
+                      disabled={!!upgradeLoading}
+                      className="w-full py-1.5 text-xs font-medium rounded-lg bg-[#6366f1] hover:bg-[#4f46e5] text-white border-transparent border transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                    >
+                      {upgradeLoading === plan.key ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                      Upgrade
+                    </button>
+                  )
                 )}
               </div>
             );
@@ -342,7 +389,7 @@ export default function AccountPage() {
       </section>
 
       {/* Billing History */}
-      <section className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <section className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <ReceiptText className="w-4 h-4 text-[#6366f1]" />
@@ -370,114 +417,218 @@ export default function AccountPage() {
         </div>
       </section>
 
-      {/* Automatic Scheduler */}
-      <section className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
-        <div className="flex items-center gap-2 mb-1">
-          <Calendar className="w-4 h-4 text-[#6366f1]" />
-          <h2 className="text-sm font-semibold text-[#F0F4F8]">Automatic Scheduler</h2>
-        </div>
-        <p className="text-xs text-[#475569] mb-5">
-          Controls the 8:00 AM and 8:00 PM UTC tracking sweeps, the nightly Reddit scan, and
-          auto-drafting. Manual &ldquo;Run Report Now&rdquo; always works regardless of this setting.
-        </p>
+        </div>{/* end left column */}
 
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {schedulerLoading ? (
-              <div className="w-[4.5rem] h-6 bg-[rgba(255,255,255,0.06)] rounded-full animate-pulse" />
-            ) : (
-              <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border ${schedulerPaused ? 'bg-[#451a03]/40 text-[#fb923c] border-[#78350f]/60' : 'bg-[#052e16]/40 text-[#34d399] border-[#065f46]/60'}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${schedulerPaused ? 'bg-[#fb923c]' : 'bg-[#34d399] animate-pulse'}`} />
-                {schedulerPaused ? 'Paused' : 'Active'}
-              </span>
-            )}
-            <p className="text-sm text-[#94A3B8]">
-              {schedulerPaused ? 'Scheduled runs will not fire' : 'Running at 8:00 AM and 8:00 PM UTC'}
-            </p>
-          </div>
+        {/* Right column — profile + scheduler + danger */}
+        <div className="space-y-5">
 
-          <button
-            type="button"
-            onClick={handleToggleScheduler}
-            disabled={schedulerLoading}
-            className={`flex items-center gap-2 text-sm font-medium rounded-lg px-4 py-2 border transition-colors disabled:opacity-50 ${
-              schedulerPaused
-                ? 'bg-[#052e16]/40 hover:bg-[#052e16]/70 border-[#065f46]/60 text-[#34d399]'
-                : 'bg-[#451a03]/30 hover:bg-[#451a03]/50 border-[#78350f]/50 text-[#fb923c]'
-            }`}
-          >
-            {schedulerLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : schedulerPaused ? <Play className="w-4 h-4" /> : <Pause className="w-4 h-4" />}
-            {schedulerLoading ? 'Updating…' : schedulerPaused ? 'Resume Scheduler' : 'Pause Scheduler'}
-          </button>
-        </div>
-
-        {schedulerPaused && !schedulerLoading && (
-          <div className="mt-4 flex items-start gap-2 text-xs text-[#fb923c] bg-[#451a03]/20 border border-[#78350f]/30 rounded-lg px-3 py-2.5">
-            <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-            <span>Automatic tracking, Reddit scanning, and auto-drafting are paused. Use &ldquo;Run Report Now&rdquo; on the Dashboard to trigger a manual run.</span>
-          </div>
-        )}
-        {schedulerError && <p className="mt-3 text-xs text-[#f87171]">{schedulerError}</p>}
-      </section>
-
-      {/* Danger Zone */}
-      <section className="border border-red-900/40 rounded-xl overflow-hidden">
-        <div className="px-6 py-4 bg-red-900/10">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-[#ef4444]" />
-            <h2 className="text-sm font-semibold text-[#ef4444]">Danger Zone</h2>
-          </div>
-        </div>
-        <div className="px-6 py-5 bg-[rgba(255,255,255,0.02)]">
-          <div className="flex items-start justify-between gap-6">
-            <div>
-              <p className="text-sm font-medium text-[#F0F4F8]">Delete account</p>
-              <p className="text-xs text-[#64748B] mt-0.5">
-                Permanently delete all brands, prompts, tracking history, and content drafts. This cannot be undone.
-              </p>
+          {/* Profile */}
+          <section className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 space-y-4 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <div className="flex items-center gap-2">
+              <User className="w-4 h-4 text-[#6366f1]" />
+              <h2 className="text-sm font-semibold text-[#F0F4F8]">Profile</h2>
             </div>
+
+            {user && (
+              <div className="space-y-1">
+                <p className="text-xs text-[#64748B] uppercase tracking-wide">Email</p>
+                <p className="text-sm text-[#94A3B8] break-all">{user.email}</p>
+              </div>
+            )}
+
+            <div>
+              <label className="block text-xs text-[#64748B] uppercase tracking-wide mb-1.5">Display Name</label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="e.g. Acme Corp"
+                className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.18)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#6366f1] placeholder-[#475569]"
+              />
+            </div>
+
+            <button
+              onClick={handleAccountSave}
+              className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            >
+              <Save className="w-4 h-4" />
+              {accountSaved ? 'Saved!' : 'Save Changes'}
+            </button>
+          </section>
+
+          {/* Two-Factor Authentication */}
+          <section className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 space-y-4 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-[#6366f1]" />
+              <h2 className="text-sm font-semibold text-[#F0F4F8]">Two-Factor Authentication</h2>
+              {twoFaEnabled && (
+                <span className="ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(52,211,153,0.15)] text-[#34d399]">ON</span>
+              )}
+            </div>
+
+            {twoFaError && (
+              <div className="flex items-center gap-2 text-xs text-[#fb923c] bg-[#451a03]/20 border border-[#78350f]/30 rounded-lg px-3 py-2.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                {twoFaError}
+              </div>
+            )}
+            {twoFaSuccess && (
+              <div className="flex items-center gap-2 text-xs text-[#34d399] bg-[#022c22]/30 border border-[#064e3b]/40 rounded-lg px-3 py-2.5">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                {twoFaSuccess}
+              </div>
+            )}
+
+            {/* Not yet set up */}
+            {!twoFaEnabled && !totpSetup && (
+              <div>
+                <p className="text-xs text-[#64748B] mb-3 leading-relaxed">
+                  Add an extra layer of security. You&apos;ll need an authenticator app like Google Authenticator or 1Password.
+                </p>
+                <button
+                  onClick={handleSetup2fa}
+                  disabled={twoFaLoading}
+                  className="flex items-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.25)] text-[#818CF8] border border-[rgba(99,102,241,0.30)] rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {twoFaLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <QrCode className="w-4 h-4" />}
+                  Set up 2FA
+                </button>
+              </div>
+            )}
+
+            {/* QR setup flow */}
+            {!twoFaEnabled && totpSetup && (
+              <div className="space-y-3">
+                <p className="text-xs text-[#64748B] leading-relaxed">
+                  Scan this QR code with your authenticator app, then enter the 6-digit code to confirm.
+                </p>
+                <div className="flex justify-center">
+                  <img src={totpSetup.qr_code} alt="2FA QR code" className="rounded-lg w-40 h-40" />
+                </div>
+                <div className="bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-lg px-3 py-2">
+                  <p className="text-[10px] text-[#64748B] mb-1">Can&apos;t scan? Enter this secret manually:</p>
+                  <p className="text-xs text-[#94A3B8] font-mono tracking-widest break-all">{totpSetup.secret}</p>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={totpConfirmCode}
+                    onChange={(e) => setTotpConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="000000"
+                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.18)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1] placeholder-[#475569] font-mono tracking-widest text-center"
+                  />
+                  <button
+                    onClick={handleEnable2fa}
+                    disabled={twoFaLoading || totpConfirmCode.length !== 6}
+                    className="flex items-center gap-1.5 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40"
+                  >
+                    {twoFaLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    Activate
+                  </button>
+                </div>
+                <button
+                  onClick={() => { setTotpSetup(null); setTotpConfirmCode(''); setTwoFaError(null); }}
+                  className="text-xs text-[#475569] hover:text-[#64748B] transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {/* Disable flow */}
+            {twoFaEnabled && (
+              <div>
+                {!showDisable2fa ? (
+                  <button
+                    onClick={() => setShowDisable2fa(true)}
+                    className="flex items-center gap-2 text-xs text-[#475569] hover:text-[#f87171] border border-[rgba(255,255,255,0.08)] hover:border-red-900/30 rounded-lg px-3 py-1.5 transition-colors"
+                  >
+                    <ShieldOff className="w-3.5 h-3.5" />
+                    Disable 2FA
+                  </button>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-xs text-[#64748B]">Enter your password to confirm.</p>
+                    <input
+                      type="password"
+                      value={totpDisablePassword}
+                      onChange={(e) => setTotpDisablePassword(e.target.value)}
+                      placeholder="Your password"
+                      className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[rgba(255,255,255,0.20)] placeholder-[#334155]"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setShowDisable2fa(false); setTotpDisablePassword(''); setTwoFaError(null); }}
+                        className="flex-1 py-1.5 text-xs text-[#475569] border border-[rgba(255,255,255,0.08)] rounded-lg transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleDisable2fa}
+                        disabled={twoFaLoading || !totpDisablePassword}
+                        className="flex-1 py-1.5 text-xs text-[#94A3B8] bg-[rgba(239,68,68,0.10)] hover:bg-[rgba(239,68,68,0.18)] rounded-lg disabled:opacity-30 transition-colors flex items-center justify-center gap-1"
+                      >
+                        {twoFaLoading ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                        Confirm disable
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
+          {/* Delete account — quiet administrative section */}
+          <section className="bg-[rgba(255,255,255,0.02)] border border-[rgba(255,255,255,0.07)] rounded-xl p-5">
+            <p className="text-xs font-medium text-[#64748B] mb-1">Delete account</p>
+            <p className="text-xs text-[#334155] mb-3 leading-relaxed">
+              Permanently removes all brands, history, and drafts. This cannot be undone.
+            </p>
             {!showDeleteAccountConfirm ? (
               <button
                 type="button"
                 onClick={() => setShowDeleteAccountConfirm(true)}
-                className="flex-shrink-0 flex items-center gap-1.5 text-sm text-[#ef4444] border border-red-900/40 hover:border-red-700 hover:bg-red-900/10 rounded-lg px-4 py-2 transition-colors"
+                className="text-xs text-[#475569] hover:text-[#f87171] border border-[rgba(255,255,255,0.08)] hover:border-red-900/30 rounded-lg px-3 py-1.5 transition-colors"
               >
-                <Trash2 className="w-4 h-4" />
-                Delete account
+                Request deletion
               </button>
             ) : (
-              <div className="flex-shrink-0 w-64">
+              <div>
                 <p className="text-xs text-[#64748B] mb-2">
-                  Type <span className="text-[#ef4444] font-mono">DELETE</span> to confirm
+                  Type <span className="text-[#94A3B8] font-mono">DELETE</span> to confirm
                 </p>
                 <input
                   type="text"
                   value={deleteAccountInput}
                   onChange={(e) => setDeleteAccountInput(e.target.value)}
                   placeholder="DELETE"
-                  className="w-full bg-[rgba(255,255,255,0.08)] border border-red-900/40 text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-red-700 placeholder-[#475569]"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] text-xs rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-[rgba(255,255,255,0.20)] placeholder-[#334155]"
                 />
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountInput(''); }}
-                    className="flex-1 py-1.5 text-xs text-[#64748B] border border-[rgba(99,102,241,0.15)] rounded-lg hover:text-[#94A3B8] transition-colors"
+                    className="flex-1 py-1.5 text-xs text-[#475569] border border-[rgba(255,255,255,0.08)] rounded-lg hover:text-[#64748B] transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="button"
+                    onClick={handleDeleteAccount}
                     disabled={deleteAccountInput !== 'DELETE'}
-                    className="flex-1 py-1.5 text-xs text-white bg-red-500 hover:bg-red-600 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="flex-1 py-1.5 text-xs text-[#94A3B8] bg-[rgba(239,68,68,0.10)] hover:bg-[rgba(239,68,68,0.18)] rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                   >
                     Confirm delete
                   </button>
                 </div>
               </div>
             )}
-          </div>
-        </div>
-      </section>
+          </section>
+
+        </div>{/* end right column */}
+      </div>{/* end grid */}
     </div>
   );
 }

@@ -1,10 +1,6 @@
 /**
- * OceanLogo — sonar/radar mark for ClarityAI.
- *
- * Concept: deep-water sonar pulse. A signal fires from the origin and
- * ripples outward in concentric arcs — exactly how "visibility" works
- * beneath the surface of the ocean. The detected ping (off-center dot)
- * represents a brand appearing in an AI response.
+ * OceanLogo — legacy sonar/radar mark (replaced by LumidianLogo).
+ * Kept for reference only.
  *
  * Usage:
  *   <OceanLogo size={40} />                 — standalone icon (no bg circle)

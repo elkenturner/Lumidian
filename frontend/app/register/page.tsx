@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Loader2, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import OceanLogo from '@/components/OceanLogo';
+import LumidianLogo from '@/components/LumidianLogo';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGoogleAuthUrl } from '@/lib/api';
 
@@ -14,7 +14,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
 
-  useEffect(() => { document.title = 'Create Account — ClarityAI'; }, []);
+  useEffect(() => { document.title = 'Create Account — Lumidian'; }, []);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -47,8 +47,9 @@ export default function RegisterPage() {
     try {
       await register(email, password, name);
       router.push('/onboarding');
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Registration failed. Please try again.');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e?.response?.data?.detail || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -95,8 +96,7 @@ export default function RegisterPage() {
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 36 }}>
-          <OceanLogo size={40} withCircle />
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#0F0F12', letterSpacing: '-0.02em' }}>ClarityAI</span>
+          <LumidianLogo size={40} withWordmark variant="light" />
         </div>
 
         {/* Card */}
@@ -247,7 +247,10 @@ export default function RegisterPage() {
           </button>
 
           <p style={{ textAlign: 'center', fontSize: 12, color: '#9CA3AF', margin: '20px 0 0', fontWeight: 400 }}>
-            By creating an account you agree to our terms of service
+            By creating an account you agree to our{' '}
+            <Link href="/terms" style={{ color: '#6B7280', textDecoration: 'underline' }}>terms of service</Link>
+            {' '}and{' '}
+            <Link href="/privacy" style={{ color: '#6B7280', textDecoration: 'underline' }}>privacy policy</Link>
           </p>
         </div>
 

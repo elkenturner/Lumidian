@@ -62,8 +62,8 @@ def _rate_check(ip: str, store: dict, limit: int) -> None:
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
-# Admin emails from env — comma-separated. Falls back to ken@clarityai.com if not set.
-_raw_admin_emails = os.getenv("ADMIN_EMAILS", "ken@clarityai.com")
+# Admin emails from env — comma-separated. Falls back to ken@lumidian.ai if not set.
+_raw_admin_emails = os.getenv("ADMIN_EMAILS", "ken@lumidian.ai")
 _ADMIN_EMAILS: set[str] = {e.strip().lower() for e in _raw_admin_emails.split(",") if e.strip()}
 
 # Use secure cookies when ENVIRONMENT=production
@@ -91,8 +91,8 @@ TIER_LIMITS = {
 BRAND_TYPE_LIMITS: dict = {
     None: {"standard": 0, "pitch": 1},       # free: 1 pitch deck only, no standard brands
     "": {"standard": 0, "pitch": 1},
-    "starter": {"standard": 2, "pitch": 3},  # 2 standard + 3 pitch decks
-    "pro": {"standard": 4, "pitch": 999},    # 4 standard + unlimited pitch decks
+    "starter": {"standard": 2, "pitch": 1},  # 2 standard + 1 pitch deck
+    "pro": {"standard": 2, "pitch": 3},      # 2 standard + 3 pitch decks
 }
 
 
@@ -141,6 +141,7 @@ def user_to_dict(user: User) -> dict:
         "subscription_status": user.subscription_status,
         "is_admin": user.is_admin,
         "prompt_limit": limit,
+        "totp_enabled": bool(user.totp_enabled),
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }
 
@@ -181,11 +182,8 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     from app.services.analytics_service import log_event
     await log_event("user_registered", {"plan": user.subscription_tier}, user_id=user.id)
 
-    try:
-        from app.services.email_service import send_welcome_email
-        send_welcome_email(email=user.email, name=user.name)
-    except Exception as exc:
-        logger.warning("Welcome email failed (non-fatal): %s", exc)
+    from app.services.email_service import send_welcome_email, send_email_background
+    send_email_background(send_welcome_email, email=user.email, name=user.name)
 
     return user_to_dict(user)
 
@@ -197,6 +195,16 @@ class LoginRequest(BaseModel):
     password: str
 
 
+def create_challenge_token(user_id: int) -> str:
+    """Short-lived token used as a 2FA challenge during login (5 min, scope='2fa_challenge')."""
+    payload = {
+        "sub": str(user_id),
+        "scope": "2fa_challenge",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+    }
+    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+
 @router.post("/login")
 async def login(body: LoginRequest, http_req: Request, response: Response, db: DbDep):
     _rate_check(http_req.client.host if http_req.client else "unknown", _login_attempts, _MAX_LOGIN)
@@ -206,6 +214,11 @@ async def login(body: LoginRequest, http_req: Request, response: Response, db: D
     user = result.scalar_one_or_none()
     if not user or not user.password_hash or not verify_password(request.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    # If 2FA is enabled, issue a short-lived challenge token instead of a session
+    if user.totp_enabled:
+        challenge_token = create_challenge_token(user.id)
+        return {"requires_2fa": True, "challenge_token": challenge_token}
 
     token = create_token(user.id)
     set_auth_cookies(response, token)
@@ -319,7 +332,7 @@ def _google_redirect_uri() -> str:
     The callback URL registered in Google Cloud Console.
     Routes through the Next.js dev proxy so cookies land on the frontend origin.
     """
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3002")
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
     return f"{frontend_url}/api/auth/google/callback"
 
 
@@ -359,7 +372,7 @@ async def google_auth_callback(
     Exchange the auth code for an id_token, find/create the user,
     set auth cookies, and redirect to the app.
     """
-    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3002")
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
     redirect_to = state if (state and state.startswith("/")) else "/dashboard"
 
     # Google signalled an error (e.g. user cancelled)
@@ -512,14 +525,11 @@ async def forgot_password(request: ForgotPasswordRequest, db: DbDep):
         db.add(reset_token)
         await db.commit()
 
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3002")
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         reset_link = f"{frontend_url}/reset-password?token={token_value}"
 
-        try:
-            from app.services.email_service import send_password_reset_email
-            send_password_reset_email(email=user.email, name=user.name, reset_link=reset_link)
-        except Exception as exc:
-            logger.warning("Password reset email failed for %s (non-fatal): %s", email, exc)
+        from app.services.email_service import send_password_reset_email, send_email_background
+        send_email_background(send_password_reset_email, email=user.email, name=user.name, reset_link=reset_link)
 
     return {"message": "If that email is registered, a reset link has been sent."}
 
@@ -599,3 +609,161 @@ async def admin_reset_password(
 
     logger.info("Admin %s reset password for user %s", current_user.email, email)
     return {"message": f"Password reset successfully for {email}"}
+
+
+# ── Two-Factor Authentication (TOTP) ──────────────────────────────────────────
+
+@router.post("/2fa/setup")
+async def setup_2fa(
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: DbDep,
+):
+    """
+    Generate (or regenerate) a TOTP secret for the authenticated user.
+    Returns the provisioning URI and a base64-encoded QR code PNG.
+    2FA is NOT enabled yet — the user must confirm with /2fa/enable.
+    """
+    import pyotp
+    import qrcode
+    import io
+    import base64
+
+    secret = pyotp.random_base32()
+    totp = pyotp.TOTP(secret)
+    label = current_user.email
+    issuer = "Lumidian"
+    uri = totp.provisioning_uri(name=label, issuer_name=issuer)
+
+    # Generate QR code as a data URL
+    img = qrcode.make(uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    qr_data_url = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+    # Persist the new secret (not yet enabled)
+    current_user.totp_secret = secret
+    await db.commit()
+
+    return {
+        "secret": secret,
+        "otpauth_uri": uri,
+        "qr_code": qr_data_url,
+    }
+
+
+class TotpCodeRequest(BaseModel):
+    code: str
+
+
+@router.post("/2fa/enable")
+async def enable_2fa(
+    body: TotpCodeRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: DbDep,
+):
+    """Confirm a TOTP code and enable 2FA on the account."""
+    import pyotp
+
+    if not current_user.totp_secret:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Call /2fa/setup first to generate a secret.",
+        )
+    totp = pyotp.TOTP(current_user.totp_secret)
+    if not totp.verify(body.code.strip(), valid_window=1):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid code. Please try again.",
+        )
+
+    current_user.totp_enabled = True
+    await db.commit()
+    logger.info("2FA enabled for user %s", current_user.email)
+    return {"message": "Two-factor authentication enabled."}
+
+
+class DisableTotpRequest(BaseModel):
+    password: str
+
+
+@router.post("/2fa/disable")
+async def disable_2fa(
+    body: DisableTotpRequest,
+    current_user: Annotated[User, Depends(get_current_user)],
+    db: DbDep,
+):
+    """Verify the user's password and disable 2FA."""
+    if not current_user.password_hash or not verify_password(body.password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password.",
+        )
+
+    current_user.totp_enabled = False
+    current_user.totp_secret = None
+    await db.commit()
+    logger.info("2FA disabled for user %s", current_user.email)
+    return {"message": "Two-factor authentication disabled."}
+
+
+class VerifyTotpRequest(BaseModel):
+    challenge_token: str
+    code: str
+
+
+@router.post("/2fa/verify")
+async def verify_2fa(
+    body: VerifyTotpRequest,
+    response: Response,
+    db: DbDep,
+):
+    """
+    Second step of login when 2FA is enabled.
+    Validates the challenge token (issued by /login) and the TOTP code,
+    then sets auth cookies and returns the user.
+    """
+    import pyotp
+
+    # Decode and validate challenge token
+    try:
+        payload = jwt.decode(body.challenge_token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Challenge expired. Please log in again.",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid challenge token.",
+        )
+
+    if payload.get("scope") != "2fa_challenge":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid challenge token.",
+        )
+
+    user_id = int(payload["sub"])
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user or not user.totp_enabled or not user.totp_secret:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid challenge token.",
+        )
+
+    totp = pyotp.TOTP(user.totp_secret)
+    if not totp.verify(body.code.strip(), valid_window=1):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authenticator code.",
+        )
+
+    token = create_token(user.id)
+    set_auth_cookies(response, token)
+
+    from app.services.analytics_service import log_event
+    await log_event("user_login_2fa", {}, user_id=user.id)
+
+    return user_to_dict(user)

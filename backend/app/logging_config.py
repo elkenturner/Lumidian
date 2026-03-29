@@ -1,5 +1,5 @@
 """
-Structured logging configuration for ClarityAI.
+Structured logging configuration for Lumidian.
 
 Sets up:
   - Console handler (INFO level)

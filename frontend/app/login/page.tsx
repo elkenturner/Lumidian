@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2, Eye, EyeOff, ArrowRight } from 'lucide-react';
-import OceanLogo from '@/components/OceanLogo';
+import { Loader2, Eye, EyeOff, ArrowRight, ShieldCheck } from 'lucide-react';
+import LumidianLogo from '@/components/LumidianLogo';
 import { useAuth } from '@/contexts/AuthContext';
-import { getGoogleAuthUrl } from '@/lib/api';
+import { getGoogleAuthUrl, verify2fa } from '@/lib/api';
 
 const NOISE_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`;
 
@@ -22,9 +22,13 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // 2FA step
+  const [challengeToken, setChallengeToken] = useState<string | null>(null);
+  const [totpCode, setTotpCode] = useState('');
+
   const from = searchParams.get('from') || '/dashboard';
 
-  useEffect(() => { document.title = 'Sign In — ClarityAI'; }, []);
+  useEffect(() => { document.title = 'Sign In — Lumidian'; }, []);
 
   useEffect(() => {
     const oauthError = searchParams.get('error');
@@ -50,8 +54,31 @@ export default function LoginPage() {
     try {
       await login(email, password);
       router.push(from);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Invalid email or password');
+    } catch (err: unknown) {
+      const e = err as { message?: string; challenge_token?: string; response?: { data?: { detail?: string } } };
+      if (e?.message === '2fa_required' && e.challenge_token) {
+        setChallengeToken(e.challenge_token);
+      } else {
+        setError(e?.response?.data?.detail || 'Invalid email or password');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleTotpSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!challengeToken) return;
+    setError('');
+    setLoading(true);
+    try {
+      await verify2fa(challengeToken, totpCode.trim());
+      // verify2fa sets the cookie; refresh loads the user
+      await refresh();
+      router.push(from);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e?.response?.data?.detail || 'Invalid code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -84,12 +111,81 @@ export default function LoginPage() {
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}>
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 36 }}>
-          <OceanLogo size={40} withCircle />
-          <span style={{ fontSize: 20, fontWeight: 700, color: '#0F0F12', letterSpacing: '-0.02em' }}>ClarityAI</span>
+          <LumidianLogo size={40} withWordmark variant="light" />
         </div>
 
+        {/* ── 2FA challenge card ── */}
+        {challengeToken && (
+          <div style={{
+            background: 'rgba(255,255,255,0.82)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0,0,0,0.07)',
+            borderRadius: 20,
+            padding: '36px 32px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <ShieldCheck size={20} color="#4F46E5" />
+              <h1 style={{ fontSize: 20, fontWeight: 800, color: '#0F0F12', margin: 0, letterSpacing: '-0.03em' }}>Two-factor authentication</h1>
+            </div>
+            <p style={{ fontSize: 14, color: '#6B7280', margin: '0 0 24px', fontWeight: 400 }}>
+              Enter the 6-digit code from your authenticator app.
+            </p>
+
+            {error && (
+              <div style={{ background: 'rgba(254,226,226,0.8)', border: '1px solid rgba(252,165,165,0.5)', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
+                <p style={{ fontSize: 13, color: '#b91c1c', margin: 0 }}>{error}</p>
+              </div>
+            )}
+
+            <form onSubmit={handleTotpSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Authenticator code</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  autoFocus
+                  autoComplete="one-time-code"
+                  placeholder="000000"
+                  style={{ width: '100%', background: '#fff', border: '1px solid rgba(0,0,0,0.12)', borderRadius: 10, padding: '10px 12px', fontSize: 22, letterSpacing: '0.25em', color: '#0F0F12', outline: 'none', boxSizing: 'border-box', textAlign: 'center', fontFamily: 'monospace', transition: 'border-color 0.15s' }}
+                  onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(79,70,229,0.5)')}
+                  onBlur={(e) => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)')}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading || totpCode.length !== 6}
+                style={{
+                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  background: '#0F0F12', border: 'none', borderRadius: 100, padding: '11px 20px',
+                  fontSize: 14, fontWeight: 600, color: '#fff',
+                  cursor: (loading || totpCode.length !== 6) ? 'not-allowed' : 'pointer',
+                  opacity: (loading || totpCode.length !== 6) ? 0.6 : 1,
+                  transition: 'background 0.15s', fontFamily: 'inherit',
+                }}
+              >
+                {loading && <Loader2 size={15} className="animate-spin" />}
+                {loading ? 'Verifying…' : 'Verify'}
+                {!loading && <ArrowRight size={15} />}
+              </button>
+            </form>
+            <button
+              type="button"
+              onClick={() => { setChallengeToken(null); setTotpCode(''); setError(''); }}
+              style={{ marginTop: 16, display: 'block', width: '100%', textAlign: 'center', fontSize: 13, color: '#9CA3AF', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}
+            >
+              ← Back to sign in
+            </button>
+          </div>
+        )}
+
         {/* Card */}
-        <div style={{
+        {!challengeToken && <div style={{
           background: 'rgba(255,255,255,0.82)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
@@ -232,17 +328,19 @@ export default function LoginPage() {
             )}
             {googleLoading ? 'Signing in…' : 'Continue with Google'}
           </button>
-        </div>
+        </div>}
 
-        <p style={{ textAlign: 'center', fontSize: 14, color: '#6B7280', marginTop: 24, fontWeight: 400 }}>
-          Don&apos;t have an account?{' '}
-          <Link href="/register" style={{ color: '#4F46E5', fontWeight: 600, textDecoration: 'none' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#3730a3')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = '#4F46E5')}
-          >
-            Create one
-          </Link>
-        </p>
+        {!challengeToken && (
+          <p style={{ textAlign: 'center', fontSize: 14, color: '#6B7280', marginTop: 24, fontWeight: 400 }}>
+            Don&apos;t have an account?{' '}
+            <Link href="/register" style={{ color: '#4F46E5', fontWeight: 600, textDecoration: 'none' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#3730a3')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#4F46E5')}
+            >
+              Create one
+            </Link>
+          </p>
+        )}
       </div>
     </div>
   );

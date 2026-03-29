@@ -11,7 +11,6 @@ import {
   Loader2,
   ToggleLeft,
   ToggleRight,
-  ChevronDown,
 } from 'lucide-react';
 import {
   getBrand,
@@ -36,12 +35,6 @@ import AttributionBadge from '@/components/AttributionBadge';
 const PLATFORMS = ['reddit', 'quora', 'medium', 'wikipedia'] as const;
 type Platform = (typeof PLATFORMS)[number];
 
-const FREQUENCY_OPTIONS = [
-  { value: 'daily', label: 'Daily' },
-  { value: 'every_3_days', label: 'Every 3 days' },
-  { value: 'weekly', label: 'Weekly' },
-  { value: 'manual', label: 'Manual only' },
-];
 
 export default function BrandContentPage() {
   const params = useParams();
@@ -86,17 +79,6 @@ export default function BrandContentPage() {
     const newVal = current ? !current.auto_post : true;
     try {
       const updated = await updateContentSettings(brandId, platform, { auto_post: newVal });
-      setSettings((prev) =>
-        prev.map((s) => (s.platform === platform ? updated : s))
-      );
-    } catch {/* ignore */}
-  }
-
-  async function updateFrequency(platform: string, frequency: string) {
-    try {
-      const updated = await updateContentSettings(brandId, platform, {
-        drafting_frequency: frequency as BrandContentSettings['drafting_frequency'],
-      });
       setSettings((prev) =>
         prev.map((s) => (s.platform === platform ? updated : s))
       );
@@ -162,18 +144,18 @@ export default function BrandContentPage() {
         <div className="flex items-center gap-4">
           <Link
             href="/content"
-            className="p-2 rounded-lg hover:bg-[#1a1a24] text-[#94a3b8] hover:text-[#e2e8f0] transition-colors"
+            className="p-2 rounded-lg hover:bg-[rgba(99,102,241,0.10)] text-[#94a3b8] hover:text-[#e2e8f0] transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-[#e2e8f0]">{brand.name}</h1>
-            <p className="text-sm text-[#64748b] mt-0.5">Content Management</p>
+            <h1 className="text-2xl font-bold text-[#F0F4F8]">{brand.name}</h1>
+            <p className="text-sm text-[#64748B] mt-0.5">Content Management</p>
           </div>
         </div>
         <button
           onClick={() => setShowGenerateModal(true)}
-          className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+          className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors shadow-[0_0_20px_rgba(99,102,241,0.25)]"
         >
           <Plus className="w-4 h-4" />
           Generate Draft
@@ -181,50 +163,28 @@ export default function BrandContentPage() {
       </div>
 
       {/* Platform Settings */}
-      <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6">
+      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
         <div className="flex items-center gap-2 mb-5">
           <Settings2 className="w-4 h-4 text-[#6366f1]" />
-          <h2 className="text-base font-semibold text-[#e2e8f0]">Platform Settings</h2>
+          <h2 className="text-base font-semibold text-[#F0F4F8]">Platform Settings</h2>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {PLATFORMS.map((platform) => {
             const s = getSettings(platform);
             const autoPost = s?.auto_post ?? false;
-            const frequency = s?.drafting_frequency ?? 'weekly';
             return (
-              <div key={platform} className="bg-[#1a1a24] border border-[#1e1e2e] rounded-lg p-4">
+              <div key={platform} className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] rounded-lg p-4">
                 <div className="flex items-center justify-between mb-3">
                   <PlatformBadge platform={platform} />
                 </div>
 
-                {/* Frequency */}
-                <div className="mb-3">
-                  <label className="text-xs text-[#64748b] uppercase tracking-wide mb-1 block">
-                    Frequency
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={frequency}
-                      onChange={(e) => updateFrequency(platform, e.target.value)}
-                      className="w-full appearance-none bg-[#0d0d14] border border-[#1e1e2e] text-[#e2e8f0] text-xs rounded px-2 py-1.5 pr-6 focus:outline-none focus:border-[#6366f1]"
-                    >
-                      {FREQUENCY_OPTIONS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-[#64748b] pointer-events-none" />
-                  </div>
-                </div>
-
                 {/* Mark as posted toggle */}
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#94a3b8]">Track posting</span>
+                  <span className="text-xs text-[#94A3B8]">Track posting</span>
                   <button
                     onClick={() => toggleAutoPost(platform)}
                     className={`flex items-center gap-1 text-xs transition-colors ${
-                      autoPost ? 'text-[#6366f1]' : 'text-[#64748b]'
+                      autoPost ? 'text-[#6366f1]' : 'text-[#64748B]'
                     }`}
                   >
                     {autoPost ? (
@@ -239,16 +199,16 @@ export default function BrandContentPage() {
             );
           })}
         </div>
-        <p className="text-xs text-[#64748b] mt-4">
-          ClarityAI drafts content for you to post manually. Enable &ldquo;Track posting&rdquo; to log
-          when you&apos;ve posted a draft so ClarityAI can measure its impact on your visibility score.
+        <p className="text-xs text-[#64748B] mt-4">
+          Lumidian drafts content for you to post manually. Enable &ldquo;Track posting&rdquo; to log
+          when you&apos;ve posted a draft so Lumidian can measure its impact on your visibility score.
         </p>
       </div>
 
       {/* Drafts */}
       <div>
         {/* Platform tabs */}
-        <div className="flex items-center gap-1 mb-5 border-b border-[#1e1e2e]">
+        <div className="flex items-center gap-1 mb-5 border-b border-[rgba(99,102,241,0.18)]">
           {(['all', ...PLATFORMS] as const).map((tab) => (
             <button
               key={tab}
@@ -256,12 +216,12 @@ export default function BrandContentPage() {
               className={`px-4 py-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
                 activeTab === tab
                   ? 'text-[#6366f1] border-[#6366f1]'
-                  : 'text-[#64748b] border-transparent hover:text-[#94a3b8]'
+                  : 'text-[#64748B] border-transparent hover:text-[#94A3B8]'
               }`}
             >
               {tab === 'all' ? 'All Drafts' : tab}
               {tab !== 'all' && (
-                <span className="ml-1.5 text-xs bg-[#1a1a24] text-[#64748b] rounded-full px-1.5 py-0.5">
+                <span className="ml-1.5 text-xs bg-[rgba(99,102,241,0.10)] text-[#64748B] rounded-full px-1.5 py-0.5">
                   {drafts.filter((d) => d.platform === tab).length}
                 </span>
               )}
@@ -271,16 +231,23 @@ export default function BrandContentPage() {
 
         {filteredDrafts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="w-12 h-12 bg-[#1a1a24] rounded-xl flex items-center justify-center mb-4">
-              <Plus className="w-6 h-6 text-[#64748b]" />
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
+              style={{
+                background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(124,58,237,0.09))',
+                border: '1px solid rgba(99,102,241,0.26)',
+                boxShadow: '0 0 28px rgba(99,102,241,0.10)',
+              }}
+            >
+              <Plus className="w-6 h-6 text-[#818cf8]" />
             </div>
-            <p className="text-[#94a3b8] font-medium mb-1">No drafts yet</p>
-            <p className="text-sm text-[#64748b] mb-4">
+            <p className="text-[#94A3B8] font-semibold mb-1">No drafts yet</p>
+            <p className="text-sm text-[#64748B] mb-4">
               Generate content targeting your lowest-visibility prompts
             </p>
             <button
               onClick={() => setShowGenerateModal(true)}
-              className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium"
+              className="bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
             >
               Generate First Draft
             </button>
@@ -303,11 +270,11 @@ export default function BrandContentPage() {
 
       {/* Attribution */}
       {attribution.length > 0 && (
-        <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6">
+        <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
           <div className="flex items-center gap-2 mb-5">
             <TrendingUp className="w-4 h-4 text-[#22c55e]" />
-            <h2 className="text-base font-semibold text-[#e2e8f0]">Content Attribution</h2>
-            <span className="text-xs text-[#64748b]">
+            <h2 className="text-base font-semibold text-[#F0F4F8]">Content Attribution</h2>
+            <span className="text-xs text-[#64748B]">
               — how your posted content has affected visibility scores
             </span>
           </div>
@@ -315,16 +282,16 @@ export default function BrandContentPage() {
             {attribution.map((a) => (
               <div
                 key={a.id}
-                className="flex items-center justify-between bg-[#1a1a24] border border-[#1e1e2e] rounded-lg px-4 py-3"
+                className="flex items-center justify-between bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] rounded-lg px-4 py-3"
               >
                 <div>
-                  <p className="text-sm text-[#e2e8f0]">
+                  <p className="text-sm text-[#F0F4F8]">
                     <span className="font-medium capitalize">{a.platform}</span> post targeting:{' '}
-                    <span className="text-[#94a3b8] italic">
-                      "{a.prompt_text ?? `Prompt #${a.prompt_id}`}"
+                    <span className="text-[#94A3B8] italic">
+                      &ldquo;{a.prompt_text ?? `Prompt #${a.prompt_id}`}&rdquo;
                     </span>
                   </p>
-                  <p className="text-xs text-[#64748b] mt-0.5">
+                  <p className="text-xs text-[#64748B] mt-0.5">
                     Before: {a.visibility_before?.toFixed(1) ?? '—'}% → After:{' '}
                     {a.visibility_after?.toFixed(1) ?? '—'}%
                   </p>
@@ -396,11 +363,11 @@ function GenerateModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#111118] border border-[#1e1e2e] rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-        <h2 className="text-lg font-semibold text-[#e2e8f0] mb-5">Generate Draft</h2>
+      <div className="bg-[rgba(10,14,24,0.97)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto shadow-[0_8px_40px_rgba(0,0,0,0.50)]">
+        <h2 className="text-lg font-semibold text-[#F0F4F8] mb-5">Generate Draft</h2>
 
         {/* Platform */}
-        <label className="block text-xs text-[#64748b] uppercase tracking-wide mb-1">Platform</label>
+        <label className="block text-xs text-[#64748B] uppercase tracking-wide mb-1">Platform</label>
         <div className="grid grid-cols-2 gap-2 mb-4">
           {PLATFORMS.map((p) => (
             <button
@@ -408,8 +375,8 @@ function GenerateModal({
               onClick={() => setPlatform(p)}
               className={`py-2 rounded-lg text-sm font-medium capitalize border transition-colors ${
                 platform === p
-                  ? 'border-[#6366f1] bg-[#6366f1]/10 text-[#6366f1]'
-                  : 'border-[#1e1e2e] text-[#64748b] hover:border-[#6366f1]/50 hover:text-[#94a3b8]'
+                  ? 'border-[#6366f1] bg-[rgba(99,102,241,0.12)] text-[#818cf8]'
+                  : 'border-[rgba(99,102,241,0.22)] text-[#64748B] hover:border-[rgba(99,102,241,0.40)] hover:text-[#94A3B8]'
               }`}
             >
               {p}
@@ -418,7 +385,7 @@ function GenerateModal({
         </div>
 
         {/* Target prompt */}
-        <label className="block text-xs text-[#64748b] uppercase tracking-wide mb-1">
+        <label className="block text-xs text-[#64748B] uppercase tracking-wide mb-1">
           Target Prompt
         </label>
         <select
@@ -426,7 +393,7 @@ function GenerateModal({
           onChange={(e) =>
             setPromptId(e.target.value === 'auto' ? 'auto' : Number(e.target.value))
           }
-          className="w-full bg-[#1a1a24] border border-[#1e1e2e] text-[#e2e8f0] text-sm rounded-lg px-3 py-2 mb-4 focus:outline-none focus:border-[#6366f1]"
+          className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-4 focus:outline-none focus:border-[#6366f1] focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)]"
         >
           <option value="auto">Auto-select (lowest visibility)</option>
           {brand.prompts.map((p: Prompt) => (
@@ -437,16 +404,16 @@ function GenerateModal({
         </select>
 
         {/* Custom brief */}
-        <label className="block text-xs text-[#64748b] uppercase tracking-wide mb-1">
+        <label className="block text-xs text-[#64748B] uppercase tracking-wide mb-1">
           Additional Brief{' '}
-          <span className="normal-case text-[#64748b]">(optional)</span>
+          <span className="normal-case text-[#64748B]">(optional)</span>
         </label>
         <textarea
           value={customBrief}
           onChange={(e) => setCustomBrief(e.target.value)}
           placeholder="Any specific angle, tone, or talking points..."
           rows={3}
-          className="w-full bg-[#1a1a24] border border-[#1e1e2e] text-[#e2e8f0] text-sm rounded-lg px-3 py-2 mb-5 focus:outline-none focus:border-[#6366f1] resize-none placeholder-[#64748b]"
+          className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-5 focus:outline-none focus:border-[#6366f1] resize-none placeholder:text-[#475569]"
         />
 
         {error && (
@@ -458,7 +425,7 @@ function GenerateModal({
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2 rounded-lg border border-[#1e1e2e] text-[#94a3b8] hover:text-[#e2e8f0] text-sm transition-colors"
+            className="flex-1 py-2 rounded-lg border border-[rgba(99,102,241,0.22)] text-[#94A3B8] hover:text-[#F0F4F8] text-sm transition-colors"
           >
             Cancel
           </button>
@@ -499,9 +466,9 @@ function EditModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#111118] border border-[#1e1e2e] rounded-2xl w-full max-w-2xl p-6 flex flex-col max-h-[90vh]">
+      <div className="bg-[rgba(10,14,24,0.97)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl w-full max-w-2xl p-6 flex flex-col max-h-[90vh] shadow-[0_8px_40px_rgba(0,0,0,0.50)]">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-[#e2e8f0]">Edit Draft</h2>
+          <h2 className="text-lg font-semibold text-[#F0F4F8]">Edit Draft</h2>
           <PlatformBadge platform={draft.platform} />
         </div>
 
@@ -509,19 +476,19 @@ function EditModal({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title (optional)"
-          className="w-full bg-[#1a1a24] border border-[#1e1e2e] text-[#e2e8f0] text-sm rounded-lg px-3 py-2 mb-3 focus:outline-none focus:border-[#6366f1]"
+          className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-3 focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569]"
         />
 
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          className="flex-1 w-full bg-[#1a1a24] border border-[#1e1e2e] text-[#e2e8f0] text-sm rounded-lg px-3 py-2 mb-4 focus:outline-none focus:border-[#6366f1] resize-none font-mono min-h-[300px]"
+          className="flex-1 w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-4 focus:outline-none focus:border-[#6366f1] resize-none font-mono min-h-[300px]"
         />
 
         <div className="flex gap-3">
           <button
             onClick={onClose}
-            className="flex-1 py-2 rounded-lg border border-[#1e1e2e] text-[#94a3b8] hover:text-[#e2e8f0] text-sm transition-colors"
+            className="flex-1 py-2 rounded-lg border border-[rgba(99,102,241,0.22)] text-[#94A3B8] hover:text-[#F0F4F8] text-sm transition-colors"
           >
             Cancel
           </button>

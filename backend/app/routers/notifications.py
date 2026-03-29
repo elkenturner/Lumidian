@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, update, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -107,11 +107,9 @@ async def mark_one_read(notification_id: int, db: DbDep, user: CurrentUser):
         )
     )
     notif = result.scalar_one_or_none()
-    if notif:
-        notif.read = True
-        await db.commit()
-        await db.refresh(notif)
-    return NotificationOut.model_validate(notif) if notif else NotificationOut(
-        id=notification_id, type="info", title="", body=None, link=None, read=True,
-        created_at=__import__("datetime").datetime.utcnow(),
-    )
+    if not notif:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notification not found")
+    notif.read = True
+    await db.commit()
+    await db.refresh(notif)
+    return NotificationOut.model_validate(notif)

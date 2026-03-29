@@ -23,7 +23,7 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 _REDDIT_BASE = "https://www.reddit.com"
-_HEADERS = {"User-Agent": "ClarityAI/2.0 (opportunity scanner; contact@clarityai.app)"}
+_HEADERS = {"User-Agent": "Lumidian/2.0 (opportunity scanner; contact@lumidian.ai)"}
 
 # ── Industry → subreddit mapping ──────────────────────────────────────────────
 # Every subreddit here must be genuinely topic-specific.

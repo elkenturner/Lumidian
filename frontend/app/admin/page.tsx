@@ -15,9 +15,9 @@ import {
 
 function StatCard({ label, value, icon: Icon }: { label: string; value: number | string; icon: React.ElementType }) {
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl p-5">
+    <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl p-5">
       <div className="flex items-center gap-3 mb-2">
-        <div className="w-8 h-8 rounded-lg bg-[rgba(99,102,241,0.15)] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-lg bg-[rgba(99,102,241,0.12)] border border-[rgba(99,102,241,0.22)] flex items-center justify-center">
           <Icon size={16} className="text-[#818cf8]" />
         </div>
         <span className="text-xs text-[#64748B] font-medium uppercase tracking-wide">{label}</span>
@@ -77,7 +77,7 @@ export default function AdminPage() {
     }
   }, []);
 
-  useEffect(() => { document.title = 'Admin — ClarityAI'; }, []);
+  useEffect(() => { document.title = 'Admin — Lumidian'; }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -127,8 +127,8 @@ export default function AdminPage() {
     return (
       <div className="p-8 max-w-4xl animate-pulse space-y-4">
         <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-40" />
-        <div className="h-32 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl" />
-        <div className="h-64 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-xl" />
+        <div className="h-32 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
+        <div className="h-64 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
       </div>
     );
   }
@@ -182,7 +182,7 @@ export default function AdminPage() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
 
           {/* Users Table */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)] overflow-hidden">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)] overflow-hidden">
             <div className="px-5 py-4 border-b border-[rgba(99,102,241,0.12)]">
               <h2 className="text-sm font-semibold text-[#F0F4F8] flex items-center gap-2">
                 <Users size={14} className="text-[#818cf8]" />
@@ -325,7 +325,7 @@ export default function AdminPage() {
           </div>
 
           {/* Tracking Runs Table */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)] overflow-hidden">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)] overflow-hidden">
             <div className="px-5 py-4 border-b border-[rgba(99,102,241,0.12)]">
               <h2 className="text-sm font-semibold text-[#F0F4F8] flex items-center gap-2">
                 <Activity size={14} className="text-[#818cf8]" />
@@ -377,7 +377,7 @@ export default function AdminPage() {
         </div>
 
         {/* Logs Panel */}
-        <div className="mt-6 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.15)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)] overflow-hidden">
+        <div className="mt-6 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)] overflow-hidden">
           <div className="px-5 py-4 border-b border-[rgba(99,102,241,0.12)] flex items-center justify-between">
             <h2 className="text-sm font-semibold text-[#F0F4F8]">Error Log (last 100 lines)</h2>
             <span className="text-xs text-[#475569]">backend/logs/app.log</span>

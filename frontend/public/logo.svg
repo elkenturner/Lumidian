@@ -1,0 +1,47 @@
+<svg viewBox="0 0 540 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .prism  { stroke: #c8c8d8; }
+    .income { stroke: #94a3b8; }
+    .wmark  { fill: #e8e8f0; }
+    .rdot   { fill: #a0a0b8; }
+    @media (prefers-color-scheme: light) {
+      .prism  { stroke: #1a1a2e; }
+      .income { stroke: #6b7280; }
+      .wmark  { fill: #1a1a2e; }
+      .rdot   { fill: #4a4a6a; }
+    }
+  </style>
+
+  <!-- Refracted rays drawn first so prism outline sits on top -->
+  <line x1="157" y1="177" x2="518" y2="72"  stroke="#10a37f" stroke-width="1.8" stroke-linecap="round"/>
+  <line x1="157" y1="177" x2="518" y2="136" stroke="#d97757" stroke-width="1.5" stroke-linecap="round"/>
+  <line x1="157" y1="177" x2="518" y2="200" stroke="#6366f1" stroke-width="1.4" stroke-linecap="round"/>
+  <line x1="157" y1="177" x2="518" y2="265" stroke="#4285f4" stroke-width="1.2" stroke-linecap="round"/>
+  <line x1="157" y1="177" x2="518" y2="336" stroke="#93c5fd" stroke-width="1.0" stroke-linecap="round" opacity="0.28"/>
+
+  <!-- Terminal dots -->
+  <circle cx="518" cy="72"  r="4.0" fill="#10a37f"/>
+  <circle cx="518" cy="136" r="3.5" fill="#d97757"/>
+  <circle cx="518" cy="200" r="3.0" fill="#6366f1"/>
+  <circle cx="518" cy="265" r="3.0" fill="#4285f4"/>
+
+  <!-- Prism: upright equilateral triangle, apex top, base bottom -->
+  <path d="M240 25 L58 345 L422 345 Z" class="prism" stroke-width="2.2" stroke-linejoin="round"/>
+
+  <!-- Incoming ray from left -->
+  <line x1="18" y1="163" x2="157" y2="177" class="income" stroke-width="1.5" stroke-linecap="round"/>
+
+  <!-- Refraction dot -->
+  <circle cx="157" cy="177" r="4.5" class="rdot"/>
+
+  <!-- Wordmark: widely tracked, light weight, centered below prism -->
+  <text
+    x="242"
+    y="400"
+    font-family="system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif"
+    font-weight="300"
+    font-size="34"
+    letter-spacing="13"
+    text-anchor="middle"
+    class="wmark">LUMIDIAN</text>
+</svg>

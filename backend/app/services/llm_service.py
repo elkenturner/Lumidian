@@ -61,6 +61,12 @@ TIER_RUNS = {
     "premium": 20,
 }
 
+# Model categories for the dual-score visibility architecture.
+# LIVE_MODELS  — query the web in real-time; reflect content changes within days.
+# INDEX_MODELS — static training data; change slowly, reflect long-term presence.
+LIVE_MODELS: frozenset = frozenset({"perplexity", "gemini"})
+INDEX_MODELS: frozenset = frozenset({"chatgpt", "claude"})
+
 
 def _mentioned(brand_name: str, text: str) -> bool:
     """Case-insensitive substring check."""
@@ -93,10 +99,9 @@ async def _query_chatgpt(prompt: str, brand_name: str) -> dict:
 
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         response = await client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4.1-mini",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1024,
-            temperature=0.7,
+            max_completion_tokens=1024,
         )
         latency_ms = int((time.monotonic() - start) * 1000)
         text = response.choices[0].message.content
@@ -176,7 +181,7 @@ async def _query_perplexity(prompt: str, brand_name: str) -> dict:
         # blast Perplexity's per-minute quota and cause 429s on later prompts.
         async with _PERPLEXITY_SEM:
             response = await client.chat.completions.create(
-                model="sonar-pro",
+                model="sonar",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1024,
                 temperature=0.7,
@@ -214,13 +219,35 @@ async def _query_gemini(prompt: str, brand_name: str) -> dict:
         import google.generativeai as genai
 
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-flash-latest")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         # google-generativeai does not provide a native async client for
         # generate_content, so we run it in a thread pool to keep the event
         # loop free.
+        # Enable Google Search grounding so Gemini queries the live web index —
+        # the closest available API proxy for Google AI brand mentions in real-time.
+        # Try both proto paths; SDK 0.8.x may expose GoogleSearch as an inner
+        # class of Tool or as a top-level proto type depending on build.
+        gen_kwargs: dict = {}
+        _grounding_ok = False
+        for _build_tool in (
+            lambda: genai.protos.Tool(google_search=genai.protos.Tool.GoogleSearch()),
+            lambda: genai.protos.Tool(google_search=genai.protos.GoogleSearch()),
+        ):
+            try:
+                gen_kwargs = {"tools": [_build_tool()]}
+                _grounding_ok = True
+                break
+            except AttributeError:
+                continue
+        if not _grounding_ok:
+            logger.warning(
+                "[gemini] Google Search grounding unavailable in this SDK build "
+                "(google-generativeai %s) — running ungrounded",
+                getattr(genai, "__version__", "unknown"),
+            )
         loop = asyncio.get_running_loop()
         response = await loop.run_in_executor(
-            None, lambda: model.generate_content(prompt)
+            None, lambda: model.generate_content(prompt, **gen_kwargs)
         )
         # response.text raises ValueError when the response was blocked by a
         # safety filter or finished with a non-STOP reason (e.g. RECITATION,

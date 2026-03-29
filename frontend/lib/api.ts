@@ -113,7 +113,6 @@ export interface BrandContentSettings {
   brand_id: number;
   platform: string;
   enabled: boolean;
-  drafting_frequency: 'daily' | 'every_3_days' | 'weekly' | 'manual';
   auto_post: boolean;
 }
 
@@ -680,6 +679,18 @@ export async function updateBrandProfile(
   return res.data;
 }
 
+export interface AiFillProfileResult {
+  company_description: string | null;
+  target_audience: string | null;
+  tone_of_voice: string | null;
+  key_stats: string[];
+}
+
+export async function aiFillProfile(brandId: number): Promise<AiFillProfileResult> {
+  const res = await api.post<AiFillProfileResult>(`/brands/${brandId}/profile/ai-fill`);
+  return res.data;
+}
+
 // ── Content Gap functions ─────────────────────────────────────────────────────
 
 export interface QuoraQuestion {
@@ -741,6 +752,7 @@ export interface AuthUser {
   subscription_status: string | null;
   is_admin: boolean;
   prompt_limit: number;
+  totp_enabled: boolean;
   created_at: string;
   is_team_member?: boolean;
   team_owner_name?: string | null;
@@ -756,8 +768,13 @@ export async function authRegister(data: {
   return res.data;
 }
 
-export async function authLogin(email: string, password: string): Promise<AuthUser> {
-  const res = await api.post<AuthUser>('/auth/login', { email, password });
+export interface LoginResult {
+  requires_2fa: true;
+  challenge_token: string;
+}
+
+export async function authLogin(email: string, password: string): Promise<AuthUser | LoginResult> {
+  const res = await api.post<AuthUser | LoginResult>('/auth/login', { email, password });
   return res.data;
 }
 
@@ -851,6 +868,11 @@ export async function createPortalSession(): Promise<{ portal_url: string }> {
 
 export async function cancelSubscription(): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>('/billing/cancel');
+  return res.data;
+}
+
+export async function changePlan(tier: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/billing/change-plan', { tier });
   return res.data;
 }
 
@@ -1043,4 +1065,36 @@ export async function getQuoraQuestions(
     { params: { prompt_id: promptId } }
   );
   return res.data.questions;
+}
+
+// ── Support ────────────────────────────────────────────────────────────────────
+
+export async function submitSupportRequest(subject: string, message: string): Promise<void> {
+  await api.post('/support/contact', { subject, message });
+}
+
+// ── Two-Factor Authentication ──────────────────────────────────────────────────
+
+export interface TotpSetupData {
+  secret: string;
+  otpauth_uri: string;
+  qr_code: string;
+}
+
+export async function setup2fa(): Promise<TotpSetupData> {
+  const res = await api.post<TotpSetupData>('/auth/2fa/setup');
+  return res.data;
+}
+
+export async function enable2fa(code: string): Promise<void> {
+  await api.post('/auth/2fa/enable', { code });
+}
+
+export async function disable2fa(password: string): Promise<void> {
+  await api.post('/auth/2fa/disable', { password });
+}
+
+export async function verify2fa(challenge_token: string, code: string): Promise<AuthUser> {
+  const res = await api.post<AuthUser>('/auth/2fa/verify', { challenge_token, code });
+  return res.data;
 }

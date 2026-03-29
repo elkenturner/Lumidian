@@ -10,7 +10,7 @@ from app.models import User, utcnow
 
 logger = logging.getLogger(__name__)
 
-_raw_admin_emails = os.getenv("ADMIN_EMAILS", "ken@clarityai.com")
+_raw_admin_emails = os.getenv("ADMIN_EMAILS", "ken@lumidian.ai")
 ADMIN_EMAIL = _raw_admin_emails.split(",")[0].strip().lower()
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "")
 ADMIN_NAME = os.getenv("ADMIN_NAME", "Admin")

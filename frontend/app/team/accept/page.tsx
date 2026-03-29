@@ -34,15 +34,16 @@ export default function TeamAcceptPage() {
         setMessage("You've joined the team! Redirecting to your dashboard…");
         setTimeout(() => router.replace('/dashboard'), 2500);
       })
-      .catch((e: any) => {
+      .catch((e: unknown) => {
+        const err = e as { response?: { data?: { detail?: string } } };
         setStatus('error');
-        setMessage(e?.response?.data?.detail ?? 'Failed to accept invitation. The link may have expired.');
+        setMessage(err?.response?.data?.detail ?? 'Failed to accept invitation. The link may have expired.');
       });
   }, [authLoading, user, router]);
 
   return (
     <div className="min-h-screen bg-[#0f1117] flex items-center justify-center p-6">
-      <div className="max-w-md w-full bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.15)] rounded-2xl p-8 text-center shadow-[0_8px_40px_rgba(0,0,0,0.4)]">
+      <div className="max-w-md w-full bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-2xl p-8 text-center shadow-[0_8px_40px_rgba(0,0,0,0.4)]">
         {status === 'loading' && (
           <>
             <Loader2 size={40} className="animate-spin text-[#6366f1] mx-auto mb-4" />

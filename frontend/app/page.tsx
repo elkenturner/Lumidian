@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { BarChart2, Target, Sparkles, TrendingUp, Check, ArrowRight, MessageSquare, Settings2, ChevronDown, TrendingDown } from 'lucide-react';
-import OceanLogo from '@/components/OceanLogo';
+import LumidianLogo from '@/components/LumidianLogo';
 
 // ── Scroll-reveal hook ─────────────────────────────────────────────────────────
 
@@ -127,7 +127,7 @@ const HOW_STEPS = [
   {
     n: '1',
     title: 'Track Your Visibility',
-    desc: 'Connect your brand and set the prompts you want to track. ClarityAI queries ChatGPT, Claude, Perplexity, and Gemini twice daily and scores how often your brand appears.',
+    desc: 'Connect your brand and set the prompts you want to track. Lumidian queries ChatGPT, Claude, Perplexity, and Gemini twice daily and scores how often your brand appears.',
   },
   {
     n: '2',
@@ -137,7 +137,7 @@ const HOW_STEPS = [
   {
     n: '3',
     title: 'Fix It with Content',
-    desc: 'ClarityAI drafts platform-specific content targeting your weakest prompts — Reddit posts, Quora answers, Medium articles, and Wikipedia edits — ready for your review.',
+    desc: 'Lumidian drafts platform-specific content targeting your weakest prompts — Reddit posts, Quora answers, Medium articles, and Wikipedia edits — ready for your review.',
   },
 ];
 
@@ -146,12 +146,12 @@ const PLATFORM_CONTENT = ['Reddit', 'Quora', 'Medium', 'Wikipedia'];
 
 const FAQ_ITEMS = [
   {
-    q: 'How does ClarityAI track AI visibility?',
-    a: 'ClarityAI runs your tracked prompts across ChatGPT, Claude, Perplexity, and Gemini twice daily, analyzing each response to detect whether your brand is mentioned. Results are scored and stored so you can track changes over time.',
+    q: 'How does Lumidian track AI visibility?',
+    a: 'Lumidian runs your tracked prompts across ChatGPT, Claude, Perplexity, and Gemini twice daily, analyzing each response to detect whether your brand is mentioned. Results are scored and stored so you can track changes over time.',
   },
   {
-    q: 'What kind of content does ClarityAI draft?',
-    a: 'ClarityAI generates Reddit posts, Quora answers, Medium articles, and Wikipedia edits — all targeted at the specific prompts where your brand has low visibility. Every draft follows your brand voice and approved language guidelines.',
+    q: 'What kind of content does Lumidian draft?',
+    a: 'Lumidian generates Reddit posts, Quora answers, Medium articles, and Wikipedia edits — all targeted at the specific prompts where your brand has low visibility. Every draft follows your brand voice and approved language guidelines.',
   },
   {
     q: 'Is the content AI-generated or human-written?',
@@ -166,8 +166,8 @@ const FAQ_ITEMS = [
     a: 'Yes. Your brand profile, prompts, and tracking data are only visible to your account. We never share individual client data.',
   },
   {
-    q: 'What makes ClarityAI different from SEO tools?',
-    a: "Traditional SEO tools track Google rankings. ClarityAI tracks what AI models say about your brand when users ask questions — a fundamentally different signal that SEO tools don't measure.",
+    q: 'What makes Lumidian different from SEO tools?',
+    a: "Traditional SEO tools track Google rankings. Lumidian tracks what AI models say about your brand when users ask questions — a fundamentally different signal that SEO tools don't measure.",
   },
 ];
 
@@ -287,7 +287,7 @@ function DemoDashboard() {
         <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#FDBD2E', display: 'inline-block' }} />
         <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#25C93F', display: 'inline-block' }} />
         <div style={{ flex: 1, background: '#E5E7EB', borderRadius: 6, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', marginLeft: 8 }}>
-          <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 500 }}>app.clarityai.com/dashboard</span>
+          <span style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 500 }}>app.lumidian.ai/dashboard</span>
         </div>
       </div>
 
@@ -460,8 +460,7 @@ export default function LandingPage() {
         >
           <div style={{ maxWidth: 1120, margin: '0 auto', padding: '0 24px', height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <OceanLogo size={32} withCircle />
-              <span style={{ fontSize: 16, fontWeight: 700, color: '#0F0F12', letterSpacing: '-0.02em' }}>ClarityAI</span>
+              <LumidianLogo size={32} withWordmark variant="light" />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Link href="/login" style={{ fontSize: 14, fontWeight: 500, color: '#6B7280', padding: '8px 16px', textDecoration: 'none', borderRadius: 8, transition: 'color 0.15s' }}
@@ -498,7 +497,7 @@ export default function LandingPage() {
 
             {/* Sub-headline */}
             <p style={{ fontSize: 20, color: '#6B7280', maxWidth: 560, margin: '0 auto 40px', lineHeight: 1.65, fontWeight: 400, animation: 'fadeSlideUp 0.5s ease-out 160ms both' }}>
-              ClarityAI tracks your brand across ChatGPT, Claude, Perplexity, and Gemini,
+              Lumidian tracks your brand across ChatGPT, Claude, Perplexity, and Gemini,
               then automatically drafts content to close every gap.
             </p>
 
@@ -567,7 +566,7 @@ export default function LandingPage() {
                 Everything to own your AI presence
               </h2>
               <p style={{ fontSize: 17, color: '#6B7280', maxWidth: 480, margin: '0 auto', lineHeight: 1.6 }}>
-                From tracking to fixing — ClarityAI handles the full visibility lifecycle automatically.
+                From tracking to fixing — Lumidian handles the full visibility lifecycle automatically.
               </p>
             </div>
           </FadeUp>
@@ -847,10 +846,13 @@ export default function LandingPage() {
         <footer style={{ borderTop: '1px solid rgba(0,0,0,0.06)', padding: '28px 24px' }}>
           <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <OceanLogo size={24} withCircle />
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#6B7280' }}>ClarityAI</span>
+              <LumidianLogo size={24} withWordmark variant="light" />
             </div>
-            <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>&copy; 2026 ClarityAI. All rights reserved.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap' }}>
+              <Link href="/terms" style={{ fontSize: 12, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Terms</Link>
+              <Link href="/privacy" style={{ fontSize: 12, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy</Link>
+              <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>&copy; 2026 Lumidian. All rights reserved.</p>
+            </div>
           </div>
         </footer>
 

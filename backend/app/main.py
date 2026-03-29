@@ -1,5 +1,5 @@
 """
-ClarityAI — FastAPI application entry point.
+Lumidian — FastAPI application entry point.
 
 Lifespan:
   - Creates all database tables on startup.
@@ -43,6 +43,7 @@ from app.routers import reports as reports_router
 from app.routers import team as team_router
 from app.routers import errors as errors_router
 from app.routers import notifications as notifications_router
+from app.routers import support as support_router
 from app.schemas import HealthResponse
 
 logging.basicConfig(
@@ -69,7 +70,7 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("Google OAuth: GOOGLE_CLIENT_ID is NOT set — /api/auth/google will be unavailable")
 
-    logger.info("ClarityAI startup: creating database tables...")
+    logger.info("Lumidian startup: creating database tables...")
     await create_tables()
     await run_migrations()
     logger.info("Database tables ready.")
@@ -84,13 +85,13 @@ async def lifespan(app: FastAPI):
     yield  # Application runs here
 
     # ── Shutdown ──────────────────────────────────────────────────────────────
-    logger.info("ClarityAI shutdown: stopping scheduler...")
+    logger.info("Lumidian shutdown: stopping scheduler...")
     stop_scheduler()
     logger.info("Scheduler stopped. Goodbye.")
 
 
 app = FastAPI(
-    title="ClarityAI",
+    title="Lumidian",
     description=(
         "Track brand visibility in AI-generated responses across "
         "ChatGPT, Claude, Perplexity, and Gemini."
@@ -142,6 +143,7 @@ app.include_router(reports_router.router, prefix="/api")
 app.include_router(team_router.router, prefix="/api")
 app.include_router(errors_router.router, prefix="/api")
 app.include_router(notifications_router.router, prefix="/api")
+app.include_router(support_router.router, prefix="/api")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

@@ -21,7 +21,7 @@ function getModelConfig(model: string) {
   for (const [k, v] of Object.entries(MODEL_CONFIG)) {
     if (key.includes(k)) return { ...v, key: k };
   }
-  return { label: model, bg: '#1a1a24', text: '#64748b', key: model };
+  return { label: model, bg: 'rgba(99,102,241,0.10)', text: '#64748b', key: model };
 }
 
 interface ModelStat {
@@ -68,13 +68,13 @@ function buildGroups(responses: QueryResult[]): PromptGroup[] {
 
 function SkeletonRow() {
   return (
-    <div className="border-b border-[#1e1e2e] px-5 py-4 animate-pulse">
+    <div className="border-b border-[rgba(99,102,241,0.12)] px-5 py-4 animate-pulse">
       <div className="flex items-center gap-4">
-        <div className="flex-1 h-4 bg-[#1a1a24] rounded" />
+        <div className="flex-1 h-4 skeleton rounded" />
         <div className="flex gap-2">
-          {[1, 2, 3, 4].map(i => <div key={i} className="h-6 w-16 bg-[#1a1a24] rounded-md" />)}
+          {[1, 2, 3, 4].map(i => <div key={i} className="h-6 w-16 skeleton rounded-md" />)}
         </div>
-        <div className="h-5 w-12 bg-[#1a1a24] rounded" />
+        <div className="h-5 w-12 skeleton rounded" />
       </div>
     </div>
   );
@@ -88,9 +88,9 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
   );
 
   return (
-    <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl overflow-hidden">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       {/* Header */}
-      <div className="px-5 py-3.5 border-b border-[#1e1e2e] flex items-center justify-between bg-[#0d0d14]">
+      <div className="px-5 py-3.5 border-b border-[rgba(99,102,241,0.15)] flex items-center justify-between bg-[rgba(99,102,241,0.04)]">
         <h3 className="text-sm font-semibold text-[#e2e8f0]">Query Responses</h3>
         {!loading && groups.length > 0 && (
           <div className="flex items-center gap-3">
@@ -106,7 +106,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                 </span>
               );
             })}
-            <span className="text-xs text-[#64748b] border-l border-[#1e1e2e] pl-3">
+            <span className="text-xs text-[#64748b] border-l border-[rgba(99,102,241,0.20)] pl-3">
               {groups.length} prompt{groups.length !== 1 ? 's' : ''}
             </span>
           </div>
@@ -123,13 +123,13 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
           No responses found for this run.
         </div>
       ) : (
-        <div className="divide-y divide-[#1e1e2e]">
+        <div className="divide-y divide-[rgba(99,102,241,0.12)]">
           {groups.map((g) => {
             const overallPct = g.total > 0 ? Math.round((g.mentioned / g.total) * 100) : 0;
             const overallColor = overallPct >= 60 ? '#10b981' : overallPct >= 30 ? '#f59e0b' : '#ef4444';
 
             return (
-              <div key={g.promptId} className="px-5 py-4 hover:bg-[#0d0d14] transition-colors">
+              <div key={g.promptId} className="px-5 py-4 hover:bg-[rgba(99,102,241,0.04)] transition-colors">
                 {/* Prompt text */}
                 <p className="text-sm text-[#94a3b8] mb-3 leading-snug font-medium">
                   {g.promptText}
@@ -147,7 +147,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                     return (
                       <div
                         key={modelKey}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#2a2a3a] bg-[#111118]"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[rgba(99,102,241,0.22)] bg-[rgba(99,102,241,0.06)]"
                       >
                         <span
                           className="text-xs font-semibold"
@@ -155,7 +155,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                         >
                           {cfg.label}
                         </span>
-                        <span className="text-[#2a2a3a]">·</span>
+                        <span className="text-[rgba(99,102,241,0.40)]">·</span>
                         <span
                           className="text-xs font-bold tabular-nums"
                           style={{ color: mentionColor }}

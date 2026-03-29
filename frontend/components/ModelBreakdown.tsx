@@ -44,7 +44,7 @@ function getModelConfig(model: string) {
   return {
     label: model,
     color: '#64748b',
-    bgColor: '#1a1a24',
+    bgColor: 'rgba(99,102,241,0.10)',
     letter: model.charAt(0).toUpperCase(),
   };
 }
@@ -56,7 +56,7 @@ function isNotConfigured(ms: ModelScore): boolean {
 export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
   if (!modelScores || modelScores.length === 0) {
     return (
-      <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6">
+      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
         <h3 className="text-base font-semibold text-[#e2e8f0] mb-4">Model Breakdown</h3>
         <p className="text-sm text-[#64748b] text-center py-4">No model data available</p>
       </div>
@@ -72,7 +72,7 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
   });
 
   return (
-    <div className="bg-[#111118] border border-[#1e1e2e] rounded-xl p-6">
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       <h3 className="text-base font-semibold text-[#e2e8f0] mb-5">Model Breakdown</h3>
       <div className="space-y-4">
         {sorted.map((ms) => {
@@ -88,7 +88,7 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
                     className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
                     style={
                       unconfigured
-                        ? { backgroundColor: '#1a1a24', color: '#475569' }
+                        ? { backgroundColor: 'rgba(99,102,241,0.08)', color: '#475569' }
                         : { backgroundColor: config.bgColor, color: config.color }
                     }
                   >
@@ -110,7 +110,7 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
                 </div>
 
                 {unconfigured ? (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#1a1a24] text-[#475569] border border-[#2a2a3a]">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(99,102,241,0.08)] text-[#475569] border border-[rgba(99,102,241,0.18)]">
                     Not configured
                   </span>
                 ) : (
@@ -123,7 +123,7 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
                 )}
               </div>
 
-              <div className="h-2 bg-[#1e1e2e] rounded-full overflow-hidden">
+              <div className="h-2 bg-[rgba(99,102,241,0.10)] rounded-full overflow-hidden">
                 {unconfigured ? (
                   <div className="h-full w-0 rounded-full" />
                 ) : (

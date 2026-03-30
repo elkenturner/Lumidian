@@ -22,7 +22,6 @@ import {
   Check,
   PenLine,
   BookOpen,
-  TrendingDown,
   ArrowRight,
   BarChart2,
   ToggleLeft,
@@ -44,8 +43,6 @@ import {
   getContentSettings,
   updateContentSettings,
   getDraftAttributions,
-  getContentGaps,
-  getGapSummary,
   getQuoraQuestions,
   Brand,
   BrandDetail,
@@ -56,8 +53,6 @@ import {
   BrandContentSettings,
   DraftQueueStatus,
   DraftAttribution,
-  ContentGap,
-  GapSummary,
   QuoraQuestion,
 } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
@@ -71,7 +66,7 @@ import Link from 'next/link';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted' | 'gaps';
+type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1480,10 +1475,12 @@ function OpportunityCard({
 
       {/* Meta */}
       <div className="flex items-center gap-3 text-xs text-[#475569]">
-        <span className="flex items-center gap-1">
-          <Clock size={10} />
-          {relativeTime(opp.posted_at)}
-        </span>
+        {opp.posted_at && (
+          <span className="flex items-center gap-1">
+            <Clock size={10} />
+            {relativeTime(opp.posted_at)}
+          </span>
+        )}
         {opp.prompt_text && (
           <span className="text-[#475569] truncate max-w-[200px]">
             Prompt: {opp.prompt_text}
@@ -1546,7 +1543,7 @@ const POSTING_GUIDANCE: Record<string, (brief: string | null) => React.ReactNode
   },
   medium: () => (
     <ol className="list-decimal list-inside space-y-1 text-xs text-[#94A3B8] leading-relaxed">
-      <li>Go to <span className="text-[#6366f1]">medium.com/new-story</span></li>
+      <li>Go to <a href="https://medium.com/new-story" target="_blank" rel="noopener noreferrer" className="text-[#6366f1] hover:underline">medium.com/new-story</a></li>
       <li>Paste your title and body</li>
       <li>Add tags relevant to your topic (up to 5)</li>
       <li>Set a featured image if possible</li>
@@ -1847,10 +1844,6 @@ export default function ContentHubPage() {
   const [postedItems, setPostedItems] = useState<ContentDraft[]>([]);
   const [draftAttributions, setDraftAttributions] = useState<DraftAttribution[]>([]);
   const [opportunities, setOpportunities] = useState<ContentOpportunity[]>([]);
-  const [contentGaps, setContentGaps] = useState<ContentGap[]>([]);
-  const [gapSummary, setGapSummary] = useState<GapSummary | null>(null);
-  const [generatingGapDraft, setGeneratingGapDraft] = useState<number | null>(null); // gap.id
-  const [gapPlatforms, setGapPlatforms] = useState<Record<number, string>>({}); // gap.id → platform
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [brandPrompts, setBrandPrompts] = useState<Prompt[]>([]);
   const [contentSettings, setContentSettings] = useState<BrandContentSettings[]>([]);
@@ -1889,7 +1882,6 @@ export default function ContentHubPage() {
     scheduled: scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform)).length,
     opportunities: opportunities.length,
     posted: postedItems.length,
-    gaps: contentGaps.length,
   };
 
   // ── Load data ──────────────────────────────────────────────────────────────
@@ -1910,8 +1902,6 @@ export default function ContentHubPage() {
         settingsData,
         statusData,
         attributionsData,
-        gapsData,
-        gapSummaryData,
       ] = await Promise.all([
         getDrafts(brandId, undefined, 'draft'),
         getDrafts(brandId, undefined, 'approved'),
@@ -1922,8 +1912,6 @@ export default function ContentHubPage() {
         getContentSettings(brandId).catch(() => [] as BrandContentSettings[]),
         getDraftStatus(brandId).catch(() => null),
         getDraftAttributions(brandId).catch(() => [] as DraftAttribution[]),
-        getContentGaps(brandId).catch(() => [] as ContentGap[]),
-        getGapSummary(brandId).catch(() => null),
       ]);
 
       // Ignore results if the user switched to a different brand while fetching
@@ -1934,8 +1922,6 @@ export default function ContentHubPage() {
       setPostedItems(postedData);
       setDraftAttributions(attributionsData);
       setOpportunities(oppsData);
-      setContentGaps(gapsData);
-      setGapSummary(gapSummaryData);
       setBrandProfile(profileData);
       setBrandPrompts(brandDetail?.prompts ?? []);
       setContentSettings(settingsData);
@@ -2127,7 +2113,7 @@ export default function ContentHubPage() {
           <EmptyState
             icon={<FileText size={48} className="text-[#818cf8]" />}
             title={platformFilter !== 'all' ? `No ${platformFilter} drafts` : 'No drafts yet'}
-            description={platformFilter !== 'all' ? 'Try switching to "All" or generate new drafts.' : 'Generate drafts targeting your top visibility gaps to get started.'}
+            description={platformFilter !== 'all' ? 'Try switching to "All" or generate new drafts.' : 'Use "Generate Drafts Now" or request a custom draft to get started.'}
             action={platformFilter === 'all' && (user?.subscription_tier || user?.is_admin) ? (
               <button
                 onClick={handleGenerateNow}
@@ -2214,7 +2200,7 @@ export default function ContentHubPage() {
       <>
         <div className="flex items-center justify-between mb-4">
           <p className="text-xs text-[#64748B]">
-            Reddit threads matched to your tracked prompts
+            Threads and questions matched to your tracked prompts
           </p>
           <button
             onClick={() => setOppHelpOpen(true)}
@@ -2262,7 +2248,7 @@ export default function ContentHubPage() {
           <EmptyState
             icon={<Radio size={26} className="text-[#818cf8]" />}
             title="No live opportunities"
-            description="The Reddit scanner runs daily at 2:00 AM UTC. Click Scan Now to find threads immediately."
+            description="Scanners run daily at 2:00 AM UTC. Click Scan Now to find threads and questions immediately."
             action={
               <button
                 onClick={handleScan}
@@ -2302,242 +2288,6 @@ export default function ContentHubPage() {
     );
   }
 
-  function renderGapsTab() {
-    if (contentGaps.length === 0) {
-      return (
-        <div className="flex flex-col gap-4">
-          {gapSummary && (
-            <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl px-4 py-3 flex items-center gap-2">
-              <BarChart2 size={14} className="text-[#6366f1] shrink-0" />
-              <p className="text-xs text-[#64748B]">No visibility gaps detected — your brand is mentioned above the 50% threshold on all tracked prompts. Run a tracking report to refresh.</p>
-            </div>
-          )}
-          <EmptyState
-            icon={<TrendingDown size={26} className="text-[#818cf8]" />}
-            title="No visibility gaps"
-            description="Run a tracking report to identify prompts where your brand is under-represented in AI responses."
-          />
-        </div>
-      );
-    }
-
-    const sorted = [...contentGaps].sort((a, b) => b.gap_score - a.gap_score);
-
-    async function handleGapDraft(gap: ContentGap) {
-      if (!selectedBrandId) return;
-      const platform = gapPlatforms[gap.id] ?? gap.platforms_lacking[0] ?? 'reddit';
-      setGeneratingGapDraft(gap.id);
-      // Auto-select the best Quora question when generating a Quora draft from a gap card
-      const quoraQ = platform === 'quora' ? (gap.quora_questions[0] ?? null) : null;
-      try {
-        const draft = await generateDraft(selectedBrandId, {
-          platform,
-          prompt_id: gap.prompt_id,
-          quora_question_url: quoraQ?.url,
-          quora_question_title: quoraQ?.title,
-          quora_question_snippet: quoraQ?.snippet,
-        });
-        setDraftItems((prev) => [draft, ...prev]);
-        setActiveTab('drafts');
-      } catch (e: unknown) {
-        const err = e as { response?: { data?: { detail?: string } } };
-        const detail = err?.response?.data?.detail ?? 'Draft generation failed. Check that API keys are configured.';
-        alert(detail);
-      } finally {
-        setGeneratingGapDraft(null);
-      }
-    }
-
-    function getGapPlatform(gap: ContentGap) {
-      return gapPlatforms[gap.id] ?? gap.platforms_lacking[0] ?? 'reddit';
-    }
-
-    function setGapPlatform(gapId: number, platform: string) {
-      setGapPlatforms((prev) => ({ ...prev, [gapId]: platform }));
-    }
-
-    const visibilityColor = (v: number) =>
-      v < 20 ? '#f87171' : v < 35 ? '#fb923c' : v < 50 ? '#fbbf24' : '#10b981';
-
-    const confidenceLabel = (score: number) =>
-      score >= 80 ? 'Critical' : score >= 60 ? 'High' : score >= 40 ? 'Medium' : 'Low';
-
-    const confidenceColor = (score: number) =>
-      score >= 80 ? '#f87171' : score >= 60 ? '#fb923c' : score >= 40 ? '#fbbf24' : '#10b981';
-
-    return (
-      <div className="flex flex-col gap-4">
-        {/* Summary bar */}
-        {gapSummary && gapSummary.total_gaps > 0 && (
-          <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl px-4 py-3 flex flex-wrap items-center gap-4">
-            <div className="flex items-center gap-1.5">
-              <TrendingDown size={13} className="text-[#f87171]" />
-              <span className="text-xs text-[#64748B]">{gapSummary.total_gaps} gap{gapSummary.total_gaps !== 1 ? 's' : ''} identified</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-[#475569]">Avg visibility</span>
-              <span className="text-xs font-medium" style={{ color: visibilityColor(gapSummary.avg_prompt_visibility) }}>
-                {gapSummary.avg_prompt_visibility.toFixed(1)}%
-              </span>
-            </div>
-            {gapSummary.top_competitors.length > 0 && (
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-xs text-[#475569]">AI mentions instead:</span>
-                {gapSummary.top_competitors.slice(0, 3).map((c) => (
-                  <span key={c.name} className="text-xs bg-[rgba(251,146,60,0.12)] border border-[rgba(251,146,60,0.20)] text-[#fb923c] rounded-full px-2 py-0.5">
-                    {c.name} ×{c.mention_count}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Gap cards */}
-        {sorted.map((gap, idx) => {
-          const vis = gap.prompt_visibility ?? 0;
-          const platform = getGapPlatform(gap);
-          const isGenerating = generatingGapDraft === gap.id;
-          const competitorEntries = Object.entries(gap.competitor_mentions ?? {}).sort((a, b) => b[1] - a[1]);
-
-          return (
-            <div
-              key={gap.id}
-              className="bg-[rgba(10,14,24,0.60)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-3 shadow-[0_4px_24px_rgba(0,0,0,0.20)] hover:border-[rgba(255,255,255,0.14)] transition-colors"
-            >
-              {/* Header row */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-semibold text-[#475569]">#{idx + 1}</span>
-                  <span
-                    className="text-xs font-bold px-2 py-0.5 rounded-full border"
-                    style={{
-                      color: confidenceColor(gap.gap_score),
-                      backgroundColor: `${confidenceColor(gap.gap_score)}15`,
-                      borderColor: `${confidenceColor(gap.gap_score)}30`,
-                    }}
-                  >
-                    {confidenceLabel(gap.gap_score)} priority
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-xs text-[#475569]">Visibility</span>
-                  <span className="text-sm font-bold" style={{ color: visibilityColor(vis) }}>
-                    {vis.toFixed(1)}%
-                  </span>
-                </div>
-              </div>
-
-              {/* Prompt text */}
-              {gap.prompt_text && (
-                <p className="text-sm text-[#94A3B8] leading-relaxed">
-                  <span className="text-[#475569] text-xs">Prompt: </span>
-                  {gap.prompt_text}
-                </p>
-              )}
-
-              {/* Score breakdown */}
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { label: 'Severity', value: gap.severity_score, tip: 'How far below 50% visibility' },
-                  { label: 'Opportunity', value: gap.opportunity_score, tip: 'How many AI models affected' },
-                  { label: 'Recency', value: gap.recency_score, tip: 'Days since last content for this prompt' },
-                ].map(({ label, value, tip }) => (
-                  <div key={label} className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg px-2.5 py-2" title={tip}>
-                    <p className="text-[10px] text-[#475569] uppercase tracking-wide mb-1">{label}</p>
-                    <div className="flex items-center gap-1.5">
-                      <div className="flex-1 h-1 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{ width: `${value}%`, backgroundColor: value > 60 ? '#f87171' : value > 30 ? '#fbbf24' : '#10b981' }}
-                        />
-                      </div>
-                      <span className="text-xs text-[#64748B] tabular-nums w-8 text-right">{Math.round(value)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Platforms lacking */}
-              {gap.platforms_lacking.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] text-[#475569] uppercase tracking-wide">No recent content on:</span>
-                  {gap.platforms_lacking.map((p) => (
-                    <span key={p} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.20)] text-[#818cf8] capitalize">
-                      {p}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Competitor mentions */}
-              {competitorEntries.length > 0 && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[10px] text-[#475569] uppercase tracking-wide">AI mentions instead:</span>
-                  {competitorEntries.slice(0, 4).map(([name, count]) => (
-                    <span key={name} className="text-[10px] px-2 py-0.5 rounded-full bg-[rgba(251,146,60,0.08)] border border-[rgba(251,146,60,0.18)] text-[#fb923c]">
-                      {name} ×{count}
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              {/* Quora questions */}
-              {gap.quora_questions.length > 0 && (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-[10px] text-[#475569] uppercase tracking-wide">Relevant Quora questions:</span>
-                  {gap.quora_questions.slice(0, 3).map((q, qi) => (
-                    <a
-                      key={qi}
-                      href={q.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-start gap-1.5 text-xs text-[#818cf8] hover:text-[#a5b4fc] transition-colors group"
-                    >
-                      <ArrowRight size={10} className="mt-0.5 shrink-0 text-[#475569] group-hover:text-[#818cf8] transition-colors" />
-                      <span className="line-clamp-1">{q.title}</span>
-                    </a>
-                  ))}
-                </div>
-              )}
-
-              {/* Generate draft action */}
-              <div className="flex items-center gap-2 pt-1 flex-wrap">
-                <div className="grid grid-cols-4 gap-1.5">
-                  {DRAFT_PLATFORMS.map((p) => (
-                    <button
-                      key={p}
-                      onClick={() => setGapPlatform(gap.id, p)}
-                      disabled={isGenerating}
-                      className={`py-1.5 rounded-lg text-[10px] font-medium capitalize transition-colors border ${
-                        platform === p
-                          ? 'bg-[#6366f1]/20 border-[#6366f1]/50 text-[#6366f1]'
-                          : 'bg-[rgba(255,255,255,0.04)] border-[rgba(255,255,255,0.08)] text-[#475569] hover:text-[#64748B]'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-                <button
-                  onClick={() => handleGapDraft(gap)}
-                  disabled={isGenerating || generatingGapDraft !== null}
-                  className="flex items-center gap-1.5 text-xs bg-[#6366f1]/15 hover:bg-[#6366f1]/25 border border-[#6366f1]/30 text-[#818cf8] hover:text-[#a5b4fc] rounded-lg px-3 py-1.5 transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isGenerating ? (
-                    <><Loader2 size={11} className="animate-spin" />Generating…</>
-                  ) : (
-                    <><Sparkles size={11} />Generate {platform} draft</>
-                  )}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
   function renderPostedTab() {
     if (postedItems.length === 0) {
       return (
@@ -2558,32 +2308,8 @@ export default function ContentHubPage() {
     );
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
-  if (error) {
-    return (
-      <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl">
-        <h1 className="text-2xl font-bold text-[#F0F4F8] mb-8">Content Hub</h1>
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-14 h-14 bg-[#7f1d1d]/15 border border-[#991b1b]/25 rounded-2xl flex items-center justify-center mb-4">
-            <X size={24} className="text-[#f87171]" />
-          </div>
-          <p className="text-base font-medium text-[#F0F4F8] mb-1">Unable to load content</p>
-          <p className="text-sm text-[#64748B] mb-4">{error}</p>
-          <button
-            onClick={() => selectedBrandId && loadAll(selectedBrandId)}
-            className="flex items-center gap-1.5 text-xs bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.25)] border border-[rgba(99,102,241,0.25)] text-[#818cf8] rounded-lg px-3 py-1.5 transition-colors"
-          >
-            <RefreshCw size={12} />
-            Try again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Filter drafts to only show enabled platforms + active platform filter
-  const redditEnabled = !_disabledPlatforms.has('reddit');
+  const oppScanEnabled = !_disabledPlatforms.has('reddit') || !_disabledPlatforms.has('quora');
   const visibleDraftItems = draftItems.filter(
     (d) => !_disabledPlatforms.has(d.platform) && (platformFilter === 'all' || d.platform === platformFilter)
   );
@@ -2595,9 +2321,8 @@ export default function ContentHubPage() {
   const TABS: { key: QueueTab; label: string }[] = [
     { key: 'drafts', label: 'Drafts' },
     { key: 'scheduled', label: 'Scheduled' },
-    ...(redditEnabled ? [{ key: 'opportunities' as QueueTab, label: 'Live Reddit Opportunities' }] : []),
+    ...(oppScanEnabled ? [{ key: 'opportunities' as QueueTab, label: 'Live Opportunities' }] : []),
     { key: 'posted', label: 'Posted' },
-    { key: 'gaps', label: 'Visibility Gaps' },
   ];
 
   return (
@@ -2625,28 +2350,28 @@ export default function ContentHubPage() {
       {/* Help modals */}
       {hubHelpOpen && (
         <HelpModal title="How Content Hub works" onClose={() => setHubHelpOpen(false)}>
-          <p>Content Hub generates AI drafts targeting your visibility gaps and surfaces Reddit threads where your brand can contribute.</p>
+          <p>Content Hub generates AI drafts for your brand and surfaces Reddit and Quora threads where you can contribute.</p>
           <ul className="space-y-2 mt-2">
-            <li><span className="text-[#F0F4F8] font-medium">Generate Drafts Now</span> — creates AI drafts based on your top-scoring content gaps (prompts where your brand is least visible).</li>
-            <li><span className="text-[#F0F4F8] font-medium">Scan Reddit Now</span> — searches subreddits relevant to your brand&apos;s industry for recent threads matching your tracked prompts.</li>
+            <li><span className="text-[#F0F4F8] font-medium">Generate Drafts Now</span> — creates a batch of AI drafts across your tracked prompts and platforms.</li>
+            <li><span className="text-[#F0F4F8] font-medium">Scan Now</span> — searches Reddit and Quora for recent threads and questions matching your tracked prompts.</li>
             <li><span className="text-[#F0F4F8] font-medium">Drafts tab</span> — review, edit, and approve AI drafts before they go live.</li>
             <li><span className="text-[#F0F4F8] font-medium">Scheduled tab</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
-            <li><span className="text-[#F0F4F8] font-medium">Live Reddit Opportunities</span> — Reddit threads where a thoughtful reply could improve your brand&apos;s visibility.</li>
+            <li><span className="text-[#F0F4F8] font-medium">Live Opportunities</span> — Reddit threads and Quora questions where a thoughtful reply could improve your brand&apos;s visibility.</li>
             <li><span className="text-[#F0F4F8] font-medium">Posted tab</span> — content that has been marked as posted.</li>
             <li><span className="text-[#F0F4F8] font-medium">Brand Settings</span> — control which platforms generate drafts and how frequently.</li>
           </ul>
         </HelpModal>
       )}
       {oppHelpOpen && (
-        <HelpModal title="Live Reddit Opportunities" onClose={() => setOppHelpOpen(false)}>
-          <p>Reddit threads where your brand can meaningfully contribute.</p>
-          <p>The scanner searches subreddits relevant to your brand&apos;s industry for threads matching your tracked prompts. Only threads with a relevance score of 40+ are shown.</p>
+        <HelpModal title="Live Opportunities" onClose={() => setOppHelpOpen(false)}>
+          <p>Reddit threads and Quora questions where your brand can meaningfully contribute.</p>
+          <p>Scanners search for content matching your tracked prompts. Only results with a relevance score of 40+ are shown.</p>
           <ul className="space-y-2 mt-2">
-            <li><span className="text-[#F0F4F8] font-medium">Relevance score</span> — how closely the thread matches your tracked prompts, based on keyword overlap, recency, and engagement.</li>
+            <li><span className="text-[#F0F4F8] font-medium">Relevance score</span> — how closely the thread or question matches your tracked prompts, based on keyword overlap, recency, and engagement.</li>
             <li><span className="text-[#F0F4F8] font-medium">Draft Reply</span> — generates an AI reply using your brand voice guidelines.</li>
             <li><span className="text-[#F0F4F8] font-medium">Dismiss</span> — removes the opportunity from this list.</li>
           </ul>
-          <p className="text-[#64748B] text-xs mt-2">The scanner runs automatically every night at 2:00 AM UTC.</p>
+          <p className="text-[#64748B] text-xs mt-2">Scanners run automatically every night at 2:00 AM UTC.</p>
         </HelpModal>
       )}
 
@@ -2774,12 +2499,25 @@ export default function ContentHubPage() {
               <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
 
                 {/* Platform header */}
-                <div className="flex items-center gap-3 mb-1">
-                  <div className="w-1 h-9 rounded-full shrink-0" style={{ background: p.color }} />
-                  <div>
-                    <p className="text-base font-semibold text-[#F0F4F8]">{p.label}</p>
-                    <p className="text-xs text-[#475569]">{p.subtitle}</p>
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-9 rounded-full shrink-0" style={{ background: p.color }} />
+                    <div>
+                      <p className="text-base font-semibold text-[#F0F4F8]">{p.label}</p>
+                      <p className="text-xs text-[#475569]">{p.subtitle}</p>
+                    </div>
                   </div>
+                  {postingPlatform === 'medium' && (
+                    <a
+                      href="https://medium.com/new-story"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-1.5 bg-[rgba(148,163,184,0.08)] hover:bg-[rgba(148,163,184,0.14)] border border-[rgba(148,163,184,0.18)] text-[#94A3B8] hover:text-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs font-medium transition-all shrink-0"
+                    >
+                      Open Medium
+                      <ExternalLink size={11} />
+                    </a>
+                  )}
                 </div>
 
                 {/* Steps */}
@@ -2863,7 +2601,7 @@ export default function ContentHubPage() {
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-[#F0F4F8]">Content Hub</h1>
             <p className="text-[13px] text-[#64748B] mt-1.5">
-              AI-powered content to close visibility gaps across every platform
+              AI-powered content for every platform
             </p>
           </div>
           <button
@@ -2960,7 +2698,7 @@ export default function ContentHubPage() {
               {activeTab === 'scheduled' && renderScheduledTab()}
               {activeTab === 'opportunities' && renderOpportunitiesTab()}
               {activeTab === 'posted' && renderPostedTab()}
-              {activeTab === 'gaps' && renderGapsTab()}
+
             </>
           </div>
 
@@ -3011,7 +2749,7 @@ export default function ContentHubPage() {
                     )}
                   </button>
                   <p className="text-xs text-[#475569] mt-2 text-center">
-                    Drafts for your top 3 visibility gaps
+                    Generates drafts across your tracked prompts
                   </p>
                 </>
               )}

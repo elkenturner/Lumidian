@@ -121,6 +121,33 @@ def send_email_background(fn, *args, **kwargs) -> None:
 
 # ── Public email functions ────────────────────────────────────────────────────
 
+def send_email_verification(email: str, name: Optional[str], code: str) -> None:
+    """Sent immediately after a new user registers — 6-digit code to verify email."""
+    display = name or email.split("@")[0]
+
+    body = f"""\
+Hi {display},
+
+Thanks for creating a Lumidian account.
+
+Your email verification code is:
+
+  {code}
+
+Enter this code on the verification page to access your account.
+This code expires in 24 hours.
+
+If you didn't create a Lumidian account, you can safely ignore this email.
+
+— The Lumidian Team
+"""
+    _send(
+        to=email,
+        subject="Verify your Lumidian account",
+        body=body,
+    )
+
+
 def send_welcome_email(email: str, name: Optional[str]) -> None:
     """Sent immediately after a new user registers."""
     display = name or email.split("@")[0]

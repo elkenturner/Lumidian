@@ -79,21 +79,7 @@ def verify_password(password: str, hashed: str) -> bool:
 
 COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 
-TIER_LIMITS = {
-    "starter": 25,
-    "pro": 100,
-    None: 10,   # free: pitch-brand prompt limit (standard brands not allowed on free)
-    "": 10,
-}
-
-# How many brands of each type a user may own
-# Must stay in sync with BRAND_LIMITS in billing.py
-BRAND_TYPE_LIMITS: dict = {
-    None: {"standard": 0, "pitch": 1},       # free: 1 pitch deck only, no standard brands
-    "": {"standard": 0, "pitch": 1},
-    "starter": {"standard": 2, "pitch": 1},  # 2 standard + 1 pitch deck
-    "pro": {"standard": 2, "pitch": 3},      # 2 standard + 3 pitch decks
-}
+from app.routers.billing import TIER_LIMITS, BRAND_LIMITS as BRAND_TYPE_LIMITS  # noqa: E402 — single source of truth
 
 
 def create_token(user_id: int) -> str:
@@ -143,6 +129,7 @@ def user_to_dict(user: User) -> dict:
         "prompt_limit": limit,
         "totp_enabled": bool(user.totp_enabled),
         "created_at": user.created_at.isoformat() if user.created_at else None,
+        "email_verified": bool(getattr(user, "email_verified", True)),
     }
 
 

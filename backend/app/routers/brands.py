@@ -168,6 +168,8 @@ async def list_brands(db: DbDep, user: CurrentUser):
                 name=brand.name,
                 slug=brand.slug,
                 tier=brand.tier,
+                brand_type=brand.brand_type,
+                pitch_expires_at=brand.pitch_expires_at,
                 prompt_count=prompt_count,
                 website_url=brand.website_url,
                 created_at=brand.created_at,

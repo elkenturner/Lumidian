@@ -33,7 +33,7 @@ import secrets
 import logging
 
 from app.database import get_db
-from app.dependencies import JWT_SECRET, JWT_ALGORITHM, get_current_user, get_current_user_allow_unverified
+from app.dependencies import JWT_SECRET, JWT_ALGORITHM, get_current_user, AllowUnverifiedUser
 from app.models import User, PasswordResetToken, utcnow
 
 logger = logging.getLogger(__name__)
@@ -238,7 +238,7 @@ async def logout(response: Response):
 # ── Me ────────────────────────────────────────────────────────────────────────
 
 @router.get("/me")
-async def get_me(user: Annotated[User, Depends(get_current_user_allow_unverified)], db: DbDep):
+async def get_me(user: AllowUnverifiedUser, db: DbDep):
     from app.models import TeamMember
     from sqlalchemy import select as sa_select
 
@@ -585,7 +585,7 @@ class VerifyEmailRequest(BaseModel):
 async def verify_email(
     body: VerifyEmailRequest,
     http_req: Request,
-    current_user: Annotated[User, Depends(get_current_user_allow_unverified)],
+    current_user: AllowUnverifiedUser,
     db: DbDep,
 ):
     """Validate the 6-digit code and mark the user's email as verified."""
@@ -623,7 +623,7 @@ async def verify_email(
 @router.post("/resend-verification", status_code=status.HTTP_200_OK)
 async def resend_verification(
     http_req: Request,
-    current_user: Annotated[User, Depends(get_current_user_allow_unverified)],
+    current_user: AllowUnverifiedUser,
     db: DbDep,
 ):
     """Generate a fresh 6-digit code and resend the verification email."""

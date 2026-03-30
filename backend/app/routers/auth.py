@@ -33,7 +33,7 @@ import secrets
 import logging
 
 from app.database import get_db
-from app.dependencies import JWT_SECRET, JWT_ALGORITHM, get_current_user
+from app.dependencies import JWT_SECRET, JWT_ALGORITHM, get_current_user, get_current_user_allow_unverified
 from app.models import User, PasswordResetToken, utcnow
 
 logger = logging.getLogger(__name__)
@@ -234,7 +234,7 @@ async def logout(response: Response):
 # ── Me ────────────────────────────────────────────────────────────────────────
 
 @router.get("/me")
-async def get_me(user: Annotated[User, Depends(get_current_user)], db: DbDep):
+async def get_me(user: Annotated[User, Depends(get_current_user_allow_unverified)], db: DbDep):
     from app.models import TeamMember
     from sqlalchemy import select as sa_select
 

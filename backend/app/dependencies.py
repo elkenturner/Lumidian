@@ -76,6 +76,35 @@ async def get_current_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your account has been paused. Contact support to restore access.",
         )
+    if not getattr(user, "email_verified", True) and not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="email_not_verified",
+        )
+    return user
+
+
+async def get_current_user_allow_unverified(
+    db: Annotated[AsyncSession, Depends(get_db)],
+    clarity_token: Optional[str] = Cookie(default=None),
+) -> User:
+    """Like get_current_user but does NOT block unverified email addresses.
+    Use only for /auth/me and the email verification endpoints themselves."""
+    if not clarity_token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+    payload = decode_token(clarity_token)
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    result = await db.execute(select(User).where(User.id == int(user_id)))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if getattr(user, "is_paused", False) and not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been paused. Contact support to restore access.",
+        )
     return user
 
 
@@ -100,6 +129,7 @@ async def get_current_user_optional(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+AllowUnverifiedUser = Annotated[User, Depends(get_current_user_allow_unverified)]
 OptionalUser = Annotated[Optional[User], Depends(get_current_user_optional)]
 
 

@@ -7,6 +7,7 @@ import LumidianLogo from '@/components/LumidianLogo';
 import {
   getBillingUsage,
   getBrandProfile,
+  getSuggestedPromptsPreview,
   createBrand,
   updateBrandProfile,
   refreshWebsiteContext,
@@ -54,6 +55,8 @@ export default function NewBrandPage() {
 
   // Prompts
   const [prompts, setPrompts] = useState<string[]>(['']);
+  const [suggestingPrompts, setSuggestingPrompts] = useState(false);
+  const [suggestError, setSuggestError] = useState('');
 
   // Profile
   const [companyDescription, setCompanyDescription] = useState('');
@@ -153,11 +156,25 @@ export default function NewBrandPage() {
         });
       }
       try { await triggerRun(createdBrandId); } catch {}
-      router.push('/dashboard?newBrand=true');
+      router.push(`/dashboard?newBrand=true&brandId=${createdBrandId}`);
     } catch {
-      router.push('/dashboard?newBrand=true');
+      router.push(`/dashboard?newBrand=true&brandId=${createdBrandId}`);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSuggestPrompts() {
+    if (!brandName.trim()) return;
+    setSuggestingPrompts(true);
+    setSuggestError('');
+    try {
+      const suggestions = await getSuggestedPromptsPreview(brandName.trim());
+      setPrompts(suggestions.slice(0, promptLimit));
+    } catch {
+      setSuggestError('Could not generate suggestions. Try again.');
+    } finally {
+      setSuggestingPrompts(false);
     }
   }
 
@@ -451,11 +468,25 @@ export default function NewBrandPage() {
         {/* ── Step: Prompts ── */}
         {step === 'prompts' && (
           <div>
-            <h2 className="text-xl font-bold text-[#F0F4F8] mb-1">What do you want to track?</h2>
+            <div className="flex items-start justify-between mb-1">
+              <h2 className="text-xl font-bold text-[#F0F4F8]">What do you want to track?</h2>
+              <button
+                type="button"
+                onClick={handleSuggestPrompts}
+                disabled={suggestingPrompts}
+                className="flex items-center gap-1.5 text-xs font-medium text-[#a78bfa] hover:text-[#c4b5fd] disabled:opacity-50 transition-colors shrink-0 ml-3 mt-0.5"
+              >
+                {suggestingPrompts ? <Loader2 size={12} className="animate-spin" /> : <span>✦</span>}
+                {suggestingPrompts ? 'Generating…' : 'Generate with AI'}
+              </button>
+            </div>
             <p className="text-sm text-[#64748B] mb-6">
               Add questions people might ask AI models where your brand should appear.{' '}
               <span className="text-[#64748B]">Up to {promptLimit} prompts.</span>
             </p>
+            {suggestError && (
+              <p className="text-xs text-[#f87171] mb-3">{suggestError}</p>
+            )}
             <div className="space-y-2 mb-4">
               {prompts.map((p, i) => (
                 <input

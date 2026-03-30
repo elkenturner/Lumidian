@@ -46,7 +46,7 @@ export default function RegisterPage() {
     setLoading(true);
     try {
       await register(email, password, name);
-      router.push('/onboarding');
+      router.push('/verify-email');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
       setError(e?.response?.data?.detail || 'Registration failed. Please try again.');

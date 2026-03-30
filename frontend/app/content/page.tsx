@@ -1411,10 +1411,12 @@ function OpportunityCard({
   opp,
   onDraft,
   onDismiss,
+  queueFull,
 }: {
   opp: ContentOpportunity;
   onDraft: (id: number) => void;
   onDismiss: (id: number) => void;
+  queueFull?: boolean;
 }) {
   const [drafting, setDrafting] = useState(false);
 
@@ -1482,11 +1484,12 @@ function OpportunityCard({
       <div className="flex items-center gap-2 pt-1">
         <button
           onClick={handleDraft}
-          disabled={drafting}
-          className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors"
+          disabled={drafting || queueFull}
+          title={queueFull ? 'Draft queue full — approve or dismiss drafts to make room' : undefined}
+          className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-1.5 transition-colors"
         >
           {drafting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-          {drafting ? 'Drafting…' : 'Draft Reply'}
+          {drafting ? 'Drafting…' : queueFull ? 'Queue full' : 'Draft Reply'}
         </button>
         <button
           onClick={() => onDismiss(opp.id)}
@@ -2231,6 +2234,7 @@ export default function ContentHubPage() {
               opp={o}
               onDraft={handleDraftOpportunity}
               onDismiss={handleDismissOpportunity}
+              queueFull={!!draftStatus?.draft_queue_full}
             />
           ))}
           {visibleOpportunities.length === 0 && (
@@ -2276,9 +2280,9 @@ export default function ContentHubPage() {
   );
 
   const TABS: { key: QueueTab; label: string }[] = [
+    ...(oppScanEnabled ? [{ key: 'opportunities' as QueueTab, label: 'Live Opportunities' }] : []),
     { key: 'drafts', label: 'Drafts' },
     { key: 'scheduled', label: 'Scheduled' },
-    ...(oppScanEnabled ? [{ key: 'opportunities' as QueueTab, label: 'Live Opportunities' }] : []),
     { key: 'posted', label: 'Posted' },
   ];
 

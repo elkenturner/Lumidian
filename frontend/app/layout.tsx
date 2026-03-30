@@ -3,6 +3,7 @@ import { Inter, Fira_Code } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import AppShell from '@/components/AppShell';
+import CookieConsent from '@/components/CookieConsent';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -54,6 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>
+        <CookieConsent />
       </body>
     </html>
   );

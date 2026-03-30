@@ -312,6 +312,7 @@ async def google_auth(request: GoogleAuthRequest, response: Response, db: DbDep)
                 google_id=google_id,
                 name=name,
                 is_admin=(email in _ADMIN_EMAILS),
+                email_verified=True,
             )
             db.add(user)
 
@@ -449,6 +450,7 @@ async def google_auth_callback(
                 google_id=google_sub,
                 name=name,
                 is_admin=(email in _ADMIN_EMAILS),
+                email_verified=True,
             )
             db.add(user)
     await db.commit()

@@ -63,6 +63,9 @@ class User(Base):
     totp_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default='1')
+    email_verification_code: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    email_verification_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
 
 # ── System-wide key-value settings ───────────────────────────────────────────

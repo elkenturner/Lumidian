@@ -259,6 +259,10 @@ async def run_migrations():
         # Two-factor authentication (TOTP)
         "ALTER TABLE users ADD COLUMN totp_secret TEXT",
         "ALTER TABLE users ADD COLUMN totp_enabled INTEGER NOT NULL DEFAULT 0",
+        # Email verification — gate new accounts until they confirm their address
+        "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1",
+        "ALTER TABLE users ADD COLUMN email_verification_code TEXT",
+        "ALTER TABLE users ADD COLUMN email_verification_expires_at DATETIME",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

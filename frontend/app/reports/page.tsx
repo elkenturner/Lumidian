@@ -10,7 +10,6 @@ import {
   Download,
   Search,
   ArrowUpDown,
-  GitCompare,
 } from 'lucide-react';
 import {
   getBrand,
@@ -18,6 +17,8 @@ import {
   getResponses,
   getRecentRuns,
   exportReportPDF,
+  getCaseStudyEligibility,
+  exportCaseStudyPDF,
   getCompetitorAnalysis,
   Brand,
   BrandDetail,
@@ -26,6 +27,7 @@ import {
   TrackingRun,
   Prompt,
   CompetitorAnalysis,
+  CaseStudyEligibility,
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
 import { useBrand } from '@/contexts/BrandContext';
@@ -144,15 +146,14 @@ export default function ReportsPage() {
   const [trends, setTrends] = useState<(TrendPoint & { formattedDate: string; score: number })[]>([]);
   const [responses, setResponses] = useState<QueryResult[]>([]);
   const [prevResponses, setPrevResponses] = useState<QueryResult[]>([]);
-  const [allRuns, setAllRuns] = useState<TrackingRun[]>([]);
-  const [compareRunId, setCompareRunId] = useState<number | null>(null);
-  const [loadingCompare, setLoadingCompare] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortBy>('visibility');
   const [loading, setLoading] = useState(false);
   const [expandedPromptId, setExpandedPromptId] = useState<number | null>(null);
   const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
+  const [caseStudyEligibility, setCaseStudyEligibility] = useState<CaseStudyEligibility | null>(null);
+  const [exportingCaseStudy, setExportingCaseStudy] = useState(false);
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysis | null>(null);
   const [competitorModelFilter, setCompetitorModelFilter] = useState<string>('all');
   const brandDropdownRef = useRef<HTMLDivElement>(null);
@@ -177,8 +178,6 @@ export default function ReportsPage() {
     setTrends([]);
     setResponses([]);
     setPrevResponses([]);
-    setAllRuns([]);
-    setCompareRunId(null);
     setExpandedPromptId(null);
     setBrandDetail(null);
     setCompetitorAnalysis(null);
@@ -191,19 +190,19 @@ export default function ReportsPage() {
           .sort((a: TrackingRun, b: TrackingRun) => b.id - a.id);
         const latestCompleted = completedRuns[0];
         const prevCompleted = completedRuns[1];
-        if (!latestCompleted) return { resps: [], prevResps: [], compAnalysis: null, completedRuns };
+        if (!latestCompleted) return { resps: [], prevResps: [], compAnalysis: null };
         return Promise.all([
           getResponses(brandId, latestCompleted.id),
           prevCompleted ? getResponses(brandId, prevCompleted.id) : Promise.resolve([]),
           getCompetitorAnalysis(brandId, latestCompleted.id).catch(() => null),
-        ]).then(([resps, prevResps, compAnalysis]) => ({ resps, prevResps, compAnalysis, completedRuns }));
+        ]).then(([resps, prevResps, compAnalysis]) => ({ resps, prevResps, compAnalysis }));
       });
 
       const [tr, , detail, runData] = await Promise.all([
         getTrends(brandId),
         runsPromise,
         getBrand(brandId).catch(() => null),
-        runsDataPromise.catch(() => ({ resps: [], prevResps: [], compAnalysis: null, completedRuns: [] })),
+        runsDataPromise.catch(() => ({ resps: [], prevResps: [], compAnalysis: null })),
       ]);
 
       if (signal?.aborted) return;
@@ -216,33 +215,20 @@ export default function ReportsPage() {
         }))
       );
       setBrandDetail(detail);
-      const { resps, prevResps, compAnalysis, completedRuns } = runData as {
+      const { resps, prevResps, compAnalysis } = runData as {
         resps: QueryResult[];
         prevResps: QueryResult[];
         compAnalysis: CompetitorAnalysis | null;
-        completedRuns: TrackingRun[];
       };
-      setAllRuns(completedRuns ?? []);
-      if ((completedRuns ?? []).length >= 2) setCompareRunId((completedRuns[1] as TrackingRun).id);
       setResponses(Array.isArray(resps) ? resps.filter((r: QueryResult) => r.response_text) : []);
       setPrevResponses(Array.isArray(prevResps) ? prevResps.filter((r: QueryResult) => r.response_text) : []);
       if (compAnalysis?.has_data) setCompetitorAnalysis(compAnalysis);
+      // Check case study eligibility
+      getCaseStudyEligibility(brandId).then(setCaseStudyEligibility).catch(() => {});
     } catch { /* ignore */ } finally {
       if (!signal?.aborted) setLoading(false);
     }
   }, []);
-
-  // When compare run changes, fetch its responses
-  useEffect(() => {
-    if (!selectedBrandId || compareRunId === null) return;
-    // Check if already loaded (prev run on initial load)
-    setLoadingCompare(true);
-    getResponses(selectedBrandId, compareRunId)
-      .then((r) => setPrevResponses(r.filter((x: QueryResult) => x.response_text)))
-      .catch((err) => { console.error('[Reports] Failed to load compare run responses:', err); })
-      .finally(() => setLoadingCompare(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [compareRunId]);
 
   useEffect(() => {
     if (!selectedBrandId) return;
@@ -259,7 +245,7 @@ export default function ReportsPage() {
     if (!selectedBrandId) return;
     setExportingPDF(true);
     try {
-      await exportReportPDF(selectedBrandId);
+      await exportReportPDF(selectedBrandId, 0);
     } catch {
       alert('Failed to generate PDF. Please try again.');
     } finally {
@@ -376,17 +362,36 @@ export default function ReportsPage() {
             </button>
           )}
           {selectedBrandId && (
-            <button
-              onClick={downloadPDF}
-              disabled={exportingPDF}
-              className="flex items-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[#818cf8] hover:text-[#a5b4fc] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
-              title="Export as PDF"
-            >
-              {exportingPDF
-                ? <Loader2 size={14} className="animate-spin" />
-                : <Download size={14} />}
-              PDF
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={downloadPDF}
+                disabled={exportingPDF}
+                className="flex items-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[#818cf8] hover:text-[#a5b4fc] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
+                title="Export as PDF"
+              >
+                {exportingPDF
+                  ? <Loader2 size={14} className="animate-spin" />
+                  : <Download size={14} />}
+                PDF
+              </button>
+              {caseStudyEligibility?.eligible && (
+                <button
+                  onClick={async () => {
+                    if (!selectedBrandId) return;
+                    setExportingCaseStudy(true);
+                    try { await exportCaseStudyPDF(selectedBrandId); }
+                    catch { alert('Failed to generate case study. Please try again.'); }
+                    finally { setExportingCaseStudy(false); }
+                  }}
+                  disabled={exportingCaseStudy}
+                  className="flex items-center gap-2 bg-[rgba(16,185,129,0.10)] hover:bg-[rgba(16,185,129,0.16)] border border-[rgba(16,185,129,0.25)] text-[#34d399] hover:text-[#6ee7b7] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
+                  title="Export 90-day case study PDF"
+                >
+                  {exportingCaseStudy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  Case Study
+                </button>
+              )}
+            </div>
           )}
           <button
             onClick={() => selectedBrandId && loadData(selectedBrandId)}
@@ -430,7 +435,7 @@ export default function ReportsPage() {
             Reports update automatically once daily at 8:00 AM UTC.
           </p>
 
-          {/* Search + sort + compare controls */}
+          {/* Search + sort controls */}
           {!loading && responses.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {/* Search */}
@@ -457,26 +462,6 @@ export default function ReportsPage() {
                   </button>
                 ))}
               </div>
-              {/* Compare run picker */}
-              {allRuns.length >= 2 && (
-                <div className="flex items-center gap-1.5 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-lg px-2.5 py-1.5">
-                  <GitCompare size={11} className="text-[#6366f1] flex-shrink-0" />
-                  <span className="text-[10px] text-[#475569] font-medium">Compare to:</span>
-                  <select
-                    value={compareRunId ?? ''}
-                    onChange={(e) => setCompareRunId(e.target.value ? Number(e.target.value) : null)}
-                    className="bg-transparent text-[#94A3B8] text-[10px] focus:outline-none cursor-pointer"
-                  >
-                    <option value="">None</option>
-                    {allRuns.slice(1).map((r) => (
-                      <option key={r.id} value={r.id}>
-                        Run #{r.id} — {r.completed_at ? format(parseUTCISO(r.completed_at), 'MMM d, HH:mm') : '?'}
-                      </option>
-                    ))}
-                  </select>
-                  {loadingCompare && <Loader2 size={10} className="animate-spin text-[#6366f1]" />}
-                </div>
-              )}
             </div>
           )}
 

@@ -798,15 +798,6 @@ function DraftCard({
             Approve
           </button>
           <button
-            onClick={() => handleRegenerate()}
-            disabled={regenerating}
-            className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-            title="Generate a fresh draft for the same prompt and platform"
-          >
-            {regenerating ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-            Regen
-          </button>
-          <button
             onClick={() => onDelete(draft.id)}
             className="flex items-center gap-1.5 text-xs text-[#ef4444]/70 hover:text-[#f87171] rounded-lg px-3 py-1.5 transition-colors ml-auto"
           >

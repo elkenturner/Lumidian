@@ -6,6 +6,7 @@ import { ChevronRight, Plus, Loader2, CheckCircle, ArrowLeft, BarChart2, Zap, Fi
 import LumidianLogo from '@/components/LumidianLogo';
 import {
   getBillingUsage,
+  getBrandProfile,
   createBrand,
   updateBrandProfile,
   refreshWebsiteContext,
@@ -56,7 +57,6 @@ export default function NewBrandPage() {
 
   // Profile
   const [companyDescription, setCompanyDescription] = useState('');
-  const [targetAudience, setTargetAudience] = useState('');
 
   useEffect(() => {
     getBillingUsage()
@@ -121,6 +121,19 @@ export default function NewBrandPage() {
       if (validPrompts.length > 0) {
         await Promise.all(validPrompts.map((p) => addPrompt(createdBrandId, p.trim())));
       }
+      // Auto-fill description from scraped website content if available
+      if (websiteUrl) {
+        try {
+          const profile = await getBrandProfile(createdBrandId);
+          if (profile.internal_brand_context && !companyDescription) {
+            const firstLine = profile.internal_brand_context
+              .split(/\n+/)
+              .map((l) => l.trim())
+              .find((l) => l.length > 20 && !l.startsWith('#') && !l.startsWith('http') && !l.startsWith('['));
+            if (firstLine) setCompanyDescription(firstLine.slice(0, 300));
+          }
+        } catch {}
+      }
       setStep('profile');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
@@ -134,10 +147,9 @@ export default function NewBrandPage() {
     if (!createdBrandId) return;
     setSaving(true);
     try {
-      if (companyDescription || targetAudience) {
+      if (companyDescription) {
         await updateBrandProfile(createdBrandId, {
-          company_description: companyDescription || undefined,
-          target_audience: targetAudience || undefined,
+          company_description: companyDescription,
         });
       }
       try { await triggerRun(createdBrandId); } catch {}
@@ -403,7 +415,7 @@ export default function NewBrandPage() {
                   value={brandName}
                   onChange={(e) => setBrandName(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleDetails()}
-                  placeholder="Acme Inc."
+                  placeholder="Your brand name"
                   autoFocus
                   className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)] placeholder:text-[#475569] transition-all"
                 />
@@ -496,16 +508,6 @@ export default function NewBrandPage() {
                   rows={3}
                   placeholder="Brief description of what your company does…"
                   className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)] placeholder:text-[#475569] resize-none transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">Target audience</label>
-                <input
-                  type="text"
-                  value={targetAudience}
-                  onChange={(e) => setTargetAudience(e.target.value)}
-                  placeholder="e.g. B2B SaaS companies, healthcare professionals…"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:shadow-[0_0_0_3px_rgba(99,102,241,0.15)] placeholder:text-[#475569] transition-all"
                 />
               </div>
             </div>

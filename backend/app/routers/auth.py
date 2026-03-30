@@ -47,6 +47,10 @@ _register_attempts: dict = defaultdict(list)
 _RATE_WINDOW = 60.0     # sliding 1-minute window
 _MAX_LOGIN = 10         # 10 attempts / minute / IP
 _MAX_REGISTER = 5       # 5 attempts / minute / IP
+_verify_attempts: dict = defaultdict(list)
+_resend_attempts: dict = defaultdict(list)
+_MAX_VERIFY = 10        # 10 attempts / minute / IP
+_MAX_RESEND = 3         # 3 attempts / minute / IP (prevent email flooding)
 
 
 def _rate_check(ip: str, store: dict, limit: int) -> None:
@@ -578,10 +582,12 @@ class VerifyEmailRequest(BaseModel):
 @router.post("/verify-email", status_code=status.HTTP_200_OK)
 async def verify_email(
     body: VerifyEmailRequest,
+    http_req: Request,
     current_user: Annotated[User, Depends(get_current_user_allow_unverified)],
     db: DbDep,
 ):
     """Validate the 6-digit code and mark the user's email as verified."""
+    _rate_check(http_req.client.host if http_req.client else "unknown", _verify_attempts, _MAX_VERIFY)
     if getattr(current_user, "email_verified", True):
         return {"message": "Email already verified"}
 
@@ -614,10 +620,12 @@ async def verify_email(
 
 @router.post("/resend-verification", status_code=status.HTTP_200_OK)
 async def resend_verification(
+    http_req: Request,
     current_user: Annotated[User, Depends(get_current_user_allow_unverified)],
     db: DbDep,
 ):
     """Generate a fresh 6-digit code and resend the verification email."""
+    _rate_check(http_req.client.host if http_req.client else "unknown", _resend_attempts, _MAX_RESEND)
     if getattr(current_user, "email_verified", True):
         return {"message": "Email already verified"}
 

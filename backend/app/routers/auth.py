@@ -569,6 +569,77 @@ async def reset_password(request: ResetPasswordRequest, db: DbDep):
     return {"message": "Password updated successfully"}
 
 
+# ── Email verification ────────────────────────────────────────────────────────
+
+class VerifyEmailRequest(BaseModel):
+    code: str
+
+
+@router.post("/verify-email", status_code=status.HTTP_200_OK)
+async def verify_email(
+    body: VerifyEmailRequest,
+    current_user: Annotated[User, Depends(get_current_user_allow_unverified)],
+    db: DbDep,
+):
+    """Validate the 6-digit code and mark the user's email as verified."""
+    if getattr(current_user, "email_verified", True):
+        return {"message": "Email already verified"}
+
+    if not current_user.email_verification_code or not current_user.email_verification_expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No pending verification. Please resend the code.",
+        )
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if current_user.email_verification_expires_at < now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Code expired. Please request a new one.",
+        )
+
+    if not verify_password(body.code.strip(), current_user.email_verification_code):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid code. Please try again.",
+        )
+
+    current_user.email_verified = True
+    current_user.email_verification_code = None
+    current_user.email_verification_expires_at = None
+    await db.commit()
+
+    return {"message": "Email verified successfully"}
+
+
+@router.post("/resend-verification", status_code=status.HTTP_200_OK)
+async def resend_verification(
+    current_user: Annotated[User, Depends(get_current_user_allow_unverified)],
+    db: DbDep,
+):
+    """Generate a fresh 6-digit code and resend the verification email."""
+    if getattr(current_user, "email_verified", True):
+        return {"message": "Email already verified"}
+
+    verification_code = f"{secrets.randbelow(1_000_000):06d}"
+    code_hash = hash_password(verification_code)
+    code_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=24)
+
+    current_user.email_verification_code = code_hash
+    current_user.email_verification_expires_at = code_expires_at
+    await db.commit()
+
+    from app.services.email_service import send_email_verification, send_email_background
+    send_email_background(
+        send_email_verification,
+        email=current_user.email,
+        name=current_user.name,
+        code=verification_code,
+    )
+
+    return {"message": "Verification email resent"}
+
+
 # ── Admin: reset any user's password ──────────────────────────────────────────
 
 class AdminResetPasswordRequest(BaseModel):

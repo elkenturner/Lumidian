@@ -143,7 +143,6 @@ class RegisterRequest(BaseModel):
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, http_req: Request, response: Response, db: DbDep):
-    import random
     request = body
     _rate_check(http_req.client.host if http_req.client else "unknown", _register_attempts, _MAX_REGISTER)
     email = request.email.strip().lower()
@@ -153,7 +152,7 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     if len(request.password) < 6:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Password must be at least 6 characters")
 
-    verification_code = f"{random.randint(0, 999999):06d}"
+    verification_code = f"{secrets.randbelow(1_000_000):06d}"
     code_hash = hash_password(verification_code)
     code_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=24)
 

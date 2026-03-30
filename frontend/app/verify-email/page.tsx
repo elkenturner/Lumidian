@@ -140,10 +140,11 @@ export default function VerifyEmailPage() {
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 8 }}>
+              <label htmlFor="verification-code" style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 8 }}>
                 Verification code
               </label>
               <input
+                id="verification-code"
                 type="text"
                 inputMode="numeric"
                 maxLength={6}

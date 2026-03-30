@@ -45,14 +45,10 @@ Disallow: /results
 Disallow: /content
 Disallow: /reports
 Disallow: /api/
-
-Allow: /
-Allow: /login
-Allow: /register
-Allow: /forgot-password
-Allow: /privacy
-Allow: /terms
+Disallow: /reset-password
 ```
+
+> **Implementation note:** `Allow:` directives were intentionally omitted during implementation — anything not explicitly disallowed is crawlable by default, so they are redundant. `/reset-password` was added to prevent password-reset token URLs from being indexed.
 
 - [ ] **Step 2: Verify it's served by Next.js**
 

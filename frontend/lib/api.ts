@@ -8,6 +8,21 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// ── Error parsing ─────────────────────────────────────────────────────────────
+// Extracts the human-readable message from an Axios error response.
+// Falls back to the provided default if the server didn't send a detail field.
+export function parseApiError(err: unknown, fallback = 'Something went wrong. Please try again.'): string {
+  const e = err as { response?: { status?: number; data?: { detail?: string } } };
+  const detail = e?.response?.data?.detail;
+  if (detail) return detail;
+  const status = e?.response?.status;
+  if (status === 402) return 'Upgrade your plan to use this feature.';
+  if (status === 429) return 'You\'ve hit a usage limit. Please wait or upgrade your plan.';
+  if (status === 403) return 'You don\'t have permission to do that.';
+  if (status === 404) return 'Not found.';
+  return fallback;
+}
+
 // ── Request deduplication ─────────────────────────────────────────────────────
 // Prevents duplicate concurrent GET requests for the same URL.
 // If the same GET is fired twice before the first resolves, both callers share
@@ -56,6 +71,7 @@ export interface TrackingRun {
   completed_at: string | null;
   created_at: string;
   has_content_influence?: boolean;
+  model_scores?: ModelScore[];
 }
 
 export interface ModelScore {
@@ -376,8 +392,8 @@ export async function getPlatformGuidelines(platform: string): Promise<PlatformG
   return res.data;
 }
 
-export async function getAttribution(brandId: number): Promise<ContentAttribution[]> {
-  const res = await api.get<ContentAttribution[]>(`/content/${brandId}/attribution`);
+export async function getAttribution(brandId: number): Promise<DraftAttribution[]> {
+  const res = await api.get<DraftAttribution[]>(`/content/${brandId}/attribution`);
   return res.data;
 }
 
@@ -754,6 +770,7 @@ export interface AuthUser {
   prompt_limit: number;
   totp_enabled: boolean;
   created_at: string;
+  email_verified: boolean;
   is_team_member?: boolean;
   team_owner_name?: string | null;
   team_owner_email?: string | null;
@@ -780,6 +797,16 @@ export async function authLogin(email: string, password: string): Promise<AuthUs
 
 export async function authLogout(): Promise<void> {
   await api.post('/auth/logout');
+}
+
+export async function authVerifyEmail(code: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/auth/verify-email', { code });
+  return res.data;
+}
+
+export async function authResendVerification(): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/auth/resend-verification');
+  return res.data;
 }
 
 export async function authMe(): Promise<AuthUser> {
@@ -949,8 +976,8 @@ export async function adminRemoveUser(userId: number): Promise<{ user_id: number
   return res.data;
 }
 
-export async function exportReportPDF(brandId: number): Promise<void> {
-  const res = await api.get(`/reports/${brandId}/export`, { responseType: 'blob' });
+export async function exportReportPDF(brandId: number, days = 0): Promise<void> {
+  const res = await api.get(`/reports/${brandId}/export`, { responseType: 'blob', params: days > 0 ? { days } : undefined });
   const blob = new Blob([res.data], { type: 'application/pdf' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -983,6 +1010,34 @@ export interface DraftAttribution {
 export async function getDraftAttributions(brandId: number): Promise<DraftAttribution[]> {
   const res = await api.get<DraftAttribution[]>(`/brands/${brandId}/content-attribution`);
   return res.data;
+}
+
+// ── Case Study ────────────────────────────────────────────────────────────────
+
+export interface CaseStudyEligibility {
+  eligible: boolean;
+  total_runs: number;
+  runs_before_90d: number;
+  runs_last_90d: number;
+  brand_name: string;
+}
+
+export async function getCaseStudyEligibility(brandId: number): Promise<CaseStudyEligibility> {
+  const res = await api.get<CaseStudyEligibility>(`/reports/${brandId}/case-study-eligible`);
+  return res.data;
+}
+
+export async function exportCaseStudyPDF(brandId: number): Promise<void> {
+  const res = await api.get(`/reports/${brandId}/case-study-export`, { responseType: 'blob' });
+  const blob = new Blob([res.data], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  const disp: string = res.headers['content-disposition'] ?? '';
+  const match = disp.match(/filename="?([^"]+)"?/);
+  a.download = match ? match[1] : `case-study-${brandId}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ── Team Members ──────────────────────────────────────────────────────────────
@@ -1019,6 +1074,17 @@ export async function removeTeamMember(memberId: number): Promise<void> {
 
 export async function acceptTeamInvite(token: string): Promise<{ message: string; account_owner_id: number }> {
   const res = await api.get<{ message: string; account_owner_id: number }>(`/team/accept?token=${token}`);
+  return res.data;
+}
+
+export interface InviteInfo {
+  invited_email: string;
+  inviter_name: string;
+  expires_at: string;
+}
+
+export async function getInviteInfo(token: string): Promise<InviteInfo> {
+  const res = await api.get<InviteInfo>(`/team/accept-info?token=${token}`);
   return res.data;
 }
 

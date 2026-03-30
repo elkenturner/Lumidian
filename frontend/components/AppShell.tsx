@@ -8,7 +8,7 @@ import Sidebar from '@/components/Sidebar';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { BrandProvider } from '@/contexts/BrandContext';
 
-const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password'];
+const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email'];
 
 const MOBILE_NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },

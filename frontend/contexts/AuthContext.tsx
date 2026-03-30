@@ -55,6 +55,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh().finally(() => setLoading(false));
   }, []);
 
+  // Redirect unverified users to /verify-email; send already-verified users away from it
+  useEffect(() => {
+    if (loading || user === null) return;
+    if (!user.email_verified && pathname !== '/verify-email') {
+      router.push('/verify-email');
+    } else if (user.email_verified && pathname === '/verify-email') {
+      router.push('/dashboard');
+    }
+  }, [loading, user, pathname, router]);
+
   async function login(email: string, password: string) {
     const result = await authLogin(email, password);
     // If server requires 2FA, propagate the challenge so the login page can show the TOTP step.

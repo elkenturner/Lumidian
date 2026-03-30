@@ -1837,6 +1837,7 @@ export default function ContentHubPage() {
   const [postedItems, setPostedItems] = useState<ContentDraft[]>([]);
   const [draftAttributions, setDraftAttributions] = useState<DraftAttribution[]>([]);
   const [opportunities, setOpportunities] = useState<ContentOpportunity[]>([]);
+  const [pinnedDraftId, setPinnedDraftId] = useState<number | null>(null);
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [brandPrompts, setBrandPrompts] = useState<Prompt[]>([]);
   const [contentSettings, setContentSettings] = useState<BrandContentSettings[]>([]);
@@ -1991,6 +1992,7 @@ export default function ContentHubPage() {
       const draft = await draftOpportunity(oppId);
       setOpportunities((prev) => prev.filter((o) => o.id !== oppId));
       setDraftItems((prev) => [draft, ...prev]);
+      setPinnedDraftId(draft.id);
       // Refresh status so the count is accurate
       if (selectedBrandId) getDraftStatus(selectedBrandId).then(setDraftStatus).catch(() => {});
       setActiveTab('drafts');
@@ -2103,10 +2105,12 @@ export default function ContentHubPage() {
         </>
       );
     }
-    // Sort by urgency score descending (High first)
-    const sorted = [...visibleDraftItems].sort(
-      (a, b) => computeUrgency(b, postedItems).score - computeUrgency(a, postedItems).score
-    );
+    // Sort by urgency score descending (High first), pinned draft always first
+    const sorted = [...visibleDraftItems].sort((a, b) => {
+      if (a.id === pinnedDraftId) return -1;
+      if (b.id === pinnedDraftId) return 1;
+      return computeUrgency(b, postedItems).score - computeUrgency(a, postedItems).score;
+    });
     return (
       <div className="flex flex-col gap-3">
         {filterBar}

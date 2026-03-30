@@ -1,0 +1,14 @@
+User-agent: *
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /account
+Disallow: /settings
+Disallow: /team
+Disallow: /onboarding
+Disallow: /brands
+Disallow: /tracker
+Disallow: /results
+Disallow: /content
+Disallow: /reports
+Disallow: /api/
+Disallow: /reset-password

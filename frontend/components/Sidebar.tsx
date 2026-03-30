@@ -416,8 +416,10 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
   }, [supportOpen]);
 
   async function handleMarkAllRead() {
-    const r = await markAllNotificationsRead().catch(() => null);
-    if (r) { setNotifications(r.notifications); setUnreadCount(0); }
+    await markAllNotificationsRead().catch(() => null);
+    setNotifications([]);
+    setUnreadCount(0);
+    setPanelOpen(false);
   }
 
   const navItems: NavItem[] = [
@@ -767,6 +769,11 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                   >
                     <LogOut size={13} />
                   </button>
+                </div>
+                <div className="flex items-center gap-2 px-3.5 pb-1">
+                  <Link href="/privacy" className="text-[10px] text-[#334155] hover:text-[#475569] transition-colors">Privacy</Link>
+                  <span className="text-[10px] text-[#334155]">·</span>
+                  <Link href="/terms" className="text-[10px] text-[#334155] hover:text-[#475569] transition-colors">Terms</Link>
                 </div>
               </>
             ) : (

@@ -455,30 +455,39 @@ function BestPromptCard({ responses, loading }: { responses: QueryResult[]; load
 function ManagePromptsModal({
   brandId,
   prompts,
+  promptLimit,
   onClose,
   onChanged,
 }: {
   brandId: number;
   prompts: Prompt[];
+  promptLimit: number;
   onClose: () => void;
   onChanged: (updated: Prompt[]) => void;
 }) {
   const [localPrompts, setLocalPrompts] = useState(prompts);
   const [newText, setNewText] = useState('');
   const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState('');
   const [suggesting, setSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
+  const atLimit = localPrompts.length >= promptLimit;
+
   async function handleAdd() {
-    if (!newText.trim()) return;
+    if (!newText.trim() || atLimit) return;
     setAdding(true);
+    setAddError('');
     try {
       const p = await addPrompt(brandId, newText.trim());
       const updated = [...localPrompts, p];
       setLocalPrompts(updated);
       setNewText('');
       onChanged(updated);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setAddError(e?.response?.data?.detail || 'Failed to add prompt.');
     } finally {
       setAdding(false);
     }
@@ -510,7 +519,12 @@ function ManagePromptsModal({
     <Dialog open={true} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
         <DialogHeader className="shrink-0">
-          <DialogTitle>Manage Prompts</DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle>Manage Prompts</DialogTitle>
+            <span className={`text-xs font-medium tabular-nums ${atLimit ? 'text-[#f87171]' : localPrompts.length >= promptLimit * 0.8 ? 'text-[#f59e0b]' : 'text-[#475569]'}`}>
+              {localPrompts.length}/{promptLimit}
+            </span>
+          </div>
           <p className="text-xs text-[#64748B] mt-0.5">Add or remove the prompts AI models are queried with</p>
         </DialogHeader>
 
@@ -557,6 +571,12 @@ function ManagePromptsModal({
 
         {/* Add new */}
         <div className="shrink-0 space-y-2">
+          {addError && (
+            <p className="text-xs text-[#f87171]">{addError}</p>
+          )}
+          {atLimit && (
+            <p className="text-xs text-[#f59e0b]">Prompt limit reached ({promptLimit}/{promptLimit}). Remove a prompt to add another.</p>
+          )}
           <div className="flex gap-2">
             <input
               type="text"
@@ -564,11 +584,12 @@ function ManagePromptsModal({
               onChange={(e) => setNewText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder="e.g. What is the best tool for early cancer detection?"
-              className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1]"
+              disabled={atLimit}
+              className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] disabled:opacity-40"
             />
             <button
               onClick={handleAdd}
-              disabled={adding || !newText.trim()}
+              disabled={adding || !newText.trim() || atLimit}
               className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-3 py-2 transition-colors shrink-0"
             >
               {adding ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
@@ -1851,6 +1872,7 @@ export default function DashboardPage() {
         <ManagePromptsModal
           brandId={selectedBrandId}
           prompts={brandDetail.prompts}
+          promptLimit={brandDetail.brand_type === 'pitch' ? 10 : (user?.prompt_limit ?? 10)}
           onClose={() => setPromptModalOpen(false)}
           onChanged={(updated) => setBrandDetail((prev) => prev ? { ...prev, prompts: updated } : prev)}
         />

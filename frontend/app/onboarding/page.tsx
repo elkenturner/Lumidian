@@ -7,6 +7,7 @@ import LumidianLogo from '@/components/LumidianLogo';
 import {
   getBrands,
   getBrandProfile,
+  getSuggestedPromptsPreview,
   createBrand,
   updateBrandProfile,
   refreshWebsiteContext,
@@ -33,6 +34,8 @@ export default function OnboardingPage() {
 
   // Step 2: prompts
   const [prompts, setPrompts] = useState<string[]>(['']);
+  const [suggestingPrompts, setSuggestingPrompts] = useState(false);
+  const [suggestError, setSuggestError] = useState('');
 
   // Step 3: profile basics
   const [companyDescription, setCompanyDescription] = useState('');
@@ -125,12 +128,26 @@ export default function OnboardingPage() {
       } catch (err) {
         console.warn('[Onboarding] Auto-run failed for brand_id=%d (non-fatal):', createdBrandId, err);
       }
-      router.push('/dashboard?newBrand=true');
+      router.push(`/dashboard?newBrand=true&brandId=${createdBrandId}`);
     } catch {
       // Profile save is optional — still proceed
-      router.push('/dashboard?newBrand=true');
+      router.push(`/dashboard?newBrand=true&brandId=${createdBrandId}`);
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleSuggestPrompts() {
+    if (!brandName.trim()) return;
+    setSuggestingPrompts(true);
+    setSuggestError('');
+    try {
+      const suggestions = await getSuggestedPromptsPreview(brandName.trim());
+      setPrompts(suggestions.slice(0, 10));
+    } catch {
+      setSuggestError('Could not generate suggestions. Try again.');
+    } finally {
+      setSuggestingPrompts(false);
     }
   }
 
@@ -239,8 +256,22 @@ export default function OnboardingPage() {
         {/* Step 2: Prompts */}
         {step === 2 && (
           <div>
-            <h2 className="text-xl font-bold text-[#F0F4F8] mb-1">What do you want to track?</h2>
+            <div className="flex items-start justify-between mb-1">
+              <h2 className="text-xl font-bold text-[#F0F4F8]">What do you want to track?</h2>
+              <button
+                type="button"
+                onClick={handleSuggestPrompts}
+                disabled={suggestingPrompts}
+                className="flex items-center gap-1.5 text-xs font-medium text-[#a78bfa] hover:text-[#c4b5fd] disabled:opacity-50 transition-colors shrink-0 ml-3 mt-0.5"
+              >
+                {suggestingPrompts ? <Loader2 size={12} className="animate-spin" /> : <span>✦</span>}
+                {suggestingPrompts ? 'Generating…' : 'Generate with AI'}
+              </button>
+            </div>
             <p className="text-sm text-[#64748B] mb-6">Add questions that people might ask AI models where your brand could come up.</p>
+            {suggestError && (
+              <p className="text-xs text-[#f87171] mb-3">{suggestError}</p>
+            )}
             <div className="space-y-2 mb-4">
               {prompts.map((p, i) => (
                 <input

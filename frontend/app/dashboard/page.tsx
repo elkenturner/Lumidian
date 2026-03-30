@@ -47,6 +47,7 @@ import {
   DashboardAnalytics,
   QueryResult,
   TrackingRun,
+  ModelScore,
   Prompt,
   Competitor,
   BrandProfile,
@@ -54,7 +55,9 @@ import {
   ModelStat,
   BillingStatus,
   BillingUsage,
+  parseApiError,
 } from '@/lib/api';
+import { AppToast, ToastData } from '@/components/AppToast';
 import TrendChart from '@/components/TrendChart';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -252,7 +255,7 @@ const MODEL_BAR_COLORS: Record<string, string> = {
   gemini: '#60a5fa',
 };
 
-function ModelBreakdown({ models }: { models: ModelStat[] }) {
+function ModelBreakdown({ models, deltas }: { models: ModelStat[]; deltas?: Record<string, number> }) {
   if (!models.length) return <p className="text-xs text-[#475569]">No model data yet</p>;
   const max = Math.max(...models.map((m) => m.mention_rate), 0.01);
   return (
@@ -261,11 +264,19 @@ function ModelBreakdown({ models }: { models: ModelStat[] }) {
         const pct = Math.round(m.mention_rate * 100);
         const barColor = MODEL_BAR_COLORS[m.model] ?? '#6366f1';
         const barWidth = `${Math.round((m.mention_rate / max) * 100)}%`;
+        const delta = deltas?.[m.model];
         return (
           <div key={m.model}>
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs font-medium text-[#CBD5E1]">{m.label}</span>
-              <span className="text-xs tabular-nums text-[#94A3B8]">{pct}% <span className="text-[#475569]">({m.mention_count}/{m.total})</span></span>
+              <span className="text-xs tabular-nums text-[#94A3B8] flex items-center gap-1">
+                {delta !== undefined && delta !== 0 && (
+                  <span style={{ color: delta > 0 ? '#10b981' : '#f87171', fontWeight: 600 }}>
+                    {delta > 0 ? `↑${delta}%` : `↓${Math.abs(delta)}%`}
+                  </span>
+                )}
+                {pct}% <span className="text-[#475569]">({m.mention_count}/{m.total})</span>
+              </span>
             </div>
             <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
               <div className="h-full rounded-full transition-all duration-500" style={{ width: barWidth, background: barColor }} />
@@ -367,7 +378,7 @@ function extractGapMentions(group: PromptGroup, brandName: string): string {
 
 // ── Best Performing Prompt card ────────────────────────────────────────────────
 
-function BestPromptCard({ responses, loading, onAddCompetitors }: { responses: QueryResult[]; loading: boolean; onAddCompetitors: () => void }) {
+function BestPromptCard({ responses, loading }: { responses: QueryResult[]; loading: boolean }) {
   // Compute the top prompt by mention rate from available responses
   const best = (() => {
     if (!responses.length) return null;
@@ -395,39 +406,39 @@ function BestPromptCard({ responses, loading, onAddCompetitors }: { responses: Q
   })();
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] flex flex-col">
-      <div className="flex items-start justify-between mb-2">
-        <p className="text-sm font-medium text-[#94A3B8] flex items-center">
-          Best Performing Prompt
-          <HelpTooltip text="The prompt where your brand is mentioned most often across AI models." />
-        </p>
-        <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] flex items-center justify-center text-[#6366f1] flex-shrink-0">
-          <MessageSquare size={15} />
-        </div>
-      </div>
+    <div className="self-start bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]" style={{ borderLeft: '2px solid rgba(99,102,241,0.5)' }}>
+      <p className="text-sm font-medium text-[#94A3B8] flex items-center mb-3">
+        Best Performing Prompt
+        <HelpTooltip text="The prompt where your brand is mentioned most often across AI models." />
+      </p>
       {loading ? (
-        <div className="h-8 w-full bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-1" />
+        <div className="space-y-2 flex-1">
+          <div className="h-3 w-full bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />
+          <div className="h-3 w-2/3 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />
+        </div>
       ) : best ? (
         <>
-          <p className="text-xs text-[#F0F4F8] leading-relaxed mt-1 line-clamp-2 flex-1">
+          <p className="text-sm text-[#F0F4F8] leading-relaxed line-clamp-2 flex-1">
             &ldquo;{best.text}&rdquo;
           </p>
-          <p className="text-2xl font-bold text-[#10b981] mt-2">
-            {Math.round((best.mentioned / best.total) * 100)}%
-            <span className="text-sm font-normal text-[#475569] ml-1">visibility</span>
-          </p>
-          {best.models.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-2">
-              {best.models.map((m) => {
-                const cfg = getModelCfg(m);
-                return (
-                  <span key={m} className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: cfg.bg, color: cfg.text }}>
-                    {cfg.label}
-                  </span>
-                );
-              })}
-            </div>
-          )}
+          <div className="flex items-end justify-between mt-3">
+            <p className="text-2xl font-bold text-[#10b981] leading-none">
+              {Math.round((best.mentioned / best.total) * 100)}%
+              <span className="text-xs font-normal text-[#475569] ml-1">visibility</span>
+            </p>
+            {best.models.length > 0 && (
+              <div className="flex flex-wrap gap-1 justify-end">
+                {best.models.map((m) => {
+                  const cfg = getModelCfg(m);
+                  return (
+                    <span key={m} className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: cfg.bg, color: cfg.text }}>
+                      {cfg.label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </>
       ) : (
         <>
@@ -435,12 +446,6 @@ function BestPromptCard({ responses, loading, onAddCompetitors }: { responses: Q
           <p className="text-xs text-[#475569] mt-1">No data yet</p>
         </>
       )}
-      <button
-        onClick={onAddCompetitors}
-        className="text-[10px] text-[#6366f1] hover:text-[#818cf8] mt-3 pt-2 border-t border-[rgba(99,102,241,0.22)] w-full text-left transition-colors"
-      >
-        + Add competitors to enable Share of Voice →
-      </button>
     </div>
   );
 }
@@ -718,7 +723,7 @@ function CompetitorModal({
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { brands, activeBrandId: selectedBrandId, loading: loadingBrands, setActiveBrandId } = useBrand();
+  const { brands, activeBrandId: selectedBrandId, loading: loadingBrands, setActiveBrandId, refetch: refetchBrands } = useBrand();
   const [newBrandMode, setNewBrandMode] = useState(false);
   const [newBrandStep, setNewBrandStep] = useState<'running' | 'drafting' | 'done'>('running');
   const newBrandHandledRef = useRef(false);
@@ -736,7 +741,7 @@ export default function DashboardPage() {
   const [publishedCount, setPublishedCount] = useState(0);
 
   // Toast
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const [toast, setToast] = useState<ToastData | null>(null);
 
   // Brand profile completeness
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
@@ -757,6 +762,7 @@ export default function DashboardPage() {
   // Run state
   const [triggering, setTriggering] = useState(false);
   const [activeRunId, setActiveRunId] = useState<number | null>(null);
+  const [runModelScores, setRunModelScores] = useState<ModelScore[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Pending single-prompt mini-runs: promptId → runId
@@ -908,13 +914,20 @@ export default function DashboardPage() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get('newBrand') === 'true') {
+        const newBrandId = parseInt(params.get('brandId') ?? '', 10);
+        if (!isNaN(newBrandId)) {
+          // Write to localStorage first so fetchBrands selects the right brand
+          setActiveBrandId(newBrandId);
+        }
+        // Refetch brands — the new brand won't be in BrandContext's stale list
+        refetchBrands();
         setNewBrandMode(true);
         setNewBrandStep('running');
         // Clean URL without reload
         window.history.replaceState({}, '', '/dashboard');
       }
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-start polling if the latest run is already in-progress when data loads
   useEffect(() => {
@@ -934,8 +947,10 @@ export default function DashboardPage() {
     pollRef.current = setInterval(async () => {
       try {
         const run = await getRunStatus(activeRunId);
+        if (run.model_scores?.length) setRunModelScores(run.model_scores);
         if (run.status === 'completed' || run.status === 'failed') {
           setActiveRunId(null);
+          setRunModelScores([]);
           if (pollRef.current) clearInterval(pollRef.current);
           if (run.status === 'completed') {
             setToast({ message: 'Report complete! Data refreshed.', type: 'success' });
@@ -997,13 +1012,12 @@ export default function DashboardPage() {
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } } };
       const httpStatus = e?.response?.status;
+      const detail = parseApiError(err);
       if (httpStatus === 429 || httpStatus === 402) {
-        const detail = e?.response?.data?.detail ?? 'Upgrade your plan to continue.';
         setUpgradeModalReason(detail);
         setUpgradeModalOpen(true);
-      } else if (httpStatus === 403) {
-        const detail = e?.response?.data?.detail ?? 'Access denied. Your account may be paused.';
-        setToast({ message: detail, type: 'info' });
+      } else {
+        setToast({ message: detail, type: 'error' });
       }
     } finally {
       setTriggering(false);
@@ -1103,6 +1117,22 @@ export default function DashboardPage() {
   const daysSinceFirst = trends.length > 0 && trends[0].completed_at
     ? Math.max(0, Math.floor((Date.now() - parseUTCISO(trends[0].completed_at).getTime()) / 86_400_000))
     : null;
+
+  // Model trend deltas: compare last two trend points' model_scores
+  const modelDeltas: Record<string, number> = (() => {
+    if (trends.length < 2) return {};
+    const prev = trends[trends.length - 2].model_scores ?? {};
+    const curr = trends[trends.length - 1].model_scores ?? {};
+    const result: Record<string, number> = {};
+    for (const model of Object.keys(curr)) {
+      const prevScore = prev[model];
+      if (prevScore !== undefined) {
+        const d = Math.round(curr[model] - prevScore);
+        if (d !== 0) result[model] = d;
+      }
+    }
+    return result;
+  })();
 
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl">
@@ -1281,6 +1311,20 @@ export default function DashboardPage() {
             <div className="flex-1">
               <p className="text-sm font-semibold text-[#F0F4F8]">Report in progress</p>
               <p className="text-xs text-[#6366f1] mt-0.5">Querying AI models with your prompts. This may take a minute...</p>
+              {runModelScores.length > 0 && (
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                  {runModelScores.map((ms) => {
+                    const cfg = getModelCfg(ms.model);
+                    const pct = ms.total_queries > 0 ? Math.round((ms.total_mentions / ms.total_queries) * 100) : 0;
+                    return (
+                      <span key={ms.model} className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: cfg.bg, color: cfg.text }}>
+                        <CheckCircle2 size={9} />
+                        {cfg.label}: {pct}%
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
             </div>
             <span className="flex items-center gap-2 text-xs text-[#6366f1] font-medium">
               <span className="w-2 h-2 rounded-full bg-[#6366f1] animate-pulse" />
@@ -1329,6 +1373,27 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
+          {/* ── EMPTY STATE: brand selected but no runs yet ──────────────── */}
+          {!loadingBrands && !loadingAnalytics && !isRunning && selectedBrandId && trends.length === 0 && overview?.latest_run == null && (
+            <div className="flex flex-col items-center justify-center py-16 text-center max-w-lg mx-auto">
+              <div className="w-14 h-14 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] rounded-2xl flex items-center justify-center mb-4">
+                <BarChart2 size={24} className="text-[#6366f1]" />
+              </div>
+              <h3 className="text-lg font-bold text-[#F0F4F8] mb-2">No data yet</h3>
+              <p className="text-sm text-[#64748B] mb-6 leading-relaxed">
+                Run your first AI visibility report to see how often your brand appears across ChatGPT, Claude, Perplexity, and Gemini.
+              </p>
+              <button
+                onClick={handleRunReport}
+                disabled={triggering}
+                className="flex items-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-6 py-3 text-sm font-semibold transition-colors shadow-lg shadow-[#6366f1]/25"
+              >
+                {triggering ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                Run First Report
+              </button>
+            </div>
+          )}
+
           {/* ── OVERVIEW ─────────────────────────────────────────────────── */}
           <>
               {/* Brand profile completeness nudge */}
@@ -1378,13 +1443,16 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Row 1: visibility + SOV + sentiment */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              {/* Row 1: visibility (left) + prompt/sentiment/sov (right) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 {/* Visibility score + sparkline */}
-                <div className="col-span-2 bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.28)] border-t-2 border-t-[#6366f1] rounded-xl p-6 shadow-[0_8px_32px_rgba(0,0,0,0.25),0_0_40px_rgba(99,102,241,0.10),inset_0_1px_0_rgba(255,255,255,0.07)]">
+                <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.28)] border-t-2 border-t-[#6366f1] rounded-xl p-6 shadow-[0_8px_32px_rgba(0,0,0,0.25),0_0_40px_rgba(99,102,241,0.10),inset_0_1px_0_rgba(255,255,255,0.07)]">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <p className="text-[13px] font-medium text-[#94A3B8] uppercase tracking-wider">Visibility Score</p>
+                      <p className="text-[13px] font-medium text-[#94A3B8] uppercase tracking-wider flex items-center">
+                        Visibility Score
+                        <HelpTooltip text="Percentage of AI responses that mention your brand when answering your tracked prompts. A higher score means AI models are more aware of your brand." />
+                      </p>
                       {loadingAnalytics ? (
                         <div className="h-14 w-28 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-2" />
                       ) : (
@@ -1466,104 +1534,100 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                {/* Best Performing Prompt — always shown */}
-                <BestPromptCard responses={responses} loading={loadingAnalytics} onAddCompetitors={() => setCompetitorModalOpen(true)} />
+                {/* Right column: Best Prompt + Sentiment on top, SOV below */}
+                <div className="flex flex-col gap-3">
+                  {/* Top row */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <BestPromptCard responses={responses} loading={loadingAnalytics} />
 
-                {/* Sentiment */}
-                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-sm font-medium text-[#94A3B8] flex items-center">
-                      Sentiment
-                      <HelpTooltip text="How positively AI models describe your brand when they mention it." />
-                    </p>
-                    <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] flex items-center justify-center text-[#6366f1] flex-shrink-0">
-                      <TrendingUp size={15} />
+                    {/* Sentiment */}
+                    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                      <div className="flex items-start justify-between mb-2">
+                        <p className="text-sm font-medium text-[#94A3B8] flex items-center">
+                          Sentiment
+                          <HelpTooltip text="How positively AI models describe your brand when they mention it." />
+                        </p>
+                        <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] flex items-center justify-center text-[#6366f1] flex-shrink-0">
+                          <TrendingUp size={15} />
+                        </div>
+                      </div>
+                      {loadingAnalytics ? (
+                        <div className="h-8 w-16 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-1" />
+                      ) : sentData?.has_data && sentHeadline ? (
+                        <>
+                          <p className="text-2xl font-bold mt-1" style={{ color: sentColor }}>
+                            {sentHeadline}
+                          </p>
+                          <div className="mt-2 flex gap-0.5 h-1.5 rounded-full overflow-hidden">
+                            <div style={{ width: `${sentData.positive_pct}%`, background: '#10b981' }} />
+                            <div style={{ width: `${sentData.neutral_pct}%`, background: '#f59e0b' }} />
+                            <div style={{ width: `${sentData.negative_pct}%`, background: '#ef4444' }} />
+                          </div>
+                          <p className="text-xs text-[#475569] mt-1.5">
+                            {Math.round(sentData.neutral_pct)}% neutral · {Math.round(sentData.negative_pct)}% negative
+                          </p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-3xl font-bold text-[#F0F4F8] mt-1">—</p>
+                          <p className="text-xs text-[#475569] mt-1">No mentions to analyze</p>
+                        </>
+                      )}
                     </div>
                   </div>
-                  {loadingAnalytics ? (
-                    <div className="h-8 w-16 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-1" />
-                  ) : sentData?.has_data && sentHeadline ? (
-                    <>
-                      <p className="text-2xl font-bold mt-1" style={{ color: sentColor }}>
-                        {sentHeadline}
+
+                  {/* SOV — fills remaining height */}
+                  <div className="flex-1 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-medium text-[#94A3B8] flex items-center">
+                        Share of Voice
+                        <HelpTooltip text="Percentage of total AI brand mentions in your category per entity." />
                       </p>
-                      <div className="mt-2 flex gap-0.5 h-1.5 rounded-full overflow-hidden">
-                        <div style={{ width: `${sentData.positive_pct}%`, background: '#10b981' }} />
-                        <div style={{ width: `${sentData.neutral_pct}%`, background: '#f59e0b' }} />
-                        <div style={{ width: `${sentData.negative_pct}%`, background: '#ef4444' }} />
+                      <button
+                        onClick={() => setCompetitorModalOpen(true)}
+                        aria-label="Manage competitors"
+                        className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#94A3B8] bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(99,102,241,0.12)] border border-[rgba(255,255,255,0.08)] rounded-lg px-2.5 py-1.5 transition-colors"
+                      >
+                        <Users size={12} />
+                        {analytics?.sov.has_competitors ? 'Manage' : 'Add competitors'}
+                      </button>
+                    </div>
+                    {loadingAnalytics ? (
+                      <div className="flex gap-3">
+                        {[1, 2, 3].map(i => <div key={i} className="h-4 flex-1 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
                       </div>
-                      <p className="text-xs text-[#475569] mt-1.5">
-                        {Math.round(sentData.neutral_pct)}% neutral · {Math.round(sentData.negative_pct)}% negative
+                    ) : !analytics?.sov.has_competitors ? (
+                      <p className="text-xs text-[#475569]">
+                        Add competitors to see how your brand&apos;s AI visibility compares.
                       </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="text-3xl font-bold text-[#F0F4F8] mt-1">—</p>
-                      <p className="text-xs text-[#475569] mt-1">No mentions to analyze</p>
-                    </>
-                  )}
+                    ) : (() => {
+                      const allStats = analytics.competitor_comparison;
+                      const maxRate = Math.max(...allStats.map((s) => s.mention_rate));
+                      return (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {allStats.map((s) => {
+                            const pct = Math.round(s.mention_rate * 100);
+                            const isLeading = s.mention_rate === maxRate && maxRate > 0;
+                            const barColor = s.is_primary ? (isLeading ? '#10b981' : '#6366f1') : (isLeading ? '#ef4444' : '#475569');
+                            const textColor = s.is_primary ? (isLeading ? '#10b981' : '#818cf8') : (isLeading ? '#f87171' : '#64748B');
+                            return (
+                              <div key={s.name} className="flex flex-col gap-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className={`text-xs font-medium truncate ${s.is_primary ? 'text-[#F0F4F8]' : 'text-[#94A3B8]'}`}>{s.name}</span>
+                                  <span className="text-xs font-bold tabular-nums ml-2 flex-shrink-0" style={{ color: textColor }}>{pct}%</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
+                                  <div className="h-full rounded-full transition-all" style={{ width: `${maxRate > 0 ? (s.mention_rate / maxRate) * 100 : 0}%`, background: barColor }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
-
-              {/* Share of Voice — shown separately when competitors are tracked */}
-              {analytics?.sov.has_competitors && (
-                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] mb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-medium text-[#94A3B8] flex items-center">
-                      Share of Voice
-                      <HelpTooltip text="Percentage of total AI brand mentions in your category per entity." />
-                    </p>
-                    <button
-                      onClick={() => setCompetitorModalOpen(true)}
-                      aria-label="Manage competitors"
-                      className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#94A3B8] bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(99,102,241,0.12)] border border-[rgba(255,255,255,0.08)] rounded-lg px-2.5 py-1.5 transition-colors"
-                    >
-                      <Users size={12} />
-                      Manage
-                    </button>
-                  </div>
-                  {loadingAnalytics ? (
-                    <div className="flex gap-3">
-                      {[1, 2, 3].map(i => <div key={i} className="h-5 flex-1 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
-                    </div>
-                  ) : (() => {
-                    const allStats = analytics.competitor_comparison;
-                    const maxRate = Math.max(...allStats.map((s) => s.mention_rate));
-                    return (
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                        {allStats.map((s) => {
-                          const pct = Math.round(s.mention_rate * 100);
-                          const isLeading = s.mention_rate === maxRate && maxRate > 0;
-                          const barColor = s.is_primary
-                            ? (isLeading ? '#10b981' : '#6366f1')
-                            : (isLeading ? '#ef4444' : '#475569');
-                          const textColor = s.is_primary
-                            ? (isLeading ? '#10b981' : '#818cf8')
-                            : (isLeading ? '#f87171' : '#64748B');
-                          return (
-                            <div key={s.name} className="flex flex-col gap-1.5">
-                              <div className="flex items-center justify-between">
-                                <span className={`text-xs font-medium truncate ${s.is_primary ? 'text-[#F0F4F8]' : 'text-[#94A3B8]'}`}>
-                                  {s.name}
-                                </span>
-                                <span className="text-xs font-bold tabular-nums ml-2 flex-shrink-0" style={{ color: textColor }}>
-                                  {pct}%
-                                </span>
-                              </div>
-                              <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                                <div
-                                  className="h-full rounded-full transition-all"
-                                  style={{ width: `${maxRate > 0 ? (s.mention_rate / maxRate) * 100 : 0}%`, background: barColor }}
-                                />
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </div>
-              )}
 
               {/* Row 2: Avg Position + Top Domains */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
@@ -1638,7 +1702,7 @@ export default function DashboardPage() {
                       {[1,2,3,4].map(i => <div key={i} className="h-6 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
                     </div>
                   ) : (
-                    <ModelBreakdown models={analytics?.model_breakdown ?? []} />
+                    <ModelBreakdown models={analytics?.model_breakdown ?? []} deltas={modelDeltas} />
                   )}
                 </div>
               </div>
@@ -1801,18 +1865,7 @@ export default function DashboardPage() {
         />
       )}
 
-      {/* Toast notification */}
-      {toast && (
-        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium transition-all ${
-          toast.type === 'success'
-            ? 'bg-[rgba(6,78,59,0.90)] border-[#065f46]/50 text-[#34d399]'
-            : 'bg-[rgba(10,14,24,0.95)] border-[rgba(99,102,241,0.25)] text-[#94A3B8]'
-        } backdrop-blur-xl`}>
-          {toast.type === 'success' ? <span className="text-[#34d399]">✓</span> : <span className="text-[#6366f1]">ℹ</span>}
-          {toast.message}
-          <button onClick={() => setToast(null)} className="ml-2 text-current opacity-50 hover:opacity-100 transition-opacity text-xs">✕</button>
-        </div>
-      )}
+      {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

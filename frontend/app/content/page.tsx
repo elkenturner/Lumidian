@@ -38,7 +38,6 @@ import {
   draftOpportunity,
   generateNow,
   getDraftStatus,
-  triggerScan,
   getBrandProfile,
   getContentSettings,
   updateContentSettings,
@@ -1848,8 +1847,7 @@ export default function ContentHubPage() {
       else localStorage.removeItem('clarity_drafts_generating');
     } catch {}
   }, [generating]);
-  const [scanning, setScanning] = useState(false);
-  const [scanError, setScanError] = useState<string | null>(null);
+
   const [requestDraftOpen, setRequestDraftOpen] = useState(false);
   const [draftStatus, setDraftStatus] = useState<DraftQueueStatus | null>(null);
 
@@ -2049,23 +2047,6 @@ export default function ContentHubPage() {
     }
   }
 
-  async function handleScan() {
-    if (!selectedBrandId) return;
-    setScanning(true);
-    setScanError(null);
-    try {
-      await triggerScan(selectedBrandId);
-      // Poll after a short delay
-      setTimeout(() => {
-        if (selectedBrandId) loadAll(selectedBrandId);
-        setScanning(false);
-      }, 4000);
-    } catch {
-      setScanning(false);
-      setScanError('Scan failed. Please try again.');
-    }
-  }
-
   // ── Tab content ────────────────────────────────────────────────────────────
 
   function renderDraftsTab() {
@@ -2201,12 +2182,7 @@ export default function ContentHubPage() {
             <HelpCircle size={14} />
           </button>
         </div>
-        {scanError && (
-          <div className="flex items-center gap-2 text-xs text-[#f87171] bg-[#f87171]/10 border border-[#f87171]/20 rounded-lg px-3 py-2 mb-3">
-            <AlertTriangle size={12} className="shrink-0" />
-            {scanError}
-          </div>
-        )}
+
       </>
     );
 
@@ -2239,17 +2215,7 @@ export default function ContentHubPage() {
           <EmptyState
             icon={<Radio size={26} className="text-[#818cf8]" />}
             title="No live opportunities"
-            description="Scanners run daily at 2:00 AM UTC. Click Scan Now to find threads and questions immediately."
-            action={
-              <button
-                onClick={handleScan}
-                disabled={scanning}
-                className="flex items-center gap-2 text-sm bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] rounded-lg px-4 py-2 transition-colors"
-              >
-                {scanning ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                {scanning ? 'Scanning…' : 'Scan Now'}
-              </button>
-            }
+            description="Reddit and Quora are scanned daily. Check back after the next scan or run a tracking report to generate fresh prompts."
           />
         </>
       );
@@ -2344,7 +2310,7 @@ export default function ContentHubPage() {
           <p>Content Hub generates AI drafts for your brand and surfaces Reddit and Quora threads where you can contribute.</p>
           <ul className="space-y-2 mt-2">
             <li><span className="text-[#F0F4F8] font-medium">Generate Drafts Now</span> — creates a batch of AI drafts across your tracked prompts and platforms.</li>
-            <li><span className="text-[#F0F4F8] font-medium">Scan Now</span> — searches Reddit and Quora for recent threads and questions matching your tracked prompts.</li>
+            <li><span className="text-[#F0F4F8] font-medium">Live Opportunities</span> tab updates daily as Reddit and Quora are scanned overnight for threads matching your tracked prompts.</li>
             <li><span className="text-[#F0F4F8] font-medium">Drafts tab</span> — review, edit, and approve AI drafts before they go live.</li>
             <li><span className="text-[#F0F4F8] font-medium">Scheduled tab</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
             <li><span className="text-[#F0F4F8] font-medium">Live Opportunities</span> — Reddit threads and Quora questions where a thoughtful reply could improve your brand&apos;s visibility.</li>
@@ -2784,11 +2750,11 @@ export default function ContentHubPage() {
                 )}
                 <div className="border-t border-[rgba(255,255,255,0.06)] pt-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#475569]">Reddit scan</span>
+                    <span className="text-xs text-[#475569]">Opportunity scan</span>
                     <span className="text-xs text-[#475569]">
                       {draftStatus?.last_scan_at
                         ? relativeTime(draftStatus.last_scan_at)
-                        : 'Runs nightly'}
+                        : 'Daily'}
                     </span>
                   </div>
                 </div>

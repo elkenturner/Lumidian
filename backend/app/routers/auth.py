@@ -143,6 +143,7 @@ class RegisterRequest(BaseModel):
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, http_req: Request, response: Response, db: DbDep):
+    import random
     request = body
     _rate_check(http_req.client.host if http_req.client else "unknown", _register_attempts, _MAX_REGISTER)
     email = request.email.strip().lower()
@@ -152,12 +153,19 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     if len(request.password) < 6:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Password must be at least 6 characters")
 
+    verification_code = f"{random.randint(0, 999999):06d}"
+    code_hash = hash_password(verification_code)
+    code_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=24)
+
     password_hash = hash_password(request.password)
     user = User(
         email=email,
         password_hash=password_hash,
         name=request.name or email.split("@")[0],
         is_admin=(email in _ADMIN_EMAILS),
+        email_verified=False,
+        email_verification_code=code_hash,
+        email_verification_expires_at=code_expires_at,
     )
     db.add(user)
     await db.commit()
@@ -169,8 +177,8 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     from app.services.analytics_service import log_event
     await log_event("user_registered", {"plan": user.subscription_tier}, user_id=user.id)
 
-    from app.services.email_service import send_welcome_email, send_email_background
-    send_email_background(send_welcome_email, email=user.email, name=user.name)
+    from app.services.email_service import send_email_verification, send_email_background
+    send_email_background(send_email_verification, email=user.email, name=user.name, code=verification_code)
 
     return user_to_dict(user)
 

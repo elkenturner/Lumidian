@@ -3,6 +3,7 @@ APScheduler-based scheduler for Lumidian.
 
 Jobs:
   • 02:00 UTC        — Reddit opportunity scanner (daily) + SQLite backup
+  • 02:30 UTC        — Quora opportunity scanner (daily)
   • 03:00 UTC Mon    — Auto-draft scheduler (weekly on Monday)
   • 04:00 UTC, day 1 — Monthly website context refresh via Jina Reader
   • 06:00 UTC        — Pitch brand expiry: warn users 24 h before expiry, delete expired brands
@@ -122,6 +123,21 @@ async def _reddit_scanner_sweep() -> None:
         logger.info("Scheduler: Reddit scanner sweep complete")
     except Exception:
         logger.exception("Scheduler: Reddit scanner sweep failed")
+
+
+async def _quora_scanner_sweep() -> None:
+    """Daily Quora scan for all brands (02:30 UTC)."""
+    if await _is_scheduler_paused():
+        logger.info("Scheduler paused — skipping Quora scanner sweep")
+        return
+
+    from app.services.quora_scanner_service import scan_all_brands
+    logger.info("Scheduler: starting Quora scanner sweep")
+    try:
+        await scan_all_brands()
+        logger.info("Scheduler: Quora scanner sweep complete")
+    except Exception:
+        logger.exception("Scheduler: Quora scanner sweep failed")
 
 
 async def _auto_draft_sweep() -> None:
@@ -495,6 +511,15 @@ def start_scheduler() -> None:
         trigger=CronTrigger(hour=2, minute=0, timezone="UTC"),
         id="reddit_scanner",
         name="Reddit opportunity scanner (02:00 UTC)",
+        replace_existing=True,
+        misfire_grace_time=600,
+    )
+
+    scheduler.add_job(
+        _quora_scanner_sweep,
+        trigger=CronTrigger(hour=2, minute=30, timezone="UTC"),
+        id="quora_scanner",
+        name="Quora opportunity scanner (02:30 UTC)",
         replace_existing=True,
         misfire_grace_time=600,
     )

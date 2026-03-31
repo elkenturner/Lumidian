@@ -133,7 +133,7 @@ function EditableList({
           onChange={(e) => setInputVal(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }}
           placeholder={placeholder}
-          className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1]/15 transition-colors"
+          className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 transition-colors"
         />
         <button
           onClick={addItem}
@@ -231,14 +231,14 @@ function PublicationsEditor({
             placeholder="DOI / URL"
             value={pub.url}
             onChange={(e) => update(idx, 'url', e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1]"
+            className="w-full px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
           />
           <input
             type="text"
             placeholder="Title"
             value={pub.title}
             onChange={(e) => update(idx, 'title', e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1]"
+            className="w-full px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
           />
           <div className="flex gap-2">
             <input
@@ -246,14 +246,14 @@ function PublicationsEditor({
               placeholder="Publisher / journal"
               value={pub.publisher}
               onChange={(e) => update(idx, 'publisher', e.target.value)}
-              className="flex-1 px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1]"
+              className="flex-1 px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
             />
             <input
               type="text"
               placeholder="Year"
               value={pub.date}
               onChange={(e) => update(idx, 'date', e.target.value)}
-              className="w-20 px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1]"
+              className="w-20 px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-md text-xs text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
             />
           </div>
         </div>
@@ -752,7 +752,7 @@ export default function SettingsPage() {
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1]"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
                 />
               </div>
 
@@ -764,7 +764,7 @@ export default function SettingsPage() {
                     value={editWebsiteUrl}
                     onChange={(e) => setEditWebsiteUrl(e.target.value)}
                     placeholder="yourcompany.com"
-                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569]"
+                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569]"
                   />
                   {refreshingContext && (
                     <span className="flex items-center gap-1.5 text-xs text-[#94A3B8] whitespace-nowrap">
@@ -841,7 +841,7 @@ export default function SettingsPage() {
                 onChange={(e) => setNewPromptText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddPrompt()}
                 placeholder="Enter a new prompt question..."
-                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569]"
+                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569]"
               />
               <button
                 onClick={handleAddPrompt}
@@ -943,7 +943,7 @@ export default function SettingsPage() {
                 onChange={(e) => setNewCompetitorName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddCompetitor()}
                 placeholder="Enter competitor name..."
-                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569]"
+                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569]"
               />
               <button
                 onClick={handleAddCompetitor}
@@ -1065,7 +1065,7 @@ export default function SettingsPage() {
                 value={companyDescription}
                 onChange={setCompanyDescription}
                 placeholder="Describe the company, its products, mission, and what makes it unique…"
-                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] resize-none"
+                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none"
               />
             </SectionCard>
 
@@ -1091,7 +1091,7 @@ export default function SettingsPage() {
                 onChange={(e) => setToneOfVoice(e.target.value)}
                 placeholder="e.g. Professional but approachable. Confident without being arrogant…"
                 rows={3}
-                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] resize-none"
+                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none"
               />
             </SectionCard>
 
@@ -1117,7 +1117,7 @@ export default function SettingsPage() {
                 onChange={(e) => setTargetAudience(e.target.value)}
                 placeholder="e.g. Healthcare professionals and clinical researchers…"
                 rows={3}
-                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] resize-none"
+                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none"
               />
             </SectionCard>
 
@@ -1180,7 +1180,7 @@ export default function SettingsPage() {
                 onChange={(e) => setInviteEmail(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
                 placeholder="colleague@company.com"
-                className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1]"
+                className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded-lg text-sm text-[#F0F4F8] placeholder-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
               />
               <button
                 onClick={handleInvite}

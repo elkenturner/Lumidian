@@ -155,6 +155,25 @@ export default function BillingPage() {
         </div>
       )}
 
+      {/* Past-due banner */}
+      {(status?.subscription_status === 'past_due' || status?.subscription_status === 'unpaid') && (
+        <div className="flex items-start gap-3 bg-[#7f1d1d]/20 border border-[#991b1b]/40 rounded-xl px-4 py-3 mb-6">
+          <AlertTriangle size={16} className="text-[#f87171] flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm text-[#f87171] font-medium">Payment past due</p>
+            <p className="text-xs text-[#fca5a5]/70 mt-0.5">
+              Update your payment method to restore full access and avoid service interruption.
+            </p>
+            <button
+              onClick={handlePortal}
+              className="mt-2 text-xs text-[#f87171] underline hover:no-underline transition-all"
+            >
+              Update payment method →
+            </button>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 size={24} className="animate-spin text-[#6366f1]" />

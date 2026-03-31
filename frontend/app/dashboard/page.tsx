@@ -311,65 +311,6 @@ function buildPromptGroups(responses: QueryResult[]): PromptGroup[] {
   return Array.from(map.values());
 }
 
-// ── Gap explanation helpers ────────────────────────────────────────────────────
-
-const STOPWORDS = new Set([
-  'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-  'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-  'should', 'may', 'might', 'can', 'that', 'this', 'these', 'those',
-  'it', 'its', 'they', 'them', 'their', 'he', 'she', 'we', 'you', 'i',
-  'as', 'if', 'when', 'then', 'than', 'so', 'also', 'both', 'each',
-  'which', 'who', 'what', 'how', 'not', 'no', 'such', 'there', 'here',
-  'more', 'most', 'other', 'some', 'any', 'all', 'between', 'into',
-  'through', 'however', 'while', 'after', 'before', 'about', 'above',
-  'medical', 'clinical', 'based', 'used', 'using', 'include', 'including',
-  'provides', 'provide', 'patient', 'patients', 'health', 'care', 'test',
-  'testing', 'research', 'study', 'studies', 'available', 'company',
-  'companies', 'technology', 'detection', 'blood', 'cancer', 'early',
-]);
-
-function extractGapMentions(group: PromptGroup, brandName: string): string {
-  const nonMentioned = group.responses.filter((r) => !r.mentioned && r.response_text);
-  if (nonMentioned.length === 0) return '';
-
-  const brandLower = brandName.toLowerCase();
-  const counts = new Map<string, number>();
-
-  for (const r of nonMentioned) {
-    const text = r.response_text!;
-    // Match sequences of 1-3 capitalized words (proper nouns)
-    const matches = text.match(/\b[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,2}\b/g) ?? [];
-    const seen = new Set<string>();
-    for (const m of matches) {
-      const lower = m.toLowerCase();
-      // Skip the brand name itself, single stopwords, and very short words
-      if (lower === brandLower || lower.split(' ').every((w) => STOPWORDS.has(w)) || m.length < 3) continue;
-      // Skip single words that are in stopwords
-      if (!m.includes(' ') && STOPWORDS.has(lower)) continue;
-      if (!seen.has(lower)) {
-        seen.add(lower);
-        counts.set(m, (counts.get(m) ?? 0) + 1);
-      }
-    }
-  }
-
-  if (counts.size === 0) return '';
-
-  // Pick top 3 by frequency, minimum 2 occurrences
-  const top = Array.from(counts.entries())
-    .filter(([, n]) => n >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([name]) => name);
-
-  if (top.length === 0) return '';
-
-  if (top.length === 1) return `${top[0]} is mentioned instead.`;
-  if (top.length === 2) return `${top[0]} and ${top[1]} are mentioned instead.`;
-  return `${top[0]}, ${top[1]}, and ${top[2]} are mentioned instead.`;
-}
-
 // ── Best Performing Prompt card ────────────────────────────────────────────────
 
 function BestPromptCard({ responses, loading }: { responses: QueryResult[]; loading: boolean }) {

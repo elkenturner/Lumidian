@@ -112,3 +112,181 @@ def test_low_relevance_scores_zero():
     score = _score_thread(title, "", "what saas tools help with brand tracking analytics", _ts(1),
                           num_comments=20, brand_name="Acme")
     assert score == 0.0
+
+
+# ── scan_brand_opportunities integration tests ────────────────────────────────
+
+import asyncio
+from unittest.mock import AsyncMock, patch
+
+
+def _make_post(permalink, title, subreddit="SaaS", created_utc=None, num_comments=5, selftext=""):
+    return {
+        "permalink": permalink,
+        "title": title,
+        "subreddit": subreddit,
+        "created_utc": created_utc or (time.time() - 86400),
+        "num_comments": num_comments,
+        "selftext": selftext,
+        "score": 10,
+    }
+
+
+def _reddit_response(*posts):
+    """Wrap posts in the Reddit listing envelope."""
+    return {"data": {"children": [{"data": p} for p in posts]}}
+
+
+@pytest.mark.asyncio
+async def test_scan_uses_prompt_text_as_search_query(tmp_db):
+    """Global search URL must contain the prompt text."""
+    from app.services import reddit_scanner_service
+
+    fetched_urls: list[str] = []
+
+    async def fake_fetch(url: str):
+        fetched_urls.append(url)
+        return _reddit_response()
+
+    brand_id = await tmp_db.create_brand_with_prompt(
+        name="Acme", prompt="what is the best project management saas tool"
+    )
+
+    with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch("asyncio.sleep"):
+        await reddit_scanner_service.scan_brand_opportunities(brand_id)
+
+    assert any("project" in u and "management" in u or "project%20management" in u or "project+management" in u for u in fetched_urls), \
+        f"No query contained prompt text. URLs: {fetched_urls}"
+    # Global search (no restrict_sr) must be used
+    assert any("reddit.com/search.json" in u for u in fetched_urls)
+
+
+@pytest.mark.asyncio
+async def test_brand_name_is_also_searched(tmp_db):
+    """Brand name must appear as a separate search query."""
+    from app.services import reddit_scanner_service
+
+    fetched_urls: list[str] = []
+
+    async def fake_fetch(url: str):
+        fetched_urls.append(url)
+        return _reddit_response()
+
+    brand_id = await tmp_db.create_brand_with_prompt(
+        name="Rhythm", prompt="what is the best project management saas tool"
+    )
+
+    with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch("asyncio.sleep"):
+        await reddit_scanner_service.scan_brand_opportunities(brand_id)
+
+    assert any("Rhythm" in u or "rhythm" in u.lower() for u in fetched_urls), \
+        f"Brand name not in any URL. URLs: {fetched_urls}"
+
+
+@pytest.mark.asyncio
+async def test_blocked_subreddit_not_stored(tmp_db):
+    """Posts from blocked subreddits must not be stored."""
+    from app.services import reddit_scanner_service
+
+    relevant_post = _make_post(
+        "/r/depression/comments/abc/post/",
+        "what is the best project management saas tool for teams",
+        subreddit="depression",
+        num_comments=10,
+    )
+
+    async def fake_fetch(url: str):
+        return _reddit_response(relevant_post)
+
+    brand_id = await tmp_db.create_brand_with_prompt(
+        name="Acme", prompt="what is the best project management saas tool"
+    )
+
+    with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch("asyncio.sleep"):
+        count = await reddit_scanner_service.scan_brand_opportunities(brand_id)
+
+    assert count == 0
+
+
+@pytest.mark.asyncio
+async def test_relevant_post_stored(tmp_db):
+    """A relevant, unblocked post must be stored as a ContentOpportunity."""
+    from app.services import reddit_scanner_service
+
+    relevant_post = _make_post(
+        "/r/SaaS/comments/xyz/post/",
+        "what is the best project management saas tool for remote teams",
+        subreddit="SaaS",
+        num_comments=15,
+    )
+
+    async def fake_fetch(url: str):
+        return _reddit_response(relevant_post)
+
+    brand_id = await tmp_db.create_brand_with_prompt(
+        name="Acme", prompt="what is the best project management saas tool"
+    )
+
+    with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch("asyncio.sleep"):
+        count = await reddit_scanner_service.scan_brand_opportunities(brand_id)
+
+    assert count >= 1
+
+
+@pytest.mark.asyncio
+async def test_deduplication(tmp_db):
+    """Same URL returned by two queries is stored only once."""
+    from app.services import reddit_scanner_service
+
+    post = _make_post(
+        "/r/SaaS/comments/xyz/post/",
+        "what is the best project management saas tool for remote teams",
+        subreddit="SaaS",
+        num_comments=15,
+    )
+
+    async def fake_fetch(url: str):
+        return _reddit_response(post)
+
+    brand_id = await tmp_db.create_brand_with_prompt(
+        name="Acme", prompt="what is the best project management saas tool"
+    )
+
+    with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch("asyncio.sleep"):
+        count = await reddit_scanner_service.scan_brand_opportunities(brand_id)
+
+    # Multiple queries all return the same URL — should store it once
+    assert count == 1
+
+
+@pytest.mark.asyncio
+async def test_works_with_no_industry_match(tmp_db):
+    """A brand in an unmapped industry (e.g. music) must not return 0 due to missing subreddits."""
+    from app.services import reddit_scanner_service
+
+    post = _make_post(
+        "/r/WeAreTheMusicMakers/comments/abc/post/",
+        "best tools for tracking music streaming royalties and visibility analytics",
+        subreddit="WeAreTheMusicMakers",
+        num_comments=8,
+    )
+
+    async def fake_fetch(url: str):
+        return _reddit_response(post)
+
+    brand_id = await tmp_db.create_brand_with_prompt(
+        name="Rhythm",
+        prompt="best tools for tracking music streaming royalties and visibility analytics",
+    )
+
+    with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch("asyncio.sleep"):
+        count = await reddit_scanner_service.scan_brand_opportunities(brand_id)
+
+    # Must not skip due to missing industry — should attempt scan and find the post
+    assert count >= 1

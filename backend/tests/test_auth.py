@@ -246,6 +246,30 @@ async def test_totp_setup_rate_limited(client):
     assert resp.status_code == 429
 
 
+# ── Task 7: CSRF Origin Check Middleware ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_csrf_rejects_cross_origin_post(client):
+    """POST from a disallowed Origin must be rejected with 403."""
+    resp = await client.post(
+        "/api/auth/login",
+        json={"email": "test@test.com", "password": "pass"},
+        headers={"origin": "https://evil.com"},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_csrf_allows_no_origin_header(client):
+    """Requests without Origin header must pass through."""
+    resp = await client.post(
+        "/api/auth/login",
+        json={"email": "nonexistent@test.com", "password": "pass"},
+    )
+    # Reaches auth handler — 401 not 403
+    assert resp.status_code == 401
+
+
 # ── Task 6: Password Reset Token Hashing ─────────────────────────────────────
 
 @pytest.mark.asyncio

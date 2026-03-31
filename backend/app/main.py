@@ -125,6 +125,36 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization", "Cookie"],
 )
 
+from starlette.middleware.base import BaseHTTPMiddleware
+
+_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+_CSRF_EXEMPT_PREFIXES = ("/api/billing/webhook",)
+
+
+class CSRFOriginMiddleware(BaseHTTPMiddleware):
+    """Reject state-changing requests from disallowed origins.
+    Requests with no Origin header are allowed (non-browser clients)."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method in _SAFE_METHODS:
+            return await call_next(request)
+
+        for prefix in _CSRF_EXEMPT_PREFIXES:
+            if request.url.path.startswith(prefix):
+                return await call_next(request)
+
+        origin = request.headers.get("origin")
+        if origin is not None and origin not in _allowed_origins:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Forbidden: cross-origin request rejected"},
+            )
+
+        return await call_next(request)
+
+
+app.add_middleware(CSRFOriginMiddleware)
+
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(brands.router, prefix="/api")
 app.include_router(brand_profile.router, prefix="/api")

@@ -479,7 +479,7 @@ function QualityChecklist({
               : 'text-[#ef4444]';
             return (
               <div key={check.label} className="flex items-start gap-2.5 px-3 py-2">
-                <span className={`text-xs mt-0.5 flex-shrink-0 font-bold ${iconColor}`}>{icon}</span>
+                <span className={`text-xs mt-0.5 flex-shrink-0 font-bold ${iconColor}`} aria-hidden="true">{icon}</span>
                 <div className="flex-1 min-w-0">
                   <span className="text-xs text-[#94A3B8]">{check.label}</span>
                   {check.detail && (
@@ -724,13 +724,13 @@ function DraftCard({
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
             placeholder="Title (optional)"
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1]"
+            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
           />
           <textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             rows={8}
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] resize-none font-mono"
+            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none font-mono"
           />
           <div className="flex gap-2">
             <button
@@ -1065,7 +1065,7 @@ function WikipediaDraftCard({
               value={plainText}
               onChange={(e) => handlePlainChange(e.target.value)}
               rows={7}
-              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] resize-none leading-relaxed font-sans"
+              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none leading-relaxed font-sans"
               placeholder="Edit the plain text. Wiki formatting and citations are applied automatically."
             />
             <p className="text-[10px] text-[#475569]">
@@ -1355,7 +1355,7 @@ function RequestDraftModal({
               <select
                 value={promptId}
                 onChange={(e) => setPromptId(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full appearance-none bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:border-[#6366f1]"
+                className="w-full appearance-none bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
               >
                 <option value="">— Select tracked prompt —</option>
                 {prompts.map((p) => (
@@ -1393,7 +1393,7 @@ function RequestDraftModal({
               value={customTopic}
               onChange={(e) => setCustomTopic(e.target.value)}
               placeholder="e.g. Why Rainbow Study matters for oncologists"
-              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1]"
+              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
             />
           </div>
 
@@ -1407,7 +1407,7 @@ function RequestDraftModal({
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
               placeholder="Focus on clinical data, write for a non-technical audience…"
-              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] resize-none"
+              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none"
             />
           </div>
 
@@ -2253,7 +2253,7 @@ export default function ContentHubPage() {
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div
-              className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/75 backdrop-blur-sm cursor-pointer"
               onClick={() => setPostingGuideOpen(false)}
             />
             <div className="relative w-full max-w-xl max-h-[88vh] flex flex-col bg-[rgba(8,12,20,0.98)] border border-[rgba(99,102,241,0.22)] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.70),0_0_0_1px_rgba(99,102,241,0.08)] overflow-hidden">
@@ -2355,13 +2355,13 @@ export default function ContentHubPage() {
                   <div className="grid grid-cols-2 gap-3 mt-1">
                     <div className="bg-[rgba(16,185,129,0.04)] border border-[rgba(16,185,129,0.14)] rounded-xl px-4 py-3">
                       <p className="text-xs text-[#10b981] font-semibold mb-2.5 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-[rgba(16,185,129,0.15)] flex items-center justify-center text-[9px]">✓</span>
+                        <span className="w-4 h-4 rounded-full bg-[rgba(16,185,129,0.15)] flex items-center justify-center text-[9px]" aria-hidden="true">✓</span>
                         Editors accept
                       </p>
                       <div className="space-y-2">
                         {['Neutral, factual statements', 'Properly cited sources', 'Brand as one of several examples', 'Correcting factual errors'].map((t) => (
                           <div key={t} className="flex items-start gap-2">
-                            <span className="text-[#10b981] text-[10px] mt-0.5 shrink-0">✓</span>
+                            <span className="text-[#10b981] text-[10px] mt-0.5 shrink-0" aria-hidden="true">✓</span>
                             <span className="text-[11px] text-[#64748B] leading-snug">{t}</span>
                           </div>
                         ))}
@@ -2369,13 +2369,13 @@ export default function ContentHubPage() {
                     </div>
                     <div className="bg-[rgba(239,68,68,0.04)] border border-[rgba(239,68,68,0.14)] rounded-xl px-4 py-3">
                       <p className="text-xs text-[#ef4444] font-semibold mb-2.5 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-[rgba(239,68,68,0.15)] flex items-center justify-center text-[9px]">✗</span>
+                        <span className="w-4 h-4 rounded-full bg-[rgba(239,68,68,0.15)] flex items-center justify-center text-[9px]" aria-hidden="true">✗</span>
                         Editors reject
                       </p>
                       <div className="space-y-2">
                         {['Promotional language', 'Uncited claims', 'Brand article without notability', 'Removing competitors'].map((t) => (
                           <div key={t} className="flex items-start gap-2">
-                            <span className="text-[#ef4444] text-[10px] mt-0.5 shrink-0">✗</span>
+                            <span className="text-[#ef4444] text-[10px] mt-0.5 shrink-0" aria-hidden="true">✗</span>
                             <span className="text-[11px] text-[#64748B] leading-snug">{t}</span>
                           </div>
                         ))}
@@ -2446,7 +2446,7 @@ export default function ContentHubPage() {
               <select
                 value={selectedBrandId ?? ''}
                 onChange={(e) => setSelectedBrandId(Number(e.target.value))}
-                className="appearance-none bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:border-[#6366f1]"
+                className="appearance-none bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
               >
                 {brands.map((b) => (
                   <option key={b.id} value={b.id}>
@@ -2663,6 +2663,7 @@ export default function ContentHubPage() {
                         onClick={() => handleTogglePlatform(platform, !enabled)}
                         className="transition-colors shrink-0"
                         title={enabled ? 'Disable' : 'Enable'}
+                        aria-label={enabled ? `Disable ${platform}` : `Enable ${platform}`}
                       >
                         {enabled
                           ? <ToggleRight size={18} className="text-[#6366f1]" />

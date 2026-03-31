@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Plus,
   FileText,
   Loader2,
   X,
@@ -16,63 +15,86 @@ import {
   Edit2,
   AlertTriangle,
   RefreshCw,
-  Sparkles,
-  HelpCircle,
   Copy,
   Check,
-  PenLine,
   BookOpen,
   ArrowRight,
   BarChart2,
-  ToggleLeft,
-  ToggleRight,
+  Sparkles,
+  HelpCircle,
 } from 'lucide-react';
 import {
-  getBrand,
-  getDrafts,
-  updateDraft,
-  deleteDraft,
   generateDraft,
-  getOpportunities,
-  dismissOpportunity,
-  draftOpportunity,
-  generateNow,
-  getDraftStatus,
-  getBrandProfile,
-  getContentSettings,
-  updateContentSettings,
-  getDraftAttributions,
+  updateDraft,
   getQuoraQuestions,
   Brand,
-  BrandDetail,
   Prompt,
   ContentDraft,
   ContentOpportunity,
   BrandProfile,
-  BrandContentSettings,
   DraftQueueStatus,
   DraftAttribution,
   QuoraQuestion,
 } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
-import SubscriptionBanner from '@/components/SubscriptionBanner';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { useAuth } from '@/contexts/AuthContext';
-import { useBrand } from '@/contexts/BrandContext';
 import { formatDistanceToNow, parseISO } from 'date-fns';
-import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import type { ContentTabPanelsProps } from '@/components/content/ContentTabPanels';
-
-const ContentTabPanels = dynamic<ContentTabPanelsProps>(
-  () => import('@/components/content/ContentTabPanels').then((m) => ({ default: m.ContentTabPanels })),
-  { ssr: false, loading: () => <div className="animate-pulse h-32 rounded-lg bg-[rgba(255,255,255,0.04)]" /> },
-);
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted';
+
+// ── Props interface ───────────────────────────────────────────────────────────
+
+export interface ContentTabPanelsProps {
+  activeTab: QueueTab;
+  // Brand context
+  brands: Brand[];
+  selectedBrandId: number | null;
+  // Draft data
+  draftItems: ContentDraft[];
+  setDraftItems: React.Dispatch<React.SetStateAction<ContentDraft[]>>;
+  visibleDraftItems: ContentDraft[];
+  scheduledItems: ContentDraft[];
+  visibleScheduledItems: ContentDraft[];
+  postedItems: ContentDraft[];
+  draftAttributions: DraftAttribution[];
+  opportunities: ContentOpportunity[];
+  visibleOpportunities: ContentOpportunity[];
+  // Profile / prompts
+  brandProfile: BrandProfile | null;
+  brandPrompts: Prompt[];
+  // Platform filter
+  platformFilter: string;
+  setPlatformFilter: (v: string) => void;
+  _disabledPlatforms: Set<string>;
+  // Status
+  draftStatus: DraftQueueStatus | null;
+  generating: boolean;
+  pinnedDraftId: number | null;
+  // Handlers
+  handleGenerateNow: () => void;
+  handleApprove: (id: number) => void;
+  handleDelete: (id: number) => void;
+  handleSaved: (d: ContentDraft) => void;
+  handleMarkAsPosted: (id: number) => void;
+  handleMoveBackToDrafts: (id: number) => void;
+  handleDraftOpportunity: (oppId: number) => void;
+  handleDismissOpportunity: (oppId: number) => void;
+  setOppHelpOpen: (v: boolean) => void;
+  // User
+  user: { subscription_tier?: string | null; is_admin?: boolean } | null;
+}
+
+// ── Router ────────────────────────────────────────────────────────────────────
+
+export function ContentTabPanels(props: ContentTabPanelsProps) {
+  const { activeTab } = props;
+  if (activeTab === 'drafts') return <DraftsPanel {...props} />;
+  if (activeTab === 'scheduled') return <ScheduledPanel {...props} />;
+  if (activeTab === 'opportunities') return <OpportunitiesPanel {...props} />;
+  if (activeTab === 'posted') return <PostedPanel {...props} />;
+  return null;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -98,7 +120,6 @@ function generateAvailableLabel(nextGenerateAt: string | null): string | null {
       const mins = Math.ceil(diffMs / (1000 * 60));
       return `Try again in ${mins}m`;
     }
-    // Show time-of-day in local time
     const label = next.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const isToday = next.toDateString() === now.toDateString();
     return isToday ? `Try again today at ${label}` : `Try again tomorrow at ${label}`;
@@ -107,7 +128,7 @@ function generateAvailableLabel(nextGenerateAt: string | null): string | null {
   }
 }
 
-// ── Subreddit promotion restriction (mirrors backend classification) ──────────
+// ── Subreddit promotion restriction ──────────────────────────────────────────
 
 const PROMO_RESTRICTED_SUBREDDITS = new Set([
   'personalfinance','legaladvice','tax','investing','financialindependence',
@@ -147,12 +168,9 @@ function computeUrgency(
   draft: ContentDraft,
   postedItems: ContentDraft[],
 ): { score: number; level: 'High' | 'Medium' | 'Low' } {
-  // Visibility component (70%): lower visibility → higher urgency
   const vis = draft.visibility_score_at_draft;
   const visUrgency = vis != null ? 100 - vis : 50;
 
-  // Recency component (30%): days since this prompt last had content posted
-  // If unknown, treat as 30 days. Cap at 60 days for normalisation.
   let daysSinceLast = 30;
   if (draft.prompt_id != null) {
     const promptPosts = postedItems.filter((p) => p.prompt_id === draft.prompt_id);
@@ -175,40 +193,8 @@ function computeUrgency(
   return { score, level };
 }
 
-
-// ── Help modal ────────────────────────────────────────────────────────────────
-
-function HelpModal({
-  title,
-  children,
-  onClose,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-}) {
-  return (
-    <Dialog open={true} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <div className="text-sm text-[#94A3B8] leading-relaxed space-y-3">{children}</div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 // ── Draft quality checklist ───────────────────────────────────────────────────
 
-const HEDGING_PHRASES = [
-  'it is worth noting', 'it should be noted', 'it is important to note',
-  'it is crucial to', 'needless to say', 'as we all know',
-  'it goes without saying', 'in conclusion', 'to summarize',
-  'in summary', 'overall,', 'ultimately,',
-];
-
-// passed: true = pass, 'warning' = soft warning (counts as passed), false = hard fail
 interface QualityCheck {
   label: string;
   passed: boolean | 'warning';
@@ -224,10 +210,8 @@ function runQualityChecks(
   const lower = text.toLowerCase();
   const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
   const platform = draft.platform;
-  // Reddit reply = generated from a Reddit opportunity (thread reply, not standalone post)
   const isRedditReply = platform === 'reddit' && draft.opportunity_id != null;
 
-  // ── Wikipedia-specific checks ──────────────────────────────────────────────
   if (platform === 'wikipedia') {
     const PROMO_WORDS = [
       'best', 'leading', 'top', 'premier', 'world-class', 'revolutionary',
@@ -246,7 +230,6 @@ function runQualityChecks(
     const hasPromoBias = promoFound || supFound || marketingFound;
 
     const hasCitation = /\[\d+\]|\{\{cite|<ref|https?:\/\//.test(text);
-
     const inLengthRange = wordCount >= 50 && wordCount <= 300;
 
     return [
@@ -275,18 +258,15 @@ function runQualityChecks(
           : undefined,
       },
       {
-        // COI reminder — always shows as a soft warning regardless of content
         label: 'COI reminder: disclose your conflict of interest on the talk page before editing',
         passed: 'warning',
       },
     ];
   }
 
-  // ── Quora-specific checks ──────────────────────────────────────────────────
   if (platform === 'quora') {
     const quoraChecks: QualityCheck[] = [];
 
-    // Word count: 250–550 words
     const inRange = wordCount >= 250 && wordCount <= 550;
     quoraChecks.push({
       label: `Length (${wordCount} words)`,
@@ -298,7 +278,6 @@ function runQualityChecks(
         : undefined,
     });
 
-    // First sentence must not start with filler
     const firstSentence = text.trim().split(/[.!?\n]/)[0].toLowerCase().trim();
     const FILLER_OPENERS = [
       'great question', 'good question', 'interesting question', 'that\'s a great',
@@ -315,7 +294,6 @@ function runQualityChecks(
         : undefined,
     });
 
-    // Quora-specific brand mention (soft warning, same threshold as generic but separate label)
     if (brandName) {
       const escaped = brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const occurrences = (lower.match(new RegExp(escaped, 'gi')) ?? []).length;
@@ -328,7 +306,6 @@ function runQualityChecks(
       });
     }
 
-    // Prohibited phrases + stats (shared checks, still apply)
     if (profile && profile.what_not_to_say.length > 0) {
       const found = profile.what_not_to_say
         .map((p) => p.trim())
@@ -352,10 +329,10 @@ function runQualityChecks(
     return quoraChecks;
   }
 
-  // ── Generic checks (Reddit, Medium) ────────────────────────────────────────
+  // Generic checks (Reddit, Medium)
   const checks: QualityCheck[] = [];
 
-  // 1. No prohibited phrases — compare against Brand Profile "What NOT to Say" (case-insensitive)
+  // 1. No prohibited phrases
   if (profile && profile.what_not_to_say.length > 0) {
     const found = profile.what_not_to_say
       .map((p) => p.trim())
@@ -418,6 +395,8 @@ function runQualityChecks(
   return checks;
 }
 
+// ── Quality checklist component ───────────────────────────────────────────────
+
 function QualityChecklist({
   draft,
   profile,
@@ -436,9 +415,8 @@ function QualityChecklist({
   const checks = runQualityChecks(effectiveDraft, profile, brandName);
   const hardFails = checks.filter((c) => c.passed === false).length;
   const warnings = checks.filter((c) => c.passed === 'warning').length;
-  const passed = checks.length - hardFails; // warnings count as passed
+  const passed = checks.length - hardFails;
   const total = checks.length;
-  const allPassed = hardFails === 0 && warnings === 0;
   const scoreColor = hardFails === 0 && warnings === 0
     ? 'text-[#10b981]'
     : hardFails === 0
@@ -570,17 +548,10 @@ function DraftCard({
     }
   }
 
-  // Word count
   const wordCount = draft.content_text.trim().split(/\s+/).filter(Boolean).length;
-
-  // Target prompt text
   const targetPrompt = prompts.find((p) => p.id === draft.prompt_id);
-
-  // Quality score for border/prominence — based on hard fails only (warnings don't trigger red border)
   const qualityChecks = runQualityChecks(draft, profile, brandName);
   const isLowQuality = qualityChecks.filter((c) => c.passed === false).length >= 2;
-
-  // No truncation — show full text in a scrollable window so users can read without clicking Edit
 
   async function handleSave() {
     setSaving(true);
@@ -610,7 +581,6 @@ function DraftCard({
       {/* Target prompt / posting instruction */}
       {draft.opportunity_id != null && draft.platform === 'reddit' &&
        draft.platform_guidelines_applied?.startsWith('http') ? (
-        /* Reddit opportunity reply: single linked element with full thread context */
         <>
           <a
             href={draft.platform_guidelines_applied}
@@ -639,7 +609,6 @@ function DraftCard({
           })()}
         </>
       ) : draft.platform === 'quora' && draft.content_brief?.startsWith('https://www.quora.com') ? (
-        /* Targeted Quora draft — content_brief = question URL, guidelines_applied = question title */
         <div className="flex flex-col gap-2">
           <a
             href={draft.content_brief}
@@ -653,7 +622,6 @@ function DraftCard({
             </span>
             <ExternalLink size={11} className="text-[#60a5fa]/50 flex-shrink-0 group-hover:text-[#60a5fa]" />
           </a>
-          {/* Change question inline picker */}
           {showQuoraPicker ? (
             <div className="border border-[rgba(99,102,241,0.22)] rounded-lg p-3 bg-[rgba(0,0,0,0.2)]">
               <QuoraQuestionPicker
@@ -711,7 +679,6 @@ function DraftCard({
       {/* Title or inline editor */}
       {editing ? (
         <div className="flex flex-col gap-2">
-          {/* Live quality checklist while editing */}
           <QualityChecklist
             draft={draft}
             profile={profile}
@@ -751,7 +718,6 @@ function DraftCard({
         </div>
       ) : (
         <div>
-          {/* Target prompt line */}
           {targetPrompt && (
             <div className="flex items-start gap-1.5 mb-2">
               <span className="text-[10px] text-[#475569] uppercase tracking-wide font-medium mt-0.5 flex-shrink-0">Targeting</span>
@@ -761,7 +727,6 @@ function DraftCard({
           {draft.title && (
             <p className="text-sm font-semibold text-[#F0F4F8] leading-snug mb-1">{draft.title}</p>
           )}
-          {/* Preview / Raw toggle */}
           <div className="flex items-center justify-between mb-1.5">
             <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
               <button
@@ -792,12 +757,10 @@ function DraftCard({
         </div>
       )}
 
-      {/* Quality checklist — always shown when not editing */}
       {!editing && (
         <QualityChecklist draft={draft} profile={profile} brandName={brandName} />
       )}
 
-      {/* Actions */}
       {!editing && (
         <div className="flex items-center gap-2 pt-1 flex-wrap">
           <button
@@ -840,19 +803,17 @@ function DraftCard({
 
 // ── Wikipedia helpers ─────────────────────────────────────────────────────────
 
-/** Strip wiki markup to produce editable plain text. */
 function wikiToPlain(wiki: string): string {
   return wiki
-    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')   // [[Article|Text]] → Text
-    .replace(/\[\[([^\]]+)\]\]/g, '$1')               // [[Article]] → Article
-    .replace(/<ref[^>]*>[\s\S]*?<\/ref>/g, '')        // remove <ref>…</ref>
-    .replace(/<ref[^>]*\/>/g, '')                     // remove <ref … />
-    .replace(/'{2,3}/g, '')                           // remove '' and '''
+    .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
+    .replace(/\[\[([^\]]+)\]\]/g, '$1')
+    .replace(/<ref[^>]*>[\s\S]*?<\/ref>/g, '')
+    .replace(/<ref[^>]*\/>/g, '')
+    .replace(/'{2,3}/g, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
 }
 
-/** Pull all <ref>…</ref> tags out of a wiki string. */
 function extractCitations(wiki: string): string[] {
   const refs: string[] = [];
   const re = /<ref[^>]*>[\s\S]*?<\/ref>/g;
@@ -861,10 +822,6 @@ function extractCitations(wiki: string): string[] {
   return refs;
 }
 
-/**
- * Extract [[wikilinks]] targets from the original LLM wiki output.
- * Returns a map of lowercased term → full [[...]] link markup.
- */
 function extractWikiLinks(wiki: string): Map<string, string> {
   const map = new Map<string, string>();
   const re = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
@@ -872,21 +829,12 @@ function extractWikiLinks(wiki: string): Map<string, string> {
   while ((m = re.exec(wiki)) !== null) {
     const target = m[1];
     const display = m[2] ?? m[1];
-    // Store by lowercased display text so we can re-link matching terms in plain text
     map.set(display.toLowerCase(), m[0]);
     map.set(target.toLowerCase(), m[0]);
   }
   return map;
 }
 
-/**
- * Convert plain text back to Wikipedia wikitext.
- * - Re-links terms that had [[wikilinks]] in the original LLM output
- * - Converts markdown **bold** → '''bold''', *italic* → ''italic''
- * - Converts markdown ## headers → == Header ==
- * - Reinserts citations at sentence boundaries
- * - Auto-links first occurrence of brandName if not already linked
- */
 function plainToWikiFormat(
   plain: string,
   originalWiki: string,
@@ -896,19 +844,14 @@ function plainToWikiFormat(
   const wikiLinks = extractWikiLinks(originalWiki);
   let out = plain;
 
-  // Convert markdown headers first (before other substitutions)
   out = out.replace(/^#{1,6}\s+(.+)$/gm, (_, title) => `== ${title.trim()} ==`);
+  out = out.replace(/\*\*\*(.+?)\*\*\*/g, "'''$1'''");
+  out = out.replace(/\*\*(.+?)\*\*/g, "'''$1'''");
+  out = out.replace(/\*(.+?)\*/g, "''$1''");
 
-  // Convert markdown bold/italic
-  out = out.replace(/\*\*\*(.+?)\*\*\*/g, "'''$1'''");   // ***bold italic***
-  out = out.replace(/\*\*(.+?)\*\*/g, "'''$1'''");        // **bold**
-  out = out.replace(/\*(.+?)\*/g, "''$1''");              // *italic*
-
-  // Re-apply wikilinks from original — replace first occurrence of each linked term
   const linkedTerms = new Set<string>();
   wikiLinks.forEach((markup, term) => {
     if (linkedTerms.has(term)) return;
-    // Only link the first occurrence (case-insensitive)
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const re = new RegExp(`(?<![\\[|])\\b${escaped}\\b(?![\\]|])`, 'i');
     const replaced = out.replace(re, markup);
@@ -918,14 +861,12 @@ function plainToWikiFormat(
     }
   });
 
-  // Auto-link first occurrence of brand name if not already linked
   if (brandName) {
     const escaped = brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const re = new RegExp(`(?<!\\[\\[)\\b${escaped}\\b(?!\\]\\])`, 'i');
     out = out.replace(re, `[[${brandName}]]`);
   }
 
-  // Reinsert citations before trailing period of each sentence that had one
   if (citations.length > 0) {
     const t = out.trimEnd();
     out = t.endsWith('.') ? t.slice(0, -1) + citations.join('') + '.' : t + citations.join('');
@@ -959,8 +900,6 @@ function WikipediaDraftCard({
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // If the user hasn't edited yet, show the original wiki (links intact).
-  // Once they edit, rebuild from their plain text with proper wiki conversion.
   const wikiFormat = hasEdited
     ? plainToWikiFormat(plainText, originalWiki, citations, brandName)
     : originalWiki;
@@ -982,7 +921,6 @@ function WikipediaDraftCard({
   async function handleSave() {
     setSaving(true);
     try {
-      // Save the rebuilt wiki format so refreshing restores the latest edit
       const updated = await updateDraft(draft.id, { content_text: wikiFormat });
       onSaved(updated);
       setEditing(false);
@@ -994,8 +932,6 @@ function WikipediaDraftCard({
   const articleUrl = draft.content_brief ?? '';
   const articleTitle = draft.title ?? 'Unknown Wikipedia article';
 
-  // insert_location is stored in platform_guidelines_applied for Wikipedia drafts.
-  // Old drafts have a JSON array of rules there — detect and ignore those.
   const rawGuidelines = draft.platform_guidelines_applied ?? '';
   const insertLocation: string = (() => {
     if (!rawGuidelines) return '';
@@ -1010,7 +946,6 @@ function WikipediaDraftCard({
 
   return (
     <>
-      {/* COI banner — slim line above the card, only when draft mentions brand */}
       {showCOI && (
         <div className="flex items-center gap-2 text-xs text-[#f59e0b] px-1 -mb-1">
           <AlertTriangle size={11} className="shrink-0" />
@@ -1029,7 +964,6 @@ function WikipediaDraftCard({
       )}
 
       <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
-        {/* Platform badge + article link */}
         <div className="flex items-start gap-2 flex-wrap">
           <PlatformBadge platform="wikipedia" />
           <div className="flex-1 min-w-0">
@@ -1049,7 +983,6 @@ function WikipediaDraftCard({
           </div>
         </div>
 
-        {/* Where to insert */}
         {insertLocation && (
           <div className="bg-[rgba(255,255,255,0.06)] border border-[rgba(99,102,241,0.22)] rounded-lg px-3 py-2.5">
             <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1 font-medium">Where to insert</p>
@@ -1057,7 +990,6 @@ function WikipediaDraftCard({
           </div>
         )}
 
-        {/* Content — edit mode or view mode */}
         {editing ? (
           <div className="flex flex-col gap-2">
             <QualityChecklist draft={draft} profile={profile} brandName={brandName} autoExpand liveText={wikiFormat} />
@@ -1090,7 +1022,6 @@ function WikipediaDraftCard({
           </div>
         ) : (
           <div>
-            {/* Raw / Preview toggle */}
             <div className="flex items-center justify-between mb-1.5">
               <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
                 <button
@@ -1122,12 +1053,10 @@ function WikipediaDraftCard({
           </div>
         )}
 
-        {/* Quality checklist — only shown in view mode */}
         {!editing && (
           <QualityChecklist draft={draft} profile={profile} brandName={brandName} liveText={wikiFormat} />
         )}
 
-        {/* Actions */}
         {!editing && (
           <div className="flex items-center gap-2 pt-1 flex-wrap">
             <button
@@ -1267,271 +1196,6 @@ function QuoraQuestionPicker({
   );
 }
 
-// ── Request Draft modal ───────────────────────────────────────────────────────
-
-const DRAFT_PLATFORMS = ['reddit', 'quora', 'medium', 'wikipedia'] as const;
-
-function RequestDraftModal({
-  brandId,
-  prompts,
-  onClose,
-  onCreated,
-}: {
-  brandId: number;
-  prompts: Prompt[];
-  onClose: () => void;
-  onCreated: (draft: ContentDraft) => void;
-}) {
-  const [platform, setPlatform] = useState<string>('reddit');
-  const [promptId, setPromptId] = useState<number | ''>('');
-  const [customTopic, setCustomTopic] = useState('');
-  const [notes, setNotes] = useState('');
-  const [creating, setCreating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedQuestion, setSelectedQuestion] = useState<QuoraQuestion | null>(null);
-
-  async function handleSubmit() {
-    setCreating(true);
-    setError(null);
-    try {
-      const parts: string[] = [];
-      if (customTopic.trim()) parts.push(customTopic.trim());
-      if (notes.trim()) parts.push(`Additional notes: ${notes.trim()}`);
-      const brief = parts.length > 0 ? parts.join('\n\n') : undefined;
-
-      const draft = await generateDraft(brandId, {
-        platform,
-        prompt_id: promptId !== '' ? (promptId as number) : undefined,
-        custom_brief: brief,
-        quora_question_url: selectedQuestion?.url,
-        quora_question_title: selectedQuestion?.title,
-        quora_question_snippet: selectedQuestion?.snippet,
-      });
-      onCreated(draft);
-      onClose();
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } } };
-      setError(err?.response?.data?.detail ?? 'Draft generation failed. Check that API keys are configured.');
-    } finally {
-      setCreating(false);
-    }
-  }
-
-  return (
-    <Dialog open={true} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Request a Draft</DialogTitle>
-          <p className="text-xs text-[#64748B] mt-0.5">Generate a targeted draft for a specific prompt or topic</p>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-4">
-          {/* Platform */}
-          <div>
-            <label className="text-xs text-[#64748B] font-medium uppercase tracking-wide mb-1.5 block">Platform</label>
-            <div className="grid grid-cols-4 gap-2">
-              {DRAFT_PLATFORMS.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => { setPlatform(p); if (p !== 'quora') setSelectedQuestion(null); }}
-                  className={`py-2 rounded-lg text-xs font-medium capitalize transition-colors border ${
-                    platform === p
-                      ? 'bg-[#6366f1]/20 border-[#6366f1]/50 text-[#6366f1]'
-                      : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[#64748B] hover:text-[#94A3B8]'
-                  }`}
-                >
-                  {p}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Target prompt */}
-          <div>
-            <label className="text-xs text-[#64748B] font-medium uppercase tracking-wide mb-1.5 block">
-              Target Prompt <span className="text-[#475569] normal-case font-normal">(optional)</span>
-            </label>
-            <div className="relative">
-              <select
-                value={promptId}
-                onChange={(e) => setPromptId(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full appearance-none bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:border-[#6366f1]"
-              >
-                <option value="">— Select tracked prompt —</option>
-                {prompts.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.text.length > 60 ? p.text.slice(0, 60) + '…' : p.text}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#475569] pointer-events-none" />
-            </div>
-          </div>
-
-          {/* Quora question picker */}
-          {platform === 'quora' && (
-            <div>
-              <label className="text-xs text-[#64748B] font-medium uppercase tracking-wide mb-2 block">
-                Target Question <span className="text-[#475569] normal-case font-normal">(optional — picks a real Quora question)</span>
-              </label>
-              <QuoraQuestionPicker
-                brandId={brandId}
-                promptId={promptId}
-                selected={selectedQuestion}
-                onSelect={setSelectedQuestion}
-              />
-            </div>
-          )}
-
-          {/* Custom topic */}
-          <div>
-            <label className="text-xs text-[#64748B] font-medium uppercase tracking-wide mb-1.5 block">
-              Custom Topic <span className="text-[#475569] normal-case font-normal">(or leave blank to use prompt)</span>
-            </label>
-            <input
-              type="text"
-              value={customTopic}
-              onChange={(e) => setCustomTopic(e.target.value)}
-              placeholder="e.g. Why Rainbow Study matters for oncologists"
-              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1]"
-            />
-          </div>
-
-          {/* Notes */}
-          <div>
-            <label className="text-xs text-[#64748B] font-medium uppercase tracking-wide mb-1.5 block">
-              Notes <span className="text-[#475569] normal-case font-normal">(optional)</span>
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Focus on clinical data, write for a non-technical audience…"
-              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] resize-none"
-            />
-          </div>
-
-          {error && (
-            <p className="text-xs text-[#f87171] bg-[#7f1d1d]/15 border border-[#991b1b]/25 rounded-lg px-3 py-2">
-              {error}
-            </p>
-          )}
-
-          <button
-            onClick={handleSubmit}
-            disabled={creating || (promptId === '' && !customTopic.trim())}
-            className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
-          >
-            {creating ? (
-              <><Loader2 size={14} className="animate-spin" /> Generating…</>
-            ) : (
-              <><Sparkles size={14} /> Generate Draft</>
-            )}
-          </button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ── Opportunity card (Live Opportunities tab) ─────────────────────────────────
-
-function OpportunityCard({
-  opp,
-  onDraft,
-  onDismiss,
-  queueFull,
-}: {
-  opp: ContentOpportunity;
-  onDraft: (id: number) => void;
-  onDismiss: (id: number) => void;
-  queueFull?: boolean;
-}) {
-  const [drafting, setDrafting] = useState(false);
-
-  async function handleDraft() {
-    setDrafting(true);
-    try {
-      await onDraft(opp.id);
-    } finally {
-      setDrafting(false);
-    }
-  }
-
-  const relevanceColor =
-    opp.relevance_score >= 70
-      ? 'text-[#10b981]'
-      : opp.relevance_score >= 40
-      ? 'text-[#f59e0b]'
-      : 'text-[#64748B]';
-
-  return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
-      {/* Top row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <PlatformBadge platform={opp.platform} />
-        {opp.subreddit && (
-          <span className="text-xs text-[#64748B] font-medium">r/{opp.subreddit}</span>
-        )}
-        <span className={`text-xs font-semibold ml-auto ${relevanceColor}`}>
-          {Math.round(opp.relevance_score)}% relevance
-        </span>
-      </div>
-
-      {/* Thread title */}
-      <a
-        href={opp.thread_url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-sm font-medium text-[#F0F4F8] hover:text-[#6366f1] transition-colors leading-snug flex items-start gap-1.5"
-      >
-        {opp.thread_title || opp.thread_url}
-        <ExternalLink size={11} className="shrink-0 mt-0.5 text-[#475569]" />
-      </a>
-
-      {/* Body preview */}
-      {opp.body_preview && (
-        <p className="text-xs text-[#475569] leading-relaxed line-clamp-2">{opp.body_preview}</p>
-      )}
-
-      {/* Meta */}
-      <div className="flex items-center gap-3 text-xs text-[#475569]">
-        {opp.posted_at && (
-          <span className="flex items-center gap-1">
-            <Clock size={10} />
-            {relativeTime(opp.posted_at)}
-          </span>
-        )}
-        {opp.prompt_text && (
-          <span className="text-[#475569] truncate max-w-[200px]">
-            Prompt: {opp.prompt_text}
-          </span>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-2 pt-1">
-        <button
-          onClick={handleDraft}
-          disabled={drafting || queueFull}
-          title={queueFull ? 'Draft queue full — approve or dismiss drafts to make room' : undefined}
-          className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-1.5 transition-colors"
-        >
-          {drafting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-          {drafting ? 'Drafting…' : queueFull ? 'Queue full' : 'Draft Reply'}
-        </button>
-        <button
-          onClick={() => onDismiss(opp.id)}
-          className="flex items-center gap-1.5 text-xs text-[#ef4444]/70 hover:text-[#f87171] rounded-lg px-3 py-1.5 transition-colors ml-auto"
-        >
-          <X size={11} />
-          Dismiss
-        </button>
-      </div>
-    </div>
-  );
-}
-
 // ── Posting guidance ──────────────────────────────────────────────────────────
 
 const POSTING_GUIDANCE: Record<string, (brief: string | null) => React.ReactNode> = {
@@ -1612,7 +1276,6 @@ function ScheduledCard({
 
   return (
     <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
-      {/* Top row */}
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={draft.platform} />
         {draft.approved_at && (
@@ -1623,7 +1286,6 @@ function ScheduledCard({
         )}
       </div>
 
-      {/* Target prompt */}
       {draft.content_brief && (
         <p className="text-xs text-[#475569] leading-relaxed line-clamp-2">
           <span className="text-[#64748B]">Targeting: </span>
@@ -1631,7 +1293,6 @@ function ScheduledCard({
         </p>
       )}
 
-      {/* Title / preview */}
       <div>
         {draft.title && (
           <p className="text-sm font-semibold text-[#F0F4F8] leading-snug mb-1">{draft.title}</p>
@@ -1641,7 +1302,6 @@ function ScheduledCard({
         )}
       </div>
 
-      {/* Expandable full draft */}
       {expanded && (
         <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg p-3 relative">
           <pre className="text-xs text-[#94A3B8] whitespace-pre-wrap leading-relaxed font-mono pr-14">
@@ -1657,7 +1317,6 @@ function ScheduledCard({
         </div>
       )}
 
-      {/* How to Post guidance */}
       {guidance && (
         <div className="border border-[rgba(99,102,241,0.22)] rounded-lg overflow-hidden">
           <button
@@ -1678,7 +1337,6 @@ function ScheduledCard({
         </div>
       )}
 
-      {/* Manual posting reminder */}
       <div className="bg-[rgba(16,185,129,0.05)] border border-[rgba(16,185,129,0.12)] rounded-lg px-3 py-2 flex items-start gap-2">
         <HelpCircle size={11} className="text-[#10b981] mt-0.5 shrink-0" />
         <p className="text-[11px] text-[#475569] leading-relaxed">
@@ -1688,7 +1346,6 @@ function ScheduledCard({
         </p>
       </div>
 
-      {/* Actions */}
       <div className="flex items-center gap-2 pt-1 flex-wrap">
         <button
           onClick={() => setExpanded(!expanded)}
@@ -1722,7 +1379,6 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
   const [expanded, setExpanded] = useState(false);
   const title = draft.title ?? draft.content_text.slice(0, 80) + (draft.content_text.length > 80 ? '…' : '');
 
-  // Confidence tier based on number of tracking runs since posting
   type ConfidenceTier = 'awaiting' | 'early' | 'developing' | 'established';
   function getConfidenceTier(runs: number): ConfidenceTier {
     if (runs === 0) return 'awaiting';
@@ -1807,7 +1463,6 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
 
   return (
     <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.20)] hover:border-[rgba(255,255,255,0.14)] transition-colors">
-      {/* Top row */}
       <div className="flex items-center gap-2">
         <PlatformBadge platform={draft.platform} />
         <p className="flex-1 text-sm text-[#94A3B8] truncate">{title}</p>
@@ -1820,14 +1475,12 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
         <span className="text-xs text-[#475569] shrink-0">{relativeTime(draft.updated_at)}</span>
       </div>
 
-      {/* Expanded content */}
       {expanded && (
         <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3">
           <pre className="text-xs text-[#64748B] whitespace-pre-wrap leading-relaxed font-mono">{draft.content_text}</pre>
         </div>
       )}
 
-      {/* Attribution */}
       {attributionNode && (
         <div className="border-t border-[rgba(255,255,255,0.05)] pt-2">
           <p className="text-[10px] text-[#475569] uppercase tracking-wide mb-1 flex items-center gap-1">
@@ -1841,841 +1494,95 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
   );
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// ── Opportunity card ──────────────────────────────────────────────────────────
 
-export default function ContentHubPage() {
-  const { user } = useAuth();
-  const { brands, activeBrandId: selectedBrandId, setActiveBrandId: setSelectedBrandId } = useBrand();
-  const [activeTab, setActiveTab] = useState<QueueTab>('drafts');
+function OpportunityCard({
+  opp,
+  onDraft,
+  onDismiss,
+  queueFull,
+}: {
+  opp: ContentOpportunity;
+  onDraft: (id: number) => void;
+  onDismiss: (id: number) => void;
+  queueFull?: boolean;
+}) {
+  const [drafting, setDrafting] = useState(false);
 
-  // Sync tab from URL after mount — avoids SSR/client hydration mismatch
-  useEffect(() => { document.title = 'Content Hub — Lumidian'; }, []);
-
-  useEffect(() => {
-    const tab = new URLSearchParams(window.location.search).get('tab');
-    if (tab === 'opportunities' || tab === 'scheduled' || tab === 'posted') {
-      setActiveTab(tab as QueueTab);
-    }
-  }, []);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // Content data
-  const [draftItems, setDraftItems] = useState<ContentDraft[]>([]);
-  const [scheduledItems, setScheduledItems] = useState<ContentDraft[]>([]);
-  const [postedItems, setPostedItems] = useState<ContentDraft[]>([]);
-  const [draftAttributions, setDraftAttributions] = useState<DraftAttribution[]>([]);
-  const [opportunities, setOpportunities] = useState<ContentOpportunity[]>([]);
-  const [pinnedDraftId, setPinnedDraftId] = useState<number | null>(null);
-  const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
-  const [brandPrompts, setBrandPrompts] = useState<Prompt[]>([]);
-  const [contentSettings, setContentSettings] = useState<BrandContentSettings[]>([]);
-
-  // Right panel
-  const [generating, setGenerating] = useState(false);
-  const [generateError, setGenerateError] = useState<string | null>(null);
-  const generatePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  // Broadcast drafts-generating state to other pages via localStorage
-  useEffect(() => {
+  async function handleDraft() {
+    setDrafting(true);
     try {
-      if (generating) localStorage.setItem('clarity_drafts_generating', '1');
-      else localStorage.removeItem('clarity_drafts_generating');
-    } catch {}
-  }, [generating]);
-
-  const [requestDraftOpen, setRequestDraftOpen] = useState(false);
-  const [draftStatus, setDraftStatus] = useState<DraftQueueStatus | null>(null);
-
-  // Help modals
-  const [hubHelpOpen, setHubHelpOpen] = useState(false);
-  const [oppHelpOpen, setOppHelpOpen] = useState(false);
-  const [postingGuideOpen, setPostingGuideOpen] = useState(false);
-  const [postingPlatform, setPostingPlatform] = useState<'reddit' | 'quora' | 'medium' | 'wikipedia'>('reddit');
-
-  // Platform filtering
-  const _disabledPlatforms = new Set(
-    contentSettings.filter((s) => !s.enabled).map((s) => s.platform)
-  );
-
-  // Active platform filter (All / specific platform)
-  const [platformFilter, setPlatformFilter] = useState<string>('all');
-
-  // Tab counts (using filtered draft/scheduled counts)
-  const tabCounts = {
-    drafts: draftItems.filter((d) => !_disabledPlatforms.has(d.platform)).length,
-    scheduled: scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform)).length,
-    opportunities: opportunities.length,
-    posted: postedItems.length,
-  };
-
-  // ── Load data ──────────────────────────────────────────────────────────────
-
-  const loadAbortRef = useRef<AbortController | null>(null);
-
-  const loadAll = useCallback(async (brandId: number, signal?: AbortSignal) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [
-        draftsData,
-        scheduledData,
-        postedData,
-        oppsData,
-        profileData,
-        brandDetail,
-        settingsData,
-        statusData,
-        attributionsData,
-      ] = await Promise.all([
-        getDrafts(brandId, undefined, 'draft'),
-        getDrafts(brandId, undefined, 'approved'),
-        getDrafts(brandId, undefined, 'posted'),
-        getOpportunities(brandId),
-        getBrandProfile(brandId).catch(() => null),
-        getBrand(brandId).catch(() => null),
-        getContentSettings(brandId).catch(() => [] as BrandContentSettings[]),
-        getDraftStatus(brandId).catch(() => null),
-        getDraftAttributions(brandId).catch(() => [] as DraftAttribution[]),
-      ]);
-
-      // Ignore results if the user switched to a different brand while fetching
-      if (signal?.aborted) return;
-
-      setDraftItems(draftsData);
-      setScheduledItems(scheduledData);
-      setPostedItems(postedData);
-      setDraftAttributions(attributionsData);
-      setOpportunities(oppsData);
-      setBrandProfile(profileData);
-      setBrandPrompts(brandDetail?.prompts ?? []);
-      setContentSettings(settingsData);
-      setDraftStatus(statusData);
-    } catch {
-      if (signal?.aborted) return;
-      setError('Failed to load content data. Check that the backend is running.');
+      await onDraft(opp.id);
     } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, []);
-
-
-  useEffect(() => {
-    if (!selectedBrandId) return;
-    // Cancel any in-flight generation poll for the previous brand
-    if (generatePollRef.current) {
-      clearInterval(generatePollRef.current);
-      generatePollRef.current = null;
-      setGenerating(false);
-    }
-    loadAbortRef.current?.abort();
-    const controller = new AbortController();
-    loadAbortRef.current = controller;
-    loadAll(selectedBrandId, controller.signal);
-    return () => controller.abort();
-  }, [selectedBrandId, loadAll]);
-
-  // Cleanup generate-now poll on unmount
-  useEffect(() => () => { if (generatePollRef.current) clearInterval(generatePollRef.current); }, []);
-
-  // ── Draft actions ──────────────────────────────────────────────────────────
-
-  async function handleApprove(id: number) {
-    if (draftStatus?.scheduled_queue_full) {
-      alert(`Scheduled queue is full (${draftStatus.scheduled_cap}/${draftStatus.scheduled_cap}). Mark some drafts as posted before approving more.`);
-      return;
-    }
-    try {
-      await updateDraft(id, { status: 'approved' });
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string }; status?: number } };
-      const detail = err?.response?.data?.detail ?? '';
-      if (detail.includes('queue is full') || err?.response?.status === 409) {
-        alert(detail || 'Scheduled queue is full. Mark some drafts as posted first.');
-        return;
-      }
-      throw e;
-    }
-    if (selectedBrandId) loadAll(selectedBrandId);
-  }
-
-  async function handleMarkAsPosted(id: number) {
-    await updateDraft(id, { status: 'posted' });
-    if (selectedBrandId) loadAll(selectedBrandId);
-  }
-
-  async function handleMoveBackToDrafts(id: number) {
-    await updateDraft(id, { status: 'draft' });
-    if (selectedBrandId) loadAll(selectedBrandId);
-  }
-
-  async function handleDelete(id: number) {
-    await deleteDraft(id);
-    setDraftItems((prev) => prev.filter((d) => d.id !== id));
-    setScheduledItems((prev) => prev.filter((d) => d.id !== id));
-    setDraftStatus((prev) =>
-      prev ? { ...prev, draft_count: Math.max(0, prev.draft_count - 1) } : prev
-    );
-  }
-
-  function handleSaved(updated: ContentDraft) {
-    setDraftItems((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-  }
-
-  // ── Opportunity actions ────────────────────────────────────────────────────
-
-  async function handleDraftOpportunity(oppId: number) {
-    if (draftStatus?.draft_queue_full) {
-      alert(`Draft queue is full (${draftStatus.draft_cap}/${draftStatus.draft_cap}). Approve or dismiss drafts to make room.`);
-      return;
-    }
-    try {
-      const draft = await draftOpportunity(oppId);
-      setOpportunities((prev) => prev.filter((o) => o.id !== oppId));
-      setDraftItems((prev) => [draft, ...prev]);
-      setPinnedDraftId(draft.id);
-      // Refresh status so the count is accurate
-      if (selectedBrandId) getDraftStatus(selectedBrandId).then(setDraftStatus).catch(() => {});
-      setActiveTab('drafts');
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } } };
-      const detail = err?.response?.data?.detail ?? 'Failed to draft reply. Try again.';
-      alert(detail);
+      setDrafting(false);
     }
   }
 
-  async function handleDismissOpportunity(oppId: number) {
-    await dismissOpportunity(oppId);
-    setOpportunities((prev) => prev.filter((o) => o.id !== oppId));
-  }
-
-  // ── Right panel actions ────────────────────────────────────────────────────
-
-  async function handleGenerateNow() {
-    if (!selectedBrandId) return;
-    setGenerating(true);
-    setGenerateError(null);
-    if (generatePollRef.current) clearInterval(generatePollRef.current);
-
-    const brandId = selectedBrandId;
-    const startCount = draftStatus?.draft_count ?? 0;
-
-    try {
-      await generateNow(brandId);
-    } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string }; status?: number }; message?: string };
-      const detail = err?.response?.data?.detail ?? err?.message ?? 'Generation failed. Check that API keys are configured in Settings.';
-      setGenerateError(detail);
-      setGenerating(false);
-      // Refresh status in case rate-limit stamp was already applied
-      getDraftStatus(brandId).then(setDraftStatus).catch(() => {});
-      return;
-    }
-
-    // Poll until count stabilizes (2 consecutive equal polls), then reload all at once.
-    // Stability is tracked unconditionally so a 0-new-drafts run exits in ~6s, not 120s.
-    // Hard timeout: 120s fallback.
-    setActiveTab('drafts');
-    const deadline = Date.now() + 120_000;
-    let prevCount = startCount;
-    let stableStreak = 0;
-
-    generatePollRef.current = setInterval(async () => {
-      try {
-        const status = await getDraftStatus(brandId);
-        setDraftStatus(status);
-        const count = status.draft_count;
-
-        if (count === prevCount) {
-          stableStreak++;
-        } else {
-          stableStreak = 0;
-        }
-        prevCount = count;
-
-        const done = stableStreak >= 2 || Date.now() > deadline;
-        if (done) {
-          clearInterval(generatePollRef.current!);
-          generatePollRef.current = null;
-          if (count > startCount) loadAll(brandId); // only reload if drafts actually changed
-          setGenerating(false);
-        }
-      } catch {
-        // ignore poll errors — keep trying
-      }
-    }, 3000);
-  }
-
-  async function handleTogglePlatform(platform: string, enabled: boolean) {
-    if (!selectedBrandId) return;
-    const updated = await updateContentSettings(selectedBrandId, platform, { enabled }).catch(() => null);
-    if (updated) {
-      setContentSettings((prev) =>
-        prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))
-      );
-    }
-  }
-
-  // Filter drafts to only show enabled platforms + active platform filter
-  const oppScanEnabled = !_disabledPlatforms.has('reddit') || !_disabledPlatforms.has('quora');
-  const visibleDraftItems = draftItems.filter(
-    (d) => !_disabledPlatforms.has(d.platform) && (platformFilter === 'all' || d.platform === platformFilter)
-  );
-  const visibleScheduledItems = scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform));
-  const visibleOpportunities = opportunities.filter(
-    (o) => platformFilter === 'all' || o.platform === platformFilter
-  );
-
-  const TABS: { key: QueueTab; label: string }[] = [
-    ...(oppScanEnabled ? [{ key: 'opportunities' as QueueTab, label: 'Live Opportunities' }] : []),
-    { key: 'drafts', label: 'Drafts' },
-    { key: 'scheduled', label: 'Scheduled' },
-    { key: 'posted', label: 'Posted' },
-  ];
+  const relevanceColor =
+    opp.relevance_score >= 70
+      ? 'text-[#10b981]'
+      : opp.relevance_score >= 40
+      ? 'text-[#f59e0b]'
+      : 'text-[#64748B]';
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px]">
-      {/* Subscription status banner */}
-      {user?.subscription_status && ['past_due', 'canceled', 'unpaid'].includes(user.subscription_status) && (
-        <div className="-mx-8 -mt-8 mb-6">
-          <SubscriptionBanner status={user.subscription_status} />
-        </div>
-      )}
-
-      {/* Request Draft modal */}
-      {requestDraftOpen && selectedBrandId && (
-        <RequestDraftModal
-          brandId={selectedBrandId}
-          prompts={brandPrompts}
-          onClose={() => setRequestDraftOpen(false)}
-          onCreated={(draft) => {
-            setDraftItems((prev) => [draft, ...prev]);
-            setActiveTab('drafts');
-          }}
-        />
-      )}
-
-      {/* Help modals */}
-      {hubHelpOpen && (
-        <HelpModal title="How Content Hub works" onClose={() => setHubHelpOpen(false)}>
-          <p>Content Hub generates AI drafts for your brand and surfaces Reddit and Quora threads where you can contribute.</p>
-          <ul className="space-y-2 mt-2">
-            <li><span className="text-[#F0F4F8] font-medium">Generate Drafts Now</span> — creates a batch of AI drafts across your tracked prompts and platforms.</li>
-            <li><span className="text-[#F0F4F8] font-medium">Live Opportunities</span> tab updates daily as Reddit and Quora are scanned overnight for threads matching your tracked prompts.</li>
-            <li><span className="text-[#F0F4F8] font-medium">Drafts tab</span> — review, edit, and approve AI drafts before they go live.</li>
-            <li><span className="text-[#F0F4F8] font-medium">Scheduled tab</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
-            <li><span className="text-[#F0F4F8] font-medium">Live Opportunities</span> — Reddit threads and Quora questions where a thoughtful reply could improve your brand&apos;s visibility.</li>
-            <li><span className="text-[#F0F4F8] font-medium">Posted tab</span> — content that has been marked as posted.</li>
-            <li><span className="text-[#F0F4F8] font-medium">Brand Settings</span> — control which platforms generate drafts and how frequently.</li>
-          </ul>
-        </HelpModal>
-      )}
-      {oppHelpOpen && (
-        <HelpModal title="Live Opportunities" onClose={() => setOppHelpOpen(false)}>
-          <p>Reddit threads and Quora questions where your brand can meaningfully contribute.</p>
-          <p>Scanners search for content matching your tracked prompts. Only results with a relevance score of 40+ are shown.</p>
-          <ul className="space-y-2 mt-2">
-            <li><span className="text-[#F0F4F8] font-medium">Relevance score</span> — how closely the thread or question matches your tracked prompts, based on keyword overlap, recency, and engagement.</li>
-            <li><span className="text-[#F0F4F8] font-medium">Draft Reply</span> — generates an AI reply using your brand voice guidelines.</li>
-            <li><span className="text-[#F0F4F8] font-medium">Dismiss</span> — removes the opportunity from this list.</li>
-          </ul>
-          <p className="text-[#64748B] text-xs mt-2">Scanners run automatically every night at 2:00 AM UTC.</p>
-        </HelpModal>
-      )}
-
-      {/* Posting Guide modal — centered */}
-      {postingGuideOpen && (() => {
-        const PLATFORMS = {
-          reddit: {
-            label: 'Reddit',
-            subtitle: 'Discussion posts & replies',
-            color: '#ff4500',
-            colorMuted: 'rgba(255,69,0,0.12)',
-            colorBorder: 'rgba(255,69,0,0.22)',
-            steps: [
-              { title: 'Pick a subreddit', detail: 'Search your niche — r/entrepreneur, r/investing, etc. Target 10k+ member subs with active daily threads. Read the rules before posting; many ban all promotion.' },
-              { title: 'Write a real title', detail: 'Frame a genuine question or insight, not a product pitch. Curiosity and controversy outperform announcements.' },
-              { title: 'Paste & clean the draft', detail: 'Remove anything that reads like an ad before submitting. If it sounds promotional to you, it will to moderators too.' },
-              { title: 'Engage in the first hour', detail: 'Reply to every comment — early engagement determines ranking. Set a reminder to check back 30 minutes after posting.' },
-            ],
-            disclosure: 'Add "Disclosure: I work at [Brand]" at the end of your post.',
-            tip: null,
-          },
-          quora: {
-            label: 'Quora',
-            subtitle: 'Q&A answers',
-            color: '#b92b27',
-            colorMuted: 'rgba(185,43,39,0.12)',
-            colorBorder: 'rgba(185,43,39,0.22)',
-            steps: [
-              { title: 'Find the right question', detail: 'Search with the exact phrasing of your tracked prompts. Favor questions with 1k+ views and fewer than 5 existing answers.' },
-              { title: 'Lead with the answer', detail: "State your main point in the first sentence — don't bury the takeaway. Quora buries answers that take too long to get to the point." },
-              { title: 'Use structure', detail: 'Short paragraphs and bold sub-headers make answers scannable and rank better in search.' },
-              { title: 'Mention your brand in context', detail: 'Never as the opening line. Weave it in naturally where it genuinely adds value to the reader.' },
-            ],
-            disclosure: 'Add "I\'m on the team at [Brand]" in your Quora bio and in the answer itself.',
-            tip: null,
-          },
-          medium: {
-            label: 'Medium',
-            subtitle: 'Long-form articles',
-            color: '#94A3B8',
-            colorMuted: 'rgba(148,163,184,0.10)',
-            colorBorder: 'rgba(148,163,184,0.18)',
-            steps: [
-              { title: 'Open a new story', detail: 'Go to medium.com/new-story and paste your draft. Clean up any formatting artifacts from the copy-paste.' },
-              { title: 'Title & subtitle', detail: 'Both appear in search results — make them specific and search-friendly. Avoid vague headlines like "Lessons I Learned."' },
-              { title: 'Header image', detail: 'Add a relevant image from Unsplash (free, no attribution needed). Articles with images get significantly more clicks.' },
-              { title: 'Tags', detail: 'Add up to 5 specific tags, e.g. "Startup", "AI", "SaaS". Tags determine which readers see your story.' },
-              { title: 'Pitch a publication', detail: 'Submitting to a publication multiplies your reach significantly. Look for publications with 10k+ followers in your niche.' },
-            ],
-            disclosure: 'End the article with "Disclosure: The author is affiliated with [Brand]."',
-            tip: null,
-          },
-          wikipedia: {
-            label: 'Wikipedia',
-            subtitle: 'Article edits — handle with care',
-            color: '#64748b',
-            colorMuted: 'rgba(100,116,139,0.10)',
-            colorBorder: 'rgba(100,116,139,0.20)',
-            steps: [
-              { title: 'Declare your COI first', detail: 'On your user talk page, add the {{connected contributor}} template before doing anything else. Skipping this can get you permanently banned.' },
-              { title: 'Propose on the Talk page', detail: "Open the article's Talk tab and post your suggested addition with sources. Do not self-publish COI edits directly — this violates policy." },
-              { title: 'Wait for review', detail: 'A volunteer editor will review and merge (or decline) your suggestion. This can take days to weeks — do not bump or re-submit.' },
-              { title: 'Iterate if declined', detail: 'Ask for specific feedback, revise with better sources, and re-submit. Patience is essential; editors respond poorly to pressure.' },
-            ],
-            disclosure: null,
-            tip: null,
-          },
-        } as const;
-
-        const p = PLATFORMS[postingPlatform];
-
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div
-              className="absolute inset-0 bg-black/75 backdrop-blur-sm"
-              onClick={() => setPostingGuideOpen(false)}
-            />
-            <div className="relative w-full max-w-xl max-h-[88vh] flex flex-col bg-[rgba(8,12,20,0.98)] border border-[rgba(99,102,241,0.22)] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.70),0_0_0_1px_rgba(99,102,241,0.08)] overflow-hidden">
-
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-[rgba(99,102,241,0.12)] border border-[rgba(99,102,241,0.22)] flex items-center justify-center">
-                    <BookOpen size={14} className="text-[#818cf8]" />
-                  </div>
-                  <div>
-                    <h2 className="text-sm font-semibold text-[#F0F4F8] leading-none">Posting Guide</h2>
-                    <p className="text-[11px] text-[#475569] mt-0.5">How to publish your draft on each platform</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setPostingGuideOpen(false)}
-                  aria-label="Close"
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-[#475569] hover:text-[#94A3B8] hover:bg-[rgba(255,255,255,0.06)] transition-all"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-
-              {/* Platform tabs */}
-              <div className="px-6 pb-0 shrink-0">
-                <div className="flex gap-1 p-1 bg-[rgba(255,255,255,0.03)] border border-[rgba(99,102,241,0.12)] rounded-xl">
-                  {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((key) => {
-                    const active = postingPlatform === key;
-                    const pl = PLATFORMS[key];
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setPostingPlatform(key)}
-                        className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium transition-all"
-                        style={{
-                          background: active ? pl.colorMuted : 'transparent',
-                          color: active ? pl.color : '#475569',
-                          border: active ? `1px solid ${pl.colorBorder}` : '1px solid transparent',
-                        }}
-                      >
-                        {pl.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Scrollable body */}
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
-
-                {/* Platform header */}
-                <div className="flex items-center justify-between gap-3 mb-1">
-                  <div className="flex items-center gap-3">
-                    <div className="w-1 h-9 rounded-full shrink-0" style={{ background: p.color }} />
-                    <div>
-                      <p className="text-base font-semibold text-[#F0F4F8]">{p.label}</p>
-                      <p className="text-xs text-[#475569]">{p.subtitle}</p>
-                    </div>
-                  </div>
-                  {postingPlatform === 'medium' && (
-                    <a
-                      href="https://medium.com/new-story"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 bg-[rgba(148,163,184,0.08)] hover:bg-[rgba(148,163,184,0.14)] border border-[rgba(148,163,184,0.18)] text-[#94A3B8] hover:text-[#E2E8F0] rounded-lg px-3 py-1.5 text-xs font-medium transition-all shrink-0"
-                    >
-                      Open Medium
-                      <ExternalLink size={11} />
-                    </a>
-                  )}
-                </div>
-
-                {/* Steps */}
-                {p.steps.map((step, i) => (
-                  <div
-                    key={step.title}
-                    className="group flex gap-4 p-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.04)] hover:border-[rgba(99,102,241,0.18)] transition-all cursor-default"
-                  >
-                    <div
-                      className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all"
-                      style={{
-                        background: p.colorMuted,
-                        border: `1px solid ${p.colorBorder}`,
-                        color: p.color,
-                      }}
-                    >
-                      {i + 1}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[#E2E8F0] mb-1">{step.title}</p>
-                      <p className="text-xs text-[#64748B] leading-relaxed">{step.detail}</p>
-                    </div>
-                  </div>
-                ))}
-
-                {/* Wikipedia accept/reject grid */}
-                {postingPlatform === 'wikipedia' && (
-                  <div className="grid grid-cols-2 gap-3 mt-1">
-                    <div className="bg-[rgba(16,185,129,0.04)] border border-[rgba(16,185,129,0.14)] rounded-xl px-4 py-3">
-                      <p className="text-xs text-[#10b981] font-semibold mb-2.5 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-[rgba(16,185,129,0.15)] flex items-center justify-center text-[9px]">✓</span>
-                        Editors accept
-                      </p>
-                      <div className="space-y-2">
-                        {['Neutral, factual statements', 'Properly cited sources', 'Brand as one of several examples', 'Correcting factual errors'].map((t) => (
-                          <div key={t} className="flex items-start gap-2">
-                            <span className="text-[#10b981] text-[10px] mt-0.5 shrink-0">✓</span>
-                            <span className="text-[11px] text-[#64748B] leading-snug">{t}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                    <div className="bg-[rgba(239,68,68,0.04)] border border-[rgba(239,68,68,0.14)] rounded-xl px-4 py-3">
-                      <p className="text-xs text-[#ef4444] font-semibold mb-2.5 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-[rgba(239,68,68,0.15)] flex items-center justify-center text-[9px]">✗</span>
-                        Editors reject
-                      </p>
-                      <div className="space-y-2">
-                        {['Promotional language', 'Uncited claims', 'Brand article without notability', 'Removing competitors'].map((t) => (
-                          <div key={t} className="flex items-start gap-2">
-                            <span className="text-[#ef4444] text-[10px] mt-0.5 shrink-0">✗</span>
-                            <span className="text-[11px] text-[#64748B] leading-snug">{t}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Disclosure */}
-                {p.disclosure && (
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.16)]">
-                    <div className="shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.15)] border border-[rgba(99,102,241,0.25)] flex items-center justify-center mt-0.5">
-                      <span className="text-[9px] text-[#818cf8] font-bold">!</span>
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-[#818cf8] mb-1">Required disclosure</p>
-                      <p className="text-xs text-[#64748B] leading-relaxed">{p.disclosure}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div className="flex items-center gap-2">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#F0F4F8]">Content Hub</h1>
-            <p className="text-[13px] text-[#64748B] mt-1.5">
-              AI-powered content for every platform
-            </p>
-          </div>
-          <button
-            onClick={() => setHubHelpOpen(true)}
-            aria-label="How does Content Hub work?"
-            className="text-[#475569] hover:text-[#6366f1] transition-colors mt-1 ml-1"
-            title="How does Content Hub work?"
-          >
-            <HelpCircle size={16} />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Posting Guide button */}
-          <button
-            onClick={() => setPostingGuideOpen(true)}
-            className="flex items-center gap-1.5 text-sm bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-2 transition-all duration-150"
-          >
-            <BookOpen size={14} />
-            Posting Guide
-          </button>
-
-          {/* Request Draft button */}
-          <button
-            onClick={() => setRequestDraftOpen(true)}
-            className="flex items-center gap-1.5 text-sm bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-2 transition-all duration-150"
-          >
-            <PenLine size={14} />
-            Request Draft
-          </button>
-
-          {/* Brand selector */}
-          {brands.length > 1 && (
-            <div className="relative">
-              <select
-                value={selectedBrandId ?? ''}
-                onChange={(e) => setSelectedBrandId(Number(e.target.value))}
-                className="appearance-none bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:border-[#6366f1]"
-              >
-                {brands.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={13}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#475569] pointer-events-none"
-              />
-            </div>
-          )}
-        </div>
+    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
+      <div className="flex items-center gap-2 flex-wrap">
+        <PlatformBadge platform={opp.platform} />
+        {opp.subreddit && (
+          <span className="text-xs text-[#64748B] font-medium">r/{opp.subreddit}</span>
+        )}
+        <span className={`text-xs font-semibold ml-auto ${relevanceColor}`}>
+          {Math.round(opp.relevance_score)}% relevance
+        </span>
       </div>
 
-      {loading ? (
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
-          <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
-          <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
-        </div>
-      ) : (
-        <div className="flex flex-col md:flex-row gap-6">
-          {/* ── Left panel (70%) — Content Queue ────────────────────────────── */}
-          <div className="flex-1 min-w-0">
-            {/* Tab bar */}
-            <div className="flex gap-0.5 border-b border-[rgba(99,102,241,0.18)] mb-5">
-              {TABS.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all ${
-                    activeTab === tab.key
-                      ? 'text-[#818cf8] border-[#6366f1]'
-                      : 'text-[#475569] border-transparent hover:text-[#64748B] hover:border-[rgba(99,102,241,0.30)]'
-                  }`}
-                >
-                  {tab.label}
-                  {tabCounts[tab.key] > 0 && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                      activeTab === tab.key
-                        ? 'bg-[#6366f1]/25 text-[#818cf8]'
-                        : 'bg-[rgba(255,255,255,0.08)] text-[#475569]'
-                    }`}>
-                      {tabCounts[tab.key]}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+      <a
+        href={opp.thread_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-sm font-medium text-[#F0F4F8] hover:text-[#6366f1] transition-colors leading-snug flex items-start gap-1.5"
+      >
+        {opp.thread_title || opp.thread_url}
+        <ExternalLink size={11} className="shrink-0 mt-0.5 text-[#475569]" />
+      </a>
 
-            {/* Tab content */}
-            <ContentTabPanels
-              activeTab={activeTab}
-              brands={brands}
-              selectedBrandId={selectedBrandId}
-              draftItems={draftItems}
-              setDraftItems={setDraftItems}
-              visibleDraftItems={visibleDraftItems}
-              scheduledItems={scheduledItems}
-              visibleScheduledItems={visibleScheduledItems}
-              postedItems={postedItems}
-              draftAttributions={draftAttributions}
-              opportunities={opportunities}
-              visibleOpportunities={visibleOpportunities}
-              brandProfile={brandProfile}
-              brandPrompts={brandPrompts}
-              platformFilter={platformFilter}
-              setPlatformFilter={setPlatformFilter}
-              _disabledPlatforms={_disabledPlatforms}
-              draftStatus={draftStatus}
-              generating={generating}
-              pinnedDraftId={pinnedDraftId}
-              handleGenerateNow={handleGenerateNow}
-              handleApprove={handleApprove}
-              handleDelete={handleDelete}
-              handleSaved={handleSaved}
-              handleMarkAsPosted={handleMarkAsPosted}
-              handleMoveBackToDrafts={handleMoveBackToDrafts}
-              handleDraftOpportunity={handleDraftOpportunity}
-              handleDismissOpportunity={handleDismissOpportunity}
-              setOppHelpOpen={setOppHelpOpen}
-              user={user}
-            />
-          </div>
-
-          {/* ── Right panel (30%) — Settings ─────────────────────────────────── */}
-          <div className="w-full md:w-72 shrink-0 flex flex-col gap-4 md:pl-4 md:border-l md:border-[rgba(99,102,241,0.14)]">
-            {/* Generate now */}
-            <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-              {!user?.subscription_tier && !user?.is_admin ? (
-                <div className="flex flex-col items-center text-center gap-3">
-                  <div className="w-10 h-10 bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] rounded-xl flex items-center justify-center">
-                    <Zap size={16} className="text-[#6366f1]/50" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-[#94A3B8]">On-demand drafts</p>
-                    <p className="text-xs text-[#475569] mt-1 leading-relaxed">Available on Starter and Pro plans. Drafts are generated automatically on free.</p>
-                  </div>
-                  <Link
-                    href="/settings/billing"
-                    className="w-full flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[#818cf8] hover:text-[#a5b4fc] rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150"
-                  >
-                    Upgrade to unlock
-                  </Link>
-                </div>
-              ) : (
-                <>
-                  {draftStatus?.draft_queue_full ? (
-                    <div className="bg-[#7f1d1d]/15 border border-[#991b1b]/30 rounded-lg px-3 py-2.5 mb-3">
-                      <p className="text-xs text-[#f87171] font-medium leading-relaxed">
-                        Draft queue full ({draftStatus.draft_cap}/{draftStatus.draft_cap}) — approve or dismiss drafts to generate new ones.
-                      </p>
-                    </div>
-                  ) : null}
-                  {(() => {
-                    const cooldownLabel = generateAvailableLabel(draftStatus?.next_generate_at ?? null);
-                    const onCooldown = !!cooldownLabel;
-                    return (
-                      <>
-                        <button
-                          onClick={handleGenerateNow}
-                          disabled={generating || !!draftStatus?.draft_queue_full || onCooldown}
-                          className="w-full flex items-center justify-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/25 hover:shadow-[#6366f1]/40"
-                        >
-                          {generating ? (
-                            <>
-                              <Loader2 size={14} className="animate-spin" />
-                              Generating…
-                            </>
-                          ) : (
-                            <>
-                              <Zap size={14} />
-                              Generate Drafts Now
-                            </>
-                          )}
-                        </button>
-                        <p className="text-xs text-[#475569] mt-2 text-center">
-                          {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : onCooldown ? cooldownLabel : 'Fills drafts to 20 and scans for new opportunities'}
-                        </p>
-                        {generateError && (
-                          <div className="mt-2 bg-[#7f1d1d]/15 border border-[#991b1b]/30 rounded-lg px-3 py-2">
-                            <p className="text-xs text-[#f87171] leading-relaxed">{generateError}</p>
-                          </div>
-                        )}
-                      </>
-                    );
-                  })()}
-                </>
-              )}
-            </div>
-
-            {/* Queue stats */}
-            <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-              <div className="space-y-3">
-                {draftStatus ? (
-                  <>
-                    {([
-                      { label: 'Drafts', count: draftStatus.draft_count, cap: draftStatus.draft_cap },
-                      { label: 'Scheduled', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
-                    ] as Array<{ label: string; count: number; cap: number }>).map(({ label, count, cap }) => {
-                      const pct = cap > 0 ? count / cap : 0;
-                      const barColor = pct >= 1 ? '#f87171' : pct >= 0.6 ? '#f59e0b' : '#10b981';
-                      const textColor = pct >= 1 ? '#f87171' : pct >= 0.6 ? '#f59e0b' : '#94A3B8';
-                      return (
-                        <div key={label}>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-[#64748B]">{label}</span>
-                            <span className="text-xs font-semibold tabular-nums" style={{ color: textColor }}>
-                              {count}/{cap}
-                            </span>
-                          </div>
-                          <div className="h-1 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{ width: `${Math.min(pct * 100, 100)}%`, backgroundColor: barColor }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </>
-                ) : (
-                  <div className="space-y-3 animate-pulse">
-                    <div className="h-8 bg-[rgba(99,102,241,0.06)] rounded" />
-                    <div className="h-8 bg-[rgba(99,102,241,0.06)] rounded" />
-                  </div>
-                )}
-                <div className="border-t border-[rgba(255,255,255,0.06)] pt-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#475569]">Opportunity scan</span>
-                    <span className="text-xs text-[#475569]">
-                      {draftStatus?.last_scan_at
-                        ? relativeTime(draftStatus.last_scan_at)
-                        : 'Daily'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Platform toggles */}
-            <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-              <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wide mb-3">Platforms</p>
-              <div className="space-y-0.5">
-                {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((platform) => {
-                  const setting = contentSettings.find((s) => s.platform === platform);
-                  const enabled = setting?.enabled ?? true;
-                  return (
-                    <div key={platform} className="flex items-center justify-between py-1.5">
-                      <span className={`text-xs capitalize ${enabled ? 'text-[#94A3B8]' : 'text-[#475569]'}`}>{platform}</span>
-                      <button
-                        onClick={() => handleTogglePlatform(platform, !enabled)}
-                        className="transition-colors shrink-0"
-                        title={enabled ? 'Disable' : 'Enable'}
-                      >
-                        {enabled
-                          ? <ToggleRight size={18} className="text-[#6366f1]" />
-                          : <ToggleLeft size={18} className="text-[#334155]" />}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
+      {opp.body_preview && (
+        <p className="text-xs text-[#475569] leading-relaxed line-clamp-2">{opp.body_preview}</p>
       )}
+
+      <div className="flex items-center gap-3 text-xs text-[#475569]">
+        {opp.posted_at && (
+          <span className="flex items-center gap-1">
+            <Clock size={10} />
+            {relativeTime(opp.posted_at)}
+          </span>
+        )}
+        {opp.prompt_text && (
+          <span className="text-[#475569] truncate max-w-[200px]">
+            Prompt: {opp.prompt_text}
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 pt-1">
+        <button
+          onClick={handleDraft}
+          disabled={drafting || queueFull}
+          title={queueFull ? 'Draft queue full — approve or dismiss drafts to make room' : undefined}
+          className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-1.5 transition-colors"
+        >
+          {drafting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+          {drafting ? 'Drafting…' : queueFull ? 'Queue full' : 'Draft Reply'}
+        </button>
+        <button
+          onClick={() => onDismiss(opp.id)}
+          className="flex items-center gap-1.5 text-xs text-[#ef4444]/70 hover:text-[#f87171] rounded-lg px-3 py-1.5 transition-colors ml-auto"
+        >
+          <X size={11} />
+          Dismiss
+        </button>
+      </div>
     </div>
   );
 }
@@ -2708,6 +1615,250 @@ function EmptyState({
       <p className="text-[15px] font-semibold text-[#F0F4F8] mb-2">{title}</p>
       <p className="text-[13px] text-[#64748B] mb-6 max-w-xs leading-relaxed">{description}</p>
       {action}
+    </div>
+  );
+}
+
+// ── Panel implementations ─────────────────────────────────────────────────────
+
+function DraftsPanel(props: ContentTabPanelsProps) {
+  const {
+    brands, selectedBrandId, draftItems, _disabledPlatforms, platformFilter,
+    setPlatformFilter, visibleDraftItems, pinnedDraftId, brandProfile, brandPrompts,
+    postedItems, draftStatus, generating, handleGenerateNow, handleApprove,
+    handleDelete, handleSaved, setDraftItems, user,
+  } = props;
+
+  const selectedBrand = brands.find((b) => b.id === selectedBrandId);
+  const brandName = selectedBrand?.name ?? '';
+
+  const draftPlatforms = Array.from(new Set(
+    draftItems.filter((d) => !_disabledPlatforms.has(d.platform)).map((d) => d.platform)
+  )).sort();
+
+  const filterBar = draftPlatforms.length >= 2 ? (
+    <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 mb-4 self-start">
+      <button
+        onClick={() => setPlatformFilter('all')}
+        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+      >
+        All
+      </button>
+      {draftPlatforms.map((p) => (
+        <button
+          key={p}
+          onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+        >
+          {p}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
+  if (visibleDraftItems.length === 0) {
+    return (
+      <>
+        {filterBar}
+        <EmptyState
+          icon={<FileText size={48} className="text-[#818cf8]" />}
+          title={platformFilter !== 'all' ? `No ${platformFilter} drafts` : 'No drafts yet'}
+          description={platformFilter !== 'all' ? 'Try switching to "All" or generate new drafts.' : 'Use "Generate Drafts Now" or request a custom draft to get started.'}
+          action={platformFilter === 'all' && (user?.subscription_tier || user?.is_admin) ? (() => {
+            const cooldownLabel = generateAvailableLabel(draftStatus?.next_generate_at ?? null);
+            const onCooldown = !!cooldownLabel;
+            return (
+              <div className="flex flex-col items-center gap-1.5">
+                <button
+                  onClick={handleGenerateNow}
+                  disabled={generating || !!draftStatus?.draft_queue_full || onCooldown}
+                  className="flex items-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/30 hover:shadow-[#6366f1]/45"
+                >
+                  {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                  {generating ? 'Generating…' : 'Generate Drafts Now'}
+                </button>
+                {onCooldown && (
+                  <p className="text-xs text-[#475569]">{cooldownLabel}</p>
+                )}
+              </div>
+            );
+          })() : undefined}
+        />
+      </>
+    );
+  }
+
+  const sorted = [...visibleDraftItems].sort((a, b) => {
+    if (a.id === pinnedDraftId) return -1;
+    if (b.id === pinnedDraftId) return 1;
+    return computeUrgency(b, postedItems).score - computeUrgency(a, postedItems).score;
+  });
+
+  return (
+    <div className="flex flex-col gap-3">
+      {filterBar}
+      <div className="flex items-start gap-2 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] rounded-lg px-3 py-2.5">
+        <RefreshCw size={12} className="text-[#475569] flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-[#475569]">
+          Unreviewed drafts are replaced when new drafts are generated. Move anything you want to keep to <span className="text-[#94A3B8]">Scheduled</span> first.
+        </p>
+      </div>
+      {sorted.map((d) =>
+        d.platform === 'wikipedia' ? (
+          <WikipediaDraftCard
+            key={d.id}
+            draft={d}
+            brandName={brandName}
+            profile={brandProfile}
+            onDelete={handleDelete}
+            onSaved={handleSaved}
+          />
+        ) : (
+          <DraftCard
+            key={d.id}
+            draft={d}
+            profile={brandProfile}
+            brandName={brandName}
+            postedItems={postedItems}
+            prompts={brandPrompts}
+            brandId={selectedBrandId!}
+            onApprove={handleApprove}
+            onDelete={handleDelete}
+            onSaved={handleSaved}
+            onRegenerated={(fresh) => setDraftItems((prev) => [fresh, ...prev])}
+          />
+        )
+      )}
+    </div>
+  );
+}
+
+function ScheduledPanel(props: ContentTabPanelsProps) {
+  const { visibleScheduledItems, handleMarkAsPosted, handleMoveBackToDrafts } = props;
+
+  if (visibleScheduledItems.length === 0) {
+    return (
+      <EmptyState
+        icon={<Clock size={26} className="text-[#818cf8]" />}
+        title="Nothing scheduled yet"
+        description="Approve a draft from the Drafts tab — it will appear here ready to post."
+      />
+    );
+  }
+  return (
+    <div className="flex flex-col gap-3">
+      {visibleScheduledItems.map((d) => (
+        <ScheduledCard
+          key={d.id}
+          draft={d}
+          onMarkPosted={handleMarkAsPosted}
+          onMoveToDrafts={handleMoveBackToDrafts}
+        />
+      ))}
+    </div>
+  );
+}
+
+function OpportunitiesPanel(props: ContentTabPanelsProps) {
+  const {
+    opportunities, visibleOpportunities, platformFilter, setPlatformFilter,
+    handleDraftOpportunity, handleDismissOpportunity, draftStatus, setOppHelpOpen,
+  } = props;
+
+  const header = (
+    <>
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-xs text-[#64748B]">
+          Threads and questions matched to your tracked prompts
+        </p>
+        <button
+          onClick={() => setOppHelpOpen(true)}
+          className="text-[#475569] hover:text-[#6366f1] transition-colors"
+          title="How do Live Opportunities work?"
+        >
+          <HelpCircle size={14} />
+        </button>
+      </div>
+    </>
+  );
+
+  const oppPlatforms = Array.from(new Set(opportunities.map((o) => o.platform))).sort();
+  const oppFilterBar = oppPlatforms.length >= 2 ? (
+    <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 mb-4 self-start">
+      <button
+        onClick={() => setPlatformFilter('all')}
+        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+      >
+        All
+      </button>
+      {oppPlatforms.map((p) => (
+        <button
+          key={p}
+          onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+        >
+          {p}
+        </button>
+      ))}
+    </div>
+  ) : null;
+
+  if (opportunities.length === 0) {
+    return (
+      <>
+        {header}
+        <EmptyState
+          icon={<Radio size={26} className="text-[#818cf8]" />}
+          title="No live opportunities"
+          description="Reddit and Quora are scanned daily. Check back after the next scan or run a tracking report to generate fresh prompts."
+        />
+      </>
+    );
+  }
+  return (
+    <>
+      {header}
+      {oppFilterBar}
+      <div className="flex flex-col gap-3">
+        {visibleOpportunities.map((o) => (
+          <OpportunityCard
+            key={o.id}
+            opp={o}
+            onDraft={handleDraftOpportunity}
+            onDismiss={handleDismissOpportunity}
+            queueFull={!!draftStatus?.draft_queue_full}
+          />
+        ))}
+        {visibleOpportunities.length === 0 && (
+          <EmptyState
+            icon={<Radio size={26} className="text-[#818cf8]" />}
+            title={`No ${platformFilter} opportunities`}
+            description='Try "All" or switch platform.'
+          />
+        )}
+      </div>
+    </>
+  );
+}
+
+function PostedPanel(props: ContentTabPanelsProps) {
+  const { postedItems, draftAttributions } = props;
+
+  if (postedItems.length === 0) {
+    return (
+      <EmptyState
+        icon={<CheckCircle2 size={26} className="text-[#818cf8]" />}
+        title="Nothing posted yet"
+        description="Approved drafts will appear here once marked as posted."
+      />
+    );
+  }
+  const attributionByDraftId = new Map(draftAttributions.map((a) => [a.draft_id, a]));
+  return (
+    <div className="flex flex-col gap-2">
+      {postedItems.map((d) => (
+        <PostedCard key={d.id} draft={d} attribution={attributionByDraftId.get(d.id)} />
+      ))}
     </div>
   );
 }

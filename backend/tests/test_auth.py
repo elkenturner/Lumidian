@@ -462,3 +462,80 @@ async def test_2fa_verify_completes_login(client: httpx.AsyncClient):
     me_resp = await client.get("/api/auth/me")
     assert me_resp.status_code == 200
     assert me_resp.json()["email"] == email
+
+
+# ── Email verification endpoint tests ────────────────────────────────────────
+
+async def test_register_returns_email_unverified(client: httpx.AsyncClient):
+    """Registration response includes email_verified=False for new users."""
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "unverif_reg@example.com", "password": "password123", "name": "Test"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["email_verified"] is False
+
+
+async def test_unverified_user_blocked_from_protected_endpoint(client: httpx.AsyncClient):
+    """Unverified user gets 403 on any protected endpoint."""
+    await register_user(client, email="unverif_gate@example.com")
+    # Cookie is set by registration — but user is unverified
+    resp = await client.get("/api/brands")
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "email_not_verified"
+
+
+async def test_unverified_user_can_call_me(client: httpx.AsyncClient):
+    """/auth/me works for unverified users (uses AllowUnverifiedUser)."""
+    await register_user(client, email="unverif_me@example.com")
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 200
+    assert resp.json()["email_verified"] is False
+
+
+async def test_verify_email_with_valid_code(client: httpx.AsyncClient, db_session):
+    """Correct 6-digit code marks user as verified."""
+    from sqlalchemy import text
+    from app.routers.auth import hash_password
+
+    email = "verify_ok@example.com"
+    await register_user(client, email=email)
+
+    # Reset the code to a known value directly via DB so we can submit it.
+    known_code = "123456"
+    code_hash = hash_password(known_code)
+    from datetime import datetime, timezone, timedelta
+    expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=24)
+    await db_session.execute(
+        text("UPDATE users SET email_verification_code = :h, email_verification_expires_at = :e WHERE email = :email"),
+        {"h": code_hash, "e": expires, "email": email},
+    )
+    await db_session.commit()
+
+    resp = await client.post("/api/auth/verify-email", json={"code": known_code})
+    assert resp.status_code == 200
+    assert "verified" in resp.json()["message"].lower()
+
+    # Confirm user is now verified
+    me = await client.get("/api/auth/me")
+    assert me.json()["email_verified"] is True
+
+
+async def test_verify_email_with_wrong_code(client: httpx.AsyncClient):
+    """Wrong 6-digit code returns 400."""
+    await register_user(client, email="verify_bad@example.com")
+    resp = await client.post("/api/auth/verify-email", json={"code": "000000"})
+    assert resp.status_code == 400
+
+
+async def test_resend_verification_returns_200(client: httpx.AsyncClient):
+    """Resend endpoint returns 200 and updates the stored code."""
+    from app.routers.auth import _resend_attempts
+    _resend_attempts.clear()
+
+    email = "resend_ok@example.com"
+    await register_user(client, email=email)
+
+    resp = await client.post("/api/auth/resend-verification")
+    assert resp.status_code == 200
+    assert "resent" in resp.json()["message"].lower()

@@ -6,23 +6,22 @@ import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Settings,
-  FileText,
+  PenLine,
   LogOut,
   CreditCard,
   User,
-  BarChart2,
+  LineChart,
   Shield,
   Bell,
-  HelpCircle,
-  X,
-  ExternalLink,
-  CheckCheck,
+  BellRing,
+  LifeBuoy,
   ChevronDown,
   Building2,
   Plus,
   Check,
-  Send,
 } from 'lucide-react';
+import NotificationPanel from '@/components/NotificationPanel';
+import SupportPanel from '@/components/SupportPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import LumidianLogo from '@/components/LumidianLogo';
@@ -30,10 +29,8 @@ import BrandAvatar from '@/components/BrandAvatar';
 import {
   getNotifications,
   markAllNotificationsRead,
-  submitSupportRequest,
   AppNotification,
 } from '@/lib/api';
-import { formatDistanceToNow, parseISO } from 'date-fns';
 
 interface NavItem {
   label: string;
@@ -96,249 +93,6 @@ const NavLink = memo(function NavLink({
     </Link>
   );
 });
-
-// ── Notification panel ─────────────────────────────────────────────────────────
-
-const TYPE_COLORS: Record<string, { bg: string; dot: string }> = {
-  report_ready:    { bg: 'rgba(99,102,241,0.10)',  dot: '#6366f1' },
-  visibility_drop: { bg: 'rgba(239,68,68,0.08)',   dot: '#ef4444' },
-  draft_ready:     { bg: 'rgba(16,185,129,0.08)',  dot: '#10b981' },
-  info:            { bg: 'rgba(255,255,255,0.04)', dot: '#64748B' },
-};
-
-function relTime(iso: string) {
-  try { return formatDistanceToNow(parseISO(iso), { addSuffix: true }); }
-  catch { return ''; }
-}
-
-function NotificationPanel({
-  notifications,
-  unreadCount,
-  onMarkAllRead,
-  onClose,
-}: {
-  notifications: AppNotification[];
-  unreadCount: number;
-  onMarkAllRead: () => void;
-  onClose: () => void;
-}) {
-  return (
-    <div
-      className="fixed z-[200]"
-      style={{
-        left: 248,
-        bottom: 16,
-        width: 320,
-        maxHeight: '80vh',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'rgba(10,14,24,0.97)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(99,102,241,0.18)',
-        borderRadius: 16,
-        boxShadow: '0 16px 48px rgba(0,0,0,0.50)',
-      }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.07)] flex-shrink-0">
-        <div className="flex items-center gap-2">
-          <Bell size={14} className="text-[#6366f1]" />
-          <span className="text-sm font-semibold text-[#F0F4F8]">Notifications</span>
-          {unreadCount > 0 && (
-            <span className="bg-[#6366f1] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-              {unreadCount}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-1">
-          {unreadCount > 0 && (
-            <button
-              onClick={onMarkAllRead}
-              className="flex items-center gap-1 text-[10px] text-[#64748B] hover:text-[#94A3B8] px-2 py-1 rounded-md hover:bg-[rgba(255,255,255,0.05)] transition-colors"
-              title="Mark all as read"
-            >
-              <CheckCheck size={11} />
-              All read
-            </button>
-          )}
-          <button
-            onClick={onClose}
-            className="text-[#475569] hover:text-[#94A3B8] transition-colors p-1 rounded-md hover:bg-[rgba(255,255,255,0.05)]"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      </div>
-
-      {/* List */}
-      <div className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
-        {notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-2">
-            <Bell size={24} className="text-[#475569]" />
-            <p className="text-sm text-[#475569]">No notifications yet</p>
-          </div>
-        ) : (
-          notifications.map((n) => {
-            const colors = TYPE_COLORS[n.type] ?? TYPE_COLORS.info;
-            return (
-              <div
-                key={n.id}
-                className="px-4 py-3 border-b border-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.03)] transition-colors"
-                style={{ background: !n.read ? 'rgba(99,102,241,0.04)' : undefined }}
-              >
-                <div className="flex items-start gap-2.5">
-                  <div
-                    className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0"
-                    style={{ background: n.read ? 'transparent' : colors.dot }}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <p className={`text-xs font-semibold leading-snug ${n.read ? 'text-[#64748B]' : 'text-[#E2E8F0]'}`}>
-                        {n.title}
-                      </p>
-                    </div>
-                    {n.body && (
-                      <p className="text-[11px] text-[#475569] mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
-                    )}
-                    <p className="text-[10px] text-[#475569] mt-1">{relTime(n.created_at)}</p>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Support panel ──────────────────────────────────────────────────────────────
-
-function SupportPanel({ onClose }: { onClose: () => void }) {
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState('');
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!subject.trim() || !message.trim()) return;
-    setSending(true);
-    setError('');
-    try {
-      await submitSupportRequest(subject.trim(), message.trim());
-      setSent(true);
-    } catch {
-      setError('Failed to send. Please email support@lumidian.ai directly.');
-    } finally {
-      setSending(false);
-    }
-  }
-
-  return (
-    <div
-      className="fixed z-[200]"
-      style={{
-        left: 248,
-        bottom: 16,
-        width: 320,
-        background: 'rgba(10,14,24,0.97)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(99,102,241,0.18)',
-        borderRadius: 16,
-        boxShadow: '0 16px 48px rgba(0,0,0,0.50)',
-      }}
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-[rgba(255,255,255,0.07)]">
-        <div className="flex items-center gap-2">
-          <HelpCircle size={14} className="text-[#6366f1]" />
-          <span className="text-sm font-semibold text-[#F0F4F8]">Contact Support</span>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-[#475569] hover:text-[#94A3B8] transition-colors p-1 rounded-md hover:bg-[rgba(255,255,255,0.05)]"
-        >
-          <X size={14} />
-        </button>
-      </div>
-
-      <div className="p-4">
-        {sent ? (
-          <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.3)' }}>
-              <Send size={16} className="text-[#10b981]" />
-            </div>
-            <p className="text-sm font-semibold text-[#E2E8F0]">Message sent</p>
-            <p className="text-xs text-[#64748B]">We'll get back to you as soon as possible.</p>
-            <button
-              onClick={onClose}
-              className="mt-1 text-xs text-[#6366f1] hover:text-[#818cf8] transition-colors"
-            >
-              Close
-            </button>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-            <div>
-              <label className="block text-[11px] font-medium text-[#64748B] mb-1">Subject</label>
-              <input
-                type="text"
-                value={subject}
-                onChange={(e) => setSubject(e.target.value)}
-                placeholder="What can we help with?"
-                maxLength={200}
-                required
-                className="w-full px-3 py-2 text-xs text-[#E2E8F0] placeholder-[#475569] rounded-lg outline-none transition-colors"
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.10)',
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.50)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; }}
-              />
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-[#64748B] mb-1">Message</label>
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Describe your question or issue..."
-                maxLength={5000}
-                required
-                rows={5}
-                className="w-full px-3 py-2 text-xs text-[#E2E8F0] placeholder-[#475569] rounded-lg outline-none transition-colors resize-none"
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.10)',
-                }}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.50)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; }}
-              />
-            </div>
-            {error && (
-              <p className="text-[11px] text-[#f87171]">{error}</p>
-            )}
-            <button
-              type="submit"
-              disabled={sending || !subject.trim() || !message.trim()}
-              className="flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ background: 'rgba(99,102,241,0.85)', color: '#fff' }}
-              onMouseEnter={(e) => { if (!sending) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,1)'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.85)'; }}
-            >
-              <Send size={11} />
-              {sending ? 'Sending…' : 'Send message'}
-            </button>
-          </form>
-        )}
-      </div>
-    </div>
-  );
-}
 
 // ── Sidebar ────────────────────────────────────────────────────────────────────
 
@@ -424,8 +178,8 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
 
   const navItems: NavItem[] = [
     { label: 'Dashboard',   href: '/dashboard', icon: LayoutDashboard },
-    { label: 'Reports',     href: '/reports',   icon: BarChart2 },
-    { label: 'Content Hub', href: '/content',   icon: FileText },
+    { label: 'Reports',     href: '/reports',   icon: LineChart },
+    { label: 'Content Hub', href: '/content',   icon: PenLine },
     { label: 'Settings',    href: '/settings',  icon: Settings },
     { label: 'Account',     href: '/account',   icon: User },
   ];
@@ -656,7 +410,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 if (!supportOpen) (e.currentTarget as HTMLElement).style.background = 'transparent';
               }}
             >
-              <HelpCircle
+              <LifeBuoy
                 size={16}
                 className={supportOpen ? 'text-[#818CF8]' : 'text-[#475569]'}
                 strokeWidth={supportOpen ? 2 : 1.75}
@@ -684,11 +438,10 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
               }}
             >
               <div className="relative flex-shrink-0">
-                <Bell
-                  size={16}
-                  className={panelOpen ? 'text-[#818CF8]' : 'text-[#475569]'}
-                  strokeWidth={panelOpen ? 2 : 1.75}
-                />
+                {unreadCount > 0 && !panelOpen
+                  ? <BellRing size={16} className="text-[#818CF8]" strokeWidth={1.75} />
+                  : <Bell size={16} className={panelOpen ? 'text-[#818CF8]' : 'text-[#475569]'} strokeWidth={panelOpen ? 2 : 1.75} />
+                }
                 {unreadCount > 0 && (
                   <span
                     className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#6366f1] rounded-full flex items-center justify-center text-[8px] font-bold text-white leading-none"
@@ -799,6 +552,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
           <NotificationPanel
             notifications={notifications}
             unreadCount={unreadCount}
+            panelLeft={expanded ? 232 : 68}
             onMarkAllRead={handleMarkAllRead}
             onClose={() => setPanelOpen(false)}
           />
@@ -808,7 +562,10 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
       {/* Support panel */}
       {supportOpen && (
         <div ref={supportRef}>
-          <SupportPanel onClose={() => setSupportOpen(false)} />
+          <SupportPanel
+            panelLeft={expanded ? 232 : 68}
+            onClose={() => setSupportOpen(false)}
+          />
         </div>
       )}
     </>

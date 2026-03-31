@@ -449,12 +449,14 @@ async def test_2fa_verify_completes_login(client: httpx.AsyncClient):
     await client.post("/api/auth/2fa/enable", json={"code": totp.now()})
     await client.post("/api/auth/logout")
 
+    # Pre-generate verify code before login to avoid timing issues with TOTP window
+    verify_code = totp.now()
     login_resp = await client.post("/api/auth/login", json={"email": email, "password": password})
     challenge_token = login_resp.json()["challenge_token"]
 
     verify_resp = await client.post("/api/auth/2fa/verify", json={
         "challenge_token": challenge_token,
-        "code": totp.now(),
+        "code": verify_code,
     })
     assert verify_resp.status_code == 200
     me_resp = await client.get("/api/auth/me")

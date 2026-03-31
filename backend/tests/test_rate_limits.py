@@ -98,3 +98,46 @@ async def test_rate_limit_window_resets():
     # Should now pass again (new window)
     check_rate_limit(user_id, limit)
     assert _rate_store[user_id][0] == 1  # counter reset to 1
+
+
+import time
+from app.dependencies import _rate_store, check_rate_limit
+
+
+def test_rate_store_prunes_stale_entries(monkeypatch):
+    """Old entries must be removed from _rate_store after the window expires."""
+    _rate_store.clear()
+
+    # Simulate a user who hit the limit 2 minutes ago (stale)
+    _rate_store[9999] = (10, time.monotonic() - 200)
+
+    # A new call for the same user should succeed (not 429) and reset their slot
+    check_rate_limit(9999, limit=5)  # should not raise
+
+    # The old stale entry must be gone — count reset to 1
+    count, _ = _rate_store[9999]
+    assert count == 1
+
+
+def test_rate_store_does_not_grow_unbounded(monkeypatch):
+    """After many distinct users, _rate_store should not retain stale entries."""
+    from app.dependencies import _rate_store, check_rate_limit, _RATE_WINDOW
+    import time
+
+    _rate_store.clear()
+
+    # Inject 100 stale user entries (window expired)
+    stale_time = time.monotonic() - (_RATE_WINDOW + 10)
+    for uid in range(1000, 1100):
+        _rate_store[uid] = (1, stale_time)
+
+    # One fresh call should trigger pruning pass
+    check_rate_limit(9998, limit=5)
+
+    # Stale entries must be gone after the next call triggers cleanup
+    # (This test will FAIL until we add the cleanup sweep)
+    stale_count = sum(
+        1 for uid, (cnt, start) in _rate_store.items()
+        if uid in range(1000, 1100)
+    )
+    assert stale_count == 0, f"Expected 0 stale entries, got {stale_count}"

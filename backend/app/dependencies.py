@@ -32,9 +32,17 @@ _RATE_WINDOW = 60.0  # seconds
 
 
 def check_rate_limit(user_id: int, limit: int) -> None:
-    """Raise HTTP 429 if user has exceeded `limit` calls within the last minute."""
-    count, start = _rate_store.get(user_id, (0, 0.0))
+    """Raise HTTP 429 if user has exceeded `limit` calls within the last minute.
+    Also prunes all stale entries to keep memory bounded."""
     now = monotonic()
+    cutoff = now - _RATE_WINDOW
+
+    # Prune all stale entries every call (cheap dict iteration)
+    stale_keys = [uid for uid, (_, start) in _rate_store.items() if start < cutoff]
+    for uid in stale_keys:
+        del _rate_store[uid]
+
+    count, start = _rate_store.get(user_id, (0, 0.0))
     if now - start > _RATE_WINDOW:
         _rate_store[user_id] = (1, now)
     elif count >= limit:

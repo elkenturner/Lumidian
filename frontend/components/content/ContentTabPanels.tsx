@@ -780,14 +780,16 @@ function DraftCard({
         <div className="flex items-center gap-2 pt-1 flex-wrap">
           <button
             onClick={() => setEditing(true)}
-            className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-1.5 transition-colors"
+            aria-label="Edit draft"
+            className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0a0e18]"
           >
             <Edit2 size={11} />
             Edit
           </button>
           <button
             onClick={handleCopy}
-            className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors border ${
+            aria-label={copied ? 'Copied to clipboard' : 'Copy draft to clipboard'}
+            className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0a0e18] ${
               copied
                 ? 'bg-[#064e3b]/20 border-[#065f46]/25 text-[#34d399]'
                 : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] hover:bg-[rgba(255,255,255,0.10)]'
@@ -799,7 +801,8 @@ function DraftCard({
           <button
             onClick={handleApproveClick}
             disabled={approving}
-            className="flex items-center gap-1.5 text-xs bg-[#064e3b]/20 hover:bg-[#064e3b]/30 disabled:opacity-50 border border-[#065f46]/25 text-[#34d399] rounded-lg px-3 py-1.5 transition-colors"
+            aria-label="Approve draft"
+            className="flex items-center gap-1.5 text-xs bg-[#064e3b]/20 hover:bg-[#064e3b]/30 disabled:opacity-50 border border-[#065f46]/25 text-[#34d399] rounded-lg px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0a0e18]"
           >
             {approving ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
             {approving ? 'Approving…' : 'Approve'}
@@ -807,7 +810,8 @@ function DraftCard({
           <button
             onClick={() => onDelete(draft.id)}
             disabled={approving}
-            className="flex items-center gap-1.5 text-xs text-[#ef4444]/70 hover:text-[#f87171] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors ml-auto"
+            aria-label="Dismiss draft"
+            className="flex items-center gap-1.5 text-xs text-[#ef4444]/70 hover:text-[#f87171] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0a0e18]"
           >
             <Trash2 size={11} />
             Dismiss

@@ -16,7 +16,6 @@ import {
   BellRing,
   LifeBuoy,
   ChevronDown,
-  Building2,
   Plus,
   Check,
 } from 'lucide-react';
@@ -255,12 +254,14 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
               onMouseEnter={(e) => { if (!brandOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; }}
               onMouseLeave={(e) => { if (!brandOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; }}
             >
-              <div
-                className="flex-shrink-0 flex items-center justify-center rounded-md"
-                style={{ width: 22, height: 22, background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.30)' }}
-              >
-                <Building2 size={12} className="text-[#818CF8]" />
-              </div>
+              <BrandAvatar
+                name={activeBrand?.name ?? '?'}
+                websiteUrl={activeBrand?.website_url}
+                size={22}
+                className="rounded-md flex-shrink-0"
+                style={{ background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.30)', padding: 3 }}
+                textClassName="text-[9px] font-bold text-[#818CF8]"
+              />
               {expanded && (
                 <>
                   <span className="flex-1 text-left text-[12px] font-medium text-[#CBD5E1] truncate leading-tight min-w-0">
@@ -424,7 +425,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
             <button
               onClick={(e) => { e.stopPropagation(); setPanelOpen((v) => !v); }}
               title="Notifications"
-              aria-label="Notifications"
+              aria-label={unreadCount > 0 ? `Notifications — ${unreadCount} unread` : 'Notifications'}
               className={[
                 'w-full flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative',
                 expanded ? 'px-3.5' : 'px-0 justify-center',
@@ -445,6 +446,8 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 {unreadCount > 0 && (
                   <span
                     className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#6366f1] rounded-full flex items-center justify-center text-[8px] font-bold text-white leading-none"
+                    aria-live="polite"
+                    aria-atomic="true"
                   >
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>

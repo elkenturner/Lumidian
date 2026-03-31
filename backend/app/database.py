@@ -11,10 +11,18 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./clarity_ai.db")
 
+_is_sqlite = "sqlite" in DATABASE_URL
+
 engine = create_async_engine(
     DATABASE_URL,
     echo=False,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {},
+    connect_args={"check_same_thread": False} if _is_sqlite else {},
+    **({} if _is_sqlite else {
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_timeout": 30,
+        "pool_recycle": 1800,
+    }),
 )
 
 # Enable FK constraints for every new SQLite connection (aiosqlite uses the sync

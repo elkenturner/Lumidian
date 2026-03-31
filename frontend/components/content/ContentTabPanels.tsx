@@ -1619,14 +1619,7 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div
-        className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5"
-        style={{
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(124,58,237,0.09))',
-          border: '1px solid rgba(99,102,241,0.26)',
-          boxShadow: '0 0 36px rgba(99,102,241,0.12)',
-        }}
-      >
+      <div className="w-16 h-16 rounded-2xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.16)] flex items-center justify-center mb-4">
         {icon}
       </div>
       <p className="text-[15px] font-semibold text-[#F0F4F8] mb-2">{title}</p>

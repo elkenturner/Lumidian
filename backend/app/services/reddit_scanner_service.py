@@ -22,248 +22,48 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-_REDDIT_BASE = "https://www.reddit.com"
-_HEADERS = {"User-Agent": "Lumidian/2.0 (opportunity scanner; contact@lumidian.ai)"}
+# ── Blocked subreddits ────────────────────────────────────────────────────────
+# Posts from these communities are filtered out regardless of relevance score.
+# Covers: medical/mental-health support, relationship advice, news mega-subs,
+# legal advice, generic catch-alls, and fiction/NSFW communities.
 
-# ── Industry → subreddit mapping ──────────────────────────────────────────────
-# Every subreddit here must be genuinely topic-specific.
-# NO generic subreddits (AskReddit, worldnews, etc.) — those produce irrelevant results.
-
-_INDUSTRY_MAP: dict[str, list[str]] = {
-    # Healthcare — VOC / breath-based early detection
-    # Active general subs first (more posts to score), then niche ones
-    "voc_detection": [
-        "cancer", "oncology", "CancerResearch",
-        "Breathtest", "BreathAnalysis", "breathomics",
-        "volatileorganiccompounds", "ExhalBreath",
-    ],
-    # Oncology / early cancer detection — active communities first
-    "oncology": [
-        "cancer", "oncology", "CancerResearch", "CancerSupport",
-        "earlydetection", "CancerScreening",
-        "lungcancer", "colorectalcancer",
-    ],
-    "diagnostics": [
-        "medicalresearch", "clinicalresearch", "medicaldevices",
-        "healthtech", "MedicalDevices", "PointOfCare",
-        "bioinformatics",
-    ],
-    "medicine": [
-        "medicine", "medical", "AskDocs",
-        "oncology", "health", "medtech",
-    ],
-    # Biotech / pharma
-    "biotech": [
-        "biotech", "biology", "labrats", "biochemistry",
-        "genetics", "DrugNerds",
-    ],
-    # Investing — biotech / smallcap
-    "investing_biotech": [
-        "investing", "stocks", "StockMarket", "smallcapstocks", "ValueInvesting",
-        "SecurityAnalysis", "biotechstocks",
-    ],
-    # SaaS / B2B software
-    "saas": [
-        "SaaS", "startups", "ProductManagement", "EntrepreneurRideAlong",
-        "microsaas", "indiehackers",
-    ],
-    # Developer tools / engineering
-    "devtools": [
-        "programming", "webdev", "devops", "softwareengineering",
-        "cscareerquestions", "ExperiencedDevs",
-    ],
-    # AI / ML
-    "ai": [
-        "MachineLearning", "artificial", "deeplearning", "LocalLLaMA",
-        "ChatGPT", "LanguageTechnology", "AIAssistants",
-    ],
-    # Fintech / personal finance
-    "fintech": [
-        "personalfinance", "financialindependence", "fintech", "CreditCards",
-        "churning", "Frugal",
-    ],
-    # Cybersecurity
-    "security": [
-        "netsec", "cybersecurity", "hacking", "AskNetsec",
-        "securityCTF", "blueteamsec",
-    ],
-    # E-commerce / retail
-    "ecommerce": [
-        "ecommerce", "fulfillment", "Flipping", "dropship",
-        "AmazonSeller", "smallbusiness",
-    ],
-    # Marketing / SEO
-    "marketing": [
-        "marketing", "SEO", "PPC", "content_marketing",
-        "digitalmarketing", "socialmedia",
-    ],
-    # Legal / compliance
-    "legal": [
-        "legaladvice", "LegalAdviceUK", "LegalAdviceEurope",
-        "law", "paralegal",
-    ],
-    # Education / edtech
-    "education": [
-        "edtech", "Teachers", "academia", "GradSchool",
-        "college", "OnlineLearning",
-    ],
-    # Climate / cleantech
-    "cleantech": [
-        "solar", "ClimateActionPlan", "renewable", "EVs",
-        "sustainability", "ClimateChange",
-    ],
-    # Real estate / proptech
-    "proptech": [
-        "realestateinvesting", "RealEstate", "FirstTimeHomeBuyer",
-        "landlord", "CommercialRealEstate",
-    ],
-    # HR / future of work
-    "hrtech": [
-        "humanresources", "recruiting", "ExperiencedDevs",
-        "remotework", "careerguidance",
-    ],
-}
-
-# Keywords that trigger each industry category.
-# Matched against the brand profile description + prompt texts combined.
-_DETECTION_RULES: list[tuple[str, list[str]]] = [
-    # VOC / breath analysis detection — triggers for SpotitEarly-specific tech
-    ("voc_detection",    ["breath", "exhaled breath", "volatile organic", "voc", "breathomics",
-                          "breath test", "breath analysis", "breath-based", "electronic nose",
-                          "mass spectrometry", "gas chromatography", "non-invasive detection",
-                          "non-invasive screening", "spotitearly"]),
-    ("oncology",         ["cancer", "oncology", "tumor", "tumour", "carcinoma",
-                          "early detection", "screening", "biomarker", "liquid biopsy",
-                          "breast cancer", "prostate cancer", "lung cancer", "colorectal cancer",
-                          "pancreatic cancer", "cancer detection", "cancer screening",
-                          "clia", "clinical trial"]),
-    ("diagnostics",      ["diagnostic", "early detection", "genomic", "sequencing",
-                          "clinical trial", "biomarker", "pathology", "medical device",
-                          "health tech", "healthtech", "medtech", "point of care",
-                          "non-invasive", "wearable diagnostic", "at-home test"]),
-    ("medicine",         ["patient", "hospital", "physician", "doctor", "clinical", "healthcare",
-                          "medicine", "medical", "treatment", "therapy", "pharma"]),
-    ("biotech",          ["biotech", "biotechnology", "biopharmaceutical", "drug discovery",
-                          "cell therapy", "gene therapy", "assay", "lab test"]),
-    ("investing_biotech", ["investor", "invest", "stock", "nasdaq", "nyse", "ipo", "funding",
-                           "series a", "series b", "venture", "biotech stock", "small cap"]),
-    ("saas",             ["saas", "software as a service", "subscription", "b2b software",
-                          "product-led", "api", "dashboard", "crm", "erp"]),
-    ("devtools",         ["developer", "engineer", "programming", "devops", "ci/cd",
-                          "kubernetes", "docker", "open source", "sdk", "api"]),
-    ("ai",               ["artificial intelligence", "machine learning", "llm", "gpt", "neural",
-                          "deep learning", "nlp", "ai model", "generative"]),
-    ("fintech",          ["fintech", "neobank", "payment", "lending", "credit", "banking",
-                          "wealth management", "personal finance", "robo-advisor"]),
-    ("security",         ["cybersecurity", "security", "vulnerability", "penetration testing",
-                          "soc", "endpoint", "zero trust", "devsecops"]),
-    ("ecommerce",        ["ecommerce", "e-commerce", "marketplace", "retail", "fulfillment",
-                          "dropshipping", "shopify", "amazon seller", "d2c", "dtc"]),
-    ("marketing",        ["seo", "ppc", "paid media", "content marketing", "demand generation",
-                          "account based", "marketing automation", "growth hacking"]),
-    ("legal",            ["legal", "law firm", "compliance", "regulatory", "gdpr", "attorney",
-                          "contract", "litigation", "ip"]),
-    ("education",        ["edtech", "e-learning", "lms", "course", "online learning",
-                          "university", "k-12", "curriculum", "upskilling"]),
-    ("cleantech",        ["solar", "renewable", "wind energy", "ev", "electric vehicle",
-                          "carbon", "net zero", "sustainability", "climate"]),
-    ("proptech",         ["real estate", "property", "reit", "proptech", "mortgage",
-                          "landlord", "tenant", "commercial real estate"]),
-    ("hrtech",           ["hr", "human resources", "recruiting", "talent", "workforce",
-                          "remote work", "hybrid", "payroll", "onboarding"]),
-]
-
-
-def _detect_industries(text: str) -> list[str]:
-    """Return all matching industry keys for a given text blob."""
-    low = text.lower()
-    return [ind for ind, keywords in _DETECTION_RULES if any(kw in low for kw in keywords)]
-
-
-# ── Subreddit promotion classification (mirrors drafting_service) ─────────────
-
-_PROMO_RESTRICTED_SUBS = frozenset({
-    "personalfinance", "legaladvice", "tax", "investing", "financialindependence",
-    "frugal", "povertyfinance", "studentloans", "debtfree", "fire",
-    "medicine", "askdocs", "medical", "medicaladvice", "nursing", "pharmacy",
-    "mentalhealth", "depression", "anxiety", "bipolar", "schizophrenia",
-    "chronicpain", "diabetes", "cancer", "epilepsy", "ibs", "autoimmune",
-    "ems", "emergencymedicine", "veterinary",
-    "science", "biology", "chemistry", "physics", "neuroscience",
-    "psychology", "datascience", "statistics", "academicphilosophy",
-    "compsci", "machinelearning", "artificial",
-    "relationships", "amitheasshole", "relationship_advice", "tifu",
-    "confessions", "grief", "survivorsofabuse", "ptsd", "addiction",
+_BLOCKED_SUBS: frozenset[str] = frozenset({
+    # Medical / mental health support
+    "cancer", "depression", "anxiety", "bipolar", "ptsd", "addiction",
+    "chronicpain", "grief", "survivorsofabuse", "mentalhealth", "suicidewatch",
+    "askdocs", "medical", "medicaladvice", "nursing", "pharmacy",
+    "canceremotionalsupport", "breastcancer", "prostatecancer",
+    "lungcancer", "leukemia", "chronicillness", "invisibleillness",
+    # Relationship / personal advice
+    "relationships", "relationship_advice", "amitheasshole", "tifu",
+    "confessions", "legaladvice", "legaladviceuk", "legaladviceeurope",
+    "offmychest", "trueoffmychest", "rant",
+    # News / politics / mega-subs
+    "worldnews", "news", "politics", "conspiracy", "nottheonion",
     "askreddit", "todayilearned", "explainlikeimfive", "changemyview",
-    "nostupidquestions", "worldnews", "news", "nottheonion",
-    "programming", "learnprogramming", "cscareerquestions", "devops",
-    "sysadmin", "netsec", "cybersecurity",
+    "nostupidquestions", "iama", "casualconversation",
+    # Generic / low-signal
+    "mildlyinteresting", "interestingasfuck", "damnthatsinteresting",
+    "facepalm", "therewasanattempt", "nextfuckinglevel",
 })
-_RESTRICTED_SIGNALS = ("help", "advice", "support", "care", "recover", "survivor", "anon")
-_ALLOWED_SIGNALS = (
-    "entrepreneur", "startup", "business", "marketing", "growth",
-    "smallbusiness", "b2b", "saas", "productmanagement", "venturecapital",
-    "growthhacking", "digitalmarketing", "contentmarketing",
+
+# Signal words in subreddit *names* that indicate NSFW/harmful content
+_BLOCKED_SUB_SIGNALS: tuple[str, ...] = (
+    "nsfw", "porn", "gore", "xxx", "nude", "fetish", "crisis",
+    "selfharm", "suicide", "rape", "abuse",
 )
 
 
-def _promo_class(sub: str) -> int:
-    """0 = promo-allowed, 1 = cautious, 2 = promo-restricted."""
-    s = sub.lower()
-    if s in _PROMO_RESTRICTED_SUBS or any(kw in s for kw in _RESTRICTED_SIGNALS):
-        return 2
-    if any(kw in s for kw in _ALLOWED_SIGNALS):
-        return 0
-    return 1
+def _is_blocked_subreddit(subreddit: str) -> bool:
+    """Return True if this subreddit should be excluded from opportunities."""
+    lower = subreddit.lower()
+    if lower in _BLOCKED_SUBS:
+        return True
+    return any(sig in lower for sig in _BLOCKED_SUB_SIGNALS)
 
 
-def _relevant_subreddits(
-    description: Optional[str],
-    prompt_texts: list[str],
-    limit: int = 8,
-    extra_profile_text: str = "",
-) -> tuple[list[str], list[str]]:
-    """
-    Return (subreddits, industries) derived from brand profile + prompt texts.
-    Applies a 70/30 split: ~70% of slots go to promo-allowed/cautious subreddits,
-    ~30% to promo-restricted ones, so direct brand mentions are possible in most results.
-    """
-    parts = list(filter(None, [description, extra_profile_text] + prompt_texts))
-    combined = " ".join(parts)
-    if not combined.strip():
-        return [], []
-
-    industries = _detect_industries(combined)
-    seen: set[str] = set()
-    all_subs: list[str] = []
-    for ind in industries:
-        for sub in _INDUSTRY_MAP.get(ind, []):
-            if sub not in seen:
-                seen.add(sub)
-                all_subs.append(sub)
-
-    # Partition into allowed/cautious vs restricted
-    open_subs = [s for s in all_subs if _promo_class(s) < 2]
-    restricted_subs = [s for s in all_subs if _promo_class(s) == 2]
-
-    # 70% open, 30% restricted (minimum 1 restricted slot if any exist)
-    open_slots = max(1, round(limit * 0.70))
-    restricted_slots = limit - open_slots
-
-    result = open_subs[:open_slots] + restricted_subs[:restricted_slots]
-    return result[:limit], industries
-
-
-def get_relevant_subreddits(
-    description: Optional[str],
-    prompt_texts: list[str],
-    limit: int = 8,
-    extra_profile_text: str = "",
-) -> list[str]:
-    """Public wrapper — returns just the subreddit list."""
-    subs, _ = _relevant_subreddits(description, prompt_texts, limit, extra_profile_text)
-    return subs
-
+_REDDIT_BASE = "https://www.reddit.com"
+_HEADERS = {"User-Agent": "Lumidian/2.0 (opportunity scanner; contact@lumidian.ai)"}
 
 # ── Relevance scoring ─────────────────────────────────────────────────────────
 
@@ -406,7 +206,8 @@ def _score_thread(
     body: str,
     prompt_text: str,
     created_utc: float,
-    upvotes: int = 0,
+    num_comments: int = 0,
+    brand_name: str = "",
     subreddit: str = "",
 ) -> float:
     # Fiction / entertainment subs are never valid opportunities
@@ -432,26 +233,40 @@ def _score_thread(
     if not prompt_words:
         return 0.0
 
-    # Use whole-word matching to avoid false substring hits (e.g. "can" in "scanner")
+    # Whole-word matching to avoid false substring hits (e.g. "can" in "scanner")
     matches = sum(
         1 for w in prompt_words
         if re.search(r"\b" + re.escape(w) + r"\b", combined)
     )
     relevance = min(1.0, matches / len(prompt_words))
 
-    # Hard minimum: post must share at least 45% of prompt keywords AND at least 2 matches.
-    # This prevents high-recency/engagement posts from passing on 1–2 coincidental word hits.
+    # Hard minimum: at least 45% keyword overlap AND at least 2 matches
     if relevance < 0.45 or matches < 2:
         return 0.0
 
+    # Recency — graduated, no hard cutoff (old evergreen threads still score)
     now_ts = datetime.now(timezone.utc).timestamp()
-    age_s = now_ts - created_utc
-    recency = max(0.0, 1.0 - age_s / (7 * 86400))
+    age_days = (now_ts - created_utc) / 86400
+    if age_days <= 7:
+        recency = 1.0
+    elif age_days <= 30:
+        recency = 0.7
+    elif age_days <= 60:
+        recency = 0.4
+    elif age_days <= 90:
+        recency = 0.2
+    else:
+        recency = 0.05  # Very old but not zero — evergreen threads still have value
 
-    engagement = min(1.0, upvotes / 50.0) if upvotes > 0 else 0.0
+    # Engagement — log scale on comment count (saturates at ~200 comments)
+    import math
+    engagement = min(1.0, math.log10(num_comments + 1) / math.log10(201)) if num_comments >= 0 else 0.0
 
-    score = relevance * 0.55 + recency * 0.30 + engagement * 0.15
-    return round(score * 100.0, 1)
+    # Brand mention bonus
+    brand_bonus = 10.0 if brand_name and brand_name.lower() in combined else 0.0
+
+    score = relevance * 50.0 + recency * 20.0 + engagement * 20.0 + brand_bonus
+    return round(min(score, 100.0), 1)
 
 
 # ── HTTP fetching (httpx with urllib fallback) ─────────────────────────────────
@@ -510,7 +325,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
     before inserting new ones.  Use for on-demand scans to flush stale results.
     """
     from app.database import AsyncSessionLocal
-    from app.models import Brand, Prompt, BrandProfile, ContentOpportunity
+    from app.models import Brand, Prompt, ContentOpportunity
     from sqlalchemy import select, delete as sql_delete
 
     logger.info("Reddit scanner: brand_id=%d clear_existing=%s", brand_id, clear_existing)
@@ -521,24 +336,6 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
         if brand is None:
             return 0
 
-        profile_row = await db.execute(
-            select(BrandProfile).where(BrandProfile.brand_id == brand_id)
-        )
-        profile = profile_row.scalar_one_or_none()
-        description = profile.company_description if profile else None
-
-        # Build extra profile text from target_audience + key_stats for richer detection
-        extra_parts: list[str] = []
-        if profile:
-            if profile.target_audience:
-                extra_parts.append(profile.target_audience)
-            try:
-                key_stats = json.loads(profile.key_stats) if profile.key_stats else []
-                extra_parts.extend(key_stats)
-            except Exception:
-                pass
-        extra_profile_text = " ".join(extra_parts)
-
         prompts_row = await db.execute(
             select(Prompt).where(Prompt.brand_id == brand_id)
         )
@@ -547,25 +344,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             logger.info("Reddit scanner: no prompts for brand_id=%d, skipping", brand_id)
             return 0
 
-        prompt_texts = [p.text for p in prompts]
-        subreddits, industries = _relevant_subreddits(
-            description, prompt_texts, limit=8, extra_profile_text=extra_profile_text
-        )
-
-        logger.info(
-            "Reddit scanner: brand=%r desc=%r | detected industries=%s | subreddits=%s",
-            brand.name,
-            (description or "")[:120],
-            industries,
-            subreddits,
-        )
-
-        if not subreddits:
-            logger.info(
-                "Reddit scanner: no relevant subreddits for brand_id=%d (%s), skipping",
-                brand_id, brand.name,
-            )
-            return 0
+        logger.info("Reddit scanner: brand=%r | %d prompts", brand.name, len(prompts))
 
         if clear_existing:
             # Delete ALL existing opportunities so stale results don't persist
@@ -605,23 +384,12 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
         for prompt in prompts[:5]:
             q = urllib.parse.quote(prompt.text)
 
-            # 1. Search within topically relevant subreddits (high precision)
-            all_posts: list[dict] = []
-            for sub in subreddits[:8]:
-                sub_url = (
-                    f"{_REDDIT_BASE}/r/{sub}/search.json"
-                    f"?q={q}&restrict_sr=1&sort=relevance&t=month&limit=15"
-                )
-                all_posts.extend(_extract_posts(await _fetch(sub_url)))
-                await asyncio.sleep(1.0)
-
-            # 2. Global search — catches relevant threads in unmapped subreddits.
-            #    Uses spam/fiction filters in _score_thread to block low-quality results.
+            # Global search — _is_blocked_subreddit + _score_thread filters handle quality
             global_url = (
                 f"{_REDDIT_BASE}/search.json"
-                f"?q={q}&sort=relevance&t=month&limit=15"
+                f"?q={q}&sort=relevance&t=month&limit=25"
             )
-            all_posts.extend(_extract_posts(await _fetch(global_url)))
+            all_posts: list[dict] = _extract_posts(await _fetch(global_url))
             await asyncio.sleep(1.0)
 
             for post in all_posts:
@@ -638,14 +406,20 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
                 title = post.get("title", "")
                 body = post.get("selftext", "")
-                upvotes = int(post.get("score", 0))
+                num_comments = int(post.get("num_comments", 0))
                 subreddit_name = post.get("subreddit", "")
 
                 if not title:
                     continue
 
+                # Skip explicitly blocked communities before any scoring
+                if _is_blocked_subreddit(subreddit_name):
+                    continue
+
                 score = _score_thread(
-                    title, body, prompt.text, created_utc, upvotes,
+                    title, body, prompt.text, created_utc,
+                    num_comments=num_comments,
+                    brand_name=brand.name,
                     subreddit=subreddit_name,
                 )
                 # Require 55+ to avoid low-relevance posts inflated by recency/engagement

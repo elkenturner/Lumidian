@@ -54,13 +54,14 @@ async def _get_brand_or_404(db: AsyncSession, brand_id: int) -> Brand:
 async def get_overview(brand_id: int, db: DbDep, user: CurrentUser):
     brand = await get_brand_for_user(brand_id, db, user)
 
-    # Latest completed run
+    # Eager-load model scores with the run to avoid a separate round-trip
     run_result = await db.execute(
         select(TrackingRun)
         .where(
             TrackingRun.brand_id == brand_id,
             TrackingRun.status == "completed",
         )
+        .options(selectinload(TrackingRun.model_scores))
         .order_by(TrackingRun.completed_at.desc())
         .limit(1)
     )
@@ -68,13 +69,7 @@ async def get_overview(brand_id: int, db: DbDep, user: CurrentUser):
 
     model_breakdown: list[ModelScoreResponse] = []
     if latest_run is not None:
-        scores_result = await db.execute(
-            select(RunModelScore).where(
-                RunModelScore.tracking_run_id == latest_run.id
-            )
-        )
-        scores = scores_result.scalars().all()
-        model_breakdown = [ModelScoreResponse.model_validate(s) for s in scores]
+        model_breakdown = [ModelScoreResponse.model_validate(s) for s in latest_run.model_scores]
 
     # Content influence flag from latest run
     has_content_influence = latest_run.has_content_influence if latest_run else False

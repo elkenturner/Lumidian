@@ -927,7 +927,7 @@ export default function DashboardPage() {
             <Loader2 size={18} className="animate-spin text-[#6366f1] shrink-0" />
           ) : (
             <div className="w-4.5 h-4.5 rounded-full bg-[#10b981] flex items-center justify-center shrink-0">
-              <span className="text-white text-xs font-bold">✓</span>
+              <span className="text-white text-xs font-bold" aria-hidden="true">✓</span>
             </div>
           )}
           <div>

@@ -127,13 +127,13 @@ export default function VerifyEmailPage() {
           </p>
 
           {error && (
-            <div style={{ background: 'rgba(254,226,226,0.8)', border: '1px solid rgba(252,165,165,0.5)', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
+            <div role="alert" style={{ background: 'rgba(254,226,226,0.8)', border: '1px solid rgba(252,165,165,0.5)', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
               <p style={{ fontSize: 13, color: '#b91c1c', margin: 0 }}>{error}</p>
             </div>
           )}
 
           {resent && (
-            <div style={{ background: 'rgba(209,250,229,0.8)', border: '1px solid rgba(110,231,183,0.5)', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
+            <div role="alert" style={{ background: 'rgba(209,250,229,0.8)', border: '1px solid rgba(110,231,183,0.5)', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
               <p style={{ fontSize: 13, color: '#065f46', margin: 0 }}>A new code has been sent to your email.</p>
             </div>
           )}
@@ -153,8 +153,8 @@ export default function VerifyEmailPage() {
                 placeholder="000000"
                 autoFocus
                 style={inputStyle}
-                onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(79,70,229,0.5)')}
-                onBlur={(e) => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)')}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(79,70,229,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.2)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
               />
             </div>
 

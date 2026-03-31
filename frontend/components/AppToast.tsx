@@ -34,7 +34,7 @@ export function AppToast({ message, type, onDismiss }: AppToastProps) {
     <div role="alert" aria-live="assertive" aria-atomic="true" className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium backdrop-blur-xl max-w-sm ${wrapper}`}>
       {icon}
       <span className="flex-1">{message}</span>
-      <button onClick={onDismiss} className="ml-1 opacity-50 hover:opacity-100 transition-opacity">
+      <button onClick={onDismiss} aria-label="Dismiss" className="ml-1 opacity-50 hover:opacity-100 transition-opacity">
         <X size={13} />
       </button>
     </div>

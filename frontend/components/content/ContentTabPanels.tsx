@@ -788,7 +788,7 @@ function DraftCard({
           </button>
           <button
             onClick={handleCopy}
-            aria-label={copied ? 'Copied to clipboard' : 'Copy draft to clipboard'}
+            aria-label="Copy draft to clipboard"
             className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0a0e18] ${
               copied
                 ? 'bg-[#064e3b]/20 border-[#065f46]/25 text-[#34d399]'
@@ -797,11 +797,12 @@ function DraftCard({
           >
             {copied ? <Check size={11} /> : <Copy size={11} />}
             {copied ? 'Copied!' : 'Copy'}
+            <span className="sr-only" role="status">{copied ? 'Copied to clipboard' : ''}</span>
           </button>
           <button
             onClick={handleApproveClick}
             disabled={approving}
-            aria-label="Approve draft"
+            aria-label={approving ? 'Approving, please wait' : 'Approve draft'}
             className="flex items-center gap-1.5 text-xs bg-[#064e3b]/20 hover:bg-[#064e3b]/30 disabled:opacity-50 border border-[#065f46]/25 text-[#34d399] rounded-lg px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0a0e18]"
           >
             {approving ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}

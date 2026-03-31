@@ -446,8 +446,6 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 {unreadCount > 0 && (
                   <span
                     className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#6366f1] rounded-full flex items-center justify-center text-[8px] font-bold text-white leading-none"
-                    aria-live="polite"
-                    aria-atomic="true"
                   >
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>

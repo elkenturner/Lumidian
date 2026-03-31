@@ -78,6 +78,28 @@ function relativeTime(iso: string | null): string {
   }
 }
 
+/** Human-readable label for when "Generate Drafts Now" becomes available again. */
+function generateAvailableLabel(nextGenerateAt: string | null): string | null {
+  if (!nextGenerateAt) return null;
+  try {
+    const next = parseISO(nextGenerateAt);
+    const now = new Date();
+    const diffMs = next.getTime() - now.getTime();
+    if (diffMs <= 0) return null;
+    const diffHours = diffMs / (1000 * 60 * 60);
+    if (diffHours < 1) {
+      const mins = Math.ceil(diffMs / (1000 * 60));
+      return `Try again in ${mins}m`;
+    }
+    // Show time-of-day in local time
+    const label = next.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const isToday = next.toDateString() === now.toDateString();
+    return isToday ? `Try again today at ${label}` : `Try again tomorrow at ${label}`;
+  } catch {
+    return 'Try again tomorrow';
+  }
+}
+
 // ── Subreddit promotion restriction (mirrors backend classification) ──────────
 
 const PROMO_RESTRICTED_SUBREDDITS = new Set([
@@ -1844,6 +1866,8 @@ export default function ContentHubPage() {
 
   // Right panel
   const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const generatePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Broadcast drafts-generating state to other pages via localStorage
   useEffect(() => {
     try {
@@ -1930,12 +1954,21 @@ export default function ContentHubPage() {
 
   useEffect(() => {
     if (!selectedBrandId) return;
+    // Cancel any in-flight generation poll for the previous brand
+    if (generatePollRef.current) {
+      clearInterval(generatePollRef.current);
+      generatePollRef.current = null;
+      setGenerating(false);
+    }
     loadAbortRef.current?.abort();
     const controller = new AbortController();
     loadAbortRef.current = controller;
     loadAll(selectedBrandId, controller.signal);
     return () => controller.abort();
   }, [selectedBrandId, loadAll]);
+
+  // Cleanup generate-now poll on unmount
+  useEffect(() => () => { if (generatePollRef.current) clearInterval(generatePollRef.current); }, []);
 
   // ── Draft actions ──────────────────────────────────────────────────────────
 
@@ -2012,34 +2045,57 @@ export default function ContentHubPage() {
 
   async function handleGenerateNow() {
     if (!selectedBrandId) return;
-    const cap = draftStatus?.draft_cap ?? 20;
-    const current = draftStatus?.draft_count ?? 0;
-    const slots = Math.max(0, cap - current);
-    if (slots === 0) {
-      alert(`Draft queue is full (${current}/${cap}). Approve or dismiss drafts to generate new ones.`);
+    setGenerating(true);
+    setGenerateError(null);
+    if (generatePollRef.current) clearInterval(generatePollRef.current);
+
+    const brandId = selectedBrandId;
+    const startCount = draftStatus?.draft_count ?? 0;
+
+    try {
+      await generateNow(brandId);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string }; status?: number }; message?: string };
+      const detail = err?.response?.data?.detail ?? err?.message ?? 'Generation failed. Check that API keys are configured in Settings.';
+      setGenerateError(detail);
+      setGenerating(false);
+      // Refresh status in case rate-limit stamp was already applied
+      getDraftStatus(brandId).then(setDraftStatus).catch(() => {});
       return;
     }
-    setGenerating(true);
-    try {
-      const newDrafts = await generateNow(selectedBrandId, slots);
-      if (newDrafts.length > 0) {
-        setDraftItems((prev) => [...newDrafts, ...prev]);
-        setActiveTab('drafts');
-      } else {
-        // No drafts returned — reload in case they were created despite the error
-        loadAll(selectedBrandId);
-        setActiveTab('drafts');
+
+    // Poll until count stabilizes (2 consecutive equal polls), then reload all at once.
+    // Stability is tracked unconditionally so a 0-new-drafts run exits in ~6s, not 120s.
+    // Hard timeout: 120s fallback.
+    setActiveTab('drafts');
+    const deadline = Date.now() + 120_000;
+    let prevCount = startCount;
+    let stableStreak = 0;
+
+    generatePollRef.current = setInterval(async () => {
+      try {
+        const status = await getDraftStatus(brandId);
+        setDraftStatus(status);
+        const count = status.draft_count;
+
+        if (count === prevCount) {
+          stableStreak++;
+        } else {
+          stableStreak = 0;
+        }
+        prevCount = count;
+
+        const done = stableStreak >= 2 || Date.now() > deadline;
+        if (done) {
+          clearInterval(generatePollRef.current!);
+          generatePollRef.current = null;
+          if (count > startCount) loadAll(brandId); // only reload if drafts actually changed
+          setGenerating(false);
+        }
+      } catch {
+        // ignore poll errors — keep trying
       }
-    } catch (e: unknown) {
-      // Reload drafts — some may have been created before the error
-      loadAll(selectedBrandId);
-      setActiveTab('drafts');
-      const err = e as { response?: { data?: { detail?: string } }; message?: string };
-      const detail = err?.response?.data?.detail ?? err?.message ?? 'Draft generation failed. Check that API keys are configured.';
-      alert(detail);
-    } finally {
-      setGenerating(false);
-    }
+    }, 3000);
   }
 
   async function handleTogglePlatform(platform: string, enabled: boolean) {
@@ -2054,7 +2110,7 @@ export default function ContentHubPage() {
 
   // ── Tab content ────────────────────────────────────────────────────────────
 
-  function renderDraftsTab() {
+  function DraftsPanel() {
     const selectedBrand = brands.find((b) => b.id === selectedBrandId);
     const brandName = selectedBrand?.name ?? '';
 
@@ -2091,16 +2147,25 @@ export default function ContentHubPage() {
             icon={<FileText size={48} className="text-[#818cf8]" />}
             title={platformFilter !== 'all' ? `No ${platformFilter} drafts` : 'No drafts yet'}
             description={platformFilter !== 'all' ? 'Try switching to "All" or generate new drafts.' : 'Use "Generate Drafts Now" or request a custom draft to get started.'}
-            action={platformFilter === 'all' && (user?.subscription_tier || user?.is_admin) ? (
-              <button
-                onClick={handleGenerateNow}
-                disabled={generating || !!draftStatus?.draft_queue_full}
-                className="flex items-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/30 hover:shadow-[#6366f1]/45"
-              >
-                {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                {generating ? 'Generating…' : 'Generate Drafts Now'}
-              </button>
-            ) : undefined}
+            action={platformFilter === 'all' && (user?.subscription_tier || user?.is_admin) ? (() => {
+              const cooldownLabel = generateAvailableLabel(draftStatus?.next_generate_at ?? null);
+              const onCooldown = !!cooldownLabel;
+              return (
+                <div className="flex flex-col items-center gap-1.5">
+                  <button
+                    onClick={handleGenerateNow}
+                    disabled={generating || !!draftStatus?.draft_queue_full || onCooldown}
+                    className="flex items-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/30 hover:shadow-[#6366f1]/45"
+                  >
+                    {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+                    {generating ? 'Generating…' : 'Generate Drafts Now'}
+                  </button>
+                  {onCooldown && (
+                    <p className="text-xs text-[#475569]">{cooldownLabel}</p>
+                  )}
+                </div>
+              );
+            })() : undefined}
           />
         </>
       );
@@ -2150,7 +2215,7 @@ export default function ContentHubPage() {
     );
   }
 
-  function renderScheduledTab() {
+  function ScheduledPanel() {
     if (visibleScheduledItems.length === 0) {
       return (
         <EmptyState
@@ -2174,7 +2239,7 @@ export default function ContentHubPage() {
     );
   }
 
-  function renderOpportunitiesTab() {
+  function OpportunitiesPanel() {
     const header = (
       <>
         <div className="flex items-center justify-between mb-4">
@@ -2253,7 +2318,7 @@ export default function ContentHubPage() {
     );
   }
 
-  function renderPostedTab() {
+  function PostedPanel() {
     if (postedItems.length === 0) {
       return (
         <EmptyState
@@ -2659,10 +2724,10 @@ export default function ContentHubPage() {
 
             {/* Tab content */}
             <>
-              {activeTab === 'drafts' && renderDraftsTab()}
-              {activeTab === 'scheduled' && renderScheduledTab()}
-              {activeTab === 'opportunities' && renderOpportunitiesTab()}
-              {activeTab === 'posted' && renderPostedTab()}
+              {activeTab === 'drafts' && <DraftsPanel />}
+              {activeTab === 'scheduled' && <ScheduledPanel />}
+              {activeTab === 'opportunities' && <OpportunitiesPanel />}
+              {activeTab === 'posted' && <PostedPanel />}
 
             </>
           </div>
@@ -2696,26 +2761,39 @@ export default function ContentHubPage() {
                       </p>
                     </div>
                   ) : null}
-                  <button
-                    onClick={handleGenerateNow}
-                    disabled={generating || !!draftStatus?.draft_queue_full}
-                    className="w-full flex items-center justify-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/25 hover:shadow-[#6366f1]/40"
-                  >
-                    {generating ? (
+                  {(() => {
+                    const cooldownLabel = generateAvailableLabel(draftStatus?.next_generate_at ?? null);
+                    const onCooldown = !!cooldownLabel;
+                    return (
                       <>
-                        <Loader2 size={14} className="animate-spin" />
-                        Generating…
+                        <button
+                          onClick={handleGenerateNow}
+                          disabled={generating || !!draftStatus?.draft_queue_full || onCooldown}
+                          className="w-full flex items-center justify-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/25 hover:shadow-[#6366f1]/40"
+                        >
+                          {generating ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin" />
+                              Generating…
+                            </>
+                          ) : (
+                            <>
+                              <Zap size={14} />
+                              Generate Drafts Now
+                            </>
+                          )}
+                        </button>
+                        <p className="text-xs text-[#475569] mt-2 text-center">
+                          {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : onCooldown ? cooldownLabel : 'Fills drafts to 20 and scans for new opportunities'}
+                        </p>
+                        {generateError && (
+                          <div className="mt-2 bg-[#7f1d1d]/15 border border-[#991b1b]/30 rounded-lg px-3 py-2">
+                            <p className="text-xs text-[#f87171] leading-relaxed">{generateError}</p>
+                          </div>
+                        )}
                       </>
-                    ) : (
-                      <>
-                        <Zap size={14} />
-                        Generate Drafts Now
-                      </>
-                    )}
-                  </button>
-                  <p className="text-xs text-[#475569] mt-2 text-center">
-                    Generates drafts across your tracked prompts
-                  </p>
+                    );
+                  })()}
                 </>
               )}
             </div>

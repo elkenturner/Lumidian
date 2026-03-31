@@ -351,3 +351,112 @@ async def test_csrf_allows_known_origin(client):
     )
     # Reaches the auth handler (401), not blocked by CSRF (403)
     assert resp.status_code == 401
+
+
+# ── TOTP full flow tests ───────────────────────────────────────────────────────
+
+async def test_totp_setup_returns_fields(client: httpx.AsyncClient):
+    """Setup endpoint returns secret, otpauth_uri, and base64 QR code."""
+    await register_and_login(client, email="totp_setup@example.com")
+    resp = await client.post("/api/auth/2fa/setup")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "secret" in data
+    assert "otpauth_uri" in data
+    assert "qr_code" in data
+    assert data["qr_code"].startswith("data:image/png;base64,")
+    assert "otpauth://totp/" in data["otpauth_uri"]
+
+
+async def test_totp_enable_with_valid_code(client: httpx.AsyncClient):
+    """Enable 2FA with a valid TOTP code — returns 200 and success message."""
+    import pyotp
+    await register_and_login(client, email="totp_enable@example.com")
+    setup_resp = await client.post("/api/auth/2fa/setup")
+    secret = setup_resp.json()["secret"]
+    totp = pyotp.TOTP(secret)
+    resp = await client.post("/api/auth/2fa/enable", json={"code": totp.now()})
+    assert resp.status_code == 200
+    assert "enabled" in resp.json()["message"].lower()
+
+
+async def test_totp_enable_with_invalid_code(client: httpx.AsyncClient):
+    """Enable 2FA with a wrong code — returns 400."""
+    await register_and_login(client, email="totp_bad@example.com")
+    await client.post("/api/auth/2fa/setup")
+    resp = await client.post("/api/auth/2fa/enable", json={"code": "000000"})
+    assert resp.status_code == 400
+
+
+async def test_totp_enable_requires_setup_first(client: httpx.AsyncClient):
+    """Enabling 2FA without calling setup first — returns 400."""
+    await register_and_login(client, email="totp_nosetup@example.com")
+    resp = await client.post("/api/auth/2fa/enable", json={"code": "123456"})
+    assert resp.status_code == 400
+
+
+async def test_totp_disable_with_correct_password(client: httpx.AsyncClient):
+    """Disable 2FA with the correct password — returns 200."""
+    import pyotp
+    email = "totp_dis@example.com"
+    password = "password123"
+    await register_and_login(client, email=email, password=password)
+    setup_resp = await client.post("/api/auth/2fa/setup")
+    totp = pyotp.TOTP(setup_resp.json()["secret"])
+    await client.post("/api/auth/2fa/enable", json={"code": totp.now()})
+    resp = await client.post("/api/auth/2fa/disable", json={"password": password})
+    assert resp.status_code == 200
+
+
+async def test_totp_disable_with_wrong_password(client: httpx.AsyncClient):
+    """Disable 2FA with wrong password — returns 401."""
+    import pyotp
+    await register_and_login(client, email="totp_dis_bad@example.com")
+    setup_resp = await client.post("/api/auth/2fa/setup")
+    totp = pyotp.TOTP(setup_resp.json()["secret"])
+    await client.post("/api/auth/2fa/enable", json={"code": totp.now()})
+    resp = await client.post("/api/auth/2fa/disable", json={"password": "wrongpass"})
+    assert resp.status_code == 401
+
+
+async def test_login_with_2fa_enabled_returns_challenge(client: httpx.AsyncClient):
+    """Login when 2FA is enabled returns requires_2fa=True and a challenge_token."""
+    import pyotp
+    email = "totp_challenge@example.com"
+    password = "password123"
+    await register_and_login(client, email=email, password=password)
+    setup_resp = await client.post("/api/auth/2fa/setup")
+    totp = pyotp.TOTP(setup_resp.json()["secret"])
+    await client.post("/api/auth/2fa/enable", json={"code": totp.now()})
+    await client.post("/api/auth/logout")
+
+    resp = await client.post("/api/auth/login", json={"email": email, "password": password})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["requires_2fa"] is True
+    assert "challenge_token" in data
+
+
+async def test_2fa_verify_completes_login(client: httpx.AsyncClient):
+    """Full 2FA login: challenge + valid code sets auth cookie and allows /me."""
+    import pyotp
+    email = "totp_verify_ok@example.com"
+    password = "password123"
+    await register_and_login(client, email=email, password=password)
+    setup_resp = await client.post("/api/auth/2fa/setup")
+    secret = setup_resp.json()["secret"]
+    totp = pyotp.TOTP(secret)
+    await client.post("/api/auth/2fa/enable", json={"code": totp.now()})
+    await client.post("/api/auth/logout")
+
+    login_resp = await client.post("/api/auth/login", json={"email": email, "password": password})
+    challenge_token = login_resp.json()["challenge_token"]
+
+    verify_resp = await client.post("/api/auth/2fa/verify", json={
+        "challenge_token": challenge_token,
+        "code": totp.now(),
+    })
+    assert verify_resp.status_code == 200
+    me_resp = await client.get("/api/auth/me")
+    assert me_resp.status_code == 200
+    assert me_resp.json()["email"] == email

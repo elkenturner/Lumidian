@@ -1893,6 +1893,8 @@ export default function ContentHubPage() {
   const [postingGuideOpen, setPostingGuideOpen] = useState(false);
   const [postingPlatform, setPostingPlatform] = useState<'reddit' | 'quora' | 'medium' | 'wikipedia'>('reddit');
 
+  const [savedPlatform, setSavedPlatform] = useState<string | null>(null);
+
   // Platform filtering
   const _disabledPlatforms = new Set(
     contentSettings.filter((s) => !s.enabled).map((s) => s.platform)
@@ -2116,6 +2118,8 @@ export default function ContentHubPage() {
       setContentSettings((prev) =>
         prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))
       );
+      setSavedPlatform(platform);
+      setTimeout(() => setSavedPlatform(null), 2000);
     }
   }
 
@@ -2425,7 +2429,7 @@ export default function ContentHubPage() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {/* Posting Guide button */}
           <button
             onClick={() => setPostingGuideOpen(true)}
@@ -2612,7 +2616,7 @@ export default function ContentHubPage() {
             </div>
 
             {/* Queue stats */}
-            <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
               <div className="space-y-3">
                 {draftStatus ? (
                   <>
@@ -2661,7 +2665,7 @@ export default function ContentHubPage() {
             </div>
 
             {/* Platform toggles */}
-            <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
               <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wide mb-3">Platforms</p>
               <div className="space-y-0.5">
                 {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((platform) => {
@@ -2669,7 +2673,12 @@ export default function ContentHubPage() {
                   const enabled = setting?.enabled ?? true;
                   return (
                     <div key={platform} className="flex items-center justify-between py-1.5">
-                      <span className={`text-xs capitalize ${enabled ? 'text-[#94A3B8]' : 'text-[#475569]'}`}>{platform}</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs capitalize ${enabled ? 'text-[#94A3B8]' : 'text-[#475569]'}`}>{platform}</span>
+                        {savedPlatform === platform && (
+                          <span className="text-[10px] text-[#34d399]">Saved</span>
+                        )}
+                      </div>
                       <button
                         onClick={() => handleTogglePlatform(platform, !enabled)}
                         className="transition-colors shrink-0"
@@ -2708,14 +2717,7 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div
-        className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5"
-        style={{
-          background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(124,58,237,0.09))',
-          border: '1px solid rgba(99,102,241,0.26)',
-          boxShadow: '0 0 36px rgba(99,102,241,0.12)',
-        }}
-      >
+      <div className="w-16 h-16 rounded-2xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.16)] flex items-center justify-center mb-4">
         {icon}
       </div>
       <p className="text-[15px] font-semibold text-[#F0F4F8] mb-2">{title}</p>

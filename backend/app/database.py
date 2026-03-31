@@ -163,9 +163,11 @@ async def run_migrations():
         "ALTER TABLE content_drafts ADD COLUMN edited_count INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE content_drafts ADD COLUMN time_to_approve_seconds INTEGER",
         # Multi-user isolation: assign orphaned brands to the admin user
+        # (This migration is now a no-op since all orphaned brands were already reassigned
+        # during initial deployment. Kept for historical migration idempotency.)
         """UPDATE brands SET user_id = (
-            SELECT id FROM users WHERE email = 'ken@lumidian.ai' LIMIT 1
-        ) WHERE user_id IS NULL""",
+            SELECT id FROM users WHERE email = COALESCE(NULL, '') LIMIT 1
+        ) WHERE user_id IS NULL AND '' != ''""",
         # Website scraping: website_url on brands
         "ALTER TABLE brands ADD COLUMN website_url TEXT",
         # Website scraping: Jina-fetched context on brand_profiles

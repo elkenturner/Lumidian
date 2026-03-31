@@ -332,7 +332,7 @@ def send_support_request_email(
     message: str,
 ) -> None:
     """Forward a user support request to the support inbox."""
-    support_inbox = os.getenv("SUPPORT_EMAIL", "ken@lumidian.ai")
+    support_inbox = os.getenv("SUPPORT_EMAIL", "")
     display = from_name or from_email
 
     body = f"""\

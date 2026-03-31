@@ -86,7 +86,7 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
             continue
         pid = qr.prompt_id
         if pid not in groups:
-            groups[pid] = PGroup(pid, qr.prompt_text or prompts.get(pid, f"Prompt #{pid}"))
+            groups[pid] = PGroup(pid, prompts.get(pid, f"Prompt #{pid}"))
         g = groups[pid]
         g.total += 1
         if qr.mentioned:

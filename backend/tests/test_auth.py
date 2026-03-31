@@ -530,9 +530,6 @@ async def test_verify_email_with_wrong_code(client: httpx.AsyncClient):
 
 async def test_resend_verification_returns_200(client: httpx.AsyncClient):
     """Resend endpoint returns 200 and updates the stored code."""
-    from app.routers.auth import _resend_attempts
-    _resend_attempts.clear()
-
     email = "resend_ok@example.com"
     await register_user(client, email=email)
 

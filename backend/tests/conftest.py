@@ -54,9 +54,12 @@ async def create_test_db():
 async def clean_tables():
     """Truncate all data-bearing tables and reset rate store between tests."""
     yield
-    # Reset in-memory rate limiter so tests don't affect each other
+    # Reset in-memory rate limiters so tests don't affect each other
     from app.dependencies import _rate_store
     _rate_store.clear()
+    from app.routers.auth import _login_attempts, _register_attempts
+    _login_attempts.clear()
+    _register_attempts.clear()
 
     async with AsyncSessionLocal() as db:
         from sqlalchemy import text
@@ -71,6 +74,15 @@ async def clean_tables():
         ]:
             await db.execute(text(f"DELETE FROM {table}"))
         await db.commit()
+
+
+# ── DB session fixture ───────────────────────────────────────────────────────
+
+@pytest_asyncio.fixture
+async def db_session():
+    """Yield an async DB session for direct database inspection in tests."""
+    async with AsyncSessionLocal() as session:
+        yield session
 
 
 # ── HTTP client ───────────────────────────────────────────────────────────────
@@ -126,9 +138,22 @@ async def register_and_login(
     client: httpx.AsyncClient,
     email: str = "user@example.com",
     password: str = "password123",
+    subscription_tier: str = "starter",
 ) -> None:
-    """Register + login in one call — sets cookies on the client."""
+    """Register + login in one call — sets cookies on the client.
+
+    Grants 'starter' subscription by default so brand/prompt creation works.
+    Pass subscription_tier=None to test free-tier limits.
+    """
     await register_user(client, email, password)
+    if subscription_tier:
+        async with AsyncSessionLocal() as db:
+            from sqlalchemy import text
+            await db.execute(
+                text("UPDATE users SET subscription_tier = :tier WHERE email = :email"),
+                {"tier": subscription_tier, "email": email},
+            )
+            await db.commit()
     await login_user(client, email, password)
 
 

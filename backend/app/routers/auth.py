@@ -542,17 +542,18 @@ async def forgot_password(request: ForgotPasswordRequest, db: DbDep):
         )
 
         token_value = secrets.token_urlsafe(48)
+        token_hash = hash_password(token_value)  # store bcrypt hash, not raw token
         expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1)
         reset_token = PasswordResetToken(
             user_id=user.id,
-            token=token_value,
+            token=token_hash,   # hashed
             expires_at=expires_at,
         )
         db.add(reset_token)
         await db.commit()
 
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        reset_link = f"{frontend_url}/reset-password?token={token_value}"
+        reset_link = f"{frontend_url}/reset-password?token={token_value}"  # raw token in URL
 
         from app.services.email_service import send_password_reset_email, send_email_background
         send_email_background(send_password_reset_email, email=user.email, name=user.name, reset_link=reset_link)
@@ -576,18 +577,23 @@ async def reset_password(request: ResetPasswordRequest, db: DbDep):
             detail="Password must be at least 6 characters",
         )
 
-    result = await db.execute(
-        select(PasswordResetToken).where(PasswordResetToken.token == request.token)
+    # Tokens are stored as bcrypt hashes — find all unexpired, unused tokens and verify
+    from sqlalchemy import and_
+    now_lookup = datetime.now(timezone.utc).replace(tzinfo=None)
+    candidates_result = await db.execute(
+        select(PasswordResetToken).where(
+            PasswordResetToken.used == False,
+            PasswordResetToken.expires_at > now_lookup,
+        )
     )
-    reset_token = result.scalar_one_or_none()
+    reset_token = None
+    for candidate in candidates_result.scalars().all():
+        if verify_password(request.token, candidate.token):
+            reset_token = candidate
+            break
 
     if not reset_token:
         logger.warning("invalid password reset token attempt")
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
-
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    if reset_token.used or reset_token.expires_at < now:
-        logger.warning("expired or used password reset token for user_id=%s", reset_token.user_id)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
 
     # Update password

@@ -244,3 +244,27 @@ async def test_totp_setup_rate_limited(client):
 
     resp = await client.post("/api/auth/2fa/setup")
     assert resp.status_code == 429
+
+
+# ── Task 6: Password Reset Token Hashing ─────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_password_reset_token_stored_as_hash(client, db_session):
+    """Reset token stored in DB must be a bcrypt hash, not the raw token."""
+    from app.models import PasswordResetToken
+    from sqlalchemy import select as sa_select
+
+    # Register a user
+    await client.post("/api/auth/register", json={
+        "email": "hashtest@example.com", "password": "password123"
+    })
+    # Trigger a reset
+    resp = await client.post("/api/auth/forgot-password", json={"email": "hashtest@example.com"})
+    assert resp.status_code == 200
+
+    # DB must store bcrypt hash ($2b$)
+    result = await db_session.execute(sa_select(PasswordResetToken))
+    tokens = result.scalars().all()
+    assert len(tokens) > 0
+    for t in tokens:
+        assert t.token.startswith("$2b$"), f"Token not hashed: {t.token[:20]}"

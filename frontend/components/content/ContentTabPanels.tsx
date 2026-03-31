@@ -508,7 +508,7 @@ function DraftCard({
   postedItems: ContentDraft[];
   prompts: Prompt[];
   brandId: number;
-  onApprove: (id: number) => void;
+  onApprove: (id: number) => void | Promise<void>;
   onDelete: (id: number) => void;
   onSaved: (d: ContentDraft) => void;
   onRegenerated: (d: ContentDraft) => void;
@@ -522,6 +522,16 @@ function DraftCard({
   const [regenerating, setRegenerating] = useState(false);
   const [showQuoraPicker, setShowQuoraPicker] = useState(false);
   const [pendingQuestion, setPendingQuestion] = useState<QuoraQuestion | null>(null);
+  const [approving, setApproving] = useState(false);
+
+  async function handleApproveClick() {
+    setApproving(true);
+    try {
+      await onApprove(draft.id);
+    } finally {
+      setApproving(false);
+    }
+  }
 
   async function handleCopy() {
     await navigator.clipboard.writeText(draft.content_text);
@@ -574,8 +584,11 @@ function DraftCard({
   return (
     <div className={`bg-[rgba(99,102,241,0.06)] backdrop-blur-md border rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors ${borderClass}`}>
       {/* Top row */}
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex items-center justify-between gap-2">
         <PlatformBadge platform={draft.platform} />
+        <span className="text-[10px] text-[#475569] shrink-0">
+          {formatDistanceToNow(parseISO(draft.created_at), { addSuffix: true })}
+        </span>
       </div>
 
       {/* Target prompt / posting instruction */}
@@ -782,11 +795,12 @@ function DraftCard({
             {copied ? 'Copied!' : 'Copy'}
           </button>
           <button
-            onClick={() => onApprove(draft.id)}
-            className="flex items-center gap-1.5 text-xs bg-[#064e3b]/20 hover:bg-[#064e3b]/30 border border-[#065f46]/25 text-[#34d399] rounded-lg px-3 py-1.5 transition-colors"
+            onClick={handleApproveClick}
+            disabled={approving}
+            className="flex items-center gap-1.5 text-xs bg-[#064e3b]/20 hover:bg-[#064e3b]/30 disabled:opacity-50 border border-[#065f46]/25 text-[#34d399] rounded-lg px-3 py-1.5 transition-colors"
           >
-            <CheckCircle2 size={11} />
-            Approve
+            {approving ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+            {approving ? 'Approving…' : 'Approve'}
           </button>
           <button
             onClick={() => onDelete(draft.id)}

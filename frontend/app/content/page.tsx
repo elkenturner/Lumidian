@@ -62,13 +62,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import Link from 'next/link';
-import dynamic from 'next/dynamic';
-import type { ContentTabPanelsProps } from '@/components/content/ContentTabPanels';
-
-const ContentTabPanels = dynamic<ContentTabPanelsProps>(
-  () => import('@/components/content/ContentTabPanels').then((m) => ({ default: m.ContentTabPanels })),
-  { ssr: false, loading: () => <div className="animate-pulse h-32 rounded-lg bg-[rgba(255,255,255,0.04)]" /> },
-);
+import { ContentTabPanels } from '@/components/content/ContentTabPanels';
+import { AppToast, ToastData } from '@/components/AppToast';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1847,6 +1842,12 @@ export default function ContentHubPage() {
   const { user } = useAuth();
   const { brands, activeBrandId: selectedBrandId, setActiveBrandId: setSelectedBrandId } = useBrand();
   const [activeTab, setActiveTab] = useState<QueueTab>('drafts');
+  const [toast, setToast] = useState<ToastData | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // Sync tab from URL after mount — avoids SSR/client hydration mismatch
   useEffect(() => { document.title = 'Content Hub — Lumidian'; }, []);
@@ -1996,6 +1997,7 @@ export default function ContentHubPage() {
       throw e;
     }
     if (selectedBrandId) loadAll(selectedBrandId);
+    setToast({ message: 'Draft approved', type: 'success' });
   }
 
   async function handleMarkAsPosted(id: number) {
@@ -2015,6 +2017,7 @@ export default function ContentHubPage() {
     setDraftStatus((prev) =>
       prev ? { ...prev, draft_count: Math.max(0, prev.draft_count - 1) } : prev
     );
+    setToast({ message: 'Draft dismissed', type: 'info' });
   }
 
   function handleSaved(updated: ContentDraft) {
@@ -2046,6 +2049,7 @@ export default function ContentHubPage() {
   async function handleDismissOpportunity(oppId: number) {
     await dismissOpportunity(oppId);
     setOpportunities((prev) => prev.filter((o) => o.id !== oppId));
+    setToast({ message: 'Opportunity dismissed', type: 'info' });
   }
 
   // ── Right panel actions ────────────────────────────────────────────────────
@@ -2585,9 +2589,16 @@ export default function ContentHubPage() {
                             </>
                           )}
                         </button>
-                        <p className="text-xs text-[#475569] mt-2 text-center">
-                          {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : onCooldown ? cooldownLabel : 'Fills drafts to 20 and scans for new opportunities'}
-                        </p>
+                        {onCooldown ? (
+                          <p className="flex items-center justify-center gap-1.5 text-xs text-[#94A3B8] mt-2">
+                            <Clock size={11} className="shrink-0" />
+                            {cooldownLabel}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-[#475569] mt-2 text-center">
+                            {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : 'Fills drafts to 20 and scans for new opportunities'}
+                          </p>
+                        )}
                         {generateError && (
                           <div className="mt-2 bg-[#7f1d1d]/15 border border-[#991b1b]/30 rounded-lg px-3 py-2">
                             <p className="text-xs text-[#f87171] leading-relaxed">{generateError}</p>
@@ -2677,6 +2688,7 @@ export default function ContentHubPage() {
           </div>
         </div>
       )}
+      {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

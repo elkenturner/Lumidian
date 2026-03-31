@@ -113,7 +113,7 @@ export default function RegisterPage() {
           <p style={{ fontSize: 14, color: '#6B7280', margin: '0 0 24px', fontWeight: 400 }}>Start tracking your brand&apos;s AI visibility</p>
 
           {error && (
-            <div style={{ background: 'rgba(254,226,226,0.8)', border: '1px solid rgba(252,165,165,0.5)', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
+            <div role="alert" style={{ background: 'rgba(254,226,226,0.8)', border: '1px solid rgba(252,165,165,0.5)', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
               <p style={{ fontSize: 13, color: '#b91c1c', margin: 0 }}>{error}</p>
             </div>
           )}

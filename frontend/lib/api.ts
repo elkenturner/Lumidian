@@ -392,8 +392,8 @@ export async function getPlatformGuidelines(platform: string): Promise<PlatformG
   return res.data;
 }
 
-export async function getAttribution(brandId: number): Promise<DraftAttribution[]> {
-  const res = await api.get<DraftAttribution[]>(`/content/${brandId}/attribution`);
+export async function getAttribution(brandId: number): Promise<ContentAttribution[]> {
+  const res = await api.get<ContentAttribution[]>(`/content/${brandId}/attribution`);
   return res.data;
 }
 
@@ -410,6 +410,7 @@ export interface DraftQueueStatus {
   scheduled_cap: number;
   scheduled_queue_full: boolean;
   last_scan_at: string | null;
+  next_generate_at?: string | null;
 }
 
 export async function getDraftStatus(brandId: number): Promise<DraftQueueStatus> {

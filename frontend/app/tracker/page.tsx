@@ -283,7 +283,7 @@ export default function TrackerPage() {
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Acme Corp"
                   disabled={creating}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#e2e8f0] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569] disabled:opacity-50"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#e2e8f0] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] disabled:opacity-50"
                 />
               </div>
 
@@ -333,7 +333,7 @@ export default function TrackerPage() {
                     onKeyDown={(e) => e.key === 'Enter' && addPrompt()}
                     placeholder="e.g. What is the best CRM software?"
                     disabled={creating}
-                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#e2e8f0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569] disabled:opacity-50"
+                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#e2e8f0] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] disabled:opacity-50"
                   />
                   <button
                     onClick={addPrompt}

@@ -446,7 +446,7 @@ export default function ReportsPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search prompts…"
-                  className="w-full bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] placeholder:text-[#475569] rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-[#6366f1] transition-colors"
+                  className="w-full bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] placeholder:text-[#475569] rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 transition-colors"
                 />
               </div>
               {/* Sort */}

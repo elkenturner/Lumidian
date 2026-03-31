@@ -443,7 +443,7 @@ export default function AccountPage() {
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 placeholder="e.g. Acme Corp"
-                className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.18)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#6366f1] placeholder-[#475569]"
+                className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.18)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder-[#475569]"
               />
             </div>
 
@@ -517,7 +517,7 @@ export default function AccountPage() {
                     value={totpConfirmCode}
                     onChange={(e) => setTotpConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="000000"
-                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.18)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1] placeholder-[#475569] font-mono tracking-widest text-center"
+                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.18)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder-[#475569] font-mono tracking-widest text-center"
                   />
                   <button
                     onClick={handleEnable2fa}

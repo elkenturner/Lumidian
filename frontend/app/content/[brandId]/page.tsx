@@ -413,7 +413,7 @@ function GenerateModal({
           onChange={(e) => setCustomBrief(e.target.value)}
           placeholder="Any specific angle, tone, or talking points..."
           rows={3}
-          className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-5 focus:outline-none focus:border-[#6366f1] resize-none placeholder:text-[#475569]"
+          className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-5 focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none placeholder:text-[#475569]"
         />
 
         {error && (
@@ -476,13 +476,13 @@ function EditModal({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Title (optional)"
-          className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-3 focus:outline-none focus:border-[#6366f1] placeholder:text-[#475569]"
+          className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-3 focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569]"
         />
 
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
-          className="flex-1 w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-4 focus:outline-none focus:border-[#6366f1] resize-none font-mono min-h-[300px]"
+          className="flex-1 w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] text-sm rounded-lg px-3 py-2 mb-4 focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none font-mono min-h-[300px]"
         />
 
         <div className="flex gap-3">

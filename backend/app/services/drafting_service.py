@@ -42,6 +42,18 @@ from app.models import (
 
 logger = logging.getLogger(__name__)
 
+import re as _re
+
+_CONTROL_CHAR_RE = _re.compile(r'[\x00-\x1f\x7f]')
+
+
+def _sanitize_user_input(text, max_length: int = 500) -> str:
+    """Strip control characters and truncate user-supplied text before LLM injection."""
+    if not text:
+        return ""
+    cleaned = _CONTROL_CHAR_RE.sub("", str(text))
+    return cleaned[:max_length]
+
 
 # ── Extended platform guidelines ──────────────────────────────────────────────
 
@@ -260,9 +272,6 @@ async def _load_profile_context(db: AsyncSession, brand_id: int) -> str:
     if profile.tone_of_voice:
         lines.append(f"Brand tone of voice: {profile.tone_of_voice}")
 
-    if profile.target_audience:
-        lines.append(f"Target audience: {profile.target_audience}")
-
     approved = json.loads(profile.approved_language) if profile.approved_language else []
     if approved:
         lines.append("Approved language / preferred terminology:\n" + "\n".join(f"  - {t}" for t in approved))
@@ -378,6 +387,7 @@ async def _analyze_responses_for_prompt(
             QueryResult.tracking_run_id == latest_run.id,
             QueryResult.prompt_id == prompt_id,
             QueryResult.response_text.isnot(None),
+            QueryResult.response_text != "",
         )
         .limit(8)
     )
@@ -721,7 +731,10 @@ QUERY MIRRORING RULES (critical for AI retrieval — these are checked):
 INSTRUCTIONS:
 1. Identify what specific angle or information is MISSING from the current AI responses above.
 2. Write content that fills that gap AND directly answers the target query using its exact language.
-3. If a title applies (Medium, Reddit post), write a title that mirrors the query's phrasing.
+3. OUTPUT FORMAT — follow exactly:
+   - Reddit post: Line 1 = post title (plain text, ≤120 chars, no trailing punctuation, no markdown). Blank line. Then the post body.
+   - Medium article: Line 1 = article title (plain text, ≤120 chars, no trailing punctuation, no markdown). Blank line. Then the article body.
+   - Quora answer, Wikipedia edit: no title line — start directly with the content.
 4. Write the full content body.
 
 ⚠ OUTPUT THE CONTENT ONLY. Do not include any analysis, commentary, explanation, or notes about what the content does or why you wrote it. No separators followed by analysis sections. The output must be exactly what would be published — nothing more."""
@@ -751,7 +764,11 @@ async def _call_claude(prompt: str, max_tokens: int = 2500) -> str:
 import re as _re2
 
 _HEDGING_RE = _re2.compile(
-    r"\b(it['']s worth noting|it['']s important to (note|mention)|notably,?|importantly,?|"
+    # Compound forms must come before their standalone components so the full
+    # phrase is consumed rather than leaving "More" or "Even more" dangling.
+    r"\b(even more importantly,?|most importantly,?|more importantly,?|"
+    r"even more notably,?|most notably,?|more notably,?|"
+    r"it['']s worth noting|it['']s important to (note|mention)|notably,?|importantly,?|"
     r"it should be noted|it['']s important to note|one thing to note|it bears mentioning|"
     r"needless to say|of course,?|additionally,|furthermore,|moreover,|"
     r"honestly,?|straightforward(ly)?,?|genuinely,?|delve into|dive into|unpack,?|"
@@ -806,15 +823,36 @@ def _post_process(text: str) -> str:
 # ── Draft creation helpers ────────────────────────────────────────────────────
 
 def _split_title_body(raw_text: str, platform: str) -> tuple[Optional[str], str]:
-    """Extract title from first line for platforms where it makes sense."""
+    """
+    Extract title from the first line for Reddit and Medium.
+    The prompt instructs Claude to separate title from body with a blank line.
+    Strips markdown bold (**) and 'Title:' prefix if Claude adds them anyway.
+    """
     title_platforms = {"reddit", "medium"}
     text = raw_text.strip()
     if platform not in title_platforms:
         return None, text
 
+    # Split on first blank line so we cleanly separate title from body
+    # when Claude uses the blank-line-separated format.
+    if "\n\n" in text:
+        first_block, rest = text.split("\n\n", 1)
+        # Title block must be a single line (no internal newlines)
+        if "\n" not in first_block.strip():
+            candidate = first_block.strip()
+            candidate = candidate.lstrip("#").strip().strip("*").strip()
+            if candidate.lower().startswith("title:"):
+                candidate = candidate[len("title:"):].strip()
+            if 5 < len(candidate) <= 150 and not candidate.endswith((".","?")):
+                return candidate, rest.strip()
+
+    # Fallback: try first newline only
     lines = text.split("\n", 1)
-    first = lines[0].strip().lstrip("#").strip()
-    if 5 < len(first) <= 200 and not first.endswith(".") and not first.endswith("?"):
+    first = lines[0].strip()
+    first = first.lstrip("#").strip().strip("*").strip()
+    if first.lower().startswith("title:"):
+        first = first[len("title:"):].strip()
+    if 5 < len(first) <= 150 and not first.endswith((".","?")):
         body = lines[1].strip() if len(lines) > 1 else text
         return first, body
     return None, text
@@ -832,6 +870,7 @@ async def _store_draft(
     estimated_impact: float,
     opportunity_id: Optional[int] = None,
     guidelines_override: Optional[str] = None,
+    source: Optional[str] = None,
 ) -> ContentDraft:
     spec = PLATFORM_SPECS.get(platform, {})
     guidelines_applied = guidelines_override if guidelines_override is not None else json.dumps(spec.get("rules", []))
@@ -1046,63 +1085,65 @@ async def generate_gap_draft(
     spec = PLATFORM_SPECS[platform]
 
     # For Quora targeted drafts, build context from the question.
-    # Tier 1 (always available): snippet from Serper search results.
-    # Tier 2 (best-effort):      full page content via Jina Reader.
-    # If both are unavailable, fall back to title + URL only.
+    # Serper snippet is the primary source — Quora blocks all Jina requests with a
+    # CAPTCHA/bot-check page, so attempting Jina for quora.com is a guaranteed 4–5s
+    # wasted round-trip. Skip it and use the snippet directly.
+    # Jina is retained for any other URL that may be passed as quora_question_url.
     effective_opportunity_context = custom_brief
     if platform == "quora" and quora_question_url and quora_question_title:
-        # Attempt Jina page fetch for richer context (full question + existing answers)
         _quora_page_content: Optional[str] = None
-        try:
-            from app.services.jina_service import fetch_website_context
-            _raw = await fetch_website_context(quora_question_url)
-            _blocked_markers = ("verify you are human", "enable javascript", "please wait", "just a moment")
-            _is_blocked = any(m in _raw.lower() for m in _blocked_markers)
-            if len(_raw) > 400 and not _is_blocked:
-                _MAX = 4_000
-                if len(_raw) > _MAX:
-                    # Snap to last sentence boundary before the limit
-                    _cut = _raw[:_MAX]
-                    _boundary = max(_cut.rfind(". "), _cut.rfind(".\n"), _cut.rfind("\n\n"))
-                    _quora_page_content = (_cut[:_boundary + 1] if _boundary > _MAX // 2 else _cut) + "\n[…]"
-                else:
-                    _quora_page_content = _raw
-                logger.info(
-                    "Quora page fetched via Jina for draft: %d chars from %s",
-                    len(_quora_page_content), quora_question_url,
-                )
-        except Exception as _je:
-            logger.debug("Quora Jina fetch skipped (%s): %s", quora_question_url, _je)
+        _is_quora_url = "quora.com" in quora_question_url.lower()
+        if not _is_quora_url:
+            # Non-Quora URL: attempt Jina fetch for richer context
+            try:
+                from app.services.jina_service import fetch_website_context
+                _raw = await fetch_website_context(quora_question_url)
+                _blocked_markers = ("verify you are human", "enable javascript", "please wait", "just a moment")
+                _is_blocked = any(m in _raw.lower() for m in _blocked_markers)
+                if len(_raw) > 400 and not _is_blocked:
+                    _MAX = 4_000
+                    if len(_raw) > _MAX:
+                        _cut = _raw[:_MAX]
+                        _boundary = max(_cut.rfind(". "), _cut.rfind(".\n"), _cut.rfind("\n\n"))
+                        _quora_page_content = (_cut[:_boundary + 1] if _boundary > _MAX // 2 else _cut) + "\n[…]"
+                    else:
+                        _quora_page_content = _raw
+                    logger.info(
+                        "Quora page fetched via Jina for draft: %d chars from %s",
+                        len(_quora_page_content), quora_question_url,
+                    )
+            except Exception as _je:
+                logger.debug("Quora Jina fetch skipped (%s): %s", quora_question_url, _je)
 
         if _quora_page_content:
             # Best case: full page content with existing answers
             effective_opportunity_context = (
-                f"QUESTION: {quora_question_title}\n"
+                f"QUESTION: {_sanitize_user_input(quora_question_title)}\n"
                 f"URL: {quora_question_url}\n\n"
                 f"PAGE CONTENT (question details and existing answers — "
                 f"your answer MUST add new value not already covered below):\n"
                 f"{_quora_page_content}"
-                + (f"\n\nADDITIONAL CONTEXT: {custom_brief}" if custom_brief else "")
+                + (f"\n\nADDITIONAL CONTEXT: {_sanitize_user_input(custom_brief)}" if custom_brief else "")
             )
         elif quora_question_snippet:
             # Reliable fallback: snippet from Serper search (always present if question was found)
             effective_opportunity_context = (
-                f"QUESTION: {quora_question_title}\n"
+                f"QUESTION: {_sanitize_user_input(quora_question_title)}\n"
                 f"URL: {quora_question_url}\n\n"
                 f"QUESTION CONTEXT (excerpt from the page):\n"
-                f"{quora_question_snippet}\n\n"
+                f"{_sanitize_user_input(quora_question_snippet)}\n\n"
                 f"Write a Quora answer that directly addresses this question and naturally "
                 f"incorporates relevant information about {brand.name}."
-                + (f"\n\nADDITIONAL CONTEXT: {custom_brief}" if custom_brief else "")
+                + (f"\n\nADDITIONAL CONTEXT: {_sanitize_user_input(custom_brief)}" if custom_brief else "")
             )
         else:
             # Minimal fallback: title + URL only
             effective_opportunity_context = (
                 f"Write a Quora answer to this specific question: "
-                f"{quora_question_title} ({quora_question_url}). "
+                f"{_sanitize_user_input(quora_question_title)} ({quora_question_url}). "
                 f"The answer should directly address this question while naturally "
                 f"incorporating relevant information about {brand.name}."
-                + (f"\n\n{custom_brief}" if custom_brief else "")
+                + (f"\n\n{_sanitize_user_input(custom_brief)}" if custom_brief else "")
             )
 
     claude_prompt = _build_prompt(
@@ -1119,6 +1160,29 @@ async def generate_gap_draft(
 
     raw_text = await _call_claude(claude_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform, 2500))
     raw_text = _post_process(raw_text)
+
+    # Quality check: brand name must appear in the content.
+    # Retry once with an explicit reminder if it's missing.
+    if brand.name.lower() not in raw_text.lower():
+        _retry_prompt = (
+            claude_prompt
+            + f"\n\n⚠ QUALITY REQUIREMENT: Your previous output did not mention '{brand.name}'."
+            f" You MUST include '{brand.name}' naturally at least once in the content body."
+        )
+        _retry_raw = await _call_claude(_retry_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform, 2500))
+        _retry_raw = _post_process(_retry_raw)
+        if brand.name.lower() in _retry_raw.lower():
+            raw_text = _retry_raw
+        else:
+            logger.warning(
+                "generate_gap_draft: brand '%s' not mentioned after retry — "
+                "brand_id=%d platform=%s prompt_id=%d",
+                brand.name, brand_id, platform, prompt_id,
+            )
+            raw_text = (
+                f"[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
+            )
+
     title, body = _split_title_body(raw_text, platform)
 
     if platform == "quora" and quora_question_url and quora_question_title:
@@ -1134,6 +1198,7 @@ async def generate_gap_draft(
             visibility_pct=visibility_pct,
             estimated_impact=estimated_impact,
             guidelines_override=quora_question_title,
+            source=source,
         )
     elif platform == "quora":
         brief = (
@@ -1157,6 +1222,7 @@ async def generate_gap_draft(
         brief=brief,
         visibility_pct=visibility_pct,
         estimated_impact=estimated_impact,
+        source=source,
     )
 
 
@@ -1205,30 +1271,35 @@ async def generate_opportunity_draft(
             prompt_text = pr.text
             visibility_pct = await _get_prompt_visibility(db, opp.prompt_id)
 
-    # Build opportunity context block
-    promo_strategy = _classify_subreddit(opp.subreddit) if opp.subreddit else "cautious"
+    # Select platform spec and token budget based on actual opportunity platform.
+    # Reddit opportunities use the short reddit_reply format (20-80 words).
+    # Quora and other platforms use their own full spec.
+    platform_key = "reddit_reply" if opp.platform == "reddit" else opp.platform
+    spec = PLATFORM_SPECS.get(platform_key, PLATFORM_SPECS["reddit_reply"])
+    max_tokens = PLATFORM_MAX_TOKENS.get(platform_key, 600)
 
+    # Build opportunity context block
     opp_context_lines = []
     if opp.thread_title:
-        opp_context_lines.append(f"Title: {opp.thread_title}")
-    if opp.subreddit:
-        opp_context_lines.append(f"Subreddit: r/{opp.subreddit}")
+        opp_context_lines.append(f"Title: {_sanitize_user_input(opp.thread_title)}")
     if opp.body_preview:
-        opp_context_lines.append(f"Post body: {opp.body_preview}")
+        opp_context_lines.append(f"Post body: {_sanitize_user_input(opp.body_preview)}")
     opp_context_lines.append(f"URL: {opp.thread_url}")
-    # Append subreddit-specific promotion strategy
-    opp_context_lines.append(
-        _build_subreddit_strategy(opp.subreddit or "this subreddit", brand.name, promo_strategy)
-    )
+
+    # Subreddit promotion strategy is Reddit-specific
+    if opp.platform == "reddit":
+        promo_strategy = _classify_subreddit(opp.subreddit) if opp.subreddit else "cautious"
+        if opp.subreddit:
+            opp_context_lines.append(f"Subreddit: r/{opp.subreddit}")
+        opp_context_lines.append(
+            _build_subreddit_strategy(opp.subreddit or "this subreddit", brand.name, promo_strategy)
+        )
+
     opportunity_context = "\n".join(opp_context_lines)
 
     response_analysis = ""
     if opp.prompt_id:
         response_analysis = await _analyze_responses_for_prompt(db, opp.brand_id, opp.prompt_id)
-
-    # Use reddit_reply spec for short-form reply
-    platform_key = "reddit_reply" if opp.platform == "reddit" else opp.platform
-    spec = PLATFORM_SPECS.get(platform_key, PLATFORM_SPECS["reddit_reply"])
 
     claude_prompt = _build_prompt(
         brand_name=brand.name,
@@ -1241,24 +1312,46 @@ async def generate_opportunity_draft(
         opportunity_context=opportunity_context,
     )
 
-    raw_text = await _call_claude(claude_prompt, max_tokens=600)
+    raw_text = await _call_claude(claude_prompt, max_tokens=max_tokens)
     raw_text = _post_process(raw_text)
+
+    # Quality check: brand name must appear
+    if brand.name.lower() not in raw_text.lower():
+        _retry_prompt = (
+            claude_prompt
+            + f"\n\n⚠ QUALITY REQUIREMENT: Your previous output did not mention '{brand.name}'."
+            f" You MUST include '{brand.name}' naturally at least once in the content."
+        )
+        _retry_raw = await _call_claude(_retry_prompt, max_tokens=max_tokens)
+        _retry_raw = _post_process(_retry_raw)
+        if brand.name.lower() in _retry_raw.lower():
+            raw_text = _retry_raw
+        else:
+            logger.warning(
+                "generate_opportunity_draft: brand '%s' not mentioned after retry — opp_id=%d",
+                brand.name, opportunity_id,
+            )
+            raw_text = f"[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
+
     _, body = _split_title_body(raw_text, platform_key)
 
     estimated_impact = await _estimate_impact(
         db, opp.brand_id, opp.prompt_id or 0, opp.platform
     ) if opp.prompt_id else 40.0
 
-    brief = (
-        f"Reply to Reddit thread: \"{opp.thread_title or opp.thread_url}\" "
-        f"in r/{opp.subreddit or 'unknown'}"
-    )
+    if opp.platform == "reddit":
+        brief = (
+            f"Reply to Reddit thread: \"{opp.thread_title or opp.thread_url}\" "
+            f"in r/{opp.subreddit or 'unknown'}"
+        )
+    else:
+        brief = f"Reply to {opp.platform.title()} question: \"{opp.thread_title or opp.thread_url}\""
 
     draft = await _store_draft(
         db=db,
         brand_id=opp.brand_id,
         prompt_id=opp.prompt_id,
-        platform="reddit",
+        platform=opp.platform,
         title=None,
         content_body=body,
         brief=brief,
@@ -1362,56 +1455,68 @@ async def auto_draft_top_gaps(
         enabled_platforms = ["reddit", "quora"]
 
     # --- Generate: round-robin across platforms for equal distribution ---
-    # Each cycle generates one draft per platform (in order) using the best
-    # remaining prompt. This ensures e.g. 4 platforms × 5 rounds = 20 evenly
-    # spread drafts rather than front-loading the first prompt/platform.
+    # Cycles through all (prompt, platform) combinations repeatedly until
+    # max_gaps drafts are created or DRAFT_CAP is hit. This means 3 prompts ×
+    # 4 platforms = 12 unique combos, but we keep cycling to reach 20.
     created: list[ContentDraft] = []
     last_error: Optional[Exception] = None  # track first hard failure for diagnostics
     n_platforms = len(enabled_platforms)
+    n_prompts = len(ordered_prompts)
     prompt_idx = 0
     platform_idx = 0  # absolute index, wraps via modulo
+    # Safety limit: stop after trying each (prompt, platform) combo 3× — prevents
+    # infinite loops when every attempt raises a non-cap exception.
+    max_attempts = n_prompts * n_platforms * 3
+    attempts = 0
+    # Per-prompt Quora question index — cycles through results so multiple drafts
+    # for the same prompt each target a different question.
+    quora_question_idx: dict[int, int] = {}
 
-    while len(created) < max_gaps and prompt_idx < len(ordered_prompts):
+    while len(created) < max_gaps and attempts < max_attempts:
         platform = enabled_platforms[platform_idx % n_platforms]
-        prompt = ordered_prompts[prompt_idx]
+        prompt = ordered_prompts[prompt_idx % n_prompts]
 
-        # For Quora, resolve a real question first so the draft is targeted
+        # For Quora, resolve a real question first so the draft is targeted.
+        # Always query Serper for fresh results (24h in-process cache prevents
+        # duplicate API calls within a day). Fall back to stored gap questions
+        # only if Serper fails or returns nothing.
         quora_url: Optional[str] = None
         quora_title: Optional[str] = None
         quora_snippet: Optional[str] = None
         if platform == "quora":
             from app.services.quora_search_service import extract_keywords, search_quora_questions
-            # 1. Use questions stored on the gap (already fetched during gap analysis)
-            _gap = best_gap_by_prompt.get(prompt.id)
-            _stored: list[dict] = []
-            if _gap and _gap.quora_questions:
-                try:
-                    _stored = json.loads(_gap.quora_questions)
-                except Exception:
-                    pass
-            if _stored:
-                _q = _stored[0]
+            _questions: list[dict] = []
+
+            # 1. Serper (fresh, cache-deduplicated per 24h)
+            try:
+                _keywords = extract_keywords(prompt.text)
+                if _keywords:
+                    _questions = await asyncio.to_thread(
+                        search_quora_questions, _keywords, 5, prompt.id
+                    )
+            except Exception as _qe:
+                logger.debug(
+                    "auto_draft_top_gaps: Serper lookup skipped for prompt %d: %s",
+                    prompt.id, _qe,
+                )
+
+            # 2. Fallback: stored gap questions (if Serper returned nothing)
+            if not _questions:
+                _gap = best_gap_by_prompt.get(prompt.id)
+                if _gap and _gap.quora_questions:
+                    try:
+                        _questions = json.loads(_gap.quora_questions)
+                    except Exception:
+                        pass
+
+            # Pick the next question for this prompt (cycle so each draft is different)
+            if _questions:
+                _idx = quora_question_idx.get(prompt.id, 0)
+                _q = _questions[_idx % len(_questions)]
+                quora_question_idx[prompt.id] = _idx + 1
                 quora_url = _q.get("url")
                 quora_title = _q.get("title")
                 quora_snippet = _q.get("snippet")
-            else:
-                # 2. Fetch live from Serper (non-fatal — falls back to generic draft)
-                try:
-                    _keywords = extract_keywords(prompt.text)
-                    if _keywords:
-                        _questions = await asyncio.to_thread(
-                            search_quora_questions, _keywords, 3, prompt.id
-                        )
-                        if _questions:
-                            _q = _questions[0]
-                            quora_url = _q.get("url")
-                            quora_title = _q.get("title")
-                            quora_snippet = _q.get("snippet")
-                except Exception as _qe:
-                    logger.debug(
-                        "auto_draft_top_gaps: Quora question lookup skipped for prompt %d: %s",
-                        prompt.id, _qe,
-                    )
 
         try:
             draft = await generate_gap_draft(
@@ -1449,6 +1554,7 @@ async def auto_draft_top_gaps(
         platform_idx += 1
         if platform_idx % n_platforms == 0:
             prompt_idx += 1
+        attempts += 1
 
     logger.info(
         "auto_draft_top_gaps: created %d drafts for brand_id=%d", len(created), brand_id,

@@ -188,7 +188,7 @@ async def test_generate_now_endpoint_exists(client: httpx.AsyncClient):
     brand = await create_brand(client, name="Cap Brand", prompts=["Test prompt?"])
     brand_id = brand["id"]
 
-    async def mock_auto_draft(db, brand_id, max_gaps=20, clear_existing=False):
+    async def mock_auto_draft(db, brand_id, max_gaps=20, clear_existing=False, **kwargs):
         return []
 
     with patch("app.routers.content.auto_draft_top_gaps", side_effect=mock_auto_draft):
@@ -237,9 +237,29 @@ async def test_update_content_settings(client: httpx.AsyncClient):
     brand = await create_brand(client, name="Update Settings Brand")
     resp = await client.put(
         f"/api/content/{brand['id']}/settings/reddit",
-        json={"enabled": True, "drafting_frequency": "weekly", "auto_post": False},
+        json={"enabled": True, "auto_post": False},
     )
     assert resp.status_code == 200
     data = resp.json()
     assert data["platform"] == "reddit"
-    assert data["drafting_frequency"] == "weekly"
+    assert data["enabled"] is True
+
+
+# ── _sanitize_user_input ──────────────────────────────────────────────────────
+
+from app.services.drafting_service import _sanitize_user_input
+
+def test_sanitize_truncates_long_input():
+    result = _sanitize_user_input("x" * 1000, max_length=500)
+    assert len(result) == 500
+
+def test_sanitize_strips_control_characters():
+    result = _sanitize_user_input("normal\x00null\x1fbytes")
+    assert "\x00" not in result
+    assert "\x1f" not in result
+
+def test_sanitize_handles_none():
+    assert _sanitize_user_input(None) == ""
+
+def test_sanitize_handles_empty():
+    assert _sanitize_user_input("") == ""

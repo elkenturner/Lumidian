@@ -70,6 +70,8 @@ _MAX_VERIFY = 10        # 10 attempts / minute / IP
 _MAX_RESEND = 3         # 3 attempts / minute / IP (prevent email flooding)
 _totp_setup_attempts: dict = defaultdict(list)
 _MAX_TOTP_SETUP = 5     # 5 setups / minute / user_id
+_reset_attempts: dict = defaultdict(list)
+_MAX_RESET = 5          # 5 attempts / minute / IP
 
 
 def _rate_check(ip: str, store: dict, limit: int) -> None:
@@ -569,8 +571,9 @@ class ResetPasswordRequest(BaseModel):
 
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
-async def reset_password(request: ResetPasswordRequest, db: DbDep):
+async def reset_password(request: ResetPasswordRequest, http_req: Request, db: DbDep):
     """Validate reset token and update user's password."""
+    _rate_check(http_req.client.host if http_req.client else "unknown", _reset_attempts, _MAX_RESET)
     if len(request.new_password) < 6:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -578,7 +581,6 @@ async def reset_password(request: ResetPasswordRequest, db: DbDep):
         )
 
     # Tokens are stored as bcrypt hashes — find all unexpired, unused tokens and verify
-    from sqlalchemy import and_
     now_lookup = datetime.now(timezone.utc).replace(tzinfo=None)
     candidates_result = await db.execute(
         select(PasswordResetToken).where(

@@ -292,3 +292,62 @@ async def test_password_reset_token_stored_as_hash(client, db_session):
     assert len(tokens) > 0
     for t in tokens:
         assert t.token.startswith("$2b$"), f"Token not hashed: {t.token[:20]}"
+
+
+@pytest.mark.asyncio
+async def test_password_reset_end_to_end(client, db_session):
+    """Full reset flow: request reset, redeem hashed token, verify new password works."""
+    from unittest.mock import patch
+    from app.models import PasswordResetToken
+    from sqlalchemy import select as sa_select
+
+    # Register user
+    await client.post("/api/auth/register", json={
+        "email": "e2ereset@example.com", "password": "oldpassword123"
+    })
+
+    captured_link = {}
+
+    def mock_send_bg(fn, **kwargs):
+        # Capture the reset_link from the kwargs passed to send_password_reset_email
+        if "reset_link" in kwargs:
+            captured_link["url"] = kwargs["reset_link"]
+
+    with patch("app.services.email_service.send_email_background", side_effect=mock_send_bg):
+        await client.post("/api/auth/forgot-password", json={"email": "e2ereset@example.com"})
+
+    assert "url" in captured_link, "Reset link was not captured"
+
+    # Extract raw token from the URL
+    raw_token = captured_link["url"].split("token=")[-1]
+
+    # Redeem the token
+    resp = await client.post("/api/auth/reset-password", json={
+        "token": raw_token,
+        "new_password": "newpassword456"
+    })
+    assert resp.status_code == 200
+
+    # Verify the token is now marked used
+    result = await db_session.execute(sa_select(PasswordResetToken))
+    tokens = result.scalars().all()
+    assert all(t.used for t in tokens), "Token should be marked used after redemption"
+
+    # Verify login with new password works
+    login_resp = await client.post("/api/auth/login", json={
+        "email": "e2ereset@example.com",
+        "password": "newpassword456"
+    })
+    assert login_resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_csrf_allows_known_origin(client):
+    """Requests from a known allowed origin must pass through to the handler."""
+    resp = await client.post(
+        "/api/auth/login",
+        json={"email": "nobody@example.com", "password": "pass"},
+        headers={"origin": "http://localhost:3000"},
+    )
+    # Reaches the auth handler (401), not blocked by CSRF (403)
+    assert resp.status_code == 401

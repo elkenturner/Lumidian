@@ -217,6 +217,19 @@ async def _sqlite_backup_sweep() -> None:
         logger.exception("SQLite backup failed — could not copy file")
         return
 
+    # Verify backup integrity
+    import sqlite3 as _sqlite3
+    try:
+        conn = _sqlite3.connect(str(backup_file))
+        result = conn.execute("PRAGMA integrity_check").fetchone()
+        conn.close()
+        if result and result[0] == "ok":
+            logger.info("Backup integrity check passed: %s", backup_file)
+        else:
+            logger.warning("Backup integrity check FAILED for %s: %s", backup_file, result)
+    except Exception:
+        logger.exception("Backup integrity check could not run for %s", backup_file)
+
     # Prune: keep only the 7 most recent backups
     backups = sorted(backup_dir.glob("clarity_ai_*.db"), key=lambda p: p.stat().st_mtime, reverse=True)
     for old_backup in backups[7:]:

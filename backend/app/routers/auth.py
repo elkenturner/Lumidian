@@ -14,6 +14,7 @@ POST /api/auth/google              — (legacy) exchange Google ID token for ses
 from __future__ import annotations
 
 import os
+import re
 import time
 import urllib.parse
 from collections import defaultdict
@@ -38,6 +39,22 @@ from app.models import User, PasswordResetToken, utcnow
 
 logger = logging.getLogger(__name__)
 
+_SAFE_PATH_RE = re.compile(r'^/[a-zA-Z0-9/_\-?=&%#.]*$')
+
+
+def _safe_redirect_path(state: Optional[str]) -> str:
+    """Validate an OAuth state parameter is a safe internal path.
+    Rejects anything with double-slash, backslash, or non-path characters."""
+    if not state:
+        return "/dashboard"
+    if not _SAFE_PATH_RE.match(state):
+        return "/dashboard"
+    # Reject double-slash (protocol-relative URLs like //evil.com)
+    if "//" in state:
+        return "/dashboard"
+    return state
+
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 # ── In-memory rate limiter ─────────────────────────────────────────────────────
@@ -51,6 +68,8 @@ _verify_attempts: dict = defaultdict(list)
 _resend_attempts: dict = defaultdict(list)
 _MAX_VERIFY = 10        # 10 attempts / minute / IP
 _MAX_RESEND = 3         # 3 attempts / minute / IP (prevent email flooding)
+_totp_setup_attempts: dict = defaultdict(list)
+_MAX_TOTP_SETUP = 5     # 5 setups / minute / user_id
 
 
 def _rate_check(ip: str, store: dict, limit: int) -> None:
@@ -72,8 +91,8 @@ def _rate_check(ip: str, store: dict, limit: int) -> None:
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
-# Admin emails from env — comma-separated. Falls back to ken@lumidian.ai if not set.
-_raw_admin_emails = os.getenv("ADMIN_EMAILS", "ken@lumidian.ai")
+# Admin emails from env — comma-separated. Requires explicit ADMIN_EMAILS env var.
+_raw_admin_emails = os.getenv("ADMIN_EMAILS", "")
 _ADMIN_EMAILS: set[str] = {e.strip().lower() for e in _raw_admin_emails.split(",") if e.strip()}
 
 # Use secure cookies when ENVIRONMENT=production
@@ -217,6 +236,7 @@ async def login(body: LoginRequest, http_req: Request, response: Response, db: D
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user or not user.password_hash or not verify_password(request.password, user.password_hash):
+        logger.warning("failed login attempt email=%s ip=%s", email, http_req.client.host if http_req.client else "unknown")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     # If 2FA is enabled, issue a short-lived challenge token instead of a session
@@ -378,7 +398,7 @@ async def google_auth_callback(
     set auth cookies, and redirect to the app.
     """
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    redirect_to = state if (state and state.startswith("/")) else "/dashboard"
+    redirect_to = _safe_redirect_path(state)
 
     # Google signalled an error (e.g. user cancelled)
     if error:
@@ -562,10 +582,12 @@ async def reset_password(request: ResetPasswordRequest, db: DbDep):
     reset_token = result.scalar_one_or_none()
 
     if not reset_token:
+        logger.warning("invalid password reset token attempt")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
 
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     if reset_token.used or reset_token.expires_at < now:
+        logger.warning("expired or used password reset token for user_id=%s", reset_token.user_id)
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token")
 
     # Update password
@@ -704,6 +726,7 @@ async def setup_2fa(
     Returns the provisioning URI and a base64-encoded QR code PNG.
     2FA is NOT enabled yet — the user must confirm with /2fa/enable.
     """
+    _rate_check(str(current_user.id), _totp_setup_attempts, _MAX_TOTP_SETUP)
     import pyotp
     import qrcode
     import io
@@ -836,6 +859,7 @@ async def verify_2fa(
 
     totp = pyotp.TOTP(user.totp_secret)
     if not totp.verify(body.code.strip(), valid_window=1):
+        logger.warning("failed 2FA verification for user_id=%s", user_id)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authenticator code.",

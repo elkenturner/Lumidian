@@ -7,6 +7,7 @@ Tests for authentication endpoints:
   JWT validation
   Password length enforcement
 """
+import logging
 import pytest
 import httpx
 from tests.conftest import register_user, login_user, register_and_login
@@ -175,3 +176,71 @@ async def test_tampered_token_rejected(client: httpx.AsyncClient):
 
 # ── Password reset token placeholder (tested in test_password_reset.py) ───────
 # (full tests are in test_password_reset.py once Task 2 is implemented)
+
+
+# ── Task 2: Auth Event Logging ────────────────────────────────────────────────
+
+async def test_failed_login_is_logged(client, caplog):
+    """A wrong-password login attempt must emit a warning log."""
+    with caplog.at_level(logging.WARNING, logger="app.routers.auth"):
+        resp = await client.post("/api/auth/login", json={
+            "email": "nobody@example.com",
+            "password": "wrongpassword"
+        })
+    assert resp.status_code == 401
+    assert any("failed login" in r.message.lower() for r in caplog.records)
+
+
+# ── Task 3: Google OAuth Open Redirect Fix ────────────────────────────────────
+
+from app.routers.auth import _safe_redirect_path
+
+
+def test_safe_redirect_path_blocks_double_slash():
+    assert _safe_redirect_path("//evil.com") == "/dashboard"
+
+
+def test_safe_redirect_path_blocks_backslash():
+    assert _safe_redirect_path("/\\evil.com") == "/dashboard"
+
+
+def test_safe_redirect_path_blocks_external_url():
+    assert _safe_redirect_path("https://evil.com") == "/dashboard"
+
+
+def test_safe_redirect_path_allows_internal_paths():
+    assert _safe_redirect_path("/dashboard") == "/dashboard"
+    assert _safe_redirect_path("/content/123") == "/content/123"
+    assert _safe_redirect_path("/settings/billing") == "/settings/billing"
+
+
+def test_safe_redirect_path_handles_none():
+    assert _safe_redirect_path(None) == "/dashboard"
+    assert _safe_redirect_path("") == "/dashboard"
+
+
+# ── Task 4: TOTP Setup Rate Limiting ─────────────────────────────────────────
+
+async def test_totp_setup_rate_limited(client):
+    """2FA setup must be rate-limited."""
+    from app.routers.auth import _totp_setup_attempts
+    from tests.conftest import AsyncSessionLocal
+    from sqlalchemy import text
+    _totp_setup_attempts.clear()
+
+    email = "totp_rate@example.com"
+    await register_and_login(client, email=email, password="password123")
+    # Mark email as verified so get_current_user allows access
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("UPDATE users SET email_verified = 1 WHERE email = :email"),
+            {"email": email},
+        )
+        await db.commit()
+
+    for _ in range(5):
+        resp = await client.post("/api/auth/2fa/setup")
+        assert resp.status_code in (200, 400, 403)
+
+    resp = await client.post("/api/auth/2fa/setup")
+    assert resp.status_code == 429

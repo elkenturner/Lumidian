@@ -64,6 +64,11 @@ def _rate_check(ip: str, store: dict, limit: int) -> None:
         )
     store[ip].append(now)
 
+    # Prune IPs with no recent attempts to keep dicts bounded
+    empty_ips = [k for k, v in store.items() if not v]
+    for k in empty_ips:
+        del store[k]
+
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 # Admin emails from env — comma-separated. Falls back to ken@lumidian.ai if not set.

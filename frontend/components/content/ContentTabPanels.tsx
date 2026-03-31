@@ -73,7 +73,7 @@ export interface ContentTabPanelsProps {
   pinnedDraftId: number | null;
   // Handlers
   handleGenerateNow: () => void;
-  handleApprove: (id: number) => void;
+  handleApprove: (id: number) => Promise<void>;
   handleDelete: (id: number) => void;
   handleSaved: (d: ContentDraft) => void;
   handleMarkAsPosted: (id: number) => void;
@@ -508,7 +508,7 @@ function DraftCard({
   postedItems: ContentDraft[];
   prompts: Prompt[];
   brandId: number;
-  onApprove: (id: number) => void | Promise<void>;
+  onApprove: (id: number) => Promise<void>;
   onDelete: (id: number) => void;
   onSaved: (d: ContentDraft) => void;
   onRegenerated: (d: ContentDraft) => void;
@@ -528,6 +528,8 @@ function DraftCard({
     setApproving(true);
     try {
       await onApprove(draft.id);
+    } catch {
+      // onApprove may re-throw on unexpected errors; spinner still clears via finally
     } finally {
       setApproving(false);
     }
@@ -587,7 +589,7 @@ function DraftCard({
       <div className="flex items-center justify-between gap-2">
         <PlatformBadge platform={draft.platform} />
         <span className="text-[10px] text-[#475569] shrink-0">
-          {formatDistanceToNow(parseISO(draft.created_at), { addSuffix: true })}
+          {relativeTime(draft.created_at)}
         </span>
       </div>
 
@@ -804,7 +806,8 @@ function DraftCard({
           </button>
           <button
             onClick={() => onDelete(draft.id)}
-            className="flex items-center gap-1.5 text-xs text-[#ef4444]/70 hover:text-[#f87171] rounded-lg px-3 py-1.5 transition-colors ml-auto"
+            disabled={approving}
+            className="flex items-center gap-1.5 text-xs text-[#ef4444]/70 hover:text-[#f87171] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors ml-auto"
           >
             <Trash2 size={11} />
             Dismiss

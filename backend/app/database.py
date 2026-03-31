@@ -263,6 +263,16 @@ async def run_migrations():
         "ALTER TABLE users ADD COLUMN email_verified INTEGER NOT NULL DEFAULT 1",
         "ALTER TABLE users ADD COLUMN email_verification_code TEXT",
         "ALTER TABLE users ADD COLUMN email_verification_expires_at DATETIME",
+        # Daily rate-limit for manual "Generate Drafts Now" button (once per 24h per brand)
+        "ALTER TABLE brands ADD COLUMN last_manual_draft_at DATETIME",
+        # Performance: content drafts filtered by brand + status (content page)
+        "CREATE INDEX IF NOT EXISTS idx_content_drafts_brand_status ON content_drafts(brand_id, status)",
+        # Performance: tracking runs sorted by brand + completion time (dashboard trend)
+        "CREATE INDEX IF NOT EXISTS idx_tracking_runs_brand_completed ON tracking_runs(brand_id, completed_at DESC)",
+        # Performance: notifications unread count (loaded on every page)
+        "CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read) WHERE read = 0",
+        # Performance: content gaps by brand (gap analysis page)
+        "CREATE INDEX IF NOT EXISTS idx_content_gaps_brand ON content_gaps(brand_id, identified_at DESC)",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

@@ -1894,6 +1894,11 @@ export default function ContentHubPage() {
   const [postingPlatform, setPostingPlatform] = useState<'reddit' | 'quora' | 'medium' | 'wikipedia'>('reddit');
 
   const [savedPlatform, setSavedPlatform] = useState<string | null>(null);
+  useEffect(() => {
+    if (!savedPlatform) return;
+    const t = setTimeout(() => setSavedPlatform(null), 2000);
+    return () => clearTimeout(t);
+  }, [savedPlatform]);
 
   // Platform filtering
   const _disabledPlatforms = new Set(
@@ -2119,7 +2124,6 @@ export default function ContentHubPage() {
         prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))
       );
       setSavedPlatform(platform);
-      setTimeout(() => setSavedPlatform(null), 2000);
     }
   }
 

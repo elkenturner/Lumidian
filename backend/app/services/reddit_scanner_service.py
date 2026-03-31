@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import re
 import urllib.parse
 from datetime import datetime, timezone, timedelta
@@ -49,7 +50,7 @@ _BLOCKED_SUBS: frozenset[str] = frozenset({
 
 # Signal words in subreddit *names* that indicate NSFW/harmful content
 _BLOCKED_SUB_SIGNALS: tuple[str, ...] = (
-    "nsfw", "porn", "gore", "xxx", "nude", "fetish", "crisis",
+    "nsfw", "porn", "gore", "xxx", "nude", "fetish",
     "selfharm", "suicide", "rape", "abuse",
 )
 
@@ -259,8 +260,7 @@ def _score_thread(
         recency = 0.05  # Very old but not zero — evergreen threads still have value
 
     # Engagement — log scale on comment count (saturates at ~200 comments)
-    import math
-    engagement = min(1.0, math.log10(num_comments + 1) / math.log10(201)) if num_comments >= 0 else 0.0
+    engagement = min(1.0, math.log10(num_comments + 1) / math.log10(201))
 
     # Brand mention bonus
     brand_bonus = 10.0 if brand_name and brand_name.lower() in combined else 0.0

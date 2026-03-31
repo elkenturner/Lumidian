@@ -55,6 +55,8 @@ import {
   TeamMember,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBrand } from '@/contexts/BrandContext';
+import { AppToast, ToastData } from '@/components/AppToast';
 
 type SettingsTab = 'general' | 'profile' | 'team';
 
@@ -276,6 +278,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
+  const { activeBrandId: contextBrandId } = useBrand();
   const [activeTab, setActiveTab] = useState<SettingsTab>(
     (searchParams.get('tab') as SettingsTab) || 'general'
   );
@@ -337,10 +340,18 @@ export default function SettingsPage() {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
 
+  const [toast, setToast] = useState<ToastData | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   useEffect(() => { document.title = 'Settings — Lumidian'; }, []);
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       try {
         // Start brand details fetching as soon as getBrands resolves —
         // don't wait for getSchedulerStatus (independent, slower).
@@ -348,10 +359,11 @@ export default function SettingsPage() {
         const schedulerPromise = getSchedulerStatus().catch(() => null);
         const detailsPromise = brandsPromise.then((brands) => {
           if (brands.length === 0) return null;
+          const targetId = contextBrandId ?? brands[0].id;
           return Promise.all([
-            getBrand(brands[0].id),
-            getCompetitors(brands[0].id),
-            getBrandProfile(brands[0].id).catch(() => null),
+            getBrand(targetId),
+            getCompetitors(targetId),
+            getBrandProfile(targetId).catch(() => null),
           ]);
         });
 
@@ -371,13 +383,13 @@ export default function SettingsPage() {
           return;
         }
 
-        const firstBrand = brands[0];
-        setBrandId(firstBrand.id);
+        const targetBrandId = contextBrandId ?? brands[0].id;
+        setBrandId(targetBrandId);
 
         const [brandDetail, comps, prof] = (details ?? await Promise.all([
-          getBrand(firstBrand.id),
-          getCompetitors(firstBrand.id),
-          getBrandProfile(firstBrand.id).catch(() => null),
+          getBrand(targetBrandId),
+          getCompetitors(targetBrandId),
+          getBrandProfile(targetBrandId).catch(() => null),
         ])) as [BrandDetail, Competitor[], BrandProfile | null];
 
         setBrand(brandDetail);
@@ -414,7 +426,7 @@ export default function SettingsPage() {
     }
 
     load();
-  }, []);
+  }, [contextBrandId]);
 
   // Load team members when team tab is selected
   useEffect(() => {
@@ -469,6 +481,7 @@ export default function SettingsPage() {
       });
       setBrand((prev) => prev ? { ...prev, ...updated } : null);
       setSaveSuccess(true);
+      setToast({ message: 'Changes saved', type: 'success' });
       setTimeout(() => setSaveSuccess(false), 2000);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
@@ -663,6 +676,7 @@ export default function SettingsPage() {
       });
       setProfile(updated);
       setProfileSaved(true);
+      setToast({ message: 'Profile saved', type: 'success' });
       setTimeout(() => setProfileSaved(false), 2500);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
@@ -743,7 +757,7 @@ export default function SettingsPage() {
           {/* Left column */}
           <div className="space-y-6">
           {/* Brand Settings */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <h2 className="text-[15px] font-semibold text-[#F0F4F8] pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">Brand Settings</h2>
             <div className="space-y-4">
               <div>
@@ -812,7 +826,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Tracking Prompts */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <div className="flex items-center justify-between pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">
               <div>
                 <h2 className="text-[15px] font-semibold text-[#F0F4F8]">Tracking Prompts</h2>
@@ -854,11 +868,7 @@ export default function SettingsPage() {
             </div>
 
             {brand.prompts.length === 0 ? (
-              <div className="flex flex-col items-center py-8 text-center border border-dashed border-[rgba(99,102,241,0.22)] rounded-lg bg-[rgba(255,255,255,0.03)]">
-                <MessageSquare size={18} className="text-[#475569] mb-2" />
-                <p className="text-sm text-[#475569]">No prompts yet</p>
-                <p className="text-xs text-[#475569] mt-0.5">Add your first prompt above</p>
-              </div>
+              <p className="text-sm text-[#475569] text-center py-6">No prompts yet — add one above</p>
             ) : (
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {brand.prompts.map((prompt: Prompt) => (
@@ -886,12 +896,11 @@ export default function SettingsPage() {
             )}
 
             {showSuggestions && (
-              <div className="mt-4 border border-[rgba(255,255,255,0.10)] rounded-xl overflow-hidden">
-                <div className="flex items-center justify-between px-4 py-2.5 bg-[rgba(255,255,255,0.06)] border-b border-[rgba(99,102,241,0.22)]">
-                  <div className="flex items-center gap-2">
-                    <Sparkles size={13} className="text-[#6366f1]" />
-                    <span className="text-xs font-semibold text-[#F0F4F8]">Suggested Prompts</span>
-                    <span className="text-xs text-[#475569]">click to add</span>
+              <div className="mt-3 border-t border-[rgba(255,255,255,0.08)] pt-3">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles size={12} className="text-[#6366f1]" />
+                    <span className="text-xs font-medium text-[#94A3B8]">Suggested — click to add</span>
                   </div>
                   <button
                     onClick={() => { setShowSuggestions(false); setSuggestions([]); }}
@@ -902,23 +911,23 @@ export default function SettingsPage() {
                   </button>
                 </div>
                 {loadingSuggestions ? (
-                  <div className="flex items-center justify-center py-8 gap-2 text-[#64748B] text-xs">
+                  <div className="flex items-center justify-center py-6 gap-2 text-[#64748B] text-xs">
                     <Loader2 size={14} className="animate-spin text-[#6366f1]" />
                     Generating suggestions with Claude…
                   </div>
                 ) : suggestions.length === 0 ? (
-                  <div className="px-4 py-6 text-center text-xs text-[#475569]">
+                  <div className="px-2 py-4 text-center text-xs text-[#475569]">
                     No suggestions available. Try adding more brand profile info.
                   </div>
                 ) : (
-                  <div className="divide-y divide-[rgba(255,255,255,0.08)] max-h-72 overflow-y-auto">
+                  <div className="divide-y divide-[rgba(255,255,255,0.06)] max-h-64 overflow-y-auto rounded-lg border border-[rgba(255,255,255,0.07)]">
                     {suggestions.map((s) => (
                       <button
                         key={s}
                         onClick={() => handleAddSuggestion(s)}
-                        className="w-full text-left px-4 py-2.5 flex items-start gap-2.5 hover:bg-[rgba(255,255,255,0.06)] transition-colors group"
+                        className="w-full text-left px-3 py-2.5 flex items-start gap-2 hover:bg-[rgba(255,255,255,0.04)] transition-colors group"
                       >
-                        <Plus size={13} className="text-[#6366f1] flex-shrink-0 mt-0.5" />
+                        <Plus size={12} className="text-[#6366f1] flex-shrink-0 mt-0.5" />
                         <span className="text-xs text-[#94A3B8] group-hover:text-[#F0F4F8] leading-relaxed transition-colors">{s}</span>
                       </button>
                     ))}
@@ -931,7 +940,7 @@ export default function SettingsPage() {
 
           <div className="space-y-6">
           {/* Competitors */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <div className="pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">
               <h2 className="text-[15px] font-semibold text-[#F0F4F8]">Competitors</h2>
               <p className="text-xs text-[#64748B] mt-0.5">Track competitor mention rates alongside your brand</p>
@@ -955,11 +964,7 @@ export default function SettingsPage() {
               </button>
             </div>
             {competitors.length === 0 ? (
-              <div className="flex flex-col items-center py-8 text-center border border-dashed border-[rgba(99,102,241,0.22)] rounded-lg bg-[rgba(255,255,255,0.03)]">
-                <Building2 size={18} className="text-[#475569] mb-2" />
-                <p className="text-sm text-[#475569]">No competitors tracked</p>
-                <p className="text-xs text-[#475569] mt-0.5 opacity-60">Add one above to unlock Share of Voice</p>
-              </div>
+              <p className="text-sm text-[#475569] text-center py-6">No competitors tracked — add one above to unlock Share of Voice</p>
             ) : (
               <div className="space-y-2">
                 {competitors.map((comp) => (
@@ -1019,40 +1024,21 @@ export default function SettingsPage() {
             </div>
           )}
 
-          <div className="flex items-center justify-between mb-4 gap-3">
-            {/* AI Fill button — only shown when website is set */}
-            <div className="flex items-center gap-3">
-              {editWebsiteUrl ? (
-                <button
-                  onClick={handleAiFill}
-                  disabled={aiFilling || profileSaving}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.18)] border border-[rgba(99,102,241,0.28)] text-[#818cf8] disabled:opacity-50 transition-all"
-                  title="Scan website and auto-fill profile fields"
-                >
-                  {aiFilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
-                  {aiFilling ? 'Scanning website…' : 'Fill from website'}
-                </button>
-              ) : (
-                <p className="text-xs text-[#475569]">Add a website URL in Brand Settings to enable AI fill.</p>
-              )}
-              {aiFillError && <p className="text-xs text-[#f87171]">{aiFillError}</p>}
-            </div>
-            <button
-              onClick={handleProfileSave}
-              disabled={profileSaving}
-              className={clsx(
-                'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all shrink-0',
-                profileSaved
-                  ? 'bg-[#064e3b]/30 text-[#10b981] border border-[#065f46]/40'
-                  : 'bg-[#6366f1] text-white hover:bg-[#4f46e5] disabled:opacity-50'
-              )}
-            >
-              {profileSaved ? (
-                <><CheckCircle size={16} />Saved</>
-              ) : (
-                <><Save size={16} />{profileSaving ? 'Saving…' : 'Save Profile'}</>
-              )}
-            </button>
+          <div className="flex items-center gap-3 mb-4">
+            {editWebsiteUrl ? (
+              <button
+                onClick={handleAiFill}
+                disabled={aiFilling || profileSaving}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.18)] border border-[rgba(99,102,241,0.28)] text-[#818cf8] disabled:opacity-50 transition-all"
+                title="Scan website and auto-fill profile fields"
+              >
+                {aiFilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
+                {aiFilling ? 'Scanning website…' : 'Fill from website'}
+              </button>
+            ) : (
+              <p className="text-xs text-[#475569]">Add a website URL in Brand Settings to enable AI fill.</p>
+            )}
+            {aiFillError && <p className="text-xs text-[#f87171]">{aiFillError}</p>}
           </div>
 
           <div className="space-y-4">
@@ -1169,7 +1155,7 @@ export default function SettingsPage() {
       {/* ── TEAM TAB ─────────────────────────────────────────────────────────── */}
       {activeTab === 'team' && (
         <div className="space-y-5">
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <h2 className="text-base font-semibold text-[#F0F4F8] mb-1">Invite Team Members</h2>
             <p className="text-sm text-[#64748B] mb-4">Team members get read-only access to your brands, reports, and drafts. They cannot trigger runs or change settings.</p>
 
@@ -1213,7 +1199,7 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
             <h2 className="text-base font-semibold text-[#F0F4F8] mb-4">Team Members</h2>
             {teamLoading ? (
               <div className="flex items-center gap-2 text-[#64748B] text-sm"><Loader2 size={14} className="animate-spin" />Loading…</div>
@@ -1305,6 +1291,7 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+      {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

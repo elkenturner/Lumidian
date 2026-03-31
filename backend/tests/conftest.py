@@ -146,14 +146,18 @@ async def register_and_login(
     Pass subscription_tier=None to test free-tier limits.
     """
     await register_user(client, email, password)
-    if subscription_tier:
-        async with AsyncSessionLocal() as db:
-            from sqlalchemy import text
-            await db.execute(
-                text("UPDATE users SET subscription_tier = :tier WHERE email = :email"),
-                {"tier": subscription_tier, "email": email},
-            )
-            await db.commit()
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        updates = "email_verified = 1"
+        params: dict = {"email": email}
+        if subscription_tier:
+            updates += ", subscription_tier = :tier"
+            params["tier"] = subscription_tier
+        await db.execute(
+            text(f"UPDATE users SET {updates} WHERE email = :email"),
+            params,
+        )
+        await db.commit()
     await login_user(client, email, password)
 
 

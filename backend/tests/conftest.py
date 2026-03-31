@@ -178,3 +178,31 @@ async def create_brand(
     )
     assert resp.status_code == 201, resp.text
     return resp.json()
+
+
+class _TmpDb:
+    """Minimal async helper for reddit scanner integration tests."""
+
+    async def create_brand_with_prompt(self, name: str, prompt: str) -> int:
+        from app.models import Brand, Prompt, User
+        import secrets
+        async with AsyncSessionLocal() as session:
+            user = User(
+                email=f"test_{secrets.token_hex(4)}@example.com",
+                password_hash="x",
+                email_verified=1,
+            )
+            session.add(user)
+            await session.flush()
+            brand = Brand(name=name, slug=f"{name.lower()}-{secrets.token_hex(4)}", user_id=user.id)
+            session.add(brand)
+            await session.flush()
+            p = Prompt(brand_id=brand.id, text=prompt)
+            session.add(p)
+            await session.commit()
+            return brand.id
+
+
+@pytest.fixture
+def tmp_db():
+    return _TmpDb()

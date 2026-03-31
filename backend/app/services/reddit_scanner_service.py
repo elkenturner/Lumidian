@@ -379,74 +379,94 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             existing_urls = {r[0] for r in existing_row.all()}
 
         new_count = 0
-        month_ago_ts = datetime.now(timezone.utc).timestamp() - 30 * 86400
 
-        for prompt in prompts[:5]:
-            q = urllib.parse.quote(prompt.text)
+        # Build search queries: one per prompt (up to 6) + one for the brand name
+        queries: list[tuple[str, int | None]] = [
+            (prompt.text, prompt.id) for prompt in prompts[:6]
+        ]
+        queries.append((brand.name, None))  # brand-name query has no associated prompt
 
-            # Global search — _is_blocked_subreddit + _score_thread filters handle quality
-            global_url = (
+        all_candidates: list[tuple[dict, int | None]] = []  # (post_data, prompt_id)
+
+        for query_text, prompt_id in queries:
+            q = urllib.parse.quote(query_text)
+            url = (
                 f"{_REDDIT_BASE}/search.json"
-                f"?q={q}&sort=relevance&t=month&limit=25"
+                f"?q={q}&sort=relevance&t=month&limit=25&type=link"
             )
-            all_posts: list[dict] = _extract_posts(await _fetch(global_url))
+            data = await _fetch(url)
+            for post in _extract_posts(data):
+                all_candidates.append((post, prompt_id))
             await asyncio.sleep(1.0)
 
-            for post in all_posts:
-                permalink = post.get("permalink", "")
-                if not permalink:
-                    continue
-                url = f"https://www.reddit.com{permalink}"
-                if url in existing_urls:
-                    continue
+        # Deduplicate by permalink across all queries
+        seen_permalinks: set[str] = set()
+        deduped: list[tuple[dict, int | None]] = []
+        for post, prompt_id in all_candidates:
+            pl = post.get("permalink", "")
+            if pl and pl not in seen_permalinks:
+                seen_permalinks.add(pl)
+                deduped.append((post, prompt_id))
 
-                created_utc = float(post.get("created_utc", 0))
-                if created_utc < month_ago_ts:
-                    continue
+        # Score and store
+        # Use first prompt text as scoring reference for brand-name query results
+        default_prompt_text = prompts[0].text if prompts else ""
 
-                title = post.get("title", "")
-                body = post.get("selftext", "")
-                num_comments = int(post.get("num_comments", 0))
-                subreddit_name = post.get("subreddit", "")
+        for post, prompt_id in deduped:
+            permalink = post.get("permalink", "")
+            if not permalink:
+                continue
+            thread_url = f"https://www.reddit.com{permalink}"
+            if thread_url in existing_urls:
+                continue
 
-                if not title:
-                    continue
+            title = post.get("title", "")
+            if not title:
+                continue
 
-                # Skip explicitly blocked communities before any scoring
-                if _is_blocked_subreddit(subreddit_name):
-                    continue
+            subreddit_name = post.get("subreddit", "")
+            if _is_blocked_subreddit(subreddit_name):
+                continue
 
-                score = _score_thread(
-                    title, body, prompt.text, created_utc,
-                    num_comments=num_comments,
-                    brand_name=brand.name,
-                    subreddit=subreddit_name,
-                )
-                # Require 55+ to avoid low-relevance posts inflated by recency/engagement
-                if score < 55.0:
-                    continue
+            body = post.get("selftext", "")
+            created_utc = float(post.get("created_utc", 0))
+            num_comments = int(post.get("num_comments", 0))
 
-                posted_dt = (
-                    datetime.fromtimestamp(created_utc, tz=timezone.utc).replace(tzinfo=None)
-                    if created_utc
-                    else None
-                )
+            # For brand-name query results use first prompt as scoring reference
+            scoring_prompt = next(
+                (p.text for p in prompts if p.id == prompt_id),
+                default_prompt_text,
+            )
 
-                opp = ContentOpportunity(
-                    brand_id=brand_id,
-                    platform="reddit",
-                    thread_url=url,
-                    thread_title=title[:500],
-                    subreddit=subreddit_name[:100],
-                    body_preview=body[:500] if body else None,
-                    posted_at=posted_dt,
-                    relevance_score=score,
-                    prompt_id=prompt.id,
-                    status="new",
-                )
-                db.add(opp)
-                existing_urls.add(url)
-                new_count += 1
+            score = _score_thread(
+                title, body, scoring_prompt, created_utc,
+                num_comments=num_comments,
+                brand_name=brand.name,
+                subreddit=subreddit_name,
+            )
+            if score < 55.0:
+                continue
+
+            posted_dt = (
+                datetime.fromtimestamp(created_utc, tz=timezone.utc).replace(tzinfo=None)
+                if created_utc else None
+            )
+
+            opp = ContentOpportunity(
+                brand_id=brand_id,
+                platform="reddit",
+                thread_url=thread_url,
+                thread_title=title[:500],
+                subreddit=subreddit_name[:100],
+                body_preview=body[:500] if body else None,
+                posted_at=posted_dt,
+                relevance_score=score,
+                prompt_id=prompt_id,
+                status="new",
+            )
+            db.add(opp)
+            existing_urls.add(thread_url)
+            new_count += 1
 
         await db.commit()
         logger.info(

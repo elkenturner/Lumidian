@@ -57,9 +57,10 @@ async def clean_tables():
     # Reset in-memory rate limiters so tests don't affect each other
     from app.dependencies import _rate_store
     _rate_store.clear()
-    from app.routers.auth import _login_attempts, _register_attempts
+    from app.routers.auth import _login_attempts, _register_attempts, _totp_setup_attempts
     _login_attempts.clear()
     _register_attempts.clear()
+    _totp_setup_attempts.clear()
 
     async with AsyncSessionLocal() as db:
         from sqlalchemy import text

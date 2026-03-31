@@ -7,10 +7,12 @@ Tests for per-user rate limiting.
 Rate limit state is in-memory (_rate_store), so we reset it between tests
 by patching check_rate_limit or by directly clearing the store.
 """
+import time
 import pytest
 import httpx
 from unittest.mock import patch, AsyncMock
 from tests.conftest import register_and_login, create_brand
+from app.dependencies import _rate_store, check_rate_limit
 
 
 pytestmark = pytest.mark.asyncio
@@ -100,11 +102,7 @@ async def test_rate_limit_window_resets():
     assert _rate_store[user_id][0] == 1  # counter reset to 1
 
 
-import time
-from app.dependencies import _rate_store, check_rate_limit
-
-
-def test_rate_store_prunes_stale_entries(monkeypatch):
+def test_rate_store_prunes_stale_entries():
     """Old entries must be removed from _rate_store after the window expires."""
     _rate_store.clear()
 
@@ -119,7 +117,7 @@ def test_rate_store_prunes_stale_entries(monkeypatch):
     assert count == 1
 
 
-def test_rate_store_does_not_grow_unbounded(monkeypatch):
+def test_rate_store_does_not_grow_unbounded():
     """After many distinct users, _rate_store should not retain stale entries."""
     from app.dependencies import _rate_store, check_rate_limit, _RATE_WINDOW
     import time
@@ -134,10 +132,29 @@ def test_rate_store_does_not_grow_unbounded(monkeypatch):
     # One fresh call should trigger pruning pass
     check_rate_limit(9998, limit=5)
 
-    # Stale entries must be gone after the next call triggers cleanup
-    # (This test will FAIL until we add the cleanup sweep)
+    # Stale entries must be gone after the pruning sweep runs
     stale_count = sum(
         1 for uid, (cnt, start) in _rate_store.items()
         if uid in range(1000, 1100)
     )
     assert stale_count == 0, f"Expected 0 stale entries, got {stale_count}"
+
+
+def test_auth_rate_check_prunes_stale_ips():
+    """_rate_check must remove stale entries for inactive IPs, not just empty lists."""
+    from app.routers.auth import _rate_check, _login_attempts, _RATE_WINDOW
+    import time
+
+    _login_attempts.clear()
+
+    # Seed 50 IPs with stale timestamps (window expired)
+    stale_time = time.monotonic() - (_RATE_WINDOW + 10)
+    for i in range(50):
+        _login_attempts[f"192.168.1.{i}"] = [stale_time, stale_time]
+
+    # Call from a different IP to trigger the pruning sweep
+    _rate_check("10.0.0.1", _login_attempts, limit=10)
+
+    # All 50 stale IPs must be gone
+    stale_remaining = [ip for ip in _login_attempts if ip.startswith("192.168.1.")]
+    assert len(stale_remaining) == 0, f"Expected 0 stale IPs, got {len(stale_remaining)}"

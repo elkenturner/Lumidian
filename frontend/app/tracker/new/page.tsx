@@ -249,7 +249,7 @@ export default function NewBrandPage() {
               onKeyDown={(e) => e.key === 'Enter' && goNext()}
               placeholder="e.g. Acme Corp, Notion, Linear..."
               autoFocus
-              className="w-full bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] text-[#e2e8f0] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#64748b]"
+              className="w-full bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] text-[#e2e8f0] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#64748b]"
             />
           </div>
 
@@ -471,7 +471,7 @@ export default function NewBrandPage() {
                 onKeyDown={(e) => e.key === 'Enter' && canAddMore && addPrompt()}
                 placeholder="What is the best project management tool?"
                 disabled={!canAddMore}
-                className="flex-1 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] text-[#e2e8f0] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] placeholder:text-[#64748b] disabled:opacity-50"
+                className="flex-1 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] text-[#e2e8f0] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#64748b] disabled:opacity-50"
               />
               <button
                 onClick={() => addPrompt()}

@@ -691,13 +691,13 @@ function DraftCard({
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
             placeholder="Title (optional)"
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1]"
+            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
           />
           <textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             rows={8}
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] resize-none font-mono"
+            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none font-mono"
           />
           <div className="flex gap-2">
             <button
@@ -997,7 +997,7 @@ function WikipediaDraftCard({
               value={plainText}
               onChange={(e) => handlePlainChange(e.target.value)}
               rows={7}
-              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] resize-none leading-relaxed font-sans"
+              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none leading-relaxed font-sans"
               placeholder="Edit the plain text. Wiki formatting and citations are applied automatically."
             />
             <p className="text-[10px] text-[#475569]">

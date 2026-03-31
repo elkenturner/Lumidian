@@ -283,6 +283,10 @@ async def run_migrations():
         "CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read) WHERE read = 0",
         # Performance: content gaps by brand (gap analysis page)
         "CREATE INDEX IF NOT EXISTS idx_content_gaps_brand ON content_gaps(brand_id, identified_at DESC)",
+        # Performance: gap analysis page sorts by gap_score DESC
+        "CREATE INDEX IF NOT EXISTS idx_content_gaps_brand_score ON content_gaps(brand_id, gap_score DESC)",
+        # Performance: Quora scanner filters opportunities by brand + platform + status
+        "CREATE INDEX IF NOT EXISTS idx_opportunities_brand_platform_status ON content_opportunities(brand_id, platform, status)",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

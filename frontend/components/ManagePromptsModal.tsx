@@ -138,7 +138,7 @@ export function ManagePromptsModal({
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder="e.g. What is the best tool for early cancer detection?"
               disabled={atLimit}
-              className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] disabled:opacity-40"
+              className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 disabled:opacity-40"
             />
             <button
               onClick={handleAdd}

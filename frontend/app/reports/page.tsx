@@ -4,7 +4,6 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   BarChart2,
   ChevronDown,
-  Building2,
   Loader2,
   RefreshCw,
   Download,
@@ -89,48 +88,28 @@ function buildPromptGroups(responses: QueryResult[]): PromptGroup[] {
   return Array.from(map.values());
 }
 
-const STOPWORDS = new Set([
-  'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-  'of', 'with', 'by', 'from', 'is', 'are', 'was', 'were', 'be', 'been',
-  'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-  'should', 'may', 'might', 'can', 'that', 'this', 'these', 'those',
-  'it', 'its', 'they', 'them', 'their', 'he', 'she', 'we', 'you', 'i',
-  'as', 'if', 'when', 'then', 'than', 'so', 'also', 'both', 'each',
-  'which', 'who', 'what', 'how', 'not', 'no', 'such', 'there', 'here',
-  'more', 'most', 'other', 'some', 'any', 'all', 'between', 'into',
-  'through', 'however', 'while', 'after', 'before', 'about', 'above',
-  'medical', 'clinical', 'based', 'used', 'using', 'include', 'including',
-  'provides', 'provide', 'patient', 'patients', 'health', 'care', 'test',
-  'testing', 'research', 'study', 'studies', 'available', 'company',
-  'companies', 'technology', 'detection', 'blood', 'cancer', 'early',
-]);
-
-function extractGapMentions(group: PromptGroup, brandName: string): string {
+function extractGapMentions(group: PromptGroup, competitorNames: string[]): string {
+  if (competitorNames.length === 0) return '';
   const nonMentioned = group.responses.filter((r) => !r.mentioned && r.response_text);
   if (nonMentioned.length === 0) return '';
-  const brandLower = brandName.toLowerCase();
+
   const counts = new Map<string, number>();
-  for (const r of nonMentioned) {
-    const text = r.response_text!;
-    const matches = text.match(/\b[A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){0,2}\b/g) ?? [];
-    const seen = new Set<string>();
-    for (const m of matches) {
-      const lower = m.toLowerCase();
-      if (lower === brandLower || lower.split(' ').every((w) => STOPWORDS.has(w)) || m.length < 3) continue;
-      if (!m.includes(' ') && STOPWORDS.has(lower)) continue;
-      if (!seen.has(lower)) {
-        seen.add(lower);
-        counts.set(m, (counts.get(m) ?? 0) + 1);
-      }
+  for (const name of competitorNames) {
+    const nameLower = name.toLowerCase();
+    let count = 0;
+    for (const r of nonMentioned) {
+      if (r.response_text!.toLowerCase().includes(nameLower)) count++;
     }
+    if (count > 0) counts.set(name, count);
   }
+
   if (counts.size === 0) return '';
+
   const top = Array.from(counts.entries())
-    .filter(([, n]) => n >= 2)
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
     .map(([name]) => name);
-  if (top.length === 0) return '';
+
   if (top.length === 1) return `${top[0]} is mentioned instead.`;
   if (top.length === 2) return `${top[0]} and ${top[1]} are mentioned instead.`;
   return `${top[0]}, ${top[1]}, and ${top[2]} are mentioned instead.`;
@@ -141,7 +120,7 @@ const MODEL_ORDER_REPORT = ['chatgpt', 'claude', 'perplexity', 'gemini'];
 type SortBy = 'visibility' | 'alpha' | 'change';
 
 export default function ReportsPage() {
-  const { brands, activeBrandId: selectedBrandId, loading: loadingBrands, setActiveBrandId: setSelectedBrandId } = useBrand();
+  const { brands, activeBrandId: selectedBrandId, loading: loadingBrands } = useBrand();
   const [brandDetail, setBrandDetail] = useState<BrandDetail | null>(null);
   const [trends, setTrends] = useState<(TrendPoint & { formattedDate: string; score: number })[]>([]);
   const [responses, setResponses] = useState<QueryResult[]>([]);
@@ -150,27 +129,14 @@ export default function ReportsPage() {
   const [sortBy, setSortBy] = useState<SortBy>('visibility');
   const [loading, setLoading] = useState(false);
   const [expandedPromptId, setExpandedPromptId] = useState<number | null>(null);
-  const [brandDropdownOpen, setBrandDropdownOpen] = useState(false);
   const [exportingPDF, setExportingPDF] = useState(false);
   const [caseStudyEligibility, setCaseStudyEligibility] = useState<CaseStudyEligibility | null>(null);
   const [exportingCaseStudy, setExportingCaseStudy] = useState(false);
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysis | null>(null);
   const [competitorModelFilter, setCompetitorModelFilter] = useState<string>('all');
-  const brandDropdownRef = useRef<HTMLDivElement>(null);
   const loadAbortRef = useRef<AbortController | null>(null);
 
-  // Close brand dropdown on outside click
   useEffect(() => { document.title = 'Reports — Lumidian'; }, []);
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (brandDropdownRef.current && !brandDropdownRef.current.contains(e.target as Node)) {
-        setBrandDropdownOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
 
   const loadData = useCallback(async (brandId: number, signal?: AbortSignal) => {
@@ -325,32 +291,6 @@ export default function ReportsPage() {
           <p className="text-[13px] text-[#64748B] mt-1.5">Per-prompt visibility breakdown by AI model</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Brand selector */}
-          {!loadingBrands && brands.length > 1 && (
-            <div className="relative" ref={brandDropdownRef}>
-              <button
-                onClick={() => setBrandDropdownOpen((v) => !v)}
-                className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] rounded-lg px-3 py-2 text-sm transition-colors"
-              >
-                <Building2 size={14} />
-                <span>{selectedBrand?.name ?? 'Select brand'}</span>
-                <ChevronDown size={14} />
-              </button>
-              {brandDropdownOpen && (
-                <div className="absolute right-0 mt-1 w-52 bg-[rgba(10,14,24,0.96)] border border-[rgba(99,102,241,0.22)] rounded-xl shadow-xl z-20 overflow-hidden backdrop-blur-xl">
-                  {brands.map((b) => (
-                    <button
-                      key={b.id}
-                      onClick={() => { setSelectedBrandId(b.id); setBrandDropdownOpen(false); }}
-                      className={`w-full text-left px-4 py-2.5 text-sm transition-colors ${b.id === selectedBrandId ? 'text-[#818CF8] bg-[rgba(99,102,241,0.12)]' : 'text-[#94A3B8] hover:bg-[rgba(255,255,255,0.06)]'}`}
-                    >
-                      {b.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
           {responses.length > 0 && (
             <button
               onClick={downloadCSV}
@@ -633,7 +573,8 @@ export default function ReportsPage() {
 
                         {/* Gap explanation */}
                         {overallPct < 50 && selectedBrand && (() => {
-                          const explanation = extractGapMentions(g, selectedBrand.name);
+                          const competitorNames = competitorAnalysis?.overall.competitors.map((c) => c.name) ?? [];
+                          const explanation = extractGapMentions(g, competitorNames);
                           return explanation ? (
                             <p className="text-xs text-[#475569] mt-2 italic">{explanation}</p>
                           ) : null;

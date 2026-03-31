@@ -392,7 +392,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             q = urllib.parse.quote(query_text)
             url = (
                 f"{_REDDIT_BASE}/search.json"
-                f"?q={q}&sort=relevance&t=month&limit=25&type=link"
+                f"?q={q}&sort=relevance&t=month&limit=25"
             )
             data = await _fetch(url)
             for post in _extract_posts(data):

@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, BarChart2, FileText, Settings } from 'lucide-react';
+import { LayoutDashboard, LineChart, PenLine, Settings } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { BrandProvider } from '@/contexts/BrandContext';
@@ -12,8 +12,8 @@ const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-pa
 
 const MOBILE_NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Reports',   href: '/reports',   icon: BarChart2 },
-  { label: 'Content',   href: '/content',   icon: FileText },
+  { label: 'Reports',   href: '/reports',   icon: LineChart },
+  { label: 'Content',   href: '/content',   icon: PenLine },
   { label: 'Settings',  href: '/settings',  icon: Settings },
 ];
 
@@ -31,8 +31,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Sync localStorage status flags — use storage events for cross-tab sync,
-  // with a single initial read. No polling needed.
+  // Sync localStorage status flags — single initial read + storage events for cross-tab sync.
   useEffect(() => {
     const sync = () => {
       try {
@@ -42,12 +41,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     };
     sync();
     window.addEventListener('storage', sync);
-    // Fallback: poll only when the tab is visible and less aggressively
-    const id = setInterval(sync, 5000);
-    return () => {
-      window.removeEventListener('storage', sync);
-      clearInterval(id);
-    };
+    return () => window.removeEventListener('storage', sync);
   }, []);
 
   // Dev-mode navigation timing

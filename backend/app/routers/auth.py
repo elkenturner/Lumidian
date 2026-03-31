@@ -64,10 +64,11 @@ def _rate_check(ip: str, store: dict, limit: int) -> None:
         )
     store[ip].append(now)
 
-    # Prune IPs with no recent attempts to keep dicts bounded
-    empty_ips = [k for k, v in store.items() if not v]
-    for k in empty_ips:
-        del store[k]
+    # Prune all IPs: re-filter timestamps and remove keys with no recent attempts
+    for k in list(store):
+        store[k] = [t for t in store[k] if t > cutoff]
+        if not store[k]:
+            del store[k]
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 

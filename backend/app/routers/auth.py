@@ -819,6 +819,7 @@ class VerifyTotpRequest(BaseModel):
 async def verify_2fa(
     body: VerifyTotpRequest,
     response: Response,
+    http_req: Request,
     db: DbDep,
 ):
     """
@@ -826,6 +827,7 @@ async def verify_2fa(
     Validates the challenge token (issued by /login) and the TOTP code,
     then sets auth cookies and returns the user.
     """
+    _rate_check(http_req.client.host if http_req.client else "unknown", _login_attempts, _MAX_LOGIN)
     import pyotp
 
     # Decode and validate challenge token

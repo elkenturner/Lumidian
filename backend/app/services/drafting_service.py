@@ -1089,7 +1089,7 @@ async def generate_gap_draft(
     # CAPTCHA/bot-check page, so attempting Jina for quora.com is a guaranteed 4–5s
     # wasted round-trip. Skip it and use the snippet directly.
     # Jina is retained for any other URL that may be passed as quora_question_url.
-    effective_opportunity_context = custom_brief
+    effective_opportunity_context = _sanitize_user_input(custom_brief) if custom_brief else None
     if platform == "quora" and quora_question_url and quora_question_title:
         _quora_page_content: Optional[str] = None
         _is_quora_url = "quora.com" in quora_question_url.lower()

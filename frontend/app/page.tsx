@@ -434,7 +434,7 @@ export default function LandingPage() {
 
       {/* ── Full-viewport background gradient layer ── */}
       <div
-        aria-hidden
+        aria-hidden="true"
         style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}
       >
         <div style={{ position: 'absolute', top: '-20vh', left: '-15vw', width: '70vw', height: '70vw', maxWidth: 900, maxHeight: 900, borderRadius: '50%', background: 'radial-gradient(circle at 40% 40%, rgba(147,197,253,0.38) 0%, rgba(147,197,253,0.08) 50%, transparent 72%)', filter: 'blur(60px)' }} />
@@ -822,8 +822,8 @@ export default function LandingPage() {
         <section style={{ maxWidth: 1120, margin: '0 auto', padding: '96px 24px' }}>
           <FadeUp>
             <div style={{ background: '#0F0F12', borderRadius: 28, padding: 'clamp(48px, 6vw, 80px) 48px', textAlign: 'center', position: 'relative', overflow: 'hidden' }}>
-              <div aria-hidden style={{ position: 'absolute', top: -60, right: -60, width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.3) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
-              <div aria-hidden style={{ position: 'absolute', bottom: -40, left: -40, width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle, rgba(167,243,208,0.15) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+              <div aria-hidden="true" style={{ position: 'absolute', top: -60, right: -60, width: 320, height: 320, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.3) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
+              <div aria-hidden="true" style={{ position: 'absolute', bottom: -40, left: -40, width: 240, height: 240, borderRadius: '50%', background: 'radial-gradient(circle, rgba(167,243,208,0.15) 0%, transparent 70%)', filter: 'blur(40px)', pointerEvents: 'none' }} />
               <div style={{ position: 'relative', zIndex: 1 }}>
                 <h2 style={{ fontSize: 'clamp(28px, 4vw, 48px)', fontWeight: 800, color: '#fff', letterSpacing: '-0.03em', margin: '0 0 16px', lineHeight: 1.15 }}>
                   Ready to see your AI visibility?

@@ -155,6 +155,55 @@ def _build_search_query(prompt_text: str) -> str:
     return " ".join(parts) if parts else prompt_text
 
 
+async def _haiku_relevance_check(
+    brand_name: str,
+    brand_description: str,
+    candidates: list[dict],
+) -> list[bool]:
+    """
+    Ask Claude Haiku whether each candidate is a genuine content opportunity.
+    candidates: list of {title, subreddit, body_preview}
+    Returns a list of booleans (True = keep). Fails open on any error.
+    """
+    import os
+    import anthropic
+
+    if not candidates:
+        return []
+
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        logger.debug("haiku_relevance_check: no ANTHROPIC_API_KEY, failing open")
+        return [True] * len(candidates)
+
+    client = anthropic.AsyncAnthropic(api_key=api_key)
+    results: list[bool] = []
+
+    for c in candidates:
+        prompt = (
+            f"Brand: {brand_name}\n"
+            f"What they do: {brand_description}\n\n"
+            f"Reddit post title: {c['title']}\n"
+            f"Subreddit: r/{c.get('subreddit', '')}\n"
+            f"Post preview: {c.get('body_preview', '')[:300]}\n\n"
+            "Is this a genuine opportunity for this brand to contribute expert value "
+            "as a reply or comment? Answer only YES or NO."
+        )
+        try:
+            msg = await client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=5,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = msg.content[0].text if msg.content else ""
+            results.append("YES" in text.upper())
+        except Exception as exc:
+            logger.debug("haiku_relevance_check: API error for candidate %r: %s", c.get("title"), exc)
+            results.append(True)  # fail open
+
+    return results
+
+
 # Subreddits that are creative writing / fiction / entertainment — never valid
 # content-marketing opportunities regardless of keyword overlap.
 _FICTION_SUBS = frozenset({
@@ -474,9 +523,22 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 seen_permalinks.add(pl)
                 deduped.append((post, prompt_id))
 
-        # Score and store
-        # Use first prompt text as scoring reference for brand-name query results
+        # ── Phase 1: score all candidates ─────────────────────────────────────
         default_prompt_text = prompts[0].text if prompts else ""
+
+        # Get brand description for Haiku gate
+        from app.models import BrandProfile
+        profile_result = await db.execute(
+            select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+        )
+        profile = profile_result.scalar_one_or_none()
+        brand_description = (
+            (profile.company_description if profile and profile.company_description else None)
+            or brand.website_url
+            or brand.name
+        )
+
+        scored: list[dict] = []  # candidates that pass keyword scoring
 
         for post, prompt_id in deduped:
             permalink = post.get("permalink", "")
@@ -498,7 +560,6 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             created_utc = float(post.get("created_utc", 0))
             num_comments = int(post.get("num_comments", 0))
 
-            # For brand-name query results use first prompt as scoring reference
             scoring_prompt = next(
                 (p.text for p in prompts if p.id == prompt_id),
                 default_prompt_text,
@@ -513,25 +574,51 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             if score < 65.0:
                 continue
 
+            scored.append({
+                "title": title,
+                "subreddit": subreddit_name,
+                "body_preview": body[:300] if body else "",
+                "thread_url": thread_url,
+                "score": score,
+                "prompt_id": prompt_id,
+                "created_utc": created_utc,
+                "num_comments": num_comments,
+                "body": body,
+            })
+
+        # ── Phase 2: Haiku relevance gate ──────────────────────────────────────
+        haiku_decisions = await _haiku_relevance_check(
+            brand.name, brand_description, scored
+        )
+
+        # ── Phase 3: Store approved candidates ────────────────────────────────
+        for cand, keep in zip(scored, haiku_decisions):
+            if not keep:
+                logger.debug(
+                    "haiku_relevance_check: rejected %r in r/%s",
+                    cand["title"][:60], cand["subreddit"],
+                )
+                continue
+
             posted_dt = (
-                datetime.fromtimestamp(created_utc, tz=timezone.utc).replace(tzinfo=None)
-                if created_utc else None
+                datetime.fromtimestamp(cand["created_utc"], tz=timezone.utc).replace(tzinfo=None)
+                if cand["created_utc"] else None
             )
 
             opp = ContentOpportunity(
                 brand_id=brand_id,
                 platform="reddit",
-                thread_url=thread_url,
-                thread_title=title[:500],
-                subreddit=subreddit_name[:100],
-                body_preview=body[:500] if body else None,
+                thread_url=cand["thread_url"],
+                thread_title=cand["title"][:500],
+                subreddit=cand["subreddit"][:100],
+                body_preview=cand["body_preview"] if cand["body_preview"] else None,
                 posted_at=posted_dt,
-                relevance_score=score,
-                prompt_id=prompt_id,
+                relevance_score=cand["score"],
+                prompt_id=cand["prompt_id"],
                 status="new",
             )
             db.add(opp)
-            existing_urls.add(thread_url)
+            existing_urls.add(cand["thread_url"])
             new_count += 1
 
         await db.commit()

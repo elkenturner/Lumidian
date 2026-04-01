@@ -35,6 +35,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   async function refresh() {
+    // If the JS-readable session flag isn't present there's no point hitting
+    // the server — we're not logged in.  Avoids a console 401 on public pages.
+    if (typeof document !== 'undefined' && !document.cookie.includes('clarity_session=1')) {
+      setUser(null);
+      return;
+    }
     try {
       const u = await authMe();
       setUser(u);

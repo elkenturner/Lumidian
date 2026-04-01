@@ -78,7 +78,6 @@ export default function TrackerPage() {
       }
       setBrandCards([]);
       setLoading(false);
-      setShowModal(true);
     } catch {
       setLoading(false);
     }

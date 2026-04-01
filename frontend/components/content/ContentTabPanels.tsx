@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   FileText,
   Loader2,
@@ -403,16 +403,21 @@ function QualityChecklist({
   brandName,
   autoExpand = false,
   liveText,
+  precomputedChecks,
 }: {
   draft: ContentDraft;
   profile: BrandProfile | null;
   brandName: string;
   autoExpand?: boolean;
   liveText?: string;
+  precomputedChecks?: QualityCheck[];
 }) {
   const [expanded, setExpanded] = useState(autoExpand);
+  // Use precomputed checks when no live editing is in progress (avoids double computation)
   const effectiveDraft = liveText != null ? { ...draft, content_text: liveText } : draft;
-  const checks = runQualityChecks(effectiveDraft, profile, brandName);
+  const checks = (liveText == null && precomputedChecks)
+    ? precomputedChecks
+    : runQualityChecks(effectiveDraft, profile, brandName);
   const hardFails = checks.filter((c) => c.passed === false).length;
   const warnings = checks.filter((c) => c.passed === 'warning').length;
   const passed = checks.length - hardFails;
@@ -449,7 +454,7 @@ function QualityChecklist({
       {expanded && (
         <div className="divide-y divide-[rgba(99,102,241,0.10)]">
           {checks.map((check) => {
-            const icon = check.passed === true ? '✓' : check.passed === 'warning' ? '~' : '⚠';
+            const icon = check.passed === true ? '✓' : check.passed === 'warning' ? '⚠' : '✕';
             const iconColor = check.passed === true
               ? 'text-[#10b981]'
               : check.passed === 'warning'
@@ -562,7 +567,10 @@ function DraftCard({
 
   const wordCount = draft.content_text.trim().split(/\s+/).filter(Boolean).length;
   const targetPrompt = prompts.find((p) => p.id === draft.prompt_id);
-  const qualityChecks = runQualityChecks(draft, profile, brandName);
+  const qualityChecks = useMemo(
+    () => runQualityChecks(draft, profile, brandName),
+    [draft, profile, brandName],
+  );
   const isLowQuality = qualityChecks.filter((c) => c.passed === false).length >= 2;
 
   async function handleSave() {
@@ -773,7 +781,7 @@ function DraftCard({
       )}
 
       {!editing && (
-        <QualityChecklist draft={draft} profile={profile} brandName={brandName} />
+        <QualityChecklist draft={draft} profile={profile} brandName={brandName} precomputedChecks={qualityChecks} />
       )}
 
       {!editing && (
@@ -882,12 +890,6 @@ function plainToWikiFormat(
       out = replaced;
     }
   });
-
-  if (brandName) {
-    const escaped = brandName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const re = new RegExp(`(?<!\\[\\[)\\b${escaped}\\b(?!\\]\\])`, 'i');
-    out = out.replace(re, `[[${brandName}]]`);
-  }
 
   if (citations.length > 0) {
     const t = out.trimEnd();
@@ -1236,6 +1238,19 @@ const POSTING_GUIDANCE: Record<string, (brief: string | null) => React.ReactNode
     );
   },
   quora: (brief) => {
+    const isDirectUrl = brief?.startsWith('https://www.quora.com') || brief?.startsWith('https://quora.com');
+    if (isDirectUrl) {
+      return (
+        <ol className="list-decimal list-inside space-y-1 text-xs text-[#94A3B8] leading-relaxed">
+          <li>Open <a href={brief!} target="_blank" rel="noopener noreferrer" className="text-[#6366f1] hover:underline break-all">{brief}</a></li>
+          <li>Click <span className="text-[#F0F4F8] font-medium">Answer</span></li>
+          <li>Paste your draft</li>
+          <li>Add your credentials if relevant</li>
+          <li>Click <span className="text-[#F0F4F8] font-medium">Submit</span></li>
+          <p className="mt-1 text-[#475569] not-italic">Tip: Answer questions posted within the last 30 days for maximum visibility.</p>
+        </ol>
+      );
+    }
     const topic = brief ? brief.split(' — ')[0].replace(/^Targeting: /i, '') : 'your topic';
     return (
       <ol className="list-decimal list-inside space-y-1 text-xs text-[#94A3B8] leading-relaxed">
@@ -1283,7 +1298,7 @@ function ScheduledCard({
   onMarkPosted: (id: number) => void;
   onMoveToDrafts: (id: number) => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(true);
   const [guideOpen, setGuideOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const title = draft.title ?? draft.content_text.slice(0, 80) + (draft.content_text.length > 80 ? '…' : '');
@@ -1678,7 +1693,7 @@ function DraftsPanel(props: ContentTabPanelsProps) {
         <EmptyState
           icon={<FileText size={48} className="text-[#818cf8]" />}
           title={platformFilter !== 'all' ? `No ${platformFilter} drafts` : 'No drafts yet'}
-          description={platformFilter !== 'all' ? 'Try switching to "All" or generate new drafts.' : 'Use "Generate Drafts Now" or request a custom draft to get started.'}
+          description={platformFilter !== 'all' ? 'Try switching to "All" or generate new drafts.' : 'Use "Regenerate Drafts" or request a custom draft to get started.'}
           action={platformFilter === 'all' && (user?.subscription_tier || user?.is_admin) ? (() => {
             const cooldownLabel = generateAvailableLabel(draftStatus?.next_generate_at ?? null);
             const onCooldown = !!cooldownLabel;
@@ -1690,7 +1705,7 @@ function DraftsPanel(props: ContentTabPanelsProps) {
                   className="flex items-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/30 hover:shadow-[#6366f1]/45"
                 >
                   {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
-                  {generating ? 'Generating…' : 'Generate Drafts Now'}
+                  {generating ? 'Generating…' : 'Regenerate Drafts'}
                 </button>
                 {onCooldown && (
                   <p className="text-xs text-[#475569]">{cooldownLabel}</p>

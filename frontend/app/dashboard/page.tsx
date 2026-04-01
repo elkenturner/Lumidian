@@ -17,6 +17,7 @@ import {
   RefreshCw,
   CheckCircle2,
 } from 'lucide-react';
+import BrandAvatar from '@/components/BrandAvatar';
 import {
   getBrand,
   getOverview,
@@ -823,7 +824,7 @@ export default function DashboardPage() {
               <UsageBar label="Manual runs today" used={usage.manual_runs_today} limit={usage.manual_run_limit} />
             </>
           )}
-          {usage.standard_brand_limit < 999 && (
+          {usage.standard_brand_limit > 0 && usage.standard_brand_limit < 999 && (
             <>
               <div className="w-px h-8 bg-[rgba(255,255,255,0.08)] flex-shrink-0" />
               <UsageBar label="Brands" used={usage.standard_brand_count} limit={usage.standard_brand_limit} />
@@ -902,11 +903,23 @@ export default function DashboardPage() {
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#F0F4F8]">
-            {selectedBrand ? selectedBrand.name : 'Dashboard'}
-          </h1>
-          <p className="text-[13px] text-[#64748B] mt-1.5">AI visibility analytics</p>
+        <div className="flex items-center gap-3">
+          {selectedBrand && (
+            <BrandAvatar
+              name={selectedBrand.name}
+              websiteUrl={selectedBrand.website_url ?? undefined}
+              size={36}
+              className="rounded-xl bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)]"
+              style={{ padding: 5 }}
+              textClassName="text-sm font-bold text-[#6366f1]"
+            />
+          )}
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-[#F0F4F8]">
+              {selectedBrand ? selectedBrand.name : 'Dashboard'}
+            </h1>
+            <p className="text-[13px] text-[#64748B] mt-1.5">AI visibility analytics</p>
+          </div>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
           <button

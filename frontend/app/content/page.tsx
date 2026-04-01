@@ -1841,7 +1841,7 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
 
 export default function ContentHubPage() {
   const { user } = useAuth();
-  const { brands, activeBrandId: selectedBrandId, setActiveBrandId: setSelectedBrandId } = useBrand();
+  const { brands, activeBrandId: selectedBrandId, setActiveBrandId: setSelectedBrandId, loading: brandsLoading } = useBrand();
   const [activeTab, setActiveTab] = useState<QueueTab>('drafts');
   const [toast, setToast] = useState<ToastData | null>(null);
   useEffect(() => {
@@ -1984,6 +1984,11 @@ export default function ContentHubPage() {
     return () => controller.abort();
   }, [selectedBrandId, loadAll]);
 
+  // When brands finish loading and there are none, stop the loading spinner.
+  useEffect(() => {
+    if (!brandsLoading && !selectedBrandId) setLoading(false);
+  }, [brandsLoading, selectedBrandId]);
+
   // Cleanup generate-now poll on unmount
   useEffect(() => () => { if (generatePollRef.current) clearInterval(generatePollRef.current); }, []);
 
@@ -2067,13 +2072,40 @@ export default function ContentHubPage() {
     if (!selectedBrandId) return;
     setGenerating(true);
     setGenerateError(null);
-    if (generatePollRef.current) clearInterval(generatePollRef.current);
 
     const brandId = selectedBrandId;
-    const startCount = draftStatus?.draft_count ?? 0;
+
+    // Clear drafts UI immediately to show we're refreshing
+    setDraftItems([]);
+    setActiveTab('drafts');
 
     try {
-      await generateNow(brandId);
+      // Backend clears existing drafts and returns new ones synchronously
+      const newDrafts = await generateNow(brandId);
+
+      // Update draft status
+      const status = await getDraftStatus(brandId);
+      setDraftStatus(status);
+
+      // Load all drafts fresh (including the new ones)
+      await loadAll(brandId);
+
+      setGenerating(false);
+
+      // Show contextual message about results
+      const promptCount = brandPrompts.length;
+      if (newDrafts.length >= 20) {
+        setToast({ message: `Generated ${newDrafts.length} new drafts`, type: 'success' });
+      } else if (newDrafts.length === 0) {
+        setToast({ message: 'No drafts generated. Add more prompts or run a tracking scan first.', type: 'info' });
+      } else if (promptCount <= 3) {
+        setToast({
+          message: `Generated ${newDrafts.length} drafts (limited by ${promptCount} prompt${promptCount === 1 ? '' : 's'})`,
+          type: 'success'
+        });
+      } else {
+        setToast({ message: `Generated ${newDrafts.length} new drafts`, type: 'success' });
+      }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string }; status?: number }; message?: string };
       const raw = err?.response?.data?.detail ?? err?.message ?? 'Generation failed. Check that API keys are configured in Settings.';
@@ -2082,25 +2114,49 @@ export default function ContentHubPage() {
         : raw;
       setGenerateError(detail);
       setGenerating(false);
-      // Refresh status in case rate-limit stamp was already applied
+      // Refresh drafts and status in case partial generation happened
       getDraftStatus(brandId).then(setDraftStatus).catch(() => {});
-      return;
+      loadAll(brandId).catch(() => {});
     }
+  }
 
-    // Poll until count stabilizes (2 consecutive equal polls), then reload all at once.
-    // Stability is tracked unconditionally so a 0-new-drafts run exits in ~6s, not 120s.
-    // Hard timeout: 120s fallback.
-    setActiveTab('drafts');
-    const deadline = Date.now() + 120_000;
-    let prevCount = startCount;
-    let stableStreak = 0;
+  const handleScanNow = useCallback(async () => {
+    if (!selectedBrandId || scanning) return;
+    setScanning(true);
 
-    generatePollRef.current = setInterval(async () => {
-      try {
-        const status = await getDraftStatus(brandId);
-        setDraftStatus(status);
-        const count = status.draft_count;
+    // Clear existing opportunities immediately so UI shows loading state
+    setOpportunities([]);
 
+    try {
+      await triggerScan(selectedBrandId);
+
+      // Poll until scan completes (opportunities count stabilizes or timeout)
+      const brandId = selectedBrandId;
+      const deadline = Date.now() + 60_000; // 60s timeout
+      let prevCount = 0;
+      let stableStreak = 0;
+
+      const poll = async (): Promise<void> => {
+        if (Date.now() > deadline) {
+          // Timeout - fetch whatever we have
+          const ops = await getOpportunities(brandId);
+          setOpportunities(ops);
+          setScanning(false);
+          const count = ops.length;
+          const promptCount = brandPrompts.length;
+          if (count === 0 && promptCount <= 3) {
+            setToast({ message: `No opportunities found. Add more prompts to expand the search.`, type: 'info' });
+          } else {
+            setToast({ message: `Found ${count} opportunities`, type: 'success' });
+          }
+          return;
+        }
+
+        await new Promise((r) => setTimeout(r, 2000)); // Poll every 2s
+        const ops = await getOpportunities(brandId);
+        const count = ops.length;
+
+        // Track stability: count matches previous (including 0)
         if (count === prevCount) {
           stableStreak++;
         } else {
@@ -2108,32 +2164,45 @@ export default function ContentHubPage() {
         }
         prevCount = count;
 
-        const done = stableStreak >= 2 || Date.now() > deadline;
-        if (done) {
-          clearInterval(generatePollRef.current!);
-          generatePollRef.current = null;
-          if (count > startCount) loadAll(brandId); // only reload if drafts actually changed
-          setGenerating(false);
-        }
-      } catch {
-        // ignore poll errors — keep trying
-      }
-    }, 3000);
-  }
+        // Stable for 3 consecutive polls (6 seconds) = done
+        // Use 3 polls to ensure backend scanner has finished
+        if (stableStreak >= 3) {
+          setOpportunities(ops);
+          setScanning(false);
 
-  const handleScanNow = useCallback(async () => {
-    if (!selectedBrandId || scanning) return;
-    setScanning(true);
-    try {
-      await triggerScan(selectedBrandId);
-      const ops = await getOpportunities(selectedBrandId);
-      setOpportunities(ops);
+          // Show contextual message about results
+          const promptCount = brandPrompts.length;
+          if (count >= 10) {
+            setToast({ message: `Found ${count} opportunities`, type: 'success' });
+          } else if (count === 0) {
+            setToast({
+              message: promptCount <= 3
+                ? `No opportunities found. Add more prompts to expand the search.`
+                : `No matching threads found on Reddit or Quora right now.`,
+              type: 'info'
+            });
+          } else if (promptCount <= 3) {
+            setToast({
+              message: `Found ${count} opportunit${count === 1 ? 'y' : 'ies'} (limited by ${promptCount} prompt${promptCount === 1 ? '' : 's'})`,
+              type: 'success'
+            });
+          } else {
+            setToast({ message: `Found ${count} opportunities`, type: 'success' });
+          }
+          return;
+        }
+
+        // Keep polling
+        return poll();
+      };
+
+      await poll();
     } catch (err: unknown) {
       console.error('Scan trigger failed:', err);
-    } finally {
       setScanning(false);
+      setToast({ message: 'Scan failed. Please try again.', type: 'error' });
     }
-  }, [selectedBrandId, scanning]);
+  }, [selectedBrandId, scanning, brandPrompts.length]);
 
   async function handleTogglePlatform(platform: string, enabled: boolean) {
     if (!selectedBrandId) return;
@@ -2169,6 +2238,23 @@ export default function ContentHubPage() {
       {user?.subscription_status && ['past_due', 'canceled', 'unpaid'].includes(user.subscription_status) && (
         <div className="-mx-8 -mt-8 mb-6">
           <SubscriptionBanner status={user.subscription_status} />
+        </div>
+      )}
+
+      {/* Progress banner for regeneration actions */}
+      {(generating || scanning) && (
+        <div className="mb-6 bg-[rgba(99,102,241,0.12)] border border-[rgba(99,102,241,0.3)] rounded-xl px-5 py-4 flex items-center gap-3">
+          <Loader2 size={18} className="animate-spin text-[#818cf8]" />
+          <div>
+            <p className="text-sm font-medium text-[#F0F4F8]">
+              {generating ? 'Generating fresh drafts…' : 'Scanning Reddit & Quora…'}
+            </p>
+            <p className="text-xs text-[#94A3B8] mt-0.5">
+              {generating
+                ? 'Creating up to 20 AI drafts. This takes about 30 seconds.'
+                : 'Finding new content opportunities. This takes about 15 seconds.'}
+            </p>
+          </div>
         </div>
       )}
 
@@ -2494,7 +2580,22 @@ export default function ContentHubPage() {
         </div>
       </div>
 
-      {loading ? (
+      {!brandsLoading && brands.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-center">
+          <div className="w-14 h-14 bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] rounded-2xl flex items-center justify-center mb-4">
+            <PenLine size={24} className="text-[#6366f1]" />
+          </div>
+          <h3 className="text-base font-semibold text-[#F0F4F8] mb-2">No brands tracked yet</h3>
+          <p className="text-sm text-[#64748B] max-w-sm mb-6">Add your first brand to start generating content drafts and finding opportunities.</p>
+          <Link
+            href="/tracker/new"
+            className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+          >
+            <Plus size={16} />
+            Track Your First Brand
+          </Link>
+        </div>
+      ) : loading ? (
         <div className="animate-pulse space-y-4">
           <div className="h-10 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
           <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
@@ -2599,33 +2700,60 @@ export default function ContentHubPage() {
                     const onCooldown = !!cooldownLabel;
                     return (
                       <>
-                        <button
-                          onClick={handleGenerateNow}
-                          disabled={generating || !!draftStatus?.draft_queue_full || onCooldown}
-                          className="w-full flex items-center justify-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/25 hover:shadow-[#6366f1]/40"
-                        >
-                          {generating ? (
-                            <>
-                              <Loader2 size={14} className="animate-spin" />
-                              Generating…
-                            </>
-                          ) : (
-                            <>
-                              <Zap size={14} />
-                              Regenerate Drafts
-                            </>
-                          )}
-                        </button>
-                        {onCooldown ? (
-                          <p className="flex items-center justify-center gap-1.5 text-xs text-[#94A3B8] mt-2">
-                            <Clock size={11} className="shrink-0" />
-                            {cooldownLabel}
-                          </p>
-                        ) : (
+                        {activeTab === 'opportunities' ? (
+                        <>
+                          <button
+                            onClick={handleScanNow}
+                            disabled={scanning || !selectedBrandId}
+                            className="w-full flex items-center justify-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/25 hover:shadow-[#6366f1]/40"
+                          >
+                            {scanning ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                Scanning…
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw size={14} />
+                                Regenerate Live Opportunities
+                              </>
+                            )}
+                          </button>
                           <p className="text-xs text-[#475569] mt-2 text-center">
-                            {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : 'Replaces all existing drafts with a fresh set of up to 20'}
+                            {scanning ? 'Scanning Reddit & Quora for new opportunities…' : 'Replaces all opportunities with a fresh scan'}
                           </p>
-                        )}
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={handleGenerateNow}
+                            disabled={generating || !!draftStatus?.draft_queue_full || onCooldown}
+                            className="w-full flex items-center justify-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/25 hover:shadow-[#6366f1]/40"
+                          >
+                            {generating ? (
+                              <>
+                                <Loader2 size={14} className="animate-spin" />
+                                Generating…
+                              </>
+                            ) : (
+                              <>
+                                <Zap size={14} />
+                                Regenerate Drafts
+                              </>
+                            )}
+                          </button>
+                          {onCooldown ? (
+                            <p className="flex items-center justify-center gap-1.5 text-xs text-[#94A3B8] mt-2">
+                              <Clock size={11} className="shrink-0" />
+                              {cooldownLabel}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-[#475569] mt-2 text-center">
+                              {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : 'Replaces all existing drafts with a fresh set of up to 20'}
+                            </p>
+                          )}
+                        </>
+                      )}
                         {generateError && (
                           <div className="mt-2 bg-[#7f1d1d]/15 border border-[#991b1b]/30 rounded-lg px-3 py-2">
                             <p className="text-xs text-[#f87171] leading-relaxed">{generateError}</p>
@@ -2674,24 +2802,13 @@ export default function ContentHubPage() {
                     <div className="h-8 bg-[rgba(99,102,241,0.06)] rounded" />
                   </div>
                 )}
-                <div className="border-t border-[rgba(255,255,255,0.06)] pt-2.5 space-y-2">
-                  <button
-                    onClick={handleScanNow}
-                    disabled={scanning || !selectedBrandId}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[rgba(99,102,241,0.12)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] text-[#818CF8] text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                  >
-                    {scanning ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Scanning…</>
-                    ) : (
-                      <><RefreshCw className="w-4 h-4" /> Regenerate Live Opportunities</>
-                    )}
-                  </button>
-                  <p className="text-[11px] text-[#475569] text-center">
-                    {draftStatus?.last_scan_at
-                      ? `Last scan: ${relativeTime(draftStatus.last_scan_at)}`
-                      : 'Replaces all opportunities with a fresh scan'}
-                  </p>
-                </div>
+                {draftStatus?.last_scan_at && (
+                  <div className="border-t border-[rgba(255,255,255,0.06)] pt-2.5">
+                    <p className="text-[11px] text-[#475569] text-center">
+                      Last opportunity scan: {relativeTime(draftStatus.last_scan_at)}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

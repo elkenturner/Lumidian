@@ -43,6 +43,7 @@ import {
   updateContentSettings,
   getDraftAttributions,
   getQuoraQuestions,
+  triggerScan,
   Brand,
   BrandDetail,
   Prompt,
@@ -1874,6 +1875,7 @@ export default function ContentHubPage() {
 
   // Right panel
   const [generating, setGenerating] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const generatePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   // Broadcast drafts-generating state to other pages via localStorage
@@ -2074,7 +2076,10 @@ export default function ContentHubPage() {
       await generateNow(brandId);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string }; status?: number }; message?: string };
-      const detail = err?.response?.data?.detail ?? err?.message ?? 'Generation failed. Check that API keys are configured in Settings.';
+      const raw = err?.response?.data?.detail ?? err?.message ?? 'Generation failed. Check that API keys are configured in Settings.';
+      const detail = raw.toLowerCase().includes('no content gaps')
+        ? 'No content gaps found yet. Run a tracking scan first to identify gaps, then try again.'
+        : raw;
       setGenerateError(detail);
       setGenerating(false);
       // Refresh status in case rate-limit stamp was already applied
@@ -2115,6 +2120,20 @@ export default function ContentHubPage() {
       }
     }, 3000);
   }
+
+  const handleScanNow = useCallback(async () => {
+    if (!selectedBrandId || scanning) return;
+    setScanning(true);
+    try {
+      await triggerScan(selectedBrandId);
+      const ops = await getOpportunities(selectedBrandId);
+      setOpportunities(ops);
+    } catch (err: unknown) {
+      console.error('Scan trigger failed:', err);
+    } finally {
+      setScanning(false);
+    }
+  }, [selectedBrandId, scanning]);
 
   async function handleTogglePlatform(platform: string, enabled: boolean) {
     if (!selectedBrandId) return;
@@ -2593,7 +2612,7 @@ export default function ContentHubPage() {
                           ) : (
                             <>
                               <Zap size={14} />
-                              Generate Drafts Now
+                              Regenerate Drafts
                             </>
                           )}
                         </button>
@@ -2604,7 +2623,7 @@ export default function ContentHubPage() {
                           </p>
                         ) : (
                           <p className="text-xs text-[#475569] mt-2 text-center">
-                            {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : 'Fills drafts to 20 and scans for new opportunities'}
+                            {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : 'Replaces all existing drafts with a fresh set of up to 20'}
                           </p>
                         )}
                         {generateError && (
@@ -2655,15 +2674,23 @@ export default function ContentHubPage() {
                     <div className="h-8 bg-[rgba(99,102,241,0.06)] rounded" />
                   </div>
                 )}
-                <div className="border-t border-[rgba(255,255,255,0.06)] pt-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-[#475569]">Opportunity scan</span>
-                    <span className="text-xs text-[#475569]">
-                      {draftStatus?.last_scan_at
-                        ? relativeTime(draftStatus.last_scan_at)
-                        : 'Daily'}
-                    </span>
-                  </div>
+                <div className="border-t border-[rgba(255,255,255,0.06)] pt-2.5 space-y-2">
+                  <button
+                    onClick={handleScanNow}
+                    disabled={scanning || !selectedBrandId}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-[rgba(99,102,241,0.12)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] text-[#818CF8] text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    {scanning ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" /> Scanning…</>
+                    ) : (
+                      <><RefreshCw className="w-4 h-4" /> Regenerate Live Opportunities</>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-[#475569] text-center">
+                    {draftStatus?.last_scan_at
+                      ? `Last scan: ${relativeTime(draftStatus.last_scan_at)}`
+                      : 'Replaces all opportunities with a fresh scan'}
+                  </p>
                 </div>
               </div>
             </div>

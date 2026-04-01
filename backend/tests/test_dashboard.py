@@ -1,0 +1,208 @@
+"""
+Tests for:
+  GET /api/dashboard/{brand_id}/analytics  — SOV, sentiment, model breakdown, access control
+"""
+from __future__ import annotations
+
+import pytest
+import httpx
+from datetime import datetime, timezone
+from tests.conftest import register_and_login, create_brand
+from app.database import AsyncSessionLocal
+from app.models import TrackingRun, QueryResult, RunModelScore
+
+
+pytestmark = pytest.mark.asyncio
+
+
+# ── Helper ────────────────────────────────────────────────────────────────────
+
+async def _insert_run_with_result(
+    brand_id: int,
+    prompt_id: int,
+    *,
+    response_text: str = "A response that mentions the brand.",
+    mentioned: bool = True,
+    model: str = "chatgpt",
+) -> int:
+    """Insert a completed TrackingRun with one QueryResult and one RunModelScore.
+    Returns the run id."""
+    async with AsyncSessionLocal() as db:
+        run = TrackingRun(
+            brand_id=brand_id,
+            status="completed",
+            run_type="manual",
+            overall_score=80.0 if mentioned else 0.0,
+            total_queries=1,
+            total_mentions=1 if mentioned else 0,
+            has_content_influence=False,
+            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            completed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        db.add(run)
+        await db.flush()
+
+        qr = QueryResult(
+            tracking_run_id=run.id,
+            prompt_id=prompt_id,
+            model=model,
+            run_number=1,
+            response_text=response_text,
+            mentioned=mentioned,
+        )
+        db.add(qr)
+
+        ms = RunModelScore(
+            tracking_run_id=run.id,
+            model=model,
+            total_queries=1,
+            total_mentions=1 if mentioned else 0,
+            score=80.0 if mentioned else 0.0,
+        )
+        db.add(ms)
+        await db.commit()
+        return run.id
+
+
+# ── No runs ───────────────────────────────────────────────────────────────────
+
+async def test_analytics_no_runs_no_competitors(client: httpx.AsyncClient):
+    """With no runs and no competitors, SOV = 100%."""
+    await register_and_login(client, email="dash_empty@example.com")
+    brand = await create_brand(client, name="Dash Empty Brand")
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sov"]["percentage"] == 100.0
+    assert data["sov"]["has_competitors"] is False
+    assert data["total_responses_analyzed"] == 0
+
+
+async def test_analytics_no_runs_with_competitor(client: httpx.AsyncClient):
+    """With no runs but a competitor present, SOV = 0% (no data yet — unknown share)."""
+    await register_and_login(client, email="dash_comp_empty@example.com")
+    brand = await create_brand(client, name="Dash Comp Empty Brand")
+    await client.post(
+        f"/api/brands/{brand['id']}/competitors",
+        json={"name": "Rival Co"},
+    )
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sov"]["percentage"] == 0.0
+    assert data["sov"]["has_competitors"] is True
+    assert data["total_responses_analyzed"] == 0
+
+
+# ── SOV ───────────────────────────────────────────────────────────────────────
+
+async def test_analytics_sov_brand_mentioned(client: httpx.AsyncClient):
+    """Brand mentioned in response → SOV = 100% with no competitors."""
+    await register_and_login(client, email="dash_sov100@example.com")
+    brand = await create_brand(
+        client, name="SOV Brand", prompts=["Best AI visibility tools?"]
+    )
+    prompt_id = brand["prompts"][0]["id"]
+    await _insert_run_with_result(
+        brand["id"], prompt_id,
+        response_text="SOV Brand is the top AI visibility tool.",
+        mentioned=True,
+    )
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sov"]["percentage"] == 100.0
+    assert data["sov"]["brand_mentions"] == 1
+    assert data["total_responses_analyzed"] == 1
+    assert data["sov"]["has_competitors"] is False
+
+
+async def test_analytics_sov_competitor_mentioned_brand_not(client: httpx.AsyncClient):
+    """Competitor is mentioned but brand is not → SOV = 0%."""
+    await register_and_login(client, email="dash_sov_comp@example.com")
+    brand = await create_brand(
+        client, name="SOV Comp Brand", prompts=["Best AI visibility tools?"]
+    )
+    prompt_id = brand["prompts"][0]["id"]
+    await client.post(
+        f"/api/brands/{brand['id']}/competitors",
+        json={"name": "Rival Inc"},
+    )
+    # Response mentions competitor but NOT the brand
+    await _insert_run_with_result(
+        brand["id"], prompt_id,
+        response_text="Rival Inc is the top AI visibility tool. Brand not mentioned.",
+        mentioned=False,
+    )
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sov"]["percentage"] == 0.0
+    assert data["sov"]["has_competitors"] is True
+
+
+async def test_analytics_sov_fallback_no_mentions_with_competitor(client: httpx.AsyncClient):
+    """
+    Regression: when runs exist but neither brand nor competitor is mentioned,
+    SOV must be 0% — not 100% — when a competitor is present.
+
+    Bug: `else 100.0` on dashboard.py line 259 returned 100% whenever
+    total_mentions == 0, even when competitors existed.
+    """
+    await register_and_login(client, email="dash_sov_bug@example.com")
+    brand = await create_brand(
+        client, name="SOV Bug Brand", prompts=["Totally unrelated question?"]
+    )
+    prompt_id = brand["prompts"][0]["id"]
+    await client.post(
+        f"/api/brands/{brand['id']}/competitors",
+        json={"name": "Rival Inc"},
+    )
+    await _insert_run_with_result(
+        brand["id"], prompt_id,
+        response_text="This response mentions neither brand nor competitor.",
+        mentioned=False,
+    )
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    assert resp.status_code == 200
+    data = resp.json()
+    # Was 100.0 before fix, must be 0.0 when competitors present and no mentions
+    assert data["sov"]["percentage"] == 0.0
+    assert data["sov"]["has_competitors"] is True
+
+
+async def test_analytics_sov_fallback_no_mentions_no_competitor(client: httpx.AsyncClient):
+    """When runs exist but no mentions and no competitors, SOV = 100%."""
+    await register_and_login(client, email="dash_sov_nocomp@example.com")
+    brand = await create_brand(
+        client, name="SOV No Comp Brand", prompts=["Totally unrelated question?"]
+    )
+    prompt_id = brand["prompts"][0]["id"]
+    await _insert_run_with_result(
+        brand["id"], prompt_id,
+        response_text="This response mentions neither brand nor competitor.",
+        mentioned=False,
+    )
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["sov"]["percentage"] == 100.0
+    assert data["sov"]["has_competitors"] is False
+
+
+# ── Access control ────────────────────────────────────────────────────────────
+
+async def test_analytics_access_control(client: httpx.AsyncClient):
+    """User cannot access another user's brand analytics."""
+    await register_and_login(client, email="dash_owner@example.com")
+    brand = await create_brand(client, name="Dash Owner Brand")
+
+    await register_and_login(client, email="dash_thief@example.com")
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    assert resp.status_code == 403
+
+
+async def test_analytics_unauthenticated(client: httpx.AsyncClient):
+    """Unauthenticated request returns 401."""
+    resp = await client.get("/api/dashboard/1/analytics")
+    assert resp.status_code == 401

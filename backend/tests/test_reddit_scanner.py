@@ -6,6 +6,7 @@ from app.services.reddit_scanner_service import (
     _is_blocked_subreddit,
     _score_thread,
     _build_search_query,
+    _haiku_relevance_check,
 )
 
 
@@ -154,6 +155,7 @@ async def test_scan_uses_prompt_text_as_search_query(tmp_db):
     )
 
     with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch.object(reddit_scanner_service, "_haiku_relevance_check", return_value=[]), \
          patch("asyncio.sleep"):
         await reddit_scanner_service.scan_brand_opportunities(brand_id)
 
@@ -179,6 +181,7 @@ async def test_brand_name_is_also_searched(tmp_db):
     )
 
     with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch.object(reddit_scanner_service, "_haiku_relevance_check", return_value=[]), \
          patch("asyncio.sleep"):
         await reddit_scanner_service.scan_brand_opportunities(brand_id)
 
@@ -206,6 +209,7 @@ async def test_blocked_subreddit_not_stored(tmp_db):
     )
 
     with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch.object(reddit_scanner_service, "_haiku_relevance_check", return_value=[]), \
          patch("asyncio.sleep"):
         count = await reddit_scanner_service.scan_brand_opportunities(brand_id)
 
@@ -232,6 +236,7 @@ async def test_relevant_post_stored(tmp_db):
     )
 
     with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch.object(reddit_scanner_service, "_haiku_relevance_check", return_value=[True]), \
          patch("asyncio.sleep"):
         count = await reddit_scanner_service.scan_brand_opportunities(brand_id)
 
@@ -258,6 +263,7 @@ async def test_deduplication(tmp_db):
     )
 
     with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch.object(reddit_scanner_service, "_haiku_relevance_check", return_value=[True]), \
          patch("asyncio.sleep"):
         count = await reddit_scanner_service.scan_brand_opportunities(brand_id)
 
@@ -286,6 +292,7 @@ async def test_works_with_no_industry_match(tmp_db):
     )
 
     with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch.object(reddit_scanner_service, "_haiku_relevance_check", return_value=[True]), \
          patch("asyncio.sleep"):
         count = await reddit_scanner_service.scan_brand_opportunities(brand_id)
 
@@ -351,3 +358,74 @@ def test_build_search_query_extracts_specific_words():
     """Specific domain words survive after stop-word removal."""
     q = _build_search_query("how do companies complete a direct listing on NYSE")
     assert any(w in q.lower() for w in ("direct", "listing", "nyse"))
+
+
+# ── _haiku_relevance_check ────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_haiku_check_returns_list_same_length():
+    """Returns a boolean list of same length as input."""
+    from unittest.mock import AsyncMock, patch, MagicMock
+    candidates = [
+        {"title": "How to raise capital via Reg A+", "subreddit": "startups", "body_preview": ""},
+        {"title": "My cat is sick", "subreddit": "cats", "body_preview": ""},
+    ]
+    mock_msg = MagicMock()
+    mock_msg.content = [MagicMock(text="YES")]
+    with patch("anthropic.AsyncAnthropic") as mock_cls:
+        mock_client = AsyncMock()
+        mock_cls.return_value = mock_client
+        mock_client.messages.create = AsyncMock(return_value=mock_msg)
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
+            result = await _haiku_relevance_check("CapCo", "Reg A+ advisory", candidates)
+    assert len(result) == 2
+    assert all(isinstance(r, bool) for r in result)
+
+@pytest.mark.asyncio
+async def test_haiku_check_fails_open_on_api_error():
+    """If Anthropic API raises, candidate is kept (True), not silently dropped."""
+    candidates = [{"title": "Test post", "subreddit": "test", "body_preview": ""}]
+    with patch("anthropic.AsyncAnthropic") as mock_cls:
+        mock_client = AsyncMock()
+        mock_cls.return_value = mock_client
+        mock_client.messages.create = AsyncMock(side_effect=Exception("API down"))
+        with patch.dict("os.environ", {"ANTHROPIC_API_KEY": "test-key"}):
+            result = await _haiku_relevance_check("CapCo", "Reg A+ advisory", candidates)
+    assert result == [True]
+
+@pytest.mark.asyncio
+async def test_haiku_check_no_api_key_fails_open():
+    """Missing ANTHROPIC_API_KEY returns all True (fail open)."""
+    import os
+    candidates = [{"title": "Test", "subreddit": "test", "body_preview": ""}]
+    env_without_key = {k: v for k, v in os.environ.items() if k != "ANTHROPIC_API_KEY"}
+    with patch.dict("os.environ", env_without_key, clear=True):
+        result = await _haiku_relevance_check("CapCo", "Reg A+ advisory", candidates)
+    assert result == [True]
+
+
+@pytest.mark.asyncio
+async def test_haiku_rejected_post_not_stored(tmp_db):
+    """A post that passes keyword scoring but fails haiku gate is NOT stored."""
+    from app.services import reddit_scanner_service
+
+    post = _make_post(
+        "/r/SaaS/comments/abc/post/",
+        "what is the best project management saas tool for remote teams",
+        subreddit="SaaS",
+        num_comments=15,
+    )
+
+    async def fake_fetch(url: str):
+        return _reddit_response(post)
+
+    brand_id = await tmp_db.create_brand_with_prompt(
+        name="Acme", prompt="what is the best project management saas tool"
+    )
+
+    with patch.object(reddit_scanner_service, "_fetch", side_effect=fake_fetch), \
+         patch.object(reddit_scanner_service, "_haiku_relevance_check", return_value=[False]), \
+         patch("asyncio.sleep"):
+        count = await reddit_scanner_service.scan_brand_opportunities(brand_id)
+
+    assert count == 0

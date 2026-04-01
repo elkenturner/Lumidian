@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import {
   BarChart2,
@@ -9,6 +10,7 @@ import {
   Download,
   Search,
   ArrowUpDown,
+  Plus,
 } from 'lucide-react';
 import {
   getBrand,
@@ -354,7 +356,11 @@ export default function ReportsPage() {
             <BarChart2 size={24} className="text-[#6366f1]" />
           </div>
           <h3 className="text-base font-semibold text-[#F0F4F8] mb-2">No brands tracked yet</h3>
-          <p className="text-sm text-[#64748B] max-w-sm">Add a brand and run a report to see prompt visibility data here.</p>
+          <p className="text-sm text-[#64748B] max-w-sm mb-6">Add a brand and run a report to see prompt visibility data here.</p>
+          <Link href="/tracker/new" className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+            <Plus size={16} />
+            Track Your First Brand
+          </Link>
         </div>
       ) : (
         <>

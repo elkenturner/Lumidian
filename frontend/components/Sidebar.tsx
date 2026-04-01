@@ -179,7 +179,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
     { label: 'Dashboard',   href: '/dashboard', icon: LayoutDashboard },
     { label: 'Reports',     href: '/reports',   icon: LineChart },
     { label: 'Content Hub', href: '/content',   icon: PenLine },
-    { label: 'Settings',    href: '/settings',  icon: Settings },
+    { label: 'Brands',      href: '/settings',  icon: Settings },
     { label: 'Account',     href: '/account',   icon: User },
   ];
 

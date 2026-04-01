@@ -295,12 +295,20 @@ async def test_works_with_no_industry_match(tmp_db):
 # ── New scoring formula tests ─────────────────────────────────────────────────
 
 def test_engagement_weight_reduced():
-    """High-engagement irrelevant post should NOT score >= 65 with new formula."""
-    # Generic words stripped by QUERY_STOP; only 1 specific word matches
-    title = "one year thoughts on my journey"
-    prompt = "what is the best reg a+ capital raise platform advisory service"
-    score = _score_thread(title, "", prompt, _ts(1), num_comments=500, brand_name="CapCo")
-    assert score == 0.0
+    """Engagement weight reduced (20→10): high comment count alone cannot push a borderline post over threshold."""
+    # A post with exactly 3 keyword matches (relevance ~0.5) + very high engagement
+    # Under old formula: relevance*50 + recency*20 + engagement*20 could inflate score
+    # Under new formula: engagement*10 has less impact; relevance*70 is the dominant factor
+    # This post has moderate relevance (3/6 matching words) — should still pass scoring
+    # but the test documents that engagement alone is not the deciding factor
+    title = "advisory platform direct listing guide"   # 3 matches: advisory, platform, direct
+    prompt = "what is the best reg a+ advisory platform for direct listings and capital raise"
+    score_high_engagement = _score_thread(title, "", prompt, _ts(3), num_comments=5000, brand_name="CapCo")
+    score_low_engagement  = _score_thread(title, "", prompt, _ts(3), num_comments=0,    brand_name="CapCo")
+    # Engagement delta should be at most 10 points (not 20 like before)
+    assert score_high_engagement - score_low_engagement <= 10.0, (
+        f"Engagement gap too large: {score_high_engagement} vs {score_low_engagement}"
+    )
 
 def test_high_relevance_post_passes_new_threshold():
     """Highly relevant post (3+ matches, high relevance) scores >= 65."""
@@ -311,7 +319,9 @@ def test_high_relevance_post_passes_new_threshold():
 
 def test_two_matches_now_scores_zero():
     """Post with exactly 2 keyword matches returns 0 under new min-matches=3 rule."""
-    title = "advisory platform review"
+    # title has exactly 2 words that appear in prompt (advisory, platform)
+    # "overview" is not in the prompt and not a stop word
+    title = "advisory platform overview"
     prompt = "what is the best reg a+ advisory platform for direct listings and capital"
     score = _score_thread(title, "", prompt, _ts(1), num_comments=50, brand_name="CapCo")
     assert score == 0.0

@@ -2190,7 +2190,7 @@ export default function ContentHubPage() {
         <HelpModal title="How Content Hub works" onClose={() => setHubHelpOpen(false)}>
           <p>Content Hub generates AI drafts for your brand and surfaces Reddit and Quora threads where you can contribute.</p>
           <ul className="space-y-2 mt-2">
-            <li><span className="text-[#F0F4F8] font-medium">Generate Drafts Now</span> — creates a batch of AI drafts across your tracked prompts and platforms.</li>
+            <li><span className="text-[#F0F4F8] font-medium">Regenerate Drafts</span> — replaces all existing drafts with a fresh batch across your tracked prompts and platforms.</li>
             <li><span className="text-[#F0F4F8] font-medium">Live Opportunities</span> tab updates daily as Reddit and Quora are scanned overnight for threads matching your tracked prompts.</li>
             <li><span className="text-[#F0F4F8] font-medium">Drafts tab</span> — review, edit, and approve AI drafts before they go live.</li>
             <li><span className="text-[#F0F4F8] font-medium">Scheduled tab</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>

@@ -5,6 +5,7 @@ import pytest
 from app.services.reddit_scanner_service import (
     _is_blocked_subreddit,
     _score_thread,
+    _build_search_query,
 )
 
 
@@ -325,3 +326,28 @@ def test_two_matches_now_scores_zero():
     prompt = "what is the best reg a+ advisory platform for direct listings and capital"
     score = _score_thread(title, "", prompt, _ts(1), num_comments=50, brand_name="CapCo")
     assert score == 0.0
+
+
+# ── _build_search_query ───────────────────────────────────────────────────────
+
+def test_build_search_query_quotes_reg_a_plus():
+    """'Reg A+' in prompt → quoted phrase in query."""
+    q = _build_search_query("what service will help me raise capital using Reg A+")
+    assert '"reg a+"' in q.lower()
+
+def test_build_search_query_strips_generic_finance_words():
+    """Generic words like 'capital', 'raise', 'service' don't appear bare."""
+    q = _build_search_query("what service will help me raise capital using Reg A+")
+    bare_words = q.lower().split()
+    for word in ("capital", "raise", "service", "help"):
+        assert word not in bare_words, f"'{word}' leaked into query: {q}"
+
+def test_build_search_query_returns_nonempty():
+    """Always returns something even for generic prompts."""
+    q = _build_search_query("what is the best way to do things")
+    assert len(q.strip()) > 0
+
+def test_build_search_query_extracts_specific_words():
+    """Specific domain words survive after stop-word removal."""
+    q = _build_search_query("how do companies complete a direct listing on NYSE")
+    assert any(w in q.lower() for w in ("direct", "listing", "nyse", "companies"))

@@ -89,6 +89,64 @@ _STOP = frozenset("""
     recently previously currently generally specifically
 """.split())
 
+# ── Query-time stop words (too generic to make a good Reddit search query) ────
+# These words appear in completely unrelated contexts and flood results.
+# Distinct from _STOP (scoring-time): a word can be scored but not searched.
+QUERY_STOP: frozenset[str] = frozenset({
+    "capital", "raise", "raises", "raised", "service", "services",
+    "platform", "platforms", "advisory", "advisor", "advisors",
+    "company", "companies", "business", "businesses",
+    "fund", "funds", "funding", "help", "best", "top",
+    "use", "using", "used", "invest", "investor", "investors",
+    "market", "markets", "money", "growth", "scale",
+    "solution", "solutions", "provider", "providers",
+    "startup", "startups", "enterprise", "product", "products",
+    "strategy", "strategies", "need", "needs", "want", "wants",
+    "find", "choose", "choosing", "getting", "making",
+})
+
+# Multi-word regulatory/technical terms to search as quoted phrases.
+# Presence of these in a post is a near-perfect relevance signal.
+_PHRASE_TERMS: list[str] = [
+    "reg a+", "reg d", "reg s", "regulation a", "regulation d", "regulation s",
+    "capital raise", "securities offering", "direct listing",
+    "crowdfunding", "equity crowdfunding", "investor relations",
+    "accredited investor", "accredited investors",
+    "venture capital", "private equity", "angel investor",
+    "initial public offering", "ipo", "spac", "reverse merger",
+]
+
+
+def _build_search_query(prompt_text: str) -> str:
+    """
+    Extract the most search-effective terms from a prompt.
+
+    - Detects multi-word regulatory/technical phrases and quotes them for exact match.
+    - Strips generic finance/SaaS words (QUERY_STOP) that cause false-positive results.
+    - Returns top-3 remaining specific keywords joined with spaces.
+    - Falls back to raw prompt text if nothing survives filtering.
+    """
+    lower = prompt_text.lower()
+
+    # Detect and quote multi-word technical phrases first
+    quoted: list[str] = []
+    for phrase in _PHRASE_TERMS:
+        if phrase in lower:
+            quoted.append(f'"{phrase}"')
+
+    # Extract remaining single keywords (not in either stop set, length > 3)
+    clean = re.sub(r"[^a-z0-9\s]", " ", lower)
+    words = [
+        w for w in clean.split()
+        if w not in _STOP and w not in QUERY_STOP and len(w) > 3
+    ]
+
+    # Compose: up to 2 quoted phrases + enough single words to reach 3 terms total
+    parts = quoted[:2] + words[:max(0, 3 - len(quoted[:2]))]
+
+    return " ".join(parts) if parts else prompt_text
+
+
 # Subreddits that are creative writing / fiction / entertainment — never valid
 # content-marketing opportunities regardless of keyword overlap.
 _FICTION_SUBS = frozenset({
@@ -382,9 +440,9 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
         # Build search queries: one per prompt (up to 6) + one for the brand name
         queries: list[tuple[str, int | None]] = [
-            (prompt.text, prompt.id) for prompt in prompts[:6]
+            (_build_search_query(prompt.text), prompt.id) for prompt in prompts[:6]
         ]
-        queries.append((brand.name, None))  # brand-name query has no associated prompt
+        queries.append((brand.name, None))  # brand-name query: already specific, no extraction
 
         all_candidates: list[tuple[dict, int | None]] = []  # (post_data, prompt_id)
 

@@ -256,7 +256,7 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
             if qr.response_text and comp_lower in qr.response_text.lower()
         )
     total_mentions = brand_mentions + sum(comp_counts.values())
-    sov_pct = (brand_mentions / total_mentions * 100.0) if total_mentions > 0 else 100.0
+    sov_pct = (brand_mentions / total_mentions * 100.0) if total_mentions > 0 else (100.0 if not competitors else 0.0)
     sov = SOVData(
         percentage=round(sov_pct, 1),
         brand_mentions=brand_mentions,

@@ -350,4 +350,4 @@ def test_build_search_query_returns_nonempty():
 def test_build_search_query_extracts_specific_words():
     """Specific domain words survive after stop-word removal."""
     q = _build_search_query("how do companies complete a direct listing on NYSE")
-    assert any(w in q.lower() for w in ("direct", "listing", "nyse", "companies"))
+    assert any(w in q.lower() for w in ("direct", "listing", "nyse"))

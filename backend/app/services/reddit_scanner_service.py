@@ -107,13 +107,16 @@ QUERY_STOP: frozenset[str] = frozenset({
 
 # Multi-word regulatory/technical terms to search as quoted phrases.
 # Presence of these in a post is a near-perfect relevance signal.
+# Note: single-word entries like "ipo" and "spac" were removed — quoting single
+# words provides no Reddit search benefit and they appeared twice (quoted + bare).
+# Longer phrases are listed before shorter subsets to prevent duplicate matches.
 _PHRASE_TERMS: list[str] = [
     "reg a+", "reg d", "reg s", "regulation a", "regulation d", "regulation s",
     "capital raise", "securities offering", "direct listing",
     "crowdfunding", "equity crowdfunding", "investor relations",
-    "accredited investor", "accredited investors",
+    "accredited investors", "accredited investor",  # longer first to prevent subset match
     "venture capital", "private equity", "angel investor",
-    "initial public offering", "ipo", "spac", "reverse merger",
+    "initial public offering", "reverse merger",
 ]
 
 
@@ -128,17 +131,22 @@ def _build_search_query(prompt_text: str) -> str:
     """
     lower = prompt_text.lower()
 
-    # Detect and quote multi-word technical phrases first
+    # Detect and quote multi-word technical phrases (sorted longest-first to avoid subset matches)
     quoted: list[str] = []
-    for phrase in _PHRASE_TERMS:
+    consumed_words: set[str] = set()
+    for phrase in sorted(_PHRASE_TERMS, key=len, reverse=True):
         if phrase in lower:
-            quoted.append(f'"{phrase}"')
+            # Check no word in this phrase was already consumed by a longer match
+            phrase_words = set(phrase.split())
+            if not phrase_words & consumed_words:
+                quoted.append(f'"{phrase}"')
+                consumed_words |= phrase_words
 
-    # Extract remaining single keywords (not in either stop set, length > 3)
+    # Extract remaining single keywords (not consumed by phrases, not in stop sets, length > 3)
     clean = re.sub(r"[^a-z0-9\s]", " ", lower)
     words = [
         w for w in clean.split()
-        if w not in _STOP and w not in QUERY_STOP and len(w) > 3
+        if w not in _STOP and w not in QUERY_STOP and len(w) > 3 and w not in consumed_words
     ]
 
     # Compose: up to 2 quoted phrases + enough single words to reach 3 terms total

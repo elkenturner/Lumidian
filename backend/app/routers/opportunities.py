@@ -10,9 +10,12 @@ POST   /api/opportunities/{brand_id}/scan          — trigger an on-demand scan
 """
 from __future__ import annotations
 
+import logging
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+
+logger = logging.getLogger(__name__)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -135,36 +138,42 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
 
 
 async def _scan_and_log(brand_id: int) -> None:
-    """Run scan_brand_opportunities and log the reddit_scan_completed event."""
-    from app.services.reddit_scanner_service import scan_brand_opportunities
+    """Run Reddit AND Quora scanners in parallel, then log the scan_completed event."""
+    from app.services import reddit_scanner_service, quora_scanner_service
     from app.services.analytics_service import log_event
     from app.database import AsyncSessionLocal
-    from sqlalchemy import select as _select
 
     try:
-        await scan_brand_opportunities(brand_id, clear_existing=True)
-    finally:
-        # Count opportunities found for this brand in the last few minutes
-        try:
-            from datetime import datetime, timezone, timedelta
-            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
-            async with AsyncSessionLocal() as db:
-                from app.models import ContentOpportunity
-                result = await db.execute(
-                    _select(ContentOpportunity).where(
-                        ContentOpportunity.brand_id == brand_id,
-                        ContentOpportunity.created_at >= cutoff,
-                    )
+        import asyncio
+        await asyncio.gather(
+            reddit_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
+            quora_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
+        )
+    except Exception:
+        logger.exception("_scan_and_log: scanner error for brand_id=%d", brand_id)
+
+    # Count opportunities found in the last few minutes for analytics
+    try:
+        from datetime import datetime, timezone, timedelta
+        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
+        async with AsyncSessionLocal() as db:
+            from app.models import ContentOpportunity
+            from sqlalchemy import select as _select
+            result = await db.execute(
+                _select(ContentOpportunity).where(
+                    ContentOpportunity.brand_id == brand_id,
+                    ContentOpportunity.created_at >= cutoff,
                 )
-                new_opps = list(result.scalars().all())
-                subreddits = list({o.subreddit for o in new_opps if o.subreddit})
-            await log_event(
-                "reddit_scan_completed",
-                {"opportunities_found": len(new_opps), "subreddits_scanned": subreddits},
-                brand_id=brand_id,
             )
-        except Exception:
-            pass
+            new_opps = list(result.scalars().all())
+            subreddits = list({o.subreddit for o in new_opps if o.subreddit})
+        await log_event(
+            "reddit_scan_completed",
+            {"opportunities_found": len(new_opps), "subreddits_scanned": subreddits},
+            brand_id=brand_id,
+        )
+    except Exception:
+        pass
 
 
 @router.post("/{brand_id}/scan", status_code=status.HTTP_202_ACCEPTED)

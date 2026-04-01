@@ -279,3 +279,20 @@ def test_sanitize_prevents_prompt_injection_in_custom_brief():
     very_long = "X" * 1000
     result2 = _sanitize_user_input(very_long)
     assert len(result2) == 500
+
+
+# ── Scan trigger includes Quora ───────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_scan_log_calls_both_reddit_and_quora():
+    """_scan_and_log must call both Reddit and Quora scan_brand_opportunities."""
+    from unittest.mock import AsyncMock, patch
+    from app.routers.opportunities import _scan_and_log
+
+    with patch("app.services.reddit_scanner_service.scan_brand_opportunities", new_callable=AsyncMock) as mock_reddit, \
+         patch("app.services.quora_scanner_service.scan_brand_opportunities", new_callable=AsyncMock) as mock_quora, \
+         patch("app.services.analytics_service.log_event", new_callable=AsyncMock):
+        await _scan_and_log(brand_id=99)
+
+    mock_reddit.assert_called_once_with(99, clear_existing=True)
+    mock_quora.assert_called_once_with(99, clear_existing=True)

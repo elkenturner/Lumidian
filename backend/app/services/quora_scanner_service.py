@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Minimum Serper relevance proxy: we score by title keyword overlap with the prompt.
 # A real Quora question URL + at least 1 prompt keyword hit counts.
-_MIN_SCORE = 40.0
+_MIN_SCORE = 55.0
 _LEAD_CAP = 20  # keep top N "new" leads per brand (by relevance_score)
 
 
@@ -103,8 +103,8 @@ def _score_question(title: str, snippet: str, prompt_text: str) -> float:
     matches = len(prompt_kw & q_kw)
     relevance = min(1.0, matches / len(prompt_kw))
 
-    # Need at least 2 keyword matches
-    if matches < 2:
+    # Need at least 3 keyword matches
+    if matches < 3:
         return 0.0
 
     return round(relevance * 100.0, 1)

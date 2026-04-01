@@ -109,6 +109,27 @@ def test_score_snippet_contributes():
     assert score_with >= score_without
 
 
+# ── New threshold tests ───────────────────────────────────────────────────────
+
+def test_score_question_two_matches_returns_zero():
+    """Exactly 2 keyword matches now returns 0 (new minimum is 3)."""
+    score = _score_question(
+        title="advisory platform review",
+        snippet="short snippet here",
+        prompt_text="what is the best reg a+ advisory platform for direct listings and capital raise",
+    )
+    assert score == 0.0
+
+def test_score_question_three_matches_nonzero():
+    """3 keyword matches returns nonzero score."""
+    score = _score_question(
+        title="how to use reg a+ advisory platform for capital raise",
+        snippet="guide for raising capital",
+        prompt_text="what is the best reg a+ advisory platform for capital raise",
+    )
+    assert score > 0.0
+
+
 # ── scan_brand_opportunities ──────────────────────────────────────────────────
 
 def _make_question(url: str, title: str, snippet: str = "") -> dict:

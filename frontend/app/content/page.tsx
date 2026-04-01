@@ -2588,7 +2588,7 @@ export default function ContentHubPage() {
           <h3 className="text-base font-semibold text-[#F0F4F8] mb-2">No brands tracked yet</h3>
           <p className="text-sm text-[#64748B] max-w-sm mb-6">Add your first brand to start generating content drafts and finding opportunities.</p>
           <Link
-            href="/tracker/new"
+            href="/onboarding"
             className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
           >
             <Plus size={16} />

@@ -1043,7 +1043,7 @@ export default function DashboardPage() {
             ))}
           </div>
           <Link
-            href="/tracker/new"
+            href="/onboarding"
             className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-6 py-3 text-sm font-semibold transition-colors shadow-lg shadow-[#6366f1]/20"
           >
             <Plus size={16} />

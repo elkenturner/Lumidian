@@ -546,7 +546,7 @@ export default function LandingPage() {
               {[
                 { value: '4', label: 'AI models monitored' },
                 { value: '2×', label: 'Daily automated reports' },
-                { value: '10+', label: 'Platforms tracked' },
+                { value: '100+', label: 'Queries per brand run' },
               ].map((stat) => (
                 <div key={stat.label} style={{ background: 'rgba(248,247,244,0.8)', padding: '32px 24px', textAlign: 'center' }}>
                   <p style={{ fontSize: 44, fontWeight: 800, color: '#0F0F12', letterSpacing: '-0.04em', margin: '0 0 6px' }}>{stat.value}</p>

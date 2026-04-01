@@ -173,6 +173,7 @@ async def create_brand(
         json={
             "name": name,
             "tier": "basic",
+            "website_url": "https://example.com",
             "prompts": prompts or ["What are the best tools for X?"],
         },
     )

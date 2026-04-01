@@ -150,3 +150,57 @@ async def test_run_status_transitions(client: httpx.AsyncClient):
     data = resp.json()
     assert data["status"] == "completed"
     assert data["overall_score"] == 75.0
+
+
+# ── Single-prompt mini run ────────────────────────────────────────────────────
+
+async def test_trigger_prompt_run_returns_202(client: httpx.AsyncClient):
+    """POST /api/tracking/run-prompt/{brand_id}/{prompt_id} returns 202 with run_id."""
+    await register_and_login(client, email="promptrun@example.com")
+    brand = await create_brand(
+        client,
+        name="Prompt Run Brand",
+        prompts=["What is the best AI visibility tool?"],
+    )
+    prompt_id = brand["prompts"][0]["id"]
+
+    with patch(
+        "app.routers.tracking._background_prompt_run",
+        new_callable=AsyncMock,
+    ):
+        resp = await client.post(
+            f"/api/tracking/run-prompt/{brand['id']}/{prompt_id}"
+        )
+
+    assert resp.status_code == 202
+    data = resp.json()
+    assert "run_id" in data
+    assert data["status"] == "pending"
+
+
+async def test_trigger_prompt_run_wrong_prompt(client: httpx.AsyncClient):
+    """Prompt id not belonging to this brand returns 404."""
+    await register_and_login(client, email="promptrun_wrong@example.com")
+    brand = await create_brand(client, name="Prompt Wrong Brand")
+
+    resp = await client.post(
+        f"/api/tracking/run-prompt/{brand['id']}/99999"
+    )
+    assert resp.status_code == 404
+
+
+async def test_trigger_prompt_run_access_control(client: httpx.AsyncClient):
+    """User cannot trigger a prompt run on another user's brand."""
+    await register_and_login(client, email="promptrun_owner@example.com")
+    brand = await create_brand(
+        client,
+        name="Prompt Owner Brand",
+        prompts=["What is the best tool?"],
+    )
+    prompt_id = brand["prompts"][0]["id"]
+
+    await register_and_login(client, email="promptrun_thief@example.com")
+    resp = await client.post(
+        f"/api/tracking/run-prompt/{brand['id']}/{prompt_id}"
+    )
+    assert resp.status_code == 403

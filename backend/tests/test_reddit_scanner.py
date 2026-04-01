@@ -107,7 +107,7 @@ def test_spam_title_scores_zero():
     assert score == 0.0
 
 def test_low_relevance_scores_zero():
-    """Post that shares fewer than 2 prompt words returns 0."""
+    """Post that shares fewer than 3 prompt words returns 0."""
     title = "cats and dogs are great pets"
     score = _score_thread(title, "", "what saas tools help with brand tracking analytics", _ts(1),
                           num_comments=20, brand_name="Acme")
@@ -290,3 +290,28 @@ async def test_works_with_no_industry_match(tmp_db):
 
     # Must not skip due to missing industry — should attempt scan and find the post
     assert count >= 1
+
+
+# ── New scoring formula tests ─────────────────────────────────────────────────
+
+def test_engagement_weight_reduced():
+    """High-engagement irrelevant post should NOT score >= 65 with new formula."""
+    # Generic words stripped by QUERY_STOP; only 1 specific word matches
+    title = "one year thoughts on my journey"
+    prompt = "what is the best reg a+ capital raise platform advisory service"
+    score = _score_thread(title, "", prompt, _ts(1), num_comments=500, brand_name="CapCo")
+    assert score == 0.0
+
+def test_high_relevance_post_passes_new_threshold():
+    """Highly relevant post (3+ matches, high relevance) scores >= 65."""
+    title = "how to choose a reg a+ advisory platform for capital raises"
+    prompt = "what is the best reg a+ advisory platform for capital raises"
+    score = _score_thread(title, "", prompt, _ts(3), num_comments=10, brand_name="CapCo")
+    assert score >= 65.0
+
+def test_two_matches_now_scores_zero():
+    """Post with exactly 2 keyword matches returns 0 under new min-matches=3 rule."""
+    title = "advisory platform review"
+    prompt = "what is the best reg a+ advisory platform for direct listings and capital"
+    score = _score_thread(title, "", prompt, _ts(1), num_comments=50, brand_name="CapCo")
+    assert score == 0.0

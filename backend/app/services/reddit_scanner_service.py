@@ -241,8 +241,8 @@ def _score_thread(
     )
     relevance = min(1.0, matches / len(prompt_words))
 
-    # Hard minimum: at least 45% keyword overlap AND at least 2 matches
-    if relevance < 0.45 or matches < 2:
+    # Hard minimum: at least 45% keyword overlap AND at least 3 matches
+    if relevance < 0.45 or matches < 3:
         return 0.0
 
     # Recency — graduated, no hard cutoff (old evergreen threads still score)
@@ -265,7 +265,7 @@ def _score_thread(
     # Brand mention bonus
     brand_bonus = 10.0 if brand_name and brand_name.lower() in combined else 0.0
 
-    score = relevance * 50.0 + recency * 20.0 + engagement * 20.0 + brand_bonus
+    score = relevance * 70.0 + recency * 20.0 + engagement * 10.0 + brand_bonus
     return round(min(score, 100.0), 1)
 
 
@@ -444,7 +444,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 brand_name=brand.name,
                 subreddit=subreddit_name,
             )
-            if score < 55.0:
+            if score < 65.0:
                 continue
 
             posted_dt = (

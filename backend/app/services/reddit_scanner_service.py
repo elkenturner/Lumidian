@@ -462,10 +462,11 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
         logger.info("Reddit scanner: brand=%r | %d prompts", brand.name, len(prompts))
 
         if clear_existing:
-            # Delete ALL existing opportunities so stale results don't persist
+            # Delete only Reddit opportunities so parallel Quora scan rows aren't wiped
             await db.execute(
                 sql_delete(ContentOpportunity).where(
-                    ContentOpportunity.brand_id == brand_id
+                    ContentOpportunity.brand_id == brand_id,
+                    ContentOpportunity.platform == "reddit",
                 )
             )
             await db.commit()

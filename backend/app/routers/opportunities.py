@@ -148,6 +148,7 @@ async def _scan_and_log(brand_id: int) -> None:
         await asyncio.gather(
             reddit_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
             quora_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
+            return_exceptions=True,
         )
     except Exception:
         logger.exception("_scan_and_log: scanner error for brand_id=%d", brand_id)

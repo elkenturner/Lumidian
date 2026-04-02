@@ -97,7 +97,7 @@ export default function BillingPage() {
       {showCancelConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowCancelConfirm(false)} />
-          <div className="relative bg-[rgba(10,14,24,0.97)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl p-6 max-w-sm w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-[#0f172a] border border-[#334155] rounded-2xl p-6 max-w-sm w-full shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-sm font-semibold text-[#e2e8f0] mb-2">Cancel subscription?</h3>
             <p className="text-xs text-[#64748b] mb-4">
               Your plan will remain active until the end of the current billing period, then revert to the free plan.
@@ -105,7 +105,7 @@ export default function BillingPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setShowCancelConfirm(false)}
-                className="flex-1 py-2 text-xs text-[#64748b] hover:text-[#94a3b8] border border-[rgba(99,102,241,0.22)] rounded-lg transition-colors"
+                className="flex-1 py-2 text-xs text-[#64748b] hover:text-[#94a3b8] border border-[#334155] rounded-lg transition-colors"
               >
                 Keep plan
               </button>
@@ -175,7 +175,7 @@ export default function BillingPage() {
       ) : (
         <>
           {/* Current plan card */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 mb-6">
+          <div className="bg-[#0f172a] border border-[#334155] rounded-xl p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <div>
                 <p className="text-xs text-[#64748b] uppercase tracking-wide mb-1">Current Plan</p>
@@ -194,7 +194,7 @@ export default function BillingPage() {
             </div>
 
             {!isAdmin && (
-              <div className="bg-[rgba(99,102,241,0.04)] rounded-lg px-4 py-3">
+              <div className="bg-[#0f172a] rounded-lg px-4 py-3">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs text-[#64748b]">Prompt limit</p>
                   <p className="text-xs font-semibold text-[#94a3b8]">
@@ -250,8 +250,8 @@ export default function BillingPage() {
                 return (
                   <div
                     key={tier}
-                    className={`bg-[rgba(99,102,241,0.06)] backdrop-blur-md rounded-xl p-6 border-2 transition-colors ${
-                      isCurrent ? 'border-[#6366f1]' : 'border-[rgba(99,102,241,0.22)]'
+                    className={`bg-[#0f172a] rounded-xl p-6 border-2 transition-colors ${
+                      isCurrent ? 'border-[#6366f1]' : 'border-[#334155]'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-3">

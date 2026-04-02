@@ -2,8 +2,9 @@
 APScheduler-based scheduler for Lumidian.
 
 Jobs:
-  • 02:00 UTC        — Reddit opportunity scanner (daily) + SQLite backup
-  • 02:30 UTC        — Quora opportunity scanner (daily)
+  • 02:00 UTC        — SQLite backup (daily)
+  • 03:15 UTC Mon    — Reddit opportunity scanner (weekly)
+  • 03:30 UTC Mon    — Quora opportunity scanner (weekly)
   • 03:00 UTC Mon    — Auto-draft scheduler (weekly on Monday)
   • 04:00 UTC, day 1 — Monthly website context refresh via Jina Reader
   • 06:00 UTC        — Pitch brand expiry: warn users 24 h before expiry, delete expired brands
@@ -111,33 +112,63 @@ async def _safe_run(brand_id: int, schedule_slot: str) -> None:
 
 
 async def _reddit_scanner_sweep() -> None:
-    """Daily Reddit scan for all brands (02:00 UTC)."""
+    """Weekly Reddit scan for all brands (03:15 UTC, Monday)."""
     if await _is_scheduler_paused():
         logger.info("Scheduler paused — skipping Reddit scanner sweep")
         return
 
-    from app.services.reddit_scanner_service import scan_all_brands
-    logger.info("Scheduler: starting Reddit scanner sweep")
-    try:
-        await scan_all_brands()
-        logger.info("Scheduler: Reddit scanner sweep complete")
-    except Exception:
-        logger.exception("Scheduler: Reddit scanner sweep failed")
+    from app import state
+    from app.database import AsyncSessionLocal
+    from app.models import Brand
+    from app.services.reddit_scanner_service import scan_brand_opportunities
+    from sqlalchemy import select
+
+    logger.info("Scheduler: starting weekly Reddit scanner sweep")
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Brand))
+        brands = result.scalars().all()
+
+    for brand in brands:
+        state.scanning_brands.add(brand.id)
+        try:
+            await scan_brand_opportunities(brand.id)
+        except Exception:
+            logger.exception("Reddit scanner failed for brand_id=%d", brand.id)
+        finally:
+            state.scanning_brands.discard(brand.id)
+
+    logger.info("Scheduler: weekly Reddit scanner sweep complete")
 
 
 async def _quora_scanner_sweep() -> None:
-    """Daily Quora scan for all brands (02:30 UTC)."""
+    """Weekly Quora scan for all brands (03:30 UTC, Monday)."""
     if await _is_scheduler_paused():
         logger.info("Scheduler paused — skipping Quora scanner sweep")
         return
 
-    from app.services.quora_scanner_service import scan_all_brands
-    logger.info("Scheduler: starting Quora scanner sweep")
-    try:
-        await scan_all_brands()
-        logger.info("Scheduler: Quora scanner sweep complete")
-    except Exception:
-        logger.exception("Scheduler: Quora scanner sweep failed")
+    from app import state
+    from app.database import AsyncSessionLocal
+    from app.models import Brand
+    from app.services.quora_scanner_service import scan_brand_opportunities
+    from sqlalchemy import select
+
+    logger.info("Scheduler: starting weekly Quora scanner sweep")
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Brand))
+        brands = result.scalars().all()
+
+    for brand in brands:
+        state.scanning_brands.add(brand.id)
+        try:
+            await scan_brand_opportunities(brand.id)
+        except Exception:
+            logger.exception("Quora scanner failed for brand_id=%d", brand.id)
+        finally:
+            state.scanning_brands.discard(brand.id)
+
+    logger.info("Scheduler: weekly Quora scanner sweep complete")
 
 
 async def _auto_draft_sweep() -> None:
@@ -508,20 +539,20 @@ def start_scheduler() -> None:
 
     scheduler.add_job(
         _reddit_scanner_sweep,
-        trigger=CronTrigger(hour=2, minute=0, timezone="UTC"),
+        trigger=CronTrigger(day_of_week="mon", hour=3, minute=15, timezone="UTC"),
         id="reddit_scanner",
-        name="Reddit opportunity scanner (02:00 UTC)",
+        name="Reddit opportunity scanner (Monday 03:15 UTC)",
         replace_existing=True,
-        misfire_grace_time=600,
+        misfire_grace_time=3600,
     )
 
     scheduler.add_job(
         _quora_scanner_sweep,
-        trigger=CronTrigger(hour=2, minute=30, timezone="UTC"),
+        trigger=CronTrigger(day_of_week="mon", hour=3, minute=30, timezone="UTC"),
         id="quora_scanner",
-        name="Quora opportunity scanner (02:30 UTC)",
+        name="Quora opportunity scanner (Monday 03:30 UTC)",
         replace_existing=True,
-        misfire_grace_time=600,
+        misfire_grace_time=3600,
     )
 
     scheduler.add_job(

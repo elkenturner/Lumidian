@@ -69,7 +69,7 @@ const NavLink = memo(function NavLink({
         background: 'rgba(99,102,241,0.15)',
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 0 18px rgba(99,102,241,0.10)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 0 18px rgba(99,102,241,0.12)',
       } : undefined}
       onMouseEnter={(e) => {
         if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
@@ -201,10 +201,10 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
         style={{
           width: expanded ? 240 : 64,
           transition: 'width 0.22s ease',
-          background: 'linear-gradient(180deg, rgba(10,14,24,0.90) 0%, rgba(5,8,16,0.95) 100%)',
+          background: 'linear-gradient(180deg, rgba(6,10,22,0.92) 0%, rgba(4,6,14,0.96) 100%)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRight: '1px solid rgba(255,255,255,0.08)',
+          borderRight: '1px solid rgba(99,102,241,0.10)',
         }}
         onMouseEnter={() => onExpandedChange(true)}
         onMouseLeave={() => onExpandedChange(false)}
@@ -445,7 +445,8 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 }
                 {unreadCount > 0 && (
                   <span
-                    className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-[#6366f1] rounded-full flex items-center justify-center text-[8px] font-bold text-white leading-none"
+                    className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white leading-none"
+                    style={{ background: 'rgba(99,102,241,0.9)', boxShadow: '0 0 8px rgba(99,102,241,0.5)' }}
                   >
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
@@ -496,7 +497,13 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl">
+                <div
+                  className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
+                  style={{
+                    background: 'rgba(99,102,241,0.06)',
+                    border: '1px solid rgba(99,102,241,0.12)',
+                  }}
+                >
                   <div
                     className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
                     style={{ background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.30)' }}

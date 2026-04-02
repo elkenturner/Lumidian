@@ -296,7 +296,7 @@ export default function ReportsPage() {
           {responses.length > 0 && (
             <button
               onClick={downloadCSV}
-              className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.09)] border border-[rgba(99,102,241,0.22)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-colors text-xs font-medium"
+              className="flex items-center gap-2 bg-[#0f172a] hover:bg-[#0f172a] border border-[#334155] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-colors text-xs font-medium"
               title="Export as CSV"
             >
               <Download size={14} />
@@ -308,7 +308,7 @@ export default function ReportsPage() {
               <button
                 onClick={downloadPDF}
                 disabled={exportingPDF}
-                className="flex items-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[#818cf8] hover:text-[#a5b4fc] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
+                className="flex items-center gap-2 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#818cf8] hover:text-[#a5b4fc] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
                 title="Export as PDF"
               >
                 {exportingPDF
@@ -338,7 +338,7 @@ export default function ReportsPage() {
           <button
             onClick={() => selectedBrandId && loadData(selectedBrandId)}
             disabled={loading}
-            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.09)] border border-[rgba(99,102,241,0.22)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 bg-[#0f172a] hover:bg-[#0f172a] border border-[#334155] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -347,12 +347,12 @@ export default function ReportsPage() {
 
       {loadingBrands ? (
         <div className="space-y-4 animate-pulse">
-          <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
-          <div className="h-64 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
+          <div className="h-48 bg-[#0f172a] border border-[#334155] rounded-xl" />
+          <div className="h-64 bg-[#0f172a] border border-[#334155] rounded-xl" />
         </div>
       ) : brands.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-14 h-14 bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] rounded-2xl flex items-center justify-center mb-4">
+          <div className="w-14 h-14 bg-[#0f172a] border border-[#334155] rounded-2xl flex items-center justify-center mb-4">
             <BarChart2 size={24} className="text-[#6366f1]" />
           </div>
           <h3 className="text-base font-semibold text-[#F0F4F8] mb-2">No brands tracked yet</h3>
@@ -367,7 +367,7 @@ export default function ReportsPage() {
           {/* Trend chart */}
           <div className="mb-4">
             {loading ? (
-              <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30)] animate-pulse">
+              <div className="bg-[#0f172a] border border-[#334155] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30)] animate-pulse">
                 <div className="h-5 bg-[rgba(255,255,255,0.06)] rounded w-32 mb-4" />
                 <div className="h-48 bg-[rgba(255,255,255,0.06)] rounded-lg" />
               </div>
@@ -392,17 +392,17 @@ export default function ReportsPage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search prompts…"
-                  className="w-full bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] placeholder:text-[#475569] rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 transition-colors"
+                  className="w-full bg-[#0f172a] border border-[#334155] text-[#94A3B8] placeholder:text-[#475569] rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 transition-colors"
                 />
               </div>
               {/* Sort */}
-              <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5">
+              <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[#1e293b] rounded-lg p-0.5">
                 <ArrowUpDown size={11} className="text-[#475569] ml-1.5" />
                 {(['visibility', 'alpha', 'change'] as SortBy[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setSortBy(s)}
-                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all capitalize ${sortBy === s ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all capitalize ${sortBy === s ? 'bg-[#1e293b] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
                   >
                     {s === 'visibility' ? 'Visibility %' : s === 'alpha' ? 'A–Z' : 'Biggest Δ'}
                   </button>
@@ -419,7 +419,7 @@ export default function ReportsPage() {
             const indexS = indexR.length > 0 ? Math.round(indexR.filter(r => r.mentioned).length / indexR.length * 100) : null;
             if (liveS === null && indexS === null) return null;
             return (
-              <div className="mb-4 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl px-5 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+              <div className="mb-4 bg-[#0f172a] border border-[#334155] rounded-xl px-5 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
                 <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-3">Score Breakdown</p>
                 <div className="grid grid-cols-2 gap-4">
                   {([
@@ -459,8 +459,8 @@ export default function ReportsPage() {
           })()}
 
           {/* Prompt visibility list */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
-            <div className="px-5 py-3.5 border-b border-[rgba(99,102,241,0.12)] bg-[rgba(99,102,241,0.05)] flex items-center justify-between">
+          <div className="bg-[#0f172a] border border-[#334155] rounded-xl overflow-hidden shadow-lg">
+            <div className="px-5 py-3.5 border-b border-[#1e293b] bg-[#0f172a] flex items-center justify-between">
               <h3 className="text-[15px] font-medium text-[#F0F4F8]">Prompt Visibility</h3>
               {!loading && (promptGroups.length + untrackedPrompts.length) > 0 && (
                 <span className="text-xs text-[#64748B]">
@@ -470,7 +470,7 @@ export default function ReportsPage() {
             </div>
 
             {loading ? (
-              <div className="divide-y divide-[rgba(99,102,241,0.10)]">
+              <div className="divide-y divide-[#1e293b]">
                 {[1, 2, 3, 4].map(i => (
                   <div key={i} className="px-5 py-5 animate-pulse">
                     <div className="flex items-start justify-between gap-3 mb-3">
@@ -485,14 +485,14 @@ export default function ReportsPage() {
               </div>
             ) : promptGroups.length === 0 && untrackedPrompts.length === 0 ? (
               <div className="px-5 py-12 text-center">
-                <div className="w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] flex items-center justify-center mx-auto mb-3">
+                <div className="w-10 h-10 rounded-xl bg-[#0f172a] border border-[#1e293b] flex items-center justify-center mx-auto mb-3">
                   <BarChart2 size={18} className="text-[#475569]" />
                 </div>
                 <p className="text-sm font-medium text-[#94A3B8] mb-1">No report data yet</p>
                 <p className="text-sm text-[#475569]">Run a report from the Dashboard to see prompt visibility.</p>
               </div>
             ) : (
-              <div className="divide-y divide-[rgba(99,102,241,0.10)]">
+              <div className="divide-y divide-[#1e293b]">
                 {promptGroups.map((g) => {
                   const overallPct = g.total > 0 ? Math.round((g.mentioned / g.total) * 100) : 0;
                   const overallColor = overallPct >= 60 ? '#10b981' : overallPct >= 30 ? '#f59e0b' : '#ef4444';
@@ -518,7 +518,7 @@ export default function ReportsPage() {
                   return (
                     <div key={g.promptId}>
                       <button
-                        className="w-full px-5 py-4 hover:bg-[rgba(99,102,241,0.05)] transition-colors text-left"
+                        className="w-full px-5 py-4 hover:bg-[#0f172a] transition-colors text-left"
                         onClick={() => setExpandedPromptId(isExpanded ? null : g.promptId)}
                       >
                         <div className="flex items-start gap-3 mb-3">
@@ -564,7 +564,7 @@ export default function ReportsPage() {
                                   return (
                                     <div
                                       key={modelKey}
-                                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[rgba(99,102,241,0.22)] bg-[rgba(99,102,241,0.06)]"
+                                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#334155] bg-[#0f172a]"
                                     >
                                       <span className="text-xs font-semibold" style={{ color: pct === null ? '#475569' : cfg.text }}>{cfg.label}</span>
                                       <span className="text-[rgba(255,255,255,0.10)]">·</span>
@@ -589,7 +589,7 @@ export default function ReportsPage() {
 
                       {/* Expanded: individual query responses */}
                       {isExpanded && (
-                        <div className="border-t border-[rgba(99,102,241,0.12)] bg-[rgba(99,102,241,0.04)] divide-y divide-[rgba(99,102,241,0.10)]">
+                        <div className="border-t border-[#1e293b] bg-[#0f172a] divide-y divide-[#1e293b]">
                           {g.responses.map((r) => {
                             const cfg = getModelCfg(r.model);
                             return (
@@ -640,8 +640,8 @@ export default function ReportsPage() {
 
           {/* Competitors section */}
           {!loading && competitorAnalysis && !competitorAnalysis.has_data && (
-            <div className="mt-4 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-8 text-center shadow-[0_4px_24px_rgba(0,0,0,0.30)]">
-              <div className="w-10 h-10 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.20)] rounded-xl flex items-center justify-center mb-3 mx-auto">
+            <div className="mt-4 bg-[#0f172a] border border-[#334155] rounded-xl p-8 text-center shadow-[0_4px_24px_rgba(0,0,0,0.30)]">
+              <div className="w-10 h-10 bg-[#1e293b] border border-[#334155] rounded-xl flex items-center justify-center mb-3 mx-auto">
                 <BarChart2 size={18} className="text-[#6366f1]" />
               </div>
               <p className="text-sm font-semibold text-[#CBD5E1] mb-1">No competitor data yet</p>
@@ -649,8 +649,8 @@ export default function ReportsPage() {
             </div>
           )}
           {competitorAnalysis && competitorAnalysis.has_data && (
-            <div className="mt-4 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
-              <div className="px-5 py-3.5 border-b border-[rgba(99,102,241,0.12)] bg-[rgba(99,102,241,0.05)] flex items-center justify-between">
+            <div className="mt-4 bg-[#0f172a] border border-[#334155] rounded-xl overflow-hidden shadow-lg">
+              <div className="px-5 py-3.5 border-b border-[#1e293b] bg-[#0f172a] flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-[#F0F4F8]">Competitor Share of Voice</h3>
                   <p className="text-xs text-[#64748B] mt-0.5">
@@ -668,7 +668,7 @@ export default function ReportsPage() {
                         onClick={() => setCompetitorModelFilter(mk)}
                         className={`text-[10px] font-medium px-2 py-1 rounded transition-colors ${
                           competitorModelFilter === mk
-                            ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]'
+                            ? 'bg-[#1e293b] text-[#818cf8]'
                             : 'text-[#475569] hover:text-[#94A3B8]'
                         }`}
                         style={cfg && competitorModelFilter === mk ? { color: cfg.text } : {}}
@@ -684,7 +684,7 @@ export default function ReportsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-[rgba(99,102,241,0.10)]">
+                    <tr className="border-b border-[#1e293b]">
                       <th className="text-left px-5 py-2.5 text-[#64748B] font-medium w-1/2">Prompt</th>
                       <th className="text-center px-3 py-2.5 text-[#6366f1] font-medium whitespace-nowrap">
                         {selectedBrand?.name ?? 'Your Brand'}
@@ -696,7 +696,7 @@ export default function ReportsPage() {
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[rgba(99,102,241,0.08)]">
+                  <tbody className="divide-y divide-[#1e293b]">
                     {competitorAnalysis.prompts.map((row) => {
                       const brandRate = competitorModelFilter === 'all'
                         ? row.brand_rate
@@ -712,7 +712,7 @@ export default function ReportsPage() {
                       const brandLoses = compRates.some((c) => c.rate > brandRate);
 
                       return (
-                        <tr key={row.prompt_id} className="hover:bg-[rgba(99,102,241,0.04)] transition-colors">
+                        <tr key={row.prompt_id} className="hover:bg-[#0f172a] transition-colors">
                           <td className="px-5 py-3 text-[#94A3B8] leading-snug">
                             <p className="line-clamp-2">{row.prompt_text}</p>
                           </td>

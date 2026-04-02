@@ -28,36 +28,48 @@
 
 /* ── Design tokens ─────────────────────────────────────────────────────────── */
 :root {
-  --bg-base:      #030509;
-  --bg-raised:    #060a15;
-  --bg-card:      rgba(99,102,241,0.08);
-  --bg-elevated:  rgba(99,102,241,0.11);
-  --bg-highest:   rgba(99,102,241,0.15);
+  /* Backgrounds - Slate scale */
+  --bg-base: #020617;
+  --bg-raised: #0f172a;
+  --bg-card: #1e293b;
+  --bg-elevated: #334155;
 
-  --border-card:    rgba(99,102,241,0.20);
-  --border-default: rgba(99,102,241,0.20);
-  --border-muted:   rgba(99,102,241,0.12);
-  --border-accent:  rgba(99,102,241,0.32);
+  /* Borders */
+  --border-subtle: rgba(51, 65, 85, 0.5);
+  --border-default: rgba(71, 85, 105, 0.5);
+  --border-strong: rgba(100, 116, 139, 0.5);
 
-  --text-primary:   #eef2ff;
+  /* Text */
+  --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
-  --text-muted:     #475569;
-  --text-faint:     #2d3a55;
+  --text-muted: #64748b;
+  --text-faint: #475569;
 
-  --accent:       #6366f1;
+  /* Model colors */
+  --color-chatgpt: #22c55e;
+  --color-chatgpt-muted: rgba(34, 197, 94, 0.15);
+  --color-claude: #f97316;
+  --color-claude-muted: rgba(249, 115, 22, 0.15);
+  --color-perplexity: #8b5cf6;
+  --color-perplexity-muted: rgba(139, 92, 246, 0.15);
+  --color-gemini: #3b82f6;
+  --color-gemini-muted: rgba(59, 130, 246, 0.15);
+
+  /* Semantic */
+  --success: #22c55e;
+  --success-muted: rgba(34, 197, 94, 0.1);
+  --warning: #f59e0b;
+  --danger: #ef4444;
+
+  /* Accent */
+  --accent: #6366f1;
   --accent-hover: #4f46e5;
-  --accent-muted: rgba(99,102,241,0.15);
 
-  --teal:         #14b8a6;
-  --teal-hi:      #2dd4bf;
-
-  --radius-sm: 8px;
-  --radius-md: 10px;
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
-
-  --font-syne:      var(--font-syne);
-  --font-jetbrains: var(--font-jetbrains);
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
@@ -85,49 +97,38 @@ body {
   transition-timing-function: ease;
 }
 
-/* ── Card utility — glassmorphism with indigo tint ─────────────────────────── */
+/* ── Card utilities ────────────────────────────────────────────────────────── */
 .card {
-  background: rgba(99,102,241,0.08);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(99,102,241,0.20);
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 20px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055);
 }
 .card-hover:hover {
-  background: rgba(99,102,241,0.11);
-  border-color: rgba(99,102,241,0.32);
-  box-shadow: 0 8px 32px rgba(0,0,0,0.40), inset 0 1px 0 rgba(255,255,255,0.08);
+  background: var(--bg-card);
+  border-color: var(--border-default);
 }
-.card-inset {
-  background: rgba(99,102,241,0.04);
-  border: 1px solid rgba(99,102,241,0.14);
-  border-radius: var(--radius-md);
-}
-
-/* ── Model-spectrum card variants ──────────────────────────────────────────── */
-.card-gpt,
-.card-cld,
-.card-ppl,
-.card-gem {
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+.card-elevated {
+  background: linear-gradient(135deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.4) 100%);
+  border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 16px 18px;
-  position: relative;
-  overflow: hidden;
+  padding: 20px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.3);
 }
-.card-gpt { background: rgba(16,163,127,0.08); border: 1px solid rgba(16,163,127,0.20); box-shadow: 0 4px 20px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05); }
-.card-cld { background: rgba(217,119,87,0.08);  border: 1px solid rgba(217,119,87,0.20);  box-shadow: 0 4px 20px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05); }
-.card-ppl { background: rgba(99,102,241,0.09);  border: 1px solid rgba(99,102,241,0.22);  box-shadow: 0 4px 20px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05); }
-.card-gem { background: rgba(66,133,244,0.08);  border: 1px solid rgba(66,133,244,0.20);  box-shadow: 0 4px 20px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.05); }
 
-/* Top gradient line per model */
-.card-gpt::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(16,163,127,0.55),transparent); }
-.card-cld::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(217,119,87,0.55),transparent); }
-.card-ppl::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(129,140,248,0.60),transparent); }
-.card-gem::before { content:''; position:absolute; top:0; left:0; right:0; height:1px; background:linear-gradient(90deg,transparent,rgba(66,133,244,0.55),transparent); }
+/* ── Model card with left-border accent ────────────────────────────────────── */
+.model-card {
+  background: rgba(15,23,42,0.4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  border-left-width: 3px;
+  border-left-style: solid;
+}
+.model-card-chatgpt { border-left-color: var(--color-chatgpt); }
+.model-card-claude { border-left-color: var(--color-claude); }
+.model-card-perplexity { border-left-color: var(--color-perplexity); }
+.model-card-gemini { border-left-color: var(--color-gemini); }
 
 /* ── Input utility ─────────────────────────────────────────────────────────── */
 .input {
@@ -154,9 +155,9 @@ body {
   gap: 6px;
   font-size: 0.875rem;
   font-weight: 500;
-  padding: 9px 16px;
+  padding: 10px 16px;
   border-radius: var(--radius-md);
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  transition: all 0.15s ease;
   cursor: pointer;
   white-space: nowrap;
   border: 1px solid transparent;
@@ -164,25 +165,22 @@ body {
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .btn-primary {
-  background: rgba(99,102,241,0.15);
-  color: #a5b4fc;
-  border-color: rgba(99,102,241,0.30);
+  background: var(--accent);
+  color: white;
+  border-color: transparent;
 }
 .btn-primary:hover:not(:disabled) {
-  background: rgba(99,102,241,0.22);
-  border-color: rgba(99,102,241,0.45);
-  box-shadow: 0 0 24px rgba(99,102,241,0.18), inset 0 1px 0 rgba(255,255,255,0.07);
-  color: #c7d2fe;
+  background: var(--accent-hover);
 }
 
 .btn-secondary {
-  background: rgba(255,255,255,0.05);
+  background: transparent;
   color: var(--text-secondary);
-  border-color: rgba(255,255,255,0.14);
+  border-color: var(--border-default);
 }
 .btn-secondary:hover:not(:disabled) {
-  background: rgba(255,255,255,0.09);
-  border-color: rgba(255,255,255,0.20);
+  background: rgba(255,255,255,0.05);
+  border-color: var(--border-strong);
   color: var(--text-primary);
 }
 
@@ -192,7 +190,7 @@ body {
   border-color: transparent;
 }
 .btn-ghost:hover:not(:disabled) {
-  background: rgba(255,255,255,0.06);
+  background: rgba(255,255,255,0.03);
   color: var(--text-secondary);
 }
 
@@ -327,21 +325,19 @@ body {
   }
 }
 
-/* ── Stat value display (Syne gradient) ────────────────────────────────────── */
-.stat-value-display {
-  font-family: var(--font-syne), sans-serif;
-  font-weight: 800;
-  letter-spacing: -0.5px;
+/* ── Stat value (mono font for data) ───────────────────────────────────────── */
+.stat-value {
+  font-family: var(--font-geist-mono), 'SF Mono', ui-monospace, monospace;
+  font-weight: 600;
+  letter-spacing: -1px;
   line-height: 1;
-  background: linear-gradient(135deg, #dde4ff 0%, #a5b4fc 45%, #818cf8 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
 }
-.stat-value-display.teal {
-  background: none;
-  -webkit-background-clip: unset;
-  -webkit-text-fill-color: unset;
-  background-clip: unset;
-  color: #2dd4bf;
+.stat-value-lg {
+  font-size: 36px;
+  letter-spacing: -2px;
+}
+.stat-value-sm {
+  font-size: 24px;
+  letter-spacing: -1px;
 }

@@ -16,6 +16,8 @@ GET  /api/content/guidelines/{platform}         — get platform guidelines + di
 """
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -47,7 +49,33 @@ from app.services.drafting_service import (
     generate_gap_draft,
 )
 from app.models import utcnow
-from app.services.drafting_service import DRAFT_CAP, SCHEDULED_CAP
+from app.services.drafting_service import DRAFT_CAP
+
+SCHEDULED_CAP = 20  # max approved/scheduled drafts queued at once
+
+logger = logging.getLogger(__name__)
+
+# Tracks brand IDs currently running a background generate_now task
+_generating: set[int] = set()
+
+
+async def _bg_generate_drafts(brand_id: int, max_gaps: int, source: str) -> None:
+    """Background coroutine: run auto_draft_top_gaps with its own DB session."""
+    from app.database import AsyncSessionLocal
+    try:
+        async with AsyncSessionLocal() as db:
+            await auto_draft_top_gaps(
+                db=db,
+                brand_id=brand_id,
+                max_gaps=max_gaps,
+                clear_existing=True,
+                source=source,
+            )
+    except Exception:
+        logger.exception("generate_now background task failed for brand_id=%d", brand_id)
+    finally:
+        _generating.discard(brand_id)
+
 
 router = APIRouter(prefix="/content", tags=["content"])
 
@@ -56,12 +84,13 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 SUPPORTED_PLATFORMS = list(PLATFORM_GUIDELINES.keys())
 ALL_DRAFT_PLATFORMS = list(PLATFORM_SPECS.keys())
 
-# Weekly manual draft limits per brand type
-_WEEKLY_MANUAL_LIMIT_STANDARD = 10
+# Weekly manual draft limit for pitch brands (same regardless of tier)
 _WEEKLY_MANUAL_LIMIT_PITCH = 1
 
 
-async def _check_weekly_manual_draft_limit(db: AsyncSession, brand: Brand) -> int:
+async def _check_weekly_manual_draft_limit(
+    db: AsyncSession, brand: Brand, subscription_tier: Optional[str] = None
+) -> int:
     """
     Enforce per-brand weekly manual draft limits.
     Returns the number of manual draft slots remaining this week.
@@ -69,9 +98,13 @@ async def _check_weekly_manual_draft_limit(db: AsyncSession, brand: Brand) -> in
     """
     from datetime import datetime, timedelta, timezone
     from sqlalchemy import func as sqlfunc
+    from app.routers.billing import WEEKLY_DRAFT_LIMITS
 
     is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
-    weekly_limit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else _WEEKLY_MANUAL_LIMIT_STANDARD
+    if is_pitch:
+        weekly_limit = _WEEKLY_MANUAL_LIMIT_PITCH
+    else:
+        weekly_limit = WEEKLY_DRAFT_LIMITS.get(subscription_tier or "", 10)
 
     week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
     count_result = await db.execute(
@@ -180,7 +213,7 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
     check_rate_limit(user.id, limit=10)  # burst guard (per minute)
     brand = await get_brand_for_user(brand_id, db, user)
     if not user.is_admin:
-        await _check_weekly_manual_draft_limit(db, brand)
+        await _check_weekly_manual_draft_limit(db, brand, user.subscription_tier)
 
     if request.platform not in ALL_DRAFT_PLATFORMS:
         raise HTTPException(
@@ -217,6 +250,7 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
             detail=str(exc),
         )
     except Exception as exc:
+        logger.exception("create_draft: unhandled error for brand_id=%d", brand_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Draft generation failed: {exc}",
@@ -417,11 +451,11 @@ async def delete_draft(draft_id: int, db: DbDep, user: CurrentUser):
 
 # ── Generate now (auto-draft top gaps) ───────────────────────────────────────
 
-@router.post("/{brand_id}/generate-now", response_model=list[ContentDraftSchema], status_code=status.HTTP_201_CREATED)
+@router.post("/{brand_id}/generate-now", status_code=status.HTTP_202_ACCEPTED)
 async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, user: CurrentUser):
     """
-    Immediately run gap analysis and generate drafts for the top N gaps
-    across all enabled platforms. Returns all newly created drafts.
+    Kick off background draft generation for the top N gaps across all enabled
+    platforms. Returns 202 immediately; poll GET /draft-status to track progress.
     """
     require_active_subscription(user)
     if not user.is_admin and not user.subscription_tier:
@@ -430,28 +464,66 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
             detail="On-demand draft generation is available on Starter and Pro plans. Upgrade to unlock this feature.",
         )
     check_rate_limit(user.id, limit=2)  # burst guard (per minute)
+
+    if brand_id in _generating:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Draft generation is already in progress for this brand.",
+        )
+
     brand = await get_brand_for_user(brand_id, db, user)
     remaining = 0
     if not user.is_admin:
-        remaining = await _check_weekly_manual_draft_limit(db, brand)
+        from datetime import datetime, timedelta, timezone
+        from sqlalchemy import func as sqlfunc
+        from app.routers.billing import WEEKLY_DRAFT_LIMITS
+        is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
+        weekly_limit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else WEEKLY_DRAFT_LIMITS.get(user.subscription_tier or "", 0)
+        week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        # How many manual drafts were created this week
+        used_result = await db.execute(
+            select(sqlfunc.count(ContentDraft.id)).where(
+                ContentDraft.brand_id == brand_id,
+                ContentDraft.source == "manual",
+                ContentDraft.created_at >= week_ago,
+            )
+        )
+        used = used_result.scalar_one_or_none() or 0
+        # Pending "draft"-status manual drafts will be deleted by clear_existing — reclaim those slots
+        # before checking the limit so users at cap can always regenerate their existing drafts.
+        pending_result = await db.execute(
+            select(sqlfunc.count(ContentDraft.id)).where(
+                ContentDraft.brand_id == brand_id,
+                ContentDraft.source == "manual",
+                ContentDraft.status == "draft",
+                ContentDraft.created_at >= week_ago,
+            )
+        )
+        pending_manual = pending_result.scalar_one_or_none() or 0
+        effective_remaining = weekly_limit - used + pending_manual
+        if effective_remaining <= 0:
+            label = "pitch deck" if is_pitch else "brand"
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"Weekly manual draft limit reached ({weekly_limit}/{weekly_limit} for this {label}). "
+                    "Resets 7 days after your first manual draft this week."
+                ),
+            )
+        remaining = min(request.max_gaps, effective_remaining)
     else:
         remaining = 20
-    try:
-        drafts = await auto_draft_top_gaps(
-            db=db,
+
+    _generating.add(brand_id)
+    asyncio.create_task(
+        _bg_generate_drafts(
             brand_id=brand_id,
             max_gaps=min(request.max_gaps, remaining),
-            clear_existing=True,  # discard unreviewed drafts before regenerating
             source="manual",
         )
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Draft generation failed: {exc}",
-        )
-    return [ContentDraftSchema.model_validate(d) for d in drafts]
+    )
+    logger.info("generate_now: background task started for brand_id=%d max_gaps=%d", brand_id, remaining)
+    return {"status": "generating", "brand_id": brand_id}
 
 
 # ── Draft queue status ────────────────────────────────────────────────────────
@@ -459,7 +531,7 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
 @router.get("/{brand_id}/draft-status")
 async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
     """Return current draft queue usage counts and caps."""
-    await get_brand_for_user(brand_id, db, user)
+    brand_obj = await get_brand_for_user(brand_id, db, user)
 
     from sqlalchemy import func as sqlfunc
     from app.models import ContentOpportunity
@@ -489,6 +561,26 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
     )
     last_scan_at = last_scan_result.scalar_one_or_none()
 
+    # Weekly draft quota for non-admin users
+    weekly_drafts_remaining: Optional[int] = None
+    weekly_drafts_limit: Optional[int] = None
+    if not user.is_admin:
+        from datetime import datetime, timedelta, timezone
+        from app.routers.billing import WEEKLY_DRAFT_LIMITS
+        is_pitch = getattr(brand_obj, "brand_type", "standard") == "pitch"
+        wlimit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else WEEKLY_DRAFT_LIMITS.get(user.subscription_tier or "", 0)
+        week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        used_result = await db.execute(
+            select(sqlfunc.count(ContentDraft.id)).where(
+                ContentDraft.brand_id == brand_id,
+                ContentDraft.source == "manual",
+                ContentDraft.created_at >= week_ago,
+            )
+        )
+        used = used_result.scalar_one_or_none() or 0
+        weekly_drafts_limit = wlimit
+        weekly_drafts_remaining = max(0, wlimit - used)
+
     return {
         "draft_count": draft_count,
         "draft_cap": DRAFT_CAP,
@@ -497,6 +589,9 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
         "scheduled_cap": SCHEDULED_CAP,
         "scheduled_queue_full": scheduled_count >= SCHEDULED_CAP,
         "last_scan_at": last_scan_at.isoformat() if last_scan_at else None,
+        "generating": brand_id in _generating,
+        "weekly_drafts_remaining": weekly_drafts_remaining,
+        "weekly_drafts_limit": weekly_drafts_limit,
     }
 
 
@@ -515,7 +610,7 @@ async def create_gap_draft(brand_id: int, request: CreateDraftRequest, db: DbDep
         )
     brand = await get_brand_for_user(brand_id, db, user)
     if not user.is_admin:
-        await _check_weekly_manual_draft_limit(db, brand)
+        await _check_weekly_manual_draft_limit(db, brand, user.subscription_tier)
 
     if request.platform not in ALL_DRAFT_PLATFORMS:
         raise HTTPException(

@@ -17,7 +17,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -43,6 +43,25 @@ def _utcnow_naive() -> datetime:
 async def invite_team_member(request: InviteTeamMemberRequest, db: DbDep, user: CurrentUser):
     """Create an invitation for a team member. Owner only."""
     await require_owner_only(db, user)
+
+    if not user.is_admin:
+        from app.routers.billing import TEAM_MEMBER_LIMITS
+        limit = TEAM_MEMBER_LIMITS.get(user.subscription_tier or "", 0)
+        if limit == 0:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="Team members require a Starter or Pro plan.",
+            )
+        count_result = await db.execute(
+            select(func.count(TeamMember.id)).where(TeamMember.account_owner_id == user.id)
+        )
+        current_count = count_result.scalar_one()
+        if current_count >= limit:
+            tier = user.subscription_tier or "free"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Team member limit reached: your {tier} plan allows {limit} seat(s). Upgrade to Pro for more.",
+            )
 
     email = request.email.strip().lower()
     if not email:

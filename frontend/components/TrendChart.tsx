@@ -10,6 +10,7 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
+  ReferenceDot,
 } from 'recharts';
 import { format, parseISO, subDays } from 'date-fns';
 import { Activity } from 'lucide-react';
@@ -211,6 +212,13 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
                 <stop offset="5%"  stopColor="#818cf8" stopOpacity={0.28} />
                 <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
               </linearGradient>
+              <filter id="lineGlow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="2.5" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
             </defs>
 
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.07)" vertical={false} />
@@ -246,7 +254,23 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
               isAnimationActive={true}
               animationDuration={1200}
               animationEasing="ease-out"
+              filter="url(#lineGlow)"
             />
+
+            {/* Endpoint pulse dot on average line */}
+            {chartData.length > 0 && (() => {
+              const last = chartData[chartData.length - 1];
+              return (
+                <ReferenceDot
+                  x={last.shortDate}
+                  y={last.score}
+                  r={5}
+                  fill="#818cf8"
+                  stroke="rgba(129,140,248,0.30)"
+                  strokeWidth={6}
+                />
+              );
+            })()}
 
             {/* Per-model lines */}
             {activeModels.map((ml) => (

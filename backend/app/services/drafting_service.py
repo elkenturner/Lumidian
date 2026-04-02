@@ -308,7 +308,6 @@ async def _load_publications(db: AsyncSession, brand_id: int) -> list[dict]:
 
 
 DRAFT_CAP = 20
-SCHEDULED_CAP = 20
 
 
 async def _get_existing_drafts_for_prompt(
@@ -482,7 +481,7 @@ async def _estimate_impact(
     recent_posts = post_result.scalar_one_or_none() or 0
     platform_bonus = 20.0 if recent_posts == 0 else max(0.0, 10.0 - recent_posts * 2)
 
-    raw = gap_score * 0.6 + low_vis_bonus * 0.6 + platform_bonus
+    raw = gap_score * 0.8 + platform_bonus
     return round(min(100.0, raw), 1)
 
 
@@ -524,8 +523,12 @@ def _clean_wiki_text(text: str) -> str:
     return result.strip()
 
 
-def _build_citation_ref(publications: list[dict], brand_name: str) -> str:
-    """Build a <ref> tag from the first publication, or a blank placeholder if none."""
+def _build_citation_ref(
+    publications: list[dict],
+    brand_name: str,
+    website_url: Optional[str] = None,
+) -> str:
+    """Build a <ref> citation from publications, website URL, or {{citation needed}}."""
     if publications:
         p = publications[0]
         url = p.get("url", "")
@@ -533,8 +536,18 @@ def _build_citation_ref(publications: list[dict], brand_name: str) -> str:
         publisher = p.get("publisher", brand_name)
         date = p.get("date", "")
         return f"<ref>{{{{cite journal|url={url}|title={title}|publisher={publisher}|date={date}}}}}</ref>"
-    # No publications — return a blank placeholder; do NOT invent citation data
-    return "<ref>{{cite journal|url=|title=|publisher=|date=}}</ref>"
+    if website_url:
+        from datetime import date as _date
+        accessdate = _date.today().strftime("%Y-%m-%d")
+        return (
+            f"<ref>{{{{cite web"
+            f"|url={website_url}"
+            f"|title={brand_name}"
+            f"|publisher={brand_name}"
+            f"|accessdate={accessdate}"
+            f"}}}}</ref>"
+        )
+    return "{{citation needed}}"
 
 
 def _build_wikipedia_prompt(
@@ -543,8 +556,9 @@ def _build_wikipedia_prompt(
     profile_context: str,
     response_analysis: str,
     publications: Optional[List[dict]] = None,
+    website_url: Optional[str] = None,
 ) -> str:
-    citation_ref = _build_citation_ref(publications or [], brand_name)
+    citation_ref = _build_citation_ref(publications or [], brand_name, website_url)
     pub_note = ""
     if publications:
         p = publications[0]
@@ -553,10 +567,16 @@ def _build_wikipedia_prompt(
             f"  {citation_ref}\n"
             f"  (Source: {p.get('title', '')} — {p.get('publisher', '')} {p.get('date', '')})"
         )
+    elif website_url:
+        pub_note = (
+            f"\nCITATION TO USE: No peer-reviewed publications available. "
+            f"Use this cite web citation — copy it exactly as-is:\n"
+            f"  {citation_ref}"
+        )
     else:
         pub_note = (
-            "\nCITATION: No peer-reviewed publications are available. "
-            "Use the blank citation placeholder exactly as shown; do NOT invent any citation data."
+            "\nCITATION: No source is available. "
+            "End the wikitext with {{citation needed}} exactly as shown — do NOT invent any citation data."
         )
 
     return f"""You are an experienced Wikipedia editor. Given a brand profile and a target query, you must:
@@ -742,7 +762,11 @@ INSTRUCTIONS:
 
 # ── Claude caller ─────────────────────────────────────────────────────────────
 
-async def _call_claude(prompt: str, max_tokens: int = 2500) -> str:
+async def _call_claude(
+    prompt: str,
+    max_tokens: int = 2500,
+    model: str = "claude-sonnet-4-6",
+) -> str:
     api_key = os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         raise ValueError(
@@ -752,7 +776,7 @@ async def _call_claude(prompt: str, max_tokens: int = 2500) -> str:
     import anthropic
     client = anthropic.AsyncAnthropic(api_key=api_key)
     response = await client.messages.create(
-        model="claude-sonnet-4-6",
+        model=model,
         max_tokens=max_tokens,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -915,12 +939,25 @@ async def _store_draft(
 
 async def _get_prompt_visibility(db: AsyncSession, prompt_id: int) -> float:
     from sqlalchemy import Float, cast
+    # Use latest completed run only — matches _analyze_responses_for_prompt
+    latest_run_result = await db.execute(
+        select(TrackingRun.id)
+        .join(QueryResult, QueryResult.tracking_run_id == TrackingRun.id)
+        .where(
+            TrackingRun.status == "completed",
+            QueryResult.prompt_id == prompt_id,
+        )
+        .order_by(TrackingRun.completed_at.desc())
+        .limit(1)
+    )
+    latest_run_id = latest_run_result.scalar_one_or_none()
+    if latest_run_id is None:
+        return 0.0
     stmt = (
         select(sqlfunc.coalesce(sqlfunc.avg(cast(QueryResult.mentioned, Float)), 0.0))
-        .join(TrackingRun, TrackingRun.id == QueryResult.tracking_run_id)
         .where(
             QueryResult.prompt_id == prompt_id,
-            TrackingRun.status == "completed",
+            QueryResult.tracking_run_id == latest_run_id,
         )
     )
     result = await db.execute(stmt)
@@ -970,9 +1007,12 @@ async def generate_gap_draft(
             f"Approve or dismiss existing drafts before generating new ones."
         )
 
-    # Check for repetition: if 3+ drafts already exist for this prompt/platform, skip
+    # Check for repetition: if 3+ active (non-posted) drafts already exist for this
+    # prompt/platform, skip.  Posted drafts are fetched for deduplication context below
+    # but should not block new generation — the user already acted on them.
     existing_drafts = await _get_existing_drafts_for_prompt(db, brand_id, prompt_id, platform)
-    if len(existing_drafts) >= 3:
+    active_draft_count = sum(1 for d in existing_drafts if d.status in ("draft", "approved"))
+    if active_draft_count >= 3:
         raise ValueError(
             f"3 or more drafts already exist for this prompt on {platform}. "
             f"Approve or dismiss existing drafts before generating another."
@@ -997,6 +1037,11 @@ async def generate_gap_draft(
 
     # ── Wikipedia: completely separate workflow ────────────────────────────────
     if platform == "wikipedia":
+        if not brand.website_url:
+            raise ValueError(
+                "A website URL is required to generate Wikipedia drafts. "
+                "Add one in your brand settings."
+            )
         publications = await _load_publications(db, brand_id)
         wiki_prompt = _build_wikipedia_prompt(
             brand_name=brand.name,
@@ -1004,6 +1049,7 @@ async def generate_gap_draft(
             profile_context=profile_context,
             response_analysis=response_analysis,
             publications=publications,
+            website_url=brand.website_url or None,
         )
         raw_text = await _call_claude(wiki_prompt, max_tokens=900)
         article_title, article_url, section, insert_location, wiki_text = _parse_wikipedia_draft(raw_text)
@@ -1019,11 +1065,11 @@ async def generate_gap_draft(
         title = article_title or f"Wikipedia edit: {prompt.text[:80]}"
         brief = article_url  # content_brief stores the article URL
 
-        # Citation check: verify the actual wikitext paste contains a <ref> tag.
-        # If Claude omitted it, append the citation built from the brand's publications.
-        if "<ref>" not in wiki_text:
+        # Citation check: verify the actual wikitext paste contains a <ref> tag or {{citation needed}}.
+        # If Claude omitted it, append the citation built from the brand's publications/website.
+        if "<ref>" not in wiki_text and "{{citation needed}}" not in wiki_text:
             publications = publications if publications else []
-            citation_ref = _build_citation_ref(publications, brand.name)
+            citation_ref = _build_citation_ref(publications, brand.name, brand.website_url or None)
             wiki_text = wiki_text.rstrip() + " " + citation_ref
             logger.warning(
                 "Wikipedia draft for brand %d was missing <ref> — appended citation",
@@ -1068,8 +1114,6 @@ async def generate_gap_draft(
         desc = prof.company_description if prof else None
         extra_parts: list[str] = []
         if prof:
-            if prof.target_audience:
-                extra_parts.append(prof.target_audience)
             try:
                 key_stats = json.loads(prof.key_stats) if prof.key_stats else []
                 extra_parts.extend(key_stats)
@@ -1081,6 +1125,11 @@ async def generate_gap_draft(
         )
         if subs:
             suggested_subreddit = subs[0]
+
+    # For restricted subreddits, brand name must NOT appear — skip mention retry
+    _reddit_strategy: Optional[str] = None
+    if platform == "reddit" and suggested_subreddit:
+        _reddit_strategy = _classify_subreddit(suggested_subreddit)
 
     spec = PLATFORM_SPECS[platform]
 
@@ -1162,8 +1211,8 @@ async def generate_gap_draft(
     raw_text = _post_process(raw_text)
 
     # Quality check: brand name must appear in the content.
-    # Retry once with an explicit reminder if it's missing.
-    if brand.name.lower() not in raw_text.lower():
+    # Skip retry for restricted subreddits — the prompt intentionally omits the brand.
+    if brand.name.lower() not in raw_text.lower() and _reddit_strategy != "restricted":
         _retry_prompt = (
             claude_prompt
             + f"\n\n⚠ QUALITY REQUIREMENT: Your previous output did not mention '{brand.name}'."
@@ -1279,6 +1328,7 @@ async def generate_opportunity_draft(
     max_tokens = PLATFORM_MAX_TOKENS.get(platform_key, 600)
 
     # Build opportunity context block
+    promo_strategy = "cautious"  # default; overridden for Reddit below
     opp_context_lines = []
     if opp.thread_title:
         opp_context_lines.append(f"Title: {_sanitize_user_input(opp.thread_title)}")
@@ -1312,17 +1362,23 @@ async def generate_opportunity_draft(
         opportunity_context=opportunity_context,
     )
 
-    raw_text = await _call_claude(claude_prompt, max_tokens=max_tokens)
+    # Use haiku for short reddit replies — cheaper and fast enough for 20-80 word content
+    _opp_model = (
+        "claude-haiku-4-5-20251001" if platform_key == "reddit_reply"
+        else "claude-sonnet-4-6"
+    )
+    raw_text = await _call_claude(claude_prompt, max_tokens=max_tokens, model=_opp_model)
     raw_text = _post_process(raw_text)
 
-    # Quality check: brand name must appear
-    if brand.name.lower() not in raw_text.lower():
+    # Quality check: brand name must appear.
+    # Skip for restricted subreddits — the prompt intentionally avoids direct brand mentions.
+    if brand.name.lower() not in raw_text.lower() and promo_strategy != "restricted":
         _retry_prompt = (
             claude_prompt
             + f"\n\n⚠ QUALITY REQUIREMENT: Your previous output did not mention '{brand.name}'."
             f" You MUST include '{brand.name}' naturally at least once in the content."
         )
-        _retry_raw = await _call_claude(_retry_prompt, max_tokens=max_tokens)
+        _retry_raw = await _call_claude(_retry_prompt, max_tokens=max_tokens, model=_opp_model)
         _retry_raw = _post_process(_retry_raw)
         if brand.name.lower() in _retry_raw.lower():
             raw_text = _retry_raw
@@ -1359,6 +1415,7 @@ async def generate_opportunity_draft(
         estimated_impact=estimated_impact,
         opportunity_id=opportunity_id,
         guidelines_override=opp.thread_url,  # frontend uses this to link directly to the thread
+        source="opportunity",
     )
 
     # Mark opportunity as drafted
@@ -1471,10 +1528,23 @@ async def auto_draft_top_gaps(
     # Per-prompt Quora question index — cycles through results so multiple drafts
     # for the same prompt each target a different question.
     quora_question_idx: dict[int, int] = {}
+    # Track (prompt_id, platform) combos that have raised a "3 or more drafts" error
+    # so we don't waste iterations retrying them.
+    exhausted_combos: set[tuple[int, str]] = set()
 
     while len(created) < max_gaps and attempts < max_attempts:
         platform = enabled_platforms[platform_idx % n_platforms]
         prompt = ordered_prompts[prompt_idx % n_prompts]
+
+        # Skip exhausted combos (already hit the 3-draft limit or been fully tried)
+        if (prompt.id, platform) in exhausted_combos:
+            if len(exhausted_combos) >= n_prompts * n_platforms:
+                break  # all combos exhausted — nothing left to try
+            platform_idx += 1
+            if platform_idx % n_platforms == 0:
+                prompt_idx += 1
+            attempts += 1
+            continue
 
         # For Quora, resolve a real question first so the draft is targeted.
         # Always query Serper for fresh results (24h in-process cache prevents
@@ -1538,6 +1608,8 @@ async def auto_draft_top_gaps(
                     brand_id, len(created),
                 )
                 return created
+            if "3 or more" in exc_str or "drafts already exist" in exc_str:
+                exhausted_combos.add((prompt.id, platform))
             logger.warning(
                 "auto_draft_top_gaps: skipped brand=%d prompt=%d platform=%s: %s",
                 brand_id, prompt.id, platform, exc,

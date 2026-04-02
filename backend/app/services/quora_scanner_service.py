@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 # Minimum Serper relevance proxy: we score by title keyword overlap with the prompt.
 # A real Quora question URL + at least 1 prompt keyword hit counts.
-_MIN_SCORE = 55.0
+_MIN_SCORE = 45.0
 _LEAD_CAP = 20  # keep top N "new" leads per brand (by relevance_score)
 
 
@@ -103,8 +103,8 @@ def _score_question(title: str, snippet: str, prompt_text: str) -> float:
     matches = len(prompt_kw & q_kw)
     relevance = min(1.0, matches / len(prompt_kw))
 
-    # Need at least 3 keyword matches
-    if matches < 3:
+    # Need at least 2 keyword matches
+    if matches < 2:
         return 0.0
 
     return round(relevance * 100.0, 1)
@@ -117,7 +117,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
     """
     from app.database import AsyncSessionLocal
     from app.models import Brand, Prompt, ContentOpportunity
-    from app.services.quora_search_service import search_quora_questions, extract_keywords
+    from app.services.quora_search_service import search_quora_questions, extract_keywords, invalidate_cache
     from sqlalchemy import select, delete as sql_delete
 
     logger.info("Quora scanner: brand_id=%d clear_existing=%s", brand_id, clear_existing)
@@ -137,6 +137,9 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             return 0
 
         if clear_existing:
+            # Bust Serper in-process cache so fresh scan fetches new results from the API
+            for p in prompts:
+                invalidate_cache(p.id)
             await db.execute(
                 sql_delete(ContentOpportunity).where(
                     ContentOpportunity.brand_id == brand_id,
@@ -177,7 +180,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
             questions = search_quora_questions(
                 query=query,
-                num_results=5,
+                num_results=10,
                 cache_key=prompt.id,
             )
 

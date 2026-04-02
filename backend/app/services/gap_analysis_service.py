@@ -133,13 +133,20 @@ async def run_gap_analysis(brand_id: int, run_id: int) -> list[int]:
         active_platforms = {row[0] for row in recent_platform_rows}
         platforms_lacking = [p for p in PLATFORMS if p not in active_platforms]
 
-        # Delete existing gaps for this brand (we'll replace them with fresh analysis)
-        existing = await db.execute(
-            select(ContentGap).where(ContentGap.brand_id == brand_id)
-        )
-        for gap in existing.scalars().all():
-            await db.delete(gap)
-        await db.flush()
+        # Delete existing gaps only for prompt IDs covered in this run.
+        # Gaps for prompts not included in this run are preserved to avoid data loss
+        # from partial runs or prompts that had no query results.
+        covered_prompt_ids = list(by_prompt_model.keys())
+        if covered_prompt_ids:
+            existing = await db.execute(
+                select(ContentGap).where(
+                    ContentGap.brand_id == brand_id,
+                    ContentGap.prompt_id.in_(covered_prompt_ids),
+                )
+            )
+            for gap in existing.scalars().all():
+                await db.delete(gap)
+            await db.flush()
 
         # Analyze each prompt for gaps
         new_gaps: list[ContentGap] = []

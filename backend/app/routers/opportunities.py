@@ -184,6 +184,9 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     Returns immediately; scan runs in the background.
     """
     import asyncio
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"trigger_scan: user.id={user.id}, user.is_admin={user.is_admin}, brand_id={brand_id}")
 
     check_rate_limit(user.id, limit=3)  # 3 manual scans per minute per user
     await get_brand_for_user(brand_id, db, user)

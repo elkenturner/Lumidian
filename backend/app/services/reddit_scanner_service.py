@@ -429,6 +429,64 @@ def _extract_posts(data: Optional[dict]) -> list[dict]:
         return []
 
 
+# ── Subreddit suggestion ─────────────────────────────────────────────────────
+
+def get_relevant_subreddits(
+    description: str | None,
+    prompts: list[str],
+    limit: int = 3,
+    extra_profile_text: str = "",
+) -> list[str]:
+    """
+    Suggest relevant subreddits for a brand based on description and prompts.
+    Uses Claude Haiku for intelligent suggestions. Falls back to empty list on error.
+    """
+    import os
+
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        logger.debug("get_relevant_subreddits: no ANTHROPIC_API_KEY")
+        return []
+
+    # Build context from available info
+    context_parts = []
+    if description:
+        context_parts.append(f"Company: {description[:500]}")
+    if prompts:
+        context_parts.append(f"Topics they track: {', '.join(p[:100] for p in prompts[:5])}")
+    if extra_profile_text:
+        context_parts.append(f"Additional context: {extra_profile_text[:300]}")
+
+    if not context_parts:
+        return []
+
+    context = "\n".join(context_parts)
+
+    prompt = f"""Based on this brand profile, suggest {limit} relevant subreddits where they could contribute valuable content (not promotional — genuine expertise sharing).
+
+{context}
+
+Return ONLY a comma-separated list of subreddit names (without r/ prefix), nothing else. Example: startups, SaaS, smallbusiness"""
+
+    try:
+        import anthropic
+        client = anthropic.Anthropic(api_key=api_key)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=100,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.content[0].text if response.content else ""
+        # Parse comma-separated list
+        subs = [s.strip().lower().replace("r/", "") for s in text.split(",")]
+        # Filter out blocked subreddits and empty strings
+        subs = [s for s in subs if s and not _is_blocked_subreddit(s)]
+        return subs[:limit]
+    except Exception as exc:
+        logger.debug("get_relevant_subreddits failed: %s", exc)
+        return []
+
+
 # ── Main scanner ──────────────────────────────────────────────────────────────
 
 async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) -> int:
@@ -572,7 +630,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 brand_name=brand.name,
                 subreddit=subreddit_name,
             )
-            if score < 65.0:
+            if score < 60.0:
                 continue
 
             scored.append({
@@ -627,14 +685,16 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             "Reddit scanner: %d new opportunities for brand_id=%d", new_count, brand_id
         )
 
-        # ── Cap: keep only the top 20 "new" leads per brand (by relevance score) ──
+        # ── Cap: keep only the top 20 "new" Reddit leads per brand (by relevance score) ──
         # This prevents the list from ballooning across daily runs and keeps the
-        # feed tight and relevant.
+        # feed tight and relevant.  Filter to platform="reddit" so parallel Quora
+        # rows don't count against this cap and vice-versa.
         LEAD_CAP = 20
         all_new_result = await db.execute(
             select(ContentOpportunity)
             .where(
                 ContentOpportunity.brand_id == brand_id,
+                ContentOpportunity.platform == "reddit",
                 ContentOpportunity.status == "new",
             )
             .order_by(ContentOpportunity.relevance_score.desc())

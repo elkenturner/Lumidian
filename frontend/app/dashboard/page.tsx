@@ -139,7 +139,7 @@ function HelpTooltip({ text }: { text: string }) {
         ?
       </span>
       {open && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[rgba(15,20,40,0.95)] border border-[rgba(99,102,241,0.22)] rounded-lg p-3 text-xs text-[#94A3B8] leading-relaxed shadow-lg z-50 pointer-events-none whitespace-normal">
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[rgba(15,20,40,0.95)] border border-[#334155] rounded-lg p-3 text-xs text-[#94A3B8] leading-relaxed shadow-lg z-50 pointer-events-none whitespace-normal">
           {text}
         </span>
       )}
@@ -153,7 +153,7 @@ function SparklineTooltip({ active, payload }: { active?: boolean; payload?: Arr
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
   return (
-    <div className="bg-[rgba(15,20,40,0.95)] border border-[rgba(99,102,241,0.22)] rounded-lg p-2 shadow-lg text-xs">
+    <div className="bg-[rgba(15,20,40,0.95)] border border-[#334155] rounded-lg p-2 shadow-lg text-xs">
       <p className="text-[#64748B]">{d.formattedDate}</p>
       <p className="text-[#6366f1] font-bold">{Math.round(d.score)}%</p>
     </div>
@@ -341,7 +341,7 @@ function BestPromptCard({ responses, loading }: { responses: QueryResult[]; load
   })();
 
   return (
-    <div className="self-start bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]" style={{ borderLeft: '2px solid rgba(99,102,241,0.5)' }}>
+    <div className="self-start bg-[#0f172a] border border-[#334155] rounded-xl p-5 shadow-md" style={{ borderLeft: '2px solid rgba(99,102,241,0.5)' }}>
       <p className="text-sm font-medium text-[#94A3B8] flex items-center mb-3">
         Best Performing Prompt
         <HelpTooltip text="The prompt where your brand is mentioned most often across AI models." />
@@ -863,7 +863,7 @@ export default function DashboardPage() {
 
       {/* New brand onboarding progress banner */}
       {newBrandMode && (
-        <div className="mb-6 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] rounded-xl px-5 py-4 flex items-center gap-4">
+        <div className="mb-6 bg-[#1e293b] border border-[#475569] rounded-xl px-5 py-4 flex items-center gap-4">
           {newBrandStep !== 'done' ? (
             <Loader2 size={18} className="animate-spin text-[#6366f1] shrink-0" />
           ) : (
@@ -908,7 +908,7 @@ export default function DashboardPage() {
               name={selectedBrand.name}
               websiteUrl={selectedBrand.website_url ?? undefined}
               size={36}
-              className="rounded-xl bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)]"
+              className="rounded-xl bg-[#0f172a] border border-[#334155]"
               style={{ padding: 5 }}
               textClassName="text-sm font-bold text-[#6366f1]"
             />
@@ -924,7 +924,7 @@ export default function DashboardPage() {
           <button
             onClick={() => setPromptModalOpen(true)}
             disabled={!selectedBrandId}
-            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.09)] border border-[rgba(99,102,241,0.22)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 text-xs transition-all duration-150"
+            className="flex items-center gap-2 bg-[#0f172a] hover:bg-[#1e293b] border border-[#334155] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 text-xs transition-all duration-150"
           >
             <MessageSquare size={14} />
             Prompts
@@ -932,7 +932,7 @@ export default function DashboardPage() {
           <button
             onClick={() => selectedBrandId && loadData(selectedBrandId)}
             aria-label="Refresh dashboard"
-            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.22)] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-all duration-150"
+            className="flex items-center gap-2 bg-[#0f172a] hover:bg-[#1e293b] border border-[#334155] hover:border-[rgba(255,255,255,0.14)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-all duration-150"
           >
             <RefreshCw size={14} />
           </button>
@@ -943,7 +943,7 @@ export default function DashboardPage() {
               title={isAtRunLimit ? 'Daily run limit reached — resets at midnight UTC' : undefined}
               className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
                 isAtRunLimit
-                  ? 'bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] text-[#475569] cursor-default'
+                  ? 'bg-[#1e293b] border border-[#475569] text-[#475569] cursor-default'
                   : 'bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-50 text-white shadow-lg shadow-[#6366f1]/25 hover:shadow-[#6366f1]/40 hover:shadow-xl'
               }`}
             >
@@ -969,7 +969,7 @@ export default function DashboardPage() {
                 Resets midnight UTC ·{' '}
                 <button
                   onClick={() => { setUpgradeModalReason("You've used your 1 daily report run. Upgrade to run reports any time."); setUpgradeModalOpen(true); }}
-                  className="text-[#6366f1] hover:text-[#818cf8] transition-colors"
+                  className="text-[#6366f1] hover:text-[#94a3b8] transition-colors"
                 >
                   Upgrade
                 </button>
@@ -1009,7 +1009,7 @@ export default function DashboardPage() {
 
       {/* Running banner */}
       {isRunning && (
-        <div className="bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] rounded-xl p-4 mb-6">
+        <div className="bg-[#1e293b] border border-[#475569] rounded-xl p-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-[#6366f1]/10 flex items-center justify-center flex-shrink-0">
               <Loader2 size={16} className="text-[#6366f1] animate-spin" />
@@ -1043,12 +1043,12 @@ export default function DashboardPage() {
       {loadingBrands ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1,2,3,4].map(i => (
-            <div key={i} className="h-28 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl animate-pulse" />
+            <div key={i} className="h-28 bg-[#0f172a] border border-[#334155] rounded-xl animate-pulse" />
           ))}
         </div>
       ) : brands.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center max-w-xl mx-auto">
-          <div className="w-16 h-16 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] rounded-2xl flex items-center justify-center mb-5">
+          <div className="w-16 h-16 bg-[#1e293b] border border-[#475569] rounded-2xl flex items-center justify-center mb-5">
             <Zap size={28} className="text-[#6366f1]" />
           </div>
           <h3 className="text-xl font-bold text-[#F0F4F8] mb-2">Track your first brand</h3>
@@ -1062,8 +1062,8 @@ export default function DashboardPage() {
               { n: '2', title: 'Auto-run report', body: 'We instantly query ChatGPT, Claude, Perplexity, and Gemini.' },
               { n: '3', title: 'Get content drafts', body: 'AI-generated posts targeting your top visibility gaps.' },
             ].map(({ n, title, body }) => (
-              <div key={n} className="flex-1 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl p-4">
-                <div className="w-6 h-6 rounded-full bg-[rgba(99,102,241,0.20)] text-[#818cf8] text-xs font-bold flex items-center justify-center mb-2">{n}</div>
+              <div key={n} className="flex-1 bg-[#0f172a] border border-[#334155] rounded-xl p-4">
+                <div className="w-6 h-6 rounded-full bg-[#334155] text-[#94a3b8] text-xs font-bold flex items-center justify-center mb-2">{n}</div>
                 <p className="text-sm font-semibold text-[#F0F4F8] mb-1">{title}</p>
                 <p className="text-xs text-[#64748B] leading-relaxed">{body}</p>
               </div>
@@ -1071,7 +1071,7 @@ export default function DashboardPage() {
           </div>
           <Link
             href="/onboarding"
-            className="flex items-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] rounded-lg px-6 py-3 text-sm font-semibold transition-colors"
+            className="flex items-center gap-2 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] hover:border-[#64748b] text-[#e2e8f0] hover:text-[#f8fafc] rounded-lg px-6 py-3 text-sm font-semibold transition-colors"
           >
             <Plus size={16} />
             Get Started
@@ -1082,7 +1082,7 @@ export default function DashboardPage() {
           {/* ── EMPTY STATE: brand selected but no runs yet ──────────────── */}
           {!loadingBrands && !loadingAnalytics && !isRunning && selectedBrandId && trends.length === 0 && overview?.latest_run == null && (
             <div className="flex flex-col items-center justify-center py-16 text-center max-w-lg mx-auto">
-              <div className="w-14 h-14 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] rounded-2xl flex items-center justify-center mb-4">
+              <div className="w-14 h-14 bg-[#1e293b] border border-[#475569] rounded-2xl flex items-center justify-center mb-4">
                 <BarChart2 size={24} className="text-[#6366f1]" />
               </div>
               <h3 className="text-lg font-bold text-[#F0F4F8] mb-2">No data yet</h3>
@@ -1104,11 +1104,11 @@ export default function DashboardPage() {
           <>
               {/* Brand profile completeness nudge */}
               {brandProfile && brandProfile.completion_pct < 100 && (
-                <div className="mb-4 flex items-center gap-4 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl px-5 py-3">
+                <div className="mb-4 flex items-center gap-4 bg-[#0f172a] border border-[#334155] rounded-xl px-5 py-3">
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1.5">
                       <p className="text-xs font-medium text-[#94A3B8]">Brand Profile — {brandProfile.completion_pct}% complete</p>
-                      <Link href="/settings?tab=profile" className="text-xs text-[#6366f1] hover:text-[#818cf8] transition-colors font-medium">Complete profile →</Link>
+                      <Link href="/settings?tab=profile" className="text-xs text-[#6366f1] hover:text-[#94a3b8] transition-colors font-medium">Complete profile →</Link>
                     </div>
                     <div className="h-1.5 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
                       <div className="h-full bg-[#6366f1] rounded-full transition-all" style={{ width: `${brandProfile.completion_pct}%` }} />
@@ -1128,7 +1128,7 @@ export default function DashboardPage() {
                   ] as Array<{ label: string; value: string | number; icon: React.ElementType; accent: string; iconBg: string; borderTop: string; sub: string | null; subColor: string }>).map(({ label, value, icon: Icon, accent, iconBg, borderTop, sub, subColor }) => (
                     <div
                       key={label}
-                      className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] rounded-xl px-4 py-4 flex items-center gap-3"
+                      className="bg-[#0f172a] border border-[#334155] rounded-xl px-4 py-4 flex items-center gap-3"
                       style={{ borderTopColor: borderTop, borderTopWidth: 2 }}
                     >
                       <div
@@ -1152,7 +1152,7 @@ export default function DashboardPage() {
               {/* Row 1: visibility (left) + prompt/sentiment/sov (right) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 {/* Visibility score + sparkline */}
-                <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.28)] border-t-2 border-t-[#6366f1] rounded-xl p-6 shadow-[0_8px_32px_rgba(0,0,0,0.25),0_0_40px_rgba(99,102,241,0.10),inset_0_1px_0_rgba(255,255,255,0.07)]">
+                <div className="bg-[#0f172a] border border-[#475569] border-t-2 border-t-[#6366f1] rounded-xl p-6 shadow-lg">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <p className="text-[13px] font-medium text-[#94A3B8] flex items-center">
@@ -1207,7 +1207,7 @@ export default function DashboardPage() {
                     <div className="mt-3 space-y-2 border-t border-[rgba(255,255,255,0.06)] pt-3">
                       {([
                         { label: 'Live Search', s: liveScore,  models: 'Perplexity · Gemini',  color: '#10b981' },
-                        { label: 'AI Index',    s: indexScore, models: 'GPT-4o-mini · Claude', color: '#818cf8' },
+                        { label: 'AI Index',    s: indexScore, models: 'GPT-4o-mini · Claude', color: '#94a3b8' },
                       ] as Array<{ label: string; s: number | null; models: string; color: string }>).map(({ label, s, models, color }) => (
                         <div key={label}>
                           <div className="flex items-center gap-3 mb-0.5">
@@ -1247,7 +1247,7 @@ export default function DashboardPage() {
                     <BestPromptCard responses={responses} loading={loadingAnalytics} />
 
                     {/* Sentiment */}
-                    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                    <div className="bg-[#0f172a] border border-[#334155] rounded-xl p-5 shadow-md">
                       <div className="flex items-start justify-between mb-2">
                         <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                           Sentiment
@@ -1283,7 +1283,7 @@ export default function DashboardPage() {
                   </div>
 
                   {/* SOV — fills remaining height */}
-                  <div className="flex-1 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                  <div className="flex-1 bg-[#0f172a] border border-[#334155] rounded-xl p-5 shadow-md">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                         Share of Voice
@@ -1292,7 +1292,7 @@ export default function DashboardPage() {
                       <button
                         onClick={() => setCompetitorModalOpen(true)}
                         aria-label="Manage competitors"
-                        className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#94A3B8] bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(99,102,241,0.12)] border border-[rgba(255,255,255,0.08)] rounded-lg px-2.5 py-1.5 transition-colors"
+                        className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#94A3B8] bg-[rgba(255,255,255,0.06)] hover:bg-[#1e293b] border border-[rgba(255,255,255,0.08)] rounded-lg px-2.5 py-1.5 transition-colors"
                       >
                         <Users size={12} />
                         {analytics?.sov.has_competitors ? 'Manage' : 'Add competitors'}
@@ -1315,7 +1315,7 @@ export default function DashboardPage() {
                             const pct = Math.round(s.mention_rate * 100);
                             const isLeading = s.mention_rate === maxRate && maxRate > 0;
                             const barColor = s.is_primary ? (isLeading ? '#10b981' : '#6366f1') : (isLeading ? '#ef4444' : '#475569');
-                            const textColor = s.is_primary ? (isLeading ? '#10b981' : '#818cf8') : (isLeading ? '#f87171' : '#64748B');
+                            const textColor = s.is_primary ? (isLeading ? '#10b981' : '#94a3b8') : (isLeading ? '#f87171' : '#64748B');
                             return (
                               <div key={s.name} className="flex flex-col gap-1.5">
                                 <div className="flex items-center justify-between">
@@ -1338,7 +1338,7 @@ export default function DashboardPage() {
               {/* Row 2: Avg Position + Top Domains */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 {/* Avg Position */}
-                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="bg-[#0f172a] border border-[#334155] rounded-xl p-5 shadow-md">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                       Avg Position
@@ -1373,7 +1373,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Top Domains */}
-                <div className="lg:col-span-2 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)] flex flex-col">
+                <div className="lg:col-span-2 bg-[#0f172a] border border-[#334155] rounded-xl p-5 shadow-md flex flex-col">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-medium text-[#94A3B8] flex items-center">
                       Top Cited Domains (across all tracked prompts)
@@ -1397,7 +1397,7 @@ export default function DashboardPage() {
 
               {/* Row 3: Model breakdown */}
               <div className="mb-4">
-                <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <div className="bg-[#0f172a] border border-[#334155] rounded-xl p-5 shadow-md">
                   <div className="flex items-center gap-2 mb-4">
                     <BarChart2 size={15} className="text-[#6366f1]" />
                     <h3 className="text-[15px] font-medium text-[#F0F4F8]">Performance by Model</h3>
@@ -1414,8 +1414,8 @@ export default function DashboardPage() {
               </div>
 
               {/* Recent Conversations */}
-              <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-                <div className="px-5 py-4 border-b border-[rgba(99,102,241,0.22)] flex items-center justify-between bg-[rgba(99,102,241,0.06)]">
+              <div className="bg-[#0f172a] border border-[#334155] rounded-xl overflow-hidden shadow-md">
+                <div className="px-5 py-4 border-b border-[#334155] flex items-center justify-between bg-[#0f172a]">
                   <div className="flex items-center gap-2">
                     <MessageSquare size={16} className="text-[#6366f1]" />
                     <h3 className="text-[15px] font-medium text-[#F0F4F8]">Recent Conversations</h3>
@@ -1433,10 +1433,10 @@ export default function DashboardPage() {
                     })));
                     if (models.length < 2) return null;
                     return (
-                      <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5">
+                      <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[#334155] rounded-lg p-0.5">
                         <button
                           onClick={() => setConvModelFilter('all')}
-                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${convModelFilter === 'all' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${convModelFilter === 'all' ? 'bg-[#334155] text-[#94a3b8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
                         >
                           All
                         </button>
@@ -1446,7 +1446,7 @@ export default function DashboardPage() {
                             <button
                               key={mk}
                               onClick={() => setConvModelFilter(convModelFilter === mk ? 'all' : mk)}
-                              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${convModelFilter === mk ? 'bg-[rgba(99,102,241,0.25)]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+                              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${convModelFilter === mk ? 'bg-[#334155]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
                               style={convModelFilter === mk ? { color: cfg.text } : {}}
                             >
                               {cfg.label}
@@ -1459,7 +1459,7 @@ export default function DashboardPage() {
                 </div>
 
                 {loadingAnalytics || isRunning ? (
-                  <div className="divide-y divide-[rgba(99,102,241,0.10)]">
+                  <div className="divide-y divide-[#1e293b]">
                     {[1,2,3,4].map(i => (
                       <div key={i} className="px-5 py-4 animate-pulse">
                         <div className="flex items-center justify-between mb-2">
@@ -1474,7 +1474,7 @@ export default function DashboardPage() {
                     ))}
                   </div>
                 ) : analytics && analytics.recent_conversations.length > 0 ? (
-                  <div className="divide-y divide-[rgba(99,102,241,0.10)]">
+                  <div className="divide-y divide-[#1e293b]">
                     {analytics.recent_conversations.filter((conv) => {
                       if (convModelFilter === 'all') return true;
                       const key = conv.model.toLowerCase().replace(/[-_\s]/g, '');
@@ -1491,7 +1491,7 @@ export default function DashboardPage() {
                       return (
                         <div key={conv.id}>
                           <button
-                            className="w-full px-5 py-4 hover:bg-[rgba(99,102,241,0.05)] transition-colors text-left"
+                            className="w-full px-5 py-4 hover:bg-[#1e293b] transition-colors text-left"
                             onClick={() => setExpandedConvId(expandedConvId === conv.id ? null : conv.id)}
                           >
                             <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -1521,7 +1521,7 @@ export default function DashboardPage() {
                             )}
                           </button>
                           {expandedConvId === conv.id && conv.response_text && (
-                            <div className="px-5 pb-4 pt-3 border-t border-[rgba(99,102,241,0.22)] bg-[rgba(99,102,241,0.06)]">
+                            <div className="px-5 pb-4 pt-3 border-t border-[#334155] bg-[#0f172a]">
                               <p className="text-xs text-[#64748B] leading-relaxed whitespace-pre-wrap">
                                 {conv.response_text}
                               </p>
@@ -1536,12 +1536,11 @@ export default function DashboardPage() {
                     <div
                       className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
                       style={{
-                        background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(124,58,237,0.09))',
-                        border: '1px solid rgba(99,102,241,0.26)',
-                        boxShadow: '0 0 28px rgba(99,102,241,0.10)',
+                        background: '#1e293b',
+                        border: '1px solid #334155',
                       }}
                     >
-                      <MessageSquare size={24} className="text-[#818cf8]" />
+                      <MessageSquare size={24} className="text-[#94a3b8]" />
                     </div>
                     <p className="text-base font-semibold text-[#F0F4F8] mb-1.5">No conversations yet</p>
                     <p className="text-[13px] text-[#64748B] max-w-xs leading-relaxed">Run a report to start tracking how AI models respond to your prompts.</p>

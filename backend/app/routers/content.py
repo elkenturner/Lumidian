@@ -55,8 +55,7 @@ SCHEDULED_CAP = 20  # max approved/scheduled drafts queued at once
 
 logger = logging.getLogger(__name__)
 
-# Tracks brand IDs currently running a background generate_now task
-_generating: set[int] = set()
+from app import state as _state
 
 
 async def _bg_generate_drafts(brand_id: int, max_gaps: int, source: str) -> None:
@@ -74,7 +73,7 @@ async def _bg_generate_drafts(brand_id: int, max_gaps: int, source: str) -> None
     except Exception:
         logger.exception("generate_now background task failed for brand_id=%d", brand_id)
     finally:
-        _generating.discard(brand_id)
+        _state.generating_brands.discard(brand_id)
 
 
 router = APIRouter(prefix="/content", tags=["content"])
@@ -457,23 +456,38 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
     Kick off background draft generation for the top N gaps across all enabled
     platforms. Returns 202 immediately; poll GET /draft-status to track progress.
     """
-    require_active_subscription(user)
-    if not user.is_admin and not user.subscription_tier:
-        raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="On-demand draft generation is available on Starter and Pro plans. Upgrade to unlock this feature.",
-        )
-    check_rate_limit(user.id, limit=2)  # burst guard (per minute)
+    is_onboarding = request.source == "onboarding"
 
-    if brand_id in _generating:
+    require_active_subscription(user)
+    if not is_onboarding:
+        if not user.is_admin and not user.subscription_tier:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail="On-demand draft generation is available on Starter and Pro plans. Upgrade to unlock this feature.",
+            )
+        check_rate_limit(user.id, limit=2)  # burst guard (per minute)
+
+    if brand_id in _state.generating_brands:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Draft generation is already in progress for this brand.",
         )
 
     brand = await get_brand_for_user(brand_id, db, user)
-    remaining = 0
-    if not user.is_admin:
+
+    if is_onboarding:
+        # One-time guard: skip if onboarding drafts already exist for this brand
+        from sqlalchemy import func as sqlfunc
+        existing_result = await db.execute(
+            select(sqlfunc.count(ContentDraft.id)).where(
+                ContentDraft.brand_id == brand_id,
+                ContentDraft.source == "onboarding",
+            )
+        )
+        if (existing_result.scalar_one_or_none() or 0) > 0:
+            return {"status": "skipped", "brand_id": brand_id, "reason": "onboarding drafts already generated"}
+        remaining = min(request.max_gaps, 5)
+    elif not user.is_admin:
         from datetime import datetime, timedelta, timezone
         from sqlalchemy import func as sqlfunc
         from app.routers.billing import WEEKLY_DRAFT_LIMITS
@@ -514,12 +528,12 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
     else:
         remaining = 20
 
-    _generating.add(brand_id)
+    _state.generating_brands.add(brand_id)
     asyncio.create_task(
         _bg_generate_drafts(
             brand_id=brand_id,
-            max_gaps=min(request.max_gaps, remaining),
-            source="manual",
+            max_gaps=remaining,
+            source=request.source,
         )
     )
     logger.info("generate_now: background task started for brand_id=%d max_gaps=%d", brand_id, remaining)
@@ -589,7 +603,7 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
         "scheduled_cap": SCHEDULED_CAP,
         "scheduled_queue_full": scheduled_count >= SCHEDULED_CAP,
         "last_scan_at": last_scan_at.isoformat() if last_scan_at else None,
-        "generating": brand_id in _generating,
+        "generating": brand_id in _state.generating_brands,
         "weekly_drafts_remaining": weekly_drafts_remaining,
         "weekly_drafts_limit": weekly_drafts_limit,
     }

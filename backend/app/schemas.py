@@ -282,6 +282,7 @@ class ContentDraftSchema(BaseModel):
     dismissed_at: Optional[datetime] = None
     posted_at: Optional[datetime] = None
     visibility_at_post: Optional[float] = None
+    source: str = "manual"
     edited_count: int = 0
     time_to_approve_seconds: Optional[int] = None
     created_at: datetime
@@ -350,6 +351,7 @@ class CreateDraftRequest(BaseModel):
 
 class GenerateNowRequest(BaseModel):
     max_gaps: int = 20
+    source: str = "manual"  # "manual" | "onboarding"
 
 
 class UpdateDraftRequest(BaseModel):

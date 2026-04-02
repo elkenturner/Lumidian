@@ -62,6 +62,10 @@ async def clean_tables():
     _register_attempts.clear()
     _totp_setup_attempts.clear()
     _resend_attempts.clear()
+    # Reset shared background-task state sets
+    from app import state
+    state.generating_brands.clear()
+    state.scanning_brands.clear()
 
     async with AsyncSessionLocal() as db:
         from sqlalchemy import text

@@ -44,6 +44,12 @@ _QUESTION_PATTERNS = (
 _cache: dict[int, tuple[float, list[dict]]] = {}  # key → (expires_at, results)
 _CACHE_TTL = 86_400.0  # 24 hours
 
+
+def invalidate_cache(key: int) -> None:
+    """Remove a cached result so the next call fetches fresh data from Serper."""
+    _cache.pop(key, None)
+
+
 _SERPER_URL = "https://google.serper.dev/search"
 
 
@@ -93,7 +99,7 @@ def search_quora_questions(
                     "X-API-KEY": api_key,
                     "Content-Type": "application/json",
                 },
-                json={"q": f"site:quora.com {query}", "num": 10},
+                json={"q": f"site:quora.com {query}", "num": 20},
             )
             resp.raise_for_status()
             data = resp.json()

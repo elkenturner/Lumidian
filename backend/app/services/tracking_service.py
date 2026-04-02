@@ -28,6 +28,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal
 from app.models import Brand, Prompt, TrackingRun, QueryResult, RunModelScore, utcnow as _utcnow
 from app.services.llm_service import query_model, SUPPORTED_MODELS, TIER_RUNS
+from app.services.drafting_service import auto_draft_top_gaps
+from app.services.reddit_scanner_service import scan_brand_opportunities as reddit_scan
+from app.services.quora_scanner_service import scan_brand_opportunities as quora_scan
 
 logger = logging.getLogger(__name__)
 
@@ -379,6 +382,17 @@ async def run_tracking(
             "Gap analysis failed for run %d (non-fatal): %s", run_id, exc
         )
 
+    # ── 9b. Onboarding post-processing pipeline ──────────────────────────────
+    if run_type == "onboarding":
+        logger.info(
+            "Onboarding run %d complete — firing post-processing pipeline for brand_id=%d",
+            run_id, brand_id,
+        )
+        asyncio.create_task(
+            _onboarding_post_process(brand_id),
+            name=f"onboarding-post-{brand_id}",
+        )
+
     # ── 10. Create in-app notifications ──────────────────────────────────────
     try:
         from app.models import Notification, Brand as BrandModel
@@ -452,3 +466,61 @@ async def run_tracking(
         logger.warning("Report-ready email failed for run %d (non-fatal): %s", run_id, exc)
 
     return run_id
+
+
+async def _onboarding_post_process(brand_id: int) -> None:
+    """
+    Sequential post-processing pipeline for onboarding tracking runs.
+
+    Fired as a background asyncio.create_task after gap analysis completes.
+    Steps run in order; each is non-fatal:
+      1. Generate up to 5 initial content drafts  (source="onboarding")
+      2. Scan Reddit + Quora for live opportunities (parallel)
+
+    state.generating_brands and state.scanning_brands are updated so
+    AppShell's background-status banners reflect each phase.
+    """
+    from app import state
+
+    # ── Step 1: Draft generation ─────────────────────────────────────────────
+    state.generating_brands.add(brand_id)
+    try:
+        async with AsyncSessionLocal() as db:
+            drafts = await auto_draft_top_gaps(
+                db=db,
+                brand_id=brand_id,
+                max_gaps=5,
+                clear_existing=False,
+                source="onboarding",
+            )
+        logger.info(
+            "Onboarding post-process: generated %d drafts for brand_id=%d",
+            len(drafts), brand_id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Onboarding draft generation failed for brand_id=%d (non-fatal): %s",
+            brand_id, exc,
+        )
+    finally:
+        state.generating_brands.discard(brand_id)
+
+    # ── Step 2: Live opportunity scan (Reddit + Quora in parallel) ───────────
+    state.scanning_brands.add(brand_id)
+    try:
+        await asyncio.gather(
+            reddit_scan(brand_id, clear_existing=True),
+            quora_scan(brand_id, clear_existing=True),
+            return_exceptions=True,
+        )
+        logger.info(
+            "Onboarding post-process: opportunity scan complete for brand_id=%d",
+            brand_id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Onboarding opp scan failed for brand_id=%d (non-fatal): %s",
+            brand_id, exc,
+        )
+    finally:
+        state.scanning_brands.discard(brand_id)

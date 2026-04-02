@@ -44,6 +44,7 @@ import {
   getDraftAttributions,
   getQuoraQuestions,
   triggerScan,
+  invalidateCache,
   Brand,
   BrandDetail,
   Prompt,
@@ -2028,9 +2029,11 @@ export default function ContentHubPage() {
     await deleteDraft(id);
     setDraftItems((prev) => prev.filter((d) => d.id !== id));
     setScheduledItems((prev) => prev.filter((d) => d.id !== id));
-    setDraftStatus((prev) =>
-      prev ? { ...prev, draft_count: Math.max(0, prev.draft_count - 1) } : prev
-    );
+    setDraftStatus((prev) => {
+      if (!prev) return prev;
+      const newCount = Math.max(0, prev.draft_count - 1);
+      return { ...prev, draft_count: newCount, draft_queue_full: newCount >= prev.draft_cap };
+    });
     setToast({ message: 'Draft dismissed', type: 'info' });
   }
 
@@ -2080,31 +2083,56 @@ export default function ContentHubPage() {
     setActiveTab('drafts');
 
     try {
-      // Backend clears existing drafts and returns new ones synchronously
-      const newDrafts = await generateNow(brandId);
+      // Backend starts generation in the background and returns 202 immediately.
+      // Poll draft-status every 4 seconds until generation completes (up to 6 min).
+      await generateNow(brandId);
 
-      // Update draft status
-      const status = await getDraftStatus(brandId);
-      setDraftStatus(status);
+      const deadline = Date.now() + 360_000; // 6-minute max
+      let prevCount = 0;
+      let unchangedStreak = 0;
 
-      // Load all drafts fresh (including the new ones)
-      await loadAll(brandId);
+      while (Date.now() < deadline) {
+        await new Promise<void>((r) => setTimeout(r, 4000));
+        if (selectedBrandId !== brandId) break; // user switched brand
+
+        let currentStatus: DraftQueueStatus | null = null;
+        try {
+          currentStatus = await getDraftStatus(brandId);
+        } catch {
+          break;
+        }
+
+        setDraftStatus(currentStatus);
+
+        if (currentStatus.draft_count !== prevCount) {
+          prevCount = currentStatus.draft_count;
+          unchangedStreak = 0;
+          loadAll(brandId).catch(() => {});
+        } else {
+          unchangedStreak++;
+        }
+
+        // Stop when generation flag cleared AND count stable for 2 consecutive polls
+        if (!currentStatus.generating && unchangedStreak >= 2) break;
+      }
 
       setGenerating(false);
+      loadAll(brandId).catch(() => {});
 
-      // Show contextual message about results
+      const finalStatus = await getDraftStatus(brandId).catch(() => null);
+      const count = finalStatus?.draft_count ?? prevCount;
       const promptCount = brandPrompts.length;
-      if (newDrafts.length >= 20) {
-        setToast({ message: `Generated ${newDrafts.length} new drafts`, type: 'success' });
-      } else if (newDrafts.length === 0) {
+      if (count >= 20) {
+        setToast({ message: `Generated ${count} new drafts`, type: 'success' });
+      } else if (count === 0) {
         setToast({ message: 'No drafts generated. Add more prompts or run a tracking scan first.', type: 'info' });
       } else if (promptCount <= 3) {
         setToast({
-          message: `Generated ${newDrafts.length} drafts (limited by ${promptCount} prompt${promptCount === 1 ? '' : 's'})`,
+          message: `Generated ${count} drafts (limited by ${promptCount} prompt${promptCount === 1 ? '' : 's'})`,
           type: 'success'
         });
       } else {
-        setToast({ message: `Generated ${newDrafts.length} new drafts`, type: 'success' });
+        setToast({ message: `Generated ${count} new drafts`, type: 'success' });
       }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string }; status?: number }; message?: string };
@@ -2114,7 +2142,6 @@ export default function ContentHubPage() {
         : raw;
       setGenerateError(detail);
       setGenerating(false);
-      // Refresh drafts and status in case partial generation happened
       getDraftStatus(brandId).then(setDraftStatus).catch(() => {});
       loadAll(brandId).catch(() => {});
     }
@@ -2133,12 +2160,18 @@ export default function ContentHubPage() {
       // Poll until scan completes (opportunities count stabilizes or timeout)
       const brandId = selectedBrandId;
       const deadline = Date.now() + 60_000; // 60s timeout
-      let prevCount = 0;
+      const scanStart = Date.now();
+      // Reddit scanner makes 7 HTTP queries (each with 1s sleep) + sequential Haiku
+      // checks — total ~20-35s. Quora finishes faster (~5-10s). We must wait for
+      // Reddit before declaring the scan done, otherwise we show only Quora results.
+      const SCAN_MIN_MS = 28_000; // don't declare done until at least 28s have elapsed
+      let prevCount = -1; // -1 sentinel so first poll never starts a stableStreak
       let stableStreak = 0;
 
       const poll = async (): Promise<void> => {
         if (Date.now() > deadline) {
           // Timeout - fetch whatever we have
+          invalidateCache('/opportunities/');
           const ops = await getOpportunities(brandId);
           setOpportunities(ops);
           setScanning(false);
@@ -2153,20 +2186,27 @@ export default function ContentHubPage() {
         }
 
         await new Promise((r) => setTimeout(r, 2000)); // Poll every 2s
+        invalidateCache('/opportunities/'); // bust cache so each poll hits the DB
         const ops = await getOpportunities(brandId);
         const count = ops.length;
 
-        // Track stability: count matches previous (including 0)
-        if (count === prevCount) {
-          stableStreak++;
-        } else {
-          stableStreak = 0;
+        // Show live count as scanners complete (Quora first, then Reddit)
+        setOpportunities(ops);
+
+        // Only track stability after the minimum scan window has elapsed
+        const elapsed = Date.now() - scanStart;
+        if (elapsed >= SCAN_MIN_MS) {
+          if (count === prevCount) {
+            stableStreak++;
+          } else {
+            stableStreak = 0;
+          }
         }
         prevCount = count;
 
-        // Stable for 3 consecutive polls (6 seconds) = done
-        // Use 3 polls to ensure backend scanner has finished
-        if (stableStreak >= 3) {
+        // Stable for 5 consecutive polls (10 seconds) = done
+        // Requires 5 matches to ensure both Reddit and Quora scanners have finished
+        if (stableStreak >= 5) {
           setOpportunities(ops);
           setScanning(false);
 
@@ -2606,22 +2646,22 @@ export default function ContentHubPage() {
           {/* ── Left panel (70%) — Content Queue ────────────────────────────── */}
           <div className="flex-1 min-w-0">
             {/* Tab bar */}
-            <div className="flex gap-0.5 border-b border-[rgba(99,102,241,0.18)] mb-5">
+            <div className="flex gap-1 mb-5">
               {TABS.map((tab) => (
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     activeTab === tab.key
-                      ? 'text-[#818cf8] border-[#6366f1]'
-                      : 'text-[#475569] border-transparent hover:text-[#64748B] hover:border-[rgba(99,102,241,0.30)]'
+                      ? 'bg-[rgba(99,102,241,0.18)] text-[#a5b4fc] border border-[rgba(99,102,241,0.30)] shadow-[0_0_14px_rgba(99,102,241,0.14)]'
+                      : 'text-[#475569] bg-transparent border border-transparent hover:text-[#64748B]'
                   }`}
                 >
                   {tab.label}
                   {tabCounts[tab.key] > 0 && (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                       activeTab === tab.key
-                        ? 'bg-[#6366f1]/25 text-[#818cf8]'
+                        ? 'bg-[rgba(99,102,241,0.25)] text-[#a5b4fc]'
                         : 'bg-[rgba(255,255,255,0.08)] text-[#475569]'
                     }`}>
                       {tabCounts[tab.key]}
@@ -2688,16 +2728,16 @@ export default function ContentHubPage() {
                 </div>
               ) : (
                 <>
-                  {draftStatus?.draft_queue_full ? (
-                    <div className="bg-[#7f1d1d]/15 border border-[#991b1b]/30 rounded-lg px-3 py-2.5 mb-3">
-                      <p className="text-xs text-[#f87171] font-medium leading-relaxed">
-                        Draft queue full ({draftStatus.draft_cap}/{draftStatus.draft_cap}) — approve or dismiss drafts to generate new ones.
-                      </p>
-                    </div>
-                  ) : null}
+                  {null}
                   {(() => {
                     const cooldownLabel = generateAvailableLabel(draftStatus?.next_generate_at ?? null);
                     const onCooldown = !!cooldownLabel;
+                    // Weekly quota exhausted: remaining=0 AND no pending drafts to reclaim
+                    const weeklyExhausted =
+                      draftStatus?.weekly_drafts_remaining !== null &&
+                      draftStatus?.weekly_drafts_remaining !== undefined &&
+                      draftStatus.weekly_drafts_remaining === 0 &&
+                      draftStatus.draft_count === 0;
                     return (
                       <>
                         {activeTab === 'opportunities' ? (
@@ -2727,7 +2767,7 @@ export default function ContentHubPage() {
                         <>
                           <button
                             onClick={handleGenerateNow}
-                            disabled={generating || !!draftStatus?.draft_queue_full || onCooldown}
+                            disabled={generating || onCooldown || weeklyExhausted}
                             className="w-full flex items-center justify-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/25 hover:shadow-[#6366f1]/40"
                           >
                             {generating ? (
@@ -2747,9 +2787,13 @@ export default function ContentHubPage() {
                               <Clock size={11} className="shrink-0" />
                               {cooldownLabel}
                             </p>
+                          ) : weeklyExhausted ? (
+                            <p className="text-xs text-[#f87171] mt-2 text-center">
+                              Weekly draft limit reached ({draftStatus?.weekly_drafts_limit}/{draftStatus?.weekly_drafts_limit}). Resets in 7 days.
+                            </p>
                           ) : (
                             <p className="text-xs text-[#475569] mt-2 text-center">
-                              {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : 'Replaces all existing drafts with a fresh set of up to 20'}
+                              {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : draftStatus?.weekly_drafts_limit != null ? `Replaces all existing drafts · ${draftStatus.weekly_drafts_remaining}/${draftStatus.weekly_drafts_limit} weekly` : 'Replaces all existing drafts with a fresh set of up to 20'}
                             </p>
                           )}
                         </>

@@ -456,16 +456,13 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
     Kick off background draft generation for the top N gaps across all enabled
     platforms. Returns 202 immediately; poll GET /draft-status to track progress.
     """
-    is_onboarding = request.source == "onboarding"
-
-    if not is_onboarding:
-        require_active_subscription(user)
-        if not user.is_admin and not user.subscription_tier:
-            raise HTTPException(
-                status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail="On-demand draft generation is available on Starter and Pro plans. Upgrade to unlock this feature.",
-            )
-        check_rate_limit(user.id, limit=2)  # burst guard (per minute)
+    require_active_subscription(user)
+    if not user.is_admin and not user.subscription_tier:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="On-demand draft generation is available on Starter and Pro plans. Upgrade to unlock this feature.",
+        )
+    check_rate_limit(user.id, limit=2)  # burst guard (per minute)
 
     if brand_id in _state.generating_brands:
         raise HTTPException(
@@ -475,19 +472,7 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
 
     brand = await get_brand_for_user(brand_id, db, user)
 
-    if is_onboarding:
-        # One-time guard: skip if onboarding drafts already exist for this brand
-        from sqlalchemy import func as sqlfunc
-        existing_result = await db.execute(
-            select(sqlfunc.count(ContentDraft.id)).where(
-                ContentDraft.brand_id == brand_id,
-                ContentDraft.source == "onboarding",
-            )
-        )
-        if (existing_result.scalar_one_or_none() or 0) > 0:
-            return {"status": "skipped", "brand_id": brand_id, "reason": "onboarding drafts already generated"}
-        remaining = min(request.max_gaps, 5)
-    elif not user.is_admin:
+    if not user.is_admin:
         from datetime import datetime, timedelta, timezone
         from sqlalchemy import func as sqlfunc
         from app.routers.billing import WEEKLY_DRAFT_LIMITS
@@ -533,7 +518,7 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
         _bg_generate_drafts(
             brand_id=brand_id,
             max_gaps=remaining,
-            source=request.source,
+            source="manual",
         )
     )
     logger.info("generate_now: background task started for brand_id=%d max_gaps=%d", brand_id, remaining)

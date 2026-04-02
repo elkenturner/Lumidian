@@ -287,6 +287,16 @@ async def run_migrations():
         "CREATE INDEX IF NOT EXISTS idx_content_gaps_brand_score ON content_gaps(brand_id, gap_score DESC)",
         # Performance: Quora scanner filters opportunities by brand + platform + status
         "CREATE INDEX IF NOT EXISTS idx_opportunities_brand_platform_status ON content_opportunities(brand_id, platform, status)",
+        # Maintenance: drop the bloated idx_query_results_run_text which stored full response_text
+        # in the B-tree (60 MB+ DB overhead). The tracking_run_id index alone is sufficient.
+        "DROP INDEX IF EXISTS idx_query_results_run_text",
+        # Performance: dashboard analytics sorts query_results by created_at DESC
+        "CREATE INDEX IF NOT EXISTS idx_query_results_created ON query_results(created_at DESC)",
+        # Performance: responses endpoint + dashboard analytics — filter by run, sort by created_at
+        # Composite index lets SQLite serve both the equality/IN filter and the ORDER BY in one pass
+        "CREATE INDEX IF NOT EXISTS idx_query_results_run_created ON query_results(tracking_run_id, created_at DESC)",
+        # BrandContentSettings: drafting_frequency was added to DB but was missing from the ORM model
+        "ALTER TABLE brand_content_settings ADD COLUMN drafting_frequency TEXT NOT NULL DEFAULT 'weekly'",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

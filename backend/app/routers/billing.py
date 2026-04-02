@@ -52,6 +52,24 @@ DAILY_RUN_LIMITS: dict = {
     "starter": 3,
     "pro": None,  # unlimited
 }
+# Competitor tracking limits per brand (across all brands, enforced at add time)
+COMPETITOR_LIMITS: dict = {
+    None: 3, "": 3,
+    "starter": 5,
+    "pro": 15,
+}
+# Team member seat limits (total invited/accepted members per account owner)
+TEAM_MEMBER_LIMITS: dict = {
+    None: 0, "": 0,
+    "starter": 1,
+    "pro": 3,
+}
+# Weekly manual draft limits per standard brand. Pitch brands are always capped at 1.
+WEEKLY_DRAFT_LIMITS: dict = {
+    None: 0, "": 0,
+    "starter": 10,
+    "pro": 25,
+}
 
 
 def get_stripe():

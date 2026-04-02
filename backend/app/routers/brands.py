@@ -67,7 +67,7 @@ async def _get_brand_or_404(db: AsyncSession, brand_id: int, user: Optional[User
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Brand {brand_id} not found",
         )
-    if user is not None and brand.user_id != user.id:
+    if user is not None and brand.user_id != user.id and not getattr(user, "is_admin", False):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return brand
 
@@ -444,6 +444,21 @@ async def list_competitors(brand_id: int, db: DbDep, user: CurrentUser):
 )
 async def add_competitor(brand_id: int, payload: CompetitorCreate, db: DbDep, user: CurrentUser):
     await get_brand_for_user(brand_id, db, user)
+
+    if not user.is_admin:
+        from app.routers.billing import COMPETITOR_LIMITS
+        limit = COMPETITOR_LIMITS.get(user.subscription_tier or "", 3)
+        count_result = await db.execute(
+            select(func.count(Competitor.id)).where(Competitor.brand_id == brand_id)
+        )
+        current_count = count_result.scalar_one()
+        if current_count >= limit:
+            tier = user.subscription_tier or "free"
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Competitor limit reached: your {tier} plan allows {limit} competitor(s) per brand.",
+            )
+
     competitor = Competitor(brand_id=brand_id, name=payload.name, website_url=payload.website_url)
     db.add(competitor)
     await db.commit()

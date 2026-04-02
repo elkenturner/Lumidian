@@ -37,7 +37,17 @@ class BrandCreate(BaseModel):
     tier: str = "basic"
     brand_type: str = "standard"  # "standard" | "pitch"
     prompts: list[str] = []
-    website_url: Optional[str] = None
+    website_url: str
+
+    @field_validator("website_url")
+    @classmethod
+    def validate_website_url(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("website_url is required")
+        if not v.startswith(("http://", "https://")):
+            v = f"https://{v}"
+        return v
 
     @field_validator("tier")
     @classmethod

@@ -12,26 +12,26 @@ const MODEL_CONFIG: Record<
 > = {
   chatgpt: {
     label: 'ChatGPT',
-    color: '#34d399',
-    bgColor: 'rgba(16,163,127,0.15)',
+    color: '#22c55e',
+    bgColor: 'rgba(34, 197, 94, 0.15)',
     letter: 'G',
   },
   claude: {
     label: 'Claude',
-    color: '#fb923c',
-    bgColor: 'rgba(217,119,87,0.15)',
+    color: '#f97316',
+    bgColor: 'rgba(249, 115, 22, 0.15)',
     letter: 'C',
   },
   perplexity: {
     label: 'Perplexity',
-    color: '#a5b4fc',
-    bgColor: 'rgba(99,102,241,0.18)',
+    color: '#8b5cf6',
+    bgColor: 'rgba(139, 92, 246, 0.15)',
     letter: 'P',
   },
   gemini: {
     label: 'Gemini',
-    color: '#60a5fa',
-    bgColor: 'rgba(66,133,244,0.15)',
+    color: '#3b82f6',
+    bgColor: 'rgba(59, 130, 246, 0.15)',
     letter: 'G',
   },
 };
@@ -56,11 +56,8 @@ function isNotConfigured(ms: ModelScore): boolean {
 export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
   if (!modelScores || modelScores.length === 0) {
     return (
-      <div
-        className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-6"
-        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}
-      >
-        <h3 className="text-base font-semibold text-[#e2e8f0] mb-4">Model Breakdown</h3>
+      <div className="card">
+        <h3 className="text-base font-semibold text-[#f8fafc] mb-4">Model Breakdown</h3>
         <p className="text-sm text-[#64748b] text-center py-4">No model data available</p>
       </div>
     );
@@ -75,11 +72,8 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
   });
 
   return (
-    <div
-      className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-6"
-      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}
-    >
-      <h3 className="text-base font-semibold text-[#e2e8f0] mb-5">Model Breakdown</h3>
+    <div className="card">
+      <h3 className="text-base font-semibold text-[#f8fafc] mb-5">Model Breakdown</h3>
       <div className="space-y-4">
         {sorted.map((ms) => {
           const config = getModelConfig(ms.model);
@@ -87,41 +81,26 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
           const pct = unconfigured ? 0 : Math.round(ms.score ?? 0);
 
           return (
-            <div key={ms.model} className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold flex-shrink-0"
-                    style={
-                      unconfigured
-                        ? { backgroundColor: 'rgba(99,102,241,0.08)', color: '#475569' }
-                        : { backgroundColor: config.bgColor, color: config.color }
-                    }
-                  >
-                    {config.letter}
-                  </div>
-                  <div>
-                    <span
-                      className="text-sm font-medium"
-                      style={{ color: unconfigured ? '#475569' : '#e2e8f0' }}
-                    >
-                      {config.label}
-                    </span>
-                    {!unconfigured && (
-                      <span className="ml-2 text-xs text-[#64748b]">
-                        {ms.total_mentions}/{ms.total_queries} mentions
-                      </span>
-                    )}
-                  </div>
-                </div>
+            <div
+              key={ms.model}
+              className="model-card"
+              style={{ borderLeftColor: unconfigured ? 'var(--border-subtle)' : config.color }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <span
+                  className="text-sm font-medium"
+                  style={{ color: unconfigured ? '#475569' : '#f8fafc' }}
+                >
+                  {config.label}
+                </span>
 
                 {unconfigured ? (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(99,102,241,0.08)] text-[#475569] border border-[rgba(99,102,241,0.18)]">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(71,85,105,0.3)] text-[#64748b] border border-[rgba(71,85,105,0.3)]">
                     Not configured
                   </span>
                 ) : (
                   <span
-                    className="text-sm font-bold tabular-nums"
+                    className="stat-value text-lg"
                     style={{ color: config.color }}
                   >
                     {pct}%
@@ -129,19 +108,22 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
                 )}
               </div>
 
-              <div className="h-2 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
-                {unconfigured ? (
-                  <div className="h-full w-0 rounded-full" />
-                ) : (
-                  <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{
-                      width: `${pct}%`,
-                      background: `linear-gradient(90deg, ${config.color}, ${config.color}cc)`,
-                    }}
-                  />
-                )}
-              </div>
+              {!unconfigured && (
+                <>
+                  <div className="h-1 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden mb-2">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${pct}%`,
+                        background: config.color,
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs text-[#64748b]">
+                    {ms.total_mentions}/{ms.total_queries} mentions
+                  </span>
+                </>
+              )}
 
               {unconfigured && (
                 <p className="text-xs text-[#475569]">Add API key in Settings to enable</p>

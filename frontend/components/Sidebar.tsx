@@ -12,24 +12,14 @@ import {
   User,
   LineChart,
   Shield,
-  Bell,
-  BellRing,
-  LifeBuoy,
   ChevronDown,
   Plus,
   Check,
 } from 'lucide-react';
-import NotificationPanel from '@/components/NotificationPanel';
-import SupportPanel from '@/components/SupportPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import LumidianLogo from '@/components/LumidianLogo';
 import BrandAvatar from '@/components/BrandAvatar';
-import {
-  getNotifications,
-  markAllNotificationsRead,
-  AppNotification,
-} from '@/lib/api';
 
 interface NavItem {
   label: string;
@@ -120,60 +110,6 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [brandOpen]);
-
-  // Notifications
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [panelOpen, setPanelOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  // Support
-  const [supportOpen, setSupportOpen] = useState(false);
-  const supportRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    getNotifications()
-      .then((r) => { setNotifications(r.notifications); setUnreadCount(r.unread_count); })
-      .catch(() => {});
-    // Poll every 60s
-    const interval = setInterval(() => {
-      getNotifications()
-        .then((r) => { setNotifications(r.notifications); setUnreadCount(r.unread_count); })
-        .catch(() => {});
-    }, 60_000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Close notification panel on outside click
-  useEffect(() => {
-    if (!panelOpen) return;
-    function handler(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
-        setPanelOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [panelOpen]);
-
-  // Close support panel on outside click
-  useEffect(() => {
-    if (!supportOpen) return;
-    function handler(e: MouseEvent) {
-      if (supportRef.current && !supportRef.current.contains(e.target as Node)) {
-        setSupportOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [supportOpen]);
-
-  async function handleMarkAllRead() {
-    await markAllNotificationsRead().catch(() => null);
-    setNotifications([]);
-    setUnreadCount(0);
-    setPanelOpen(false);
-  }
 
   const navItems: NavItem[] = [
     { label: 'Dashboard',   href: '/dashboard', icon: LayoutDashboard },
@@ -393,68 +329,6 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
             </div>
           )}
 
-          {/* ── Support button ── */}
-          <div>
-            <button
-              onClick={(e) => { e.stopPropagation(); setPanelOpen(false); setSupportOpen((v) => !v); }}
-              title="Contact Support"
-              aria-label="Contact Support"
-              className={[
-                'w-full flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative',
-                expanded ? 'px-3.5' : 'px-0 justify-center',
-                supportOpen ? 'text-[#818CF8] bg-[rgba(99,102,241,0.15)]' : 'text-[#64748B] hover:text-[#94A3B8]',
-              ].join(' ')}
-              onMouseEnter={(e) => {
-                if (!supportOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)';
-              }}
-              onMouseLeave={(e) => {
-                if (!supportOpen) (e.currentTarget as HTMLElement).style.background = 'transparent';
-              }}
-            >
-              <LifeBuoy
-                size={16}
-                className={supportOpen ? 'text-[#818CF8]' : 'text-[#475569]'}
-                strokeWidth={supportOpen ? 2 : 1.75}
-              />
-              {expanded && <span className="truncate">Support</span>}
-            </button>
-          </div>
-
-          {/* ── Bell button ── */}
-          <div className="pt-1">
-            <button
-              onClick={(e) => { e.stopPropagation(); setPanelOpen((v) => !v); }}
-              title="Notifications"
-              aria-label={unreadCount > 0 ? `Notifications — ${unreadCount} unread` : 'Notifications'}
-              className={[
-                'w-full flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative',
-                expanded ? 'px-3.5' : 'px-0 justify-center',
-                panelOpen ? 'text-[#818CF8] bg-[rgba(99,102,241,0.15)]' : 'text-[#64748B] hover:text-[#94A3B8]',
-              ].join(' ')}
-              onMouseEnter={(e) => {
-                if (!panelOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)';
-              }}
-              onMouseLeave={(e) => {
-                if (!panelOpen) (e.currentTarget as HTMLElement).style.background = 'transparent';
-              }}
-            >
-              <div className="relative flex-shrink-0">
-                {unreadCount > 0 && !panelOpen
-                  ? <BellRing size={16} className="text-[#818CF8]" strokeWidth={1.75} />
-                  : <Bell size={16} className={panelOpen ? 'text-[#818CF8]' : 'text-[#475569]'} strokeWidth={panelOpen ? 2 : 1.75} />
-                }
-                {unreadCount > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold text-white leading-none"
-                    style={{ background: 'rgba(99,102,241,0.9)', boxShadow: '0 0 8px rgba(99,102,241,0.5)' }}
-                  >
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-              </div>
-              {expanded && <span className="truncate">Notifications</span>}
-            </button>
-          </div>
         </nav>
 
         {/* ── User section ── */}
@@ -477,17 +351,12 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                   >
                     {planLabel} Plan
                   </Link>
-                  {user?.subscription_status === 'trialing' && (
-                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#166534]/30 text-[#4ade80] border border-[#166534]/40 leading-none">
-                      TRIAL
-                    </span>
-                  )}
                   {(user?.subscription_status === 'past_due' || user?.subscription_status === 'unpaid') && (
                     <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#7f1d1d]/30 text-[#f87171] border border-[#7f1d1d]/40 leading-none">
                       PAST DUE
                     </span>
                   )}
-                  {!user?.is_admin && (!user?.subscription_tier || user.subscription_tier === 'starter') && user?.subscription_status !== 'trialing' && (
+                  {!user?.is_admin && (!user?.subscription_tier || user.subscription_tier === 'starter') && (
                     <Link
                       href="/settings/billing"
                       className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#6366f1]/20 text-[#818cf8] border border-[#6366f1]/30 hover:bg-[#6366f1]/30 transition-colors leading-none whitespace-nowrap"
@@ -554,28 +423,6 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
         )}
       </aside>
 
-      {/* Notification panel — rendered outside aside so it's not clipped */}
-      {panelOpen && (
-        <div ref={panelRef}>
-          <NotificationPanel
-            notifications={notifications}
-            unreadCount={unreadCount}
-            panelLeft={expanded ? 232 : 68}
-            onMarkAllRead={handleMarkAllRead}
-            onClose={() => setPanelOpen(false)}
-          />
-        </div>
-      )}
-
-      {/* Support panel */}
-      {supportOpen && (
-        <div ref={supportRef}>
-          <SupportPanel
-            panelLeft={expanded ? 232 : 68}
-            onClose={() => setSupportOpen(false)}
-          />
-        </div>
-      )}
     </>
   );
 }

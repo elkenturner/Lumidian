@@ -101,10 +101,10 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
 
 const MODEL_ORDER = ['chatgpt', 'claude', 'perplexity', 'gemini'];
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  chatgpt:    { label: 'ChatGPT',    bg: 'rgba(16,163,127,0.12)',  text: '#34d399' },
-  claude:     { label: 'Claude',     bg: 'rgba(217,119,87,0.12)',   text: '#fb923c' },
-  perplexity: { label: 'Perplexity', bg: 'rgba(99,102,241,0.12)',   text: '#a5b4fc' },
-  gemini:     { label: 'Gemini',     bg: 'rgba(66,133,244,0.12)',   text: '#60a5fa' },
+  chatgpt:    { label: 'ChatGPT',    bg: 'rgba(34,197,94,0.12)',   text: '#22c55e' },
+  claude:     { label: 'Claude',     bg: 'rgba(249,115,22,0.12)',  text: '#f97316' },
+  perplexity: { label: 'Perplexity', bg: 'rgba(139,92,246,0.12)',  text: '#8b5cf6' },
+  gemini:     { label: 'Gemini',     bg: 'rgba(59,130,246,0.12)',  text: '#3b82f6' },
 };
 
 function getModelCfg(model: string) {

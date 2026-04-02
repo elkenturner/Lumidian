@@ -12,26 +12,26 @@ const MODEL_CONFIG: Record<
 > = {
   chatgpt: {
     label: 'ChatGPT',
-    color: '#10b981',
-    bgColor: '#064e3b',
+    color: '#34d399',
+    bgColor: 'rgba(16,163,127,0.15)',
     letter: 'G',
   },
   claude: {
     label: 'Claude',
-    color: '#f59e0b',
-    bgColor: '#451a03',
+    color: '#fb923c',
+    bgColor: 'rgba(217,119,87,0.15)',
     letter: 'C',
   },
   perplexity: {
     label: 'Perplexity',
-    color: '#a78bfa',
-    bgColor: '#2e1065',
+    color: '#a5b4fc',
+    bgColor: 'rgba(99,102,241,0.18)',
     letter: 'P',
   },
   gemini: {
     label: 'Gemini',
     color: '#60a5fa',
-    bgColor: '#172554',
+    bgColor: 'rgba(66,133,244,0.15)',
     letter: 'G',
   },
 };
@@ -56,7 +56,10 @@ function isNotConfigured(ms: ModelScore): boolean {
 export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
   if (!modelScores || modelScores.length === 0) {
     return (
-      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+      <div
+        className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-6"
+        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}
+      >
         <h3 className="text-base font-semibold text-[#e2e8f0] mb-4">Model Breakdown</h3>
         <p className="text-sm text-[#64748b] text-center py-4">No model data available</p>
       </div>
@@ -72,7 +75,10 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
   });
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+    <div
+      className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-6"
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}
+    >
       <h3 className="text-base font-semibold text-[#e2e8f0] mb-5">Model Breakdown</h3>
       <div className="space-y-4">
         {sorted.map((ms) => {
@@ -123,7 +129,7 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
                 )}
               </div>
 
-              <div className="h-2 bg-[rgba(99,102,241,0.10)] rounded-full overflow-hidden">
+              <div className="h-2 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
                 {unconfigured ? (
                   <div className="h-full w-0 rounded-full" />
                 ) : (

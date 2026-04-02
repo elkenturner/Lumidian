@@ -252,13 +252,12 @@ const MODEL_BAR_COLORS: Record<string, string> = {
 
 function ModelBreakdown({ models, deltas }: { models: ModelStat[]; deltas?: Record<string, number> }) {
   if (!models.length) return <p className="text-xs text-[#475569]">No model data yet</p>;
-  const max = Math.max(...models.map((m) => m.mention_rate), 0.01);
   return (
     <div className="space-y-3 w-full">
       {models.map((m) => {
         const pct = Math.round(m.mention_rate * 100);
         const barColor = MODEL_BAR_COLORS[m.model] ?? '#6366f1';
-        const barWidth = `${Math.round((m.mention_rate / max) * 100)}%`;
+        const barWidth = `${pct}%`;
         const delta = deltas?.[m.model];
         return (
           <div key={m.model}>

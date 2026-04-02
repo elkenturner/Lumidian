@@ -203,14 +203,6 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
         <div className="flex items-center justify-center h-[220px] text-[#475569] text-sm">
           No data in this timeframe.
         </div>
-      ) : chartData.length === 1 ? (
-        <div className="flex flex-col items-center justify-center h-[220px] gap-2">
-          <p className="text-3xl font-bold text-[#818cf8]" style={{ fontFamily: 'var(--font-jetbrains, monospace)' }}>
-            {chartData[0].score}%
-          </p>
-          <p className="text-sm text-[#475569]">Baseline recorded — {chartData[0].formattedDate}</p>
-          <p className="text-xs text-[#334155] mt-1">Run more tracking scans to build a trend.</p>
-        </div>
       ) : (
         <ResponsiveContainer width="100%" height={240}>
           <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
@@ -266,7 +258,7 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
                 stroke={ml.color}
                 strokeWidth={1.5}
                 strokeDasharray="4 2"
-                dot={false}
+                dot={chartData.length === 1 ? { fill: ml.color, r: 4, strokeWidth: 0 } : false}
                 activeDot={{ fill: ml.color, r: 4, strokeWidth: 0 }}
                 hide={hiddenModels.has(ml.key)}
                 connectNulls

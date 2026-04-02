@@ -1041,6 +1041,13 @@ export default function SettingsPage() {
             {aiFillError && <p className="text-xs text-[#f87171]">{aiFillError}</p>}
           </div>
 
+          {aiFilling && (
+            <div className="flex items-center gap-3 px-4 py-3 mb-4 rounded-xl bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] text-[#a5b4fc] text-sm">
+              <Loader2 size={15} className="animate-spin flex-shrink-0" />
+              <span>Scanning your website and filling profile fields…</span>
+            </div>
+          )}
+
           <div className="space-y-4">
             <SectionCard
               icon={Building2}

@@ -809,7 +809,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleSave}
                 disabled={saving || saveSuccess}
-                className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                className="flex items-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
               >
                 {saving ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -860,7 +860,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleAddPrompt}
                 disabled={addingPrompt || !newPromptText.trim()}
-                className="flex items-center gap-1.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-40 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-40 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
               >
                 {addingPrompt ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 Add
@@ -957,7 +957,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleAddCompetitor}
                 disabled={addingCompetitor || !newCompetitorName.trim()}
-                className="flex items-center gap-1.5 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-40 text-white rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-40 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
               >
                 {addingCompetitor ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 Add
@@ -1003,7 +1003,7 @@ export default function SettingsPage() {
           </div>
           <p className="text-sm font-medium text-[#F0F4F8] mb-1">No brand yet</p>
           <p className="text-xs text-[#64748B] mb-4">Add your first brand to start tracking AI visibility.</p>
-          <a href="/onboarding" className="inline-flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-3 py-2 font-medium transition-colors">
+          <a href="/onboarding" className="inline-flex items-center gap-1.5 text-xs bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] rounded-lg px-3 py-2 font-medium transition-colors">
             Create a brand
           </a>
         </div>
@@ -1139,7 +1139,7 @@ export default function SettingsPage() {
                 'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all',
                 profileSaved
                   ? 'bg-[#064e3b]/30 text-[#10b981] border border-[#065f46]/40'
-                  : 'bg-[#6366f1] text-white hover:bg-[#4f46e5] disabled:opacity-50'
+                  : 'bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50'
               )}
             >
               {profileSaved ? (
@@ -1171,7 +1171,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleInvite}
                 disabled={inviting || !inviteEmail.trim()}
-                className="flex items-center gap-2 px-4 py-2 bg-[#6366f1] text-white rounded-lg text-sm font-medium hover:bg-[#4f46e5] disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 {inviting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 Invite

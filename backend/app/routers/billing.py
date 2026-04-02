@@ -67,6 +67,13 @@ WEEKLY_DRAFT_LIMITS: dict = {
     "starter": 10,
     "pro": 25,
 }
+# Weekly manual opp-scan limits per brand. Mirrors WEEKLY_DRAFT_LIMITS.
+# Free users only get the weekly auto-scan; manual re-scans require a paid plan.
+WEEKLY_SCAN_LIMITS: dict = {
+    None: 0, "": 0,
+    "starter": 10,
+    "pro": 25,
+}
 
 
 def get_stripe():

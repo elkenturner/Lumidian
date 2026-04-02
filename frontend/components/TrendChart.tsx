@@ -28,12 +28,12 @@ const TIMEFRAME_OPTIONS: { label: string; value: Timeframe }[] = [
 ];
 
 const MODEL_LINES: { key: string; label: string; color: string }[] = [
-  { key: 'chatgpt',    label: 'ChatGPT',    color: '#10b981' },
-  { key: 'claude',     label: 'Claude',     color: '#f59e0b' },
-  { key: 'perplexity', label: 'Perplexity', color: '#a78bfa' },
-  { key: 'gemini',     label: 'Gemini',     color: '#60a5fa' },
+  { key: 'chatgpt',    label: 'ChatGPT',    color: '#10a37f' },
+  { key: 'claude',     label: 'Claude',     color: '#d97757' },
+  { key: 'perplexity', label: 'Perplexity', color: '#818cf8' },
+  { key: 'gemini',     label: 'Gemini',     color: '#4285f4' },
 ];
-const AVG_COLOR = '#6366f1';
+const AVG_COLOR = '#818cf8';
 
 interface TrendChartProps {
   data: TrendPoint[];
@@ -76,7 +76,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
           fontWeight: 700,
           marginBottom: 7,
           color: AVG_COLOR,
-          fontFamily: 'var(--font-fira-code, monospace)',
+          fontFamily: 'var(--font-jetbrains, monospace)',
           letterSpacing: '-0.01em',
         }}>
           ⌀ {Math.round(avg.value)}%
@@ -87,7 +87,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
         return (
           <div key={m.dataKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20, marginTop: 3 }}>
             <span style={{ fontSize: 11, color: cfg?.color ?? '#94a3b8' }}>{cfg?.label ?? m.dataKey}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: cfg?.color ?? '#94a3b8', fontFamily: 'var(--font-fira-code, monospace)' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: cfg?.color ?? '#94a3b8', fontFamily: 'var(--font-jetbrains, monospace)' }}>
               {Math.round(m.value)}%
             </span>
           </div>
@@ -144,7 +144,8 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-6"
+        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
         <h3 className="text-base font-semibold text-[#e2e8f0] mb-4">Visibility Trend</h3>
         <div className="empty-state">
           <div className="empty-state-icon">
@@ -158,7 +159,8 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
   }
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+    <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-6"
+      style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-semibold text-[#e2e8f0]">Visibility Trend</h3>
         <Tabs value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}>
@@ -201,17 +203,25 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
         <div className="flex items-center justify-center h-[220px] text-[#475569] text-sm">
           No data in this timeframe.
         </div>
+      ) : chartData.length === 1 ? (
+        <div className="flex flex-col items-center justify-center h-[220px] gap-2">
+          <p className="text-3xl font-bold text-[#818cf8]" style={{ fontFamily: 'var(--font-jetbrains, monospace)' }}>
+            {chartData[0].score}%
+          </p>
+          <p className="text-sm text-[#475569]">Baseline recorded — {chartData[0].formattedDate}</p>
+          <p className="text-xs text-[#334155] mt-1">Run more tracking scans to build a trend.</p>
+        </div>
       ) : (
         <ResponsiveContainer width="100%" height={240}>
           <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
             <defs>
               <linearGradient id="avgAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.18} />
-                <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                <stop offset="5%"  stopColor="#818cf8" stopOpacity={0.28} />
+                <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
               </linearGradient>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.10)" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.07)" vertical={false} />
             <XAxis
               dataKey="shortDate"
               tick={{ fill: '#475569', fontSize: 11 }}
@@ -219,7 +229,7 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
               tickLine={false}
             />
             <YAxis
-              domain={[0, 100]}
+              domain={[0, (dataMax: number) => dataMax < 20 ? 25 : 100]}
               tick={{ fill: '#475569', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
@@ -240,7 +250,7 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
               fill="url(#avgAreaGradient)"
               fillOpacity={1}
               dot={false}
-              activeDot={{ fill: AVG_COLOR, r: 5, strokeWidth: 2, stroke: 'rgba(99,102,241,0.30)' }}
+              activeDot={{ fill: '#818cf8', r: 5, strokeWidth: 2, stroke: 'rgba(129,140,248,0.30)' }}
               isAnimationActive={true}
               animationDuration={1200}
               animationEasing="ease-out"

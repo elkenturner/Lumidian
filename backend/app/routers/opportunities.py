@@ -10,6 +10,7 @@ POST   /api/opportunities/{brand_id}/scan          — trigger an on-demand scan
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Annotated, Optional
 
@@ -180,19 +181,56 @@ async def _scan_and_log(brand_id: int) -> None:
 @router.post("/{brand_id}/scan", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     """
-    Trigger an on-demand Reddit scan for a brand (fire-and-forget).
+    Trigger an on-demand Reddit + Quora scan for a brand (fire-and-forget).
     Returns immediately; scan runs in the background.
-    """
-    import asyncio
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"trigger_scan: user.id={user.id}, user.is_admin={user.is_admin}, brand_id={brand_id}")
 
-    check_rate_limit(user.id, limit=3)  # 3 manual scans per minute per user
+    Free users are blocked (they receive the automatic weekly scan instead).
+    Starter: 10 manual scans per 7-day rolling window.
+    Pro: 25 manual scans per 7-day rolling window.
+    Admins: unlimited.
+    """
+    from datetime import datetime, timezone, timedelta
+    from sqlalchemy import func as sqlfunc
+    from app.models import AnalyticsEvent
+    from app.routers.billing import WEEKLY_SCAN_LIMITS
+    from app.services.analytics_service import log_event
+
+    check_rate_limit(user.id, limit=3)  # burst guard: 3 per minute
     await get_brand_for_user(brand_id, db, user)
+
+    if not user.is_admin:
+        scan_limit = WEEKLY_SCAN_LIMITS.get(user.subscription_tier or "", 0)
+        if scan_limit == 0:
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=(
+                    "Manual opportunity scans are available on Starter and Pro plans. "
+                    "Your brand will be scanned automatically each week."
+                ),
+            )
+        week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        used_result = await db.execute(
+            select(sqlfunc.count(AnalyticsEvent.id)).where(
+                AnalyticsEvent.brand_id == brand_id,
+                AnalyticsEvent.event_type == "manual_scan_triggered",
+                AnalyticsEvent.created_at >= week_ago,
+            )
+        )
+        used = used_result.scalar_one_or_none() or 0
+        if used >= scan_limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=(
+                    f"Weekly scan limit reached ({scan_limit}/{scan_limit}). "
+                    "Resets 7 days after your first manual scan this week."
+                ),
+            )
+
+    # Log before firing so the event counts immediately on the next quota check
+    await log_event("manual_scan_triggered", {"brand_id": brand_id}, brand_id=brand_id)
 
     asyncio.create_task(
         _scan_and_log(brand_id),
         name=f"reddit-scan-{brand_id}",
     )
-    return {"message": f"Reddit scan started for brand {brand_id}", "brand_id": brand_id}
+    return {"message": f"Scan started for brand {brand_id}", "brand_id": brand_id}

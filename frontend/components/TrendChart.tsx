@@ -29,12 +29,12 @@ const TIMEFRAME_OPTIONS: { label: string; value: Timeframe }[] = [
 ];
 
 const MODEL_LINES: { key: string; label: string; color: string }[] = [
-  { key: 'chatgpt',    label: 'ChatGPT',    color: '#10a37f' },
-  { key: 'claude',     label: 'Claude',     color: '#d97757' },
-  { key: 'perplexity', label: 'Perplexity', color: '#818cf8' },
-  { key: 'gemini',     label: 'Gemini',     color: '#4285f4' },
+  { key: 'chatgpt',    label: 'ChatGPT',    color: '#22c55e' },
+  { key: 'claude',     label: 'Claude',     color: '#f97316' },
+  { key: 'perplexity', label: 'Perplexity', color: '#8b5cf6' },
+  { key: 'gemini',     label: 'Gemini',     color: '#3b82f6' },
 ];
-const AVG_COLOR = '#818cf8';
+const AVG_COLOR = '#6366f1';
 
 interface TrendChartProps {
   data: TrendPoint[];
@@ -77,7 +77,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
           fontWeight: 700,
           marginBottom: 7,
           color: AVG_COLOR,
-          fontFamily: 'var(--font-jetbrains, monospace)',
+          fontFamily: 'var(--font-geist-mono), ui-monospace, monospace',
           letterSpacing: '-0.01em',
         }}>
           ⌀ {Math.round(avg.value)}%
@@ -88,7 +88,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
         return (
           <div key={m.dataKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20, marginTop: 3 }}>
             <span style={{ fontSize: 11, color: cfg?.color ?? '#94a3b8' }}>{cfg?.label ?? m.dataKey}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: cfg?.color ?? '#94a3b8', fontFamily: 'var(--font-jetbrains, monospace)' }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: cfg?.color ?? '#94a3b8', fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' }}>
               {Math.round(m.value)}%
             </span>
           </div>

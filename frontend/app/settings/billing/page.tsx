@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { CreditCard, Check, Loader2, Zap, AlertTriangle, CheckCircle2, Clock, X } from 'lucide-react';
+import { CreditCard, Check, Loader2, Zap, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { getBillingStatus, createCheckoutSession, createPortalSession, cancelSubscription, BillingStatus } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -12,7 +12,7 @@ const TIER_FEATURES: Record<string, string[]> = {
 };
 
 export default function BillingPage() {
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const searchParams = useSearchParams();
   const [status, setStatus] = useState<BillingStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -23,14 +23,23 @@ export default function BillingPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const successParam = searchParams.get('success');
-  const trialParam = searchParams.get('trial');
 
   useEffect(() => {
-    getBillingStatus()
-      .then(setStatus)
-      .catch(() => setLoadError('Could not load billing status. Please refresh the page.'))
-      .finally(() => setLoading(false));
-  }, []);
+    const init = async () => {
+      try {
+        const [s] = await Promise.all([
+          getBillingStatus(),
+          successParam === 'true' ? refresh() : Promise.resolve(),
+        ]);
+        setStatus(s);
+      } catch {
+        setLoadError('Could not load billing status. Please refresh the page.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    init();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleUpgrade(tier: string) {
     setUpgrading(tier);
@@ -90,17 +99,9 @@ export default function BillingPage() {
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowCancelConfirm(false)} />
           <div className="relative bg-[rgba(10,14,24,0.97)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl p-6 max-w-sm w-full shadow-2xl max-h-[90vh] overflow-y-auto">
             <h3 className="text-sm font-semibold text-[#e2e8f0] mb-2">Cancel subscription?</h3>
-            {status?.subscription_status === 'trialing' && status.subscription_trial_end ? (
-              <p className="text-xs text-[#64748b] mb-4">
-                You are currently in your free trial. Cancelling now means you won&apos;t be charged on{' '}
-                <span className="text-[#e2e8f0] font-medium">{new Date(status.subscription_trial_end + 'Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</span>{' '}
-                and your account will revert to the free plan.
-              </p>
-            ) : (
-              <p className="text-xs text-[#64748b] mb-4">
-                Your plan will remain active until the end of the current billing period, then revert to the free plan.
-              </p>
-            )}
+            <p className="text-xs text-[#64748b] mb-4">
+              Your plan will remain active until the end of the current billing period, then revert to the free plan.
+            </p>
             <div className="flex gap-2">
               <button
                 onClick={() => setShowCancelConfirm(false)}
@@ -121,22 +122,15 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Trial started banner */}
-      {trialParam === 'true' && (
-        <div className="flex items-start gap-3 bg-[#064e3b]/20 border border-[#065f46]/40 rounded-xl px-4 py-3 mb-6">
-          <CheckCircle2 size={16} className="text-[#10b981] flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm text-[#10b981] font-medium">Free trial started!</p>
-            <p className="text-xs text-[#34d399]/70 mt-0.5">You won&apos;t be charged for 30 days. Cancel any time before your trial ends to avoid being billed.</p>
-          </div>
-        </div>
-      )}
-
       {/* Success banner */}
-      {successParam === 'true' && trialParam !== 'true' && (
+      {successParam === 'true' && (
         <div className="flex items-center gap-3 bg-[#064e3b]/20 border border-[#065f46]/40 rounded-xl px-4 py-3 mb-6">
           <CheckCircle2 size={16} className="text-[#10b981] flex-shrink-0" />
-          <p className="text-sm text-[#10b981] font-medium">Subscription activated! Your plan has been updated.</p>
+          <p className="text-sm text-[#10b981] font-medium">
+            {currentTier
+              ? `${currentTier.charAt(0).toUpperCase() + currentTier.slice(1)} plan activated — you now have full access.`
+              : 'Subscription activated! Your plan has been updated.'}
+          </p>
         </div>
       )}
 
@@ -210,23 +204,6 @@ export default function BillingPage() {
                 <p className="text-xs text-[#475569]">
                   {currentTier === 'starter' ? '25 prompts per brand' : currentTier === 'pro' ? '100 prompts per brand' : '10 prompts on free plan — upgrade for more'}
                 </p>
-              </div>
-            )}
-
-            {/* Trial status */}
-            {status?.subscription_status === 'trialing' && status.subscription_trial_end && (
-              <div className="flex items-start gap-2 bg-[#10b981]/10 border border-[#10b981]/20 rounded-lg px-3 py-2.5 mt-3">
-                <Clock size={13} className="text-[#10b981] flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-medium text-[#10b981]">Free trial active</p>
-                  <p className="text-xs text-[#64748b] mt-0.5">
-                    Trial ends{' '}
-                    <span className="text-[#94a3b8] font-medium">
-                      {new Date(status.subscription_trial_end + 'Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                    </span>
-                    . Your card will be charged automatically unless you cancel before then.
-                  </p>
-                </div>
               </div>
             )}
 

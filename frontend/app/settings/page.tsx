@@ -181,7 +181,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+    <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
       <div className="flex items-start gap-3 mb-4">
         <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] flex items-center justify-center shrink-0 mt-0.5">
           <Icon size={15} className="text-[#6366f1]" />
@@ -727,7 +727,7 @@ export default function SettingsPage() {
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[#F0F4F8]">Settings</h1>
+        <h1 className="text-2xl font-bold text-[#F0F4F8]" style={{ fontFamily: 'var(--font-syne)', fontWeight: 800, letterSpacing: '-0.3px', color: '#eef2ff' }}>Settings</h1>
         <p className="text-[13px] text-[#64748B] mt-1.5">
           {brand ? `Managing settings for ${brand.name}` : 'Manage your account preferences'}
         </p>
@@ -757,7 +757,7 @@ export default function SettingsPage() {
           {/* Left column */}
           <div className="space-y-6">
           {/* Brand Settings */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
             <h2 className="text-[15px] font-semibold text-[#F0F4F8] pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">Brand Settings</h2>
             <div className="space-y-4">
               <div>
@@ -826,7 +826,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Tracking Prompts */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
             <div className="flex items-center justify-between pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">
               <div>
                 <h2 className="text-[15px] font-semibold text-[#F0F4F8]">Tracking Prompts</h2>
@@ -940,7 +940,7 @@ export default function SettingsPage() {
 
           <div className="space-y-6">
           {/* Competitors */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
             <div className="pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">
               <h2 className="text-[15px] font-semibold text-[#F0F4F8]">Competitors</h2>
               <p className="text-xs text-[#64748B] mt-0.5">Track competitor mention rates alongside your brand</p>
@@ -1013,7 +1013,7 @@ export default function SettingsPage() {
       {activeTab === 'profile' && (
         <div>
           {profile && (
-            <div className="mb-5 p-4 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+            <div className="mb-5 p-4 bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-[#94A3B8]">Profile Completion</span>
                 <span className="text-xs text-[#64748B]">
@@ -1155,7 +1155,7 @@ export default function SettingsPage() {
       {/* ── TEAM TAB ─────────────────────────────────────────────────────────── */}
       {activeTab === 'team' && (
         <div className="space-y-5">
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
             <h2 className="text-base font-semibold text-[#F0F4F8] mb-1">Invite Team Members</h2>
             <p className="text-sm text-[#64748B] mb-4">Team members get read-only access to your brands, reports, and drafts. They cannot trigger runs or change settings.</p>
 
@@ -1199,7 +1199,7 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+          <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
             <h2 className="text-base font-semibold text-[#F0F4F8] mb-4">Team Members</h2>
             {teamLoading ? (
               <div className="flex items-center gap-2 text-[#64748B] text-sm"><Loader2 size={14} className="animate-spin" />Loading…</div>

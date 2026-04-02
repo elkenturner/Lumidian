@@ -458,8 +458,8 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
     """
     is_onboarding = request.source == "onboarding"
 
-    require_active_subscription(user)
     if not is_onboarding:
+        require_active_subscription(user)
         if not user.is_admin and not user.subscription_tier:
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,

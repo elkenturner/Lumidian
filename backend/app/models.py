@@ -295,6 +295,7 @@ class BrandContentSettings(Base):
     platform: Mapped[str] = mapped_column(String(50), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     auto_post: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    drafting_frequency: Mapped[str] = mapped_column(String(50), nullable=False, default="weekly")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 

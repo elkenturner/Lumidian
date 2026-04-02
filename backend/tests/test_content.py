@@ -183,19 +183,22 @@ async def test_delete_draft(client: httpx.AsyncClient):
 # ── Draft queue cap (DRAFT_CAP = 20) ─────────────────────────────────────────
 
 async def test_generate_now_endpoint_exists(client: httpx.AsyncClient):
-    """generate-now endpoint accepts a request and delegates to auto_draft_top_gaps."""
+    """generate-now endpoint accepts a request and returns 202 (fire-and-forget)."""
     await register_and_login(client, email="cap@example.com")
     brand = await create_brand(client, name="Cap Brand", prompts=["Test prompt?"])
     brand_id = brand["id"]
 
-    async def mock_auto_draft(db, brand_id, max_gaps=20, clear_existing=False, **kwargs):
-        return []
+    # Patch the background coroutine itself so create_task gets a no-op coroutine
+    async def _noop(*args, **kwargs):
+        pass
 
-    with patch("app.routers.content.auto_draft_top_gaps", side_effect=mock_auto_draft):
+    with patch("app.routers.content._bg_generate_drafts", side_effect=_noop):
         resp = await client.post(f"/api/content/{brand_id}/generate-now", json={"max_gaps": 5})
 
-    assert resp.status_code == 201
-    assert resp.json() == []
+    assert resp.status_code == 202
+    data = resp.json()
+    assert data["status"] == "generating"
+    assert data["brand_id"] == brand_id
 
 
 async def test_draft_cap_constant():

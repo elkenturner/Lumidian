@@ -79,12 +79,15 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    logger.info(f"get_current_user: id={user.id} email={user.email} is_admin={user.is_admin} is_paused={getattr(user, 'is_paused', False)} email_verified={getattr(user, 'email_verified', True)}")
     if getattr(user, "is_paused", False) and not user.is_admin:
+        logger.warning(f"get_current_user: BLOCKED - account paused for user {user.id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your account has been paused. Contact support to restore access.",
         )
     if not getattr(user, "email_verified", True) and not user.is_admin:
+        logger.warning(f"get_current_user: BLOCKED - email not verified for user {user.id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="email_not_verified",
@@ -182,14 +185,20 @@ async def get_data_owner_id(db: AsyncSession, user: User) -> int:
 
 
 async def get_brand_for_user(brand_id: int, db: AsyncSession, user: User) -> "Brand":
-    """Load a brand and verify it belongs to the authenticated user or their team owner. Raises 404/403."""
+    """Load a brand and verify it belongs to the authenticated user or their team owner. Raises 404/403. Admins can access any brand."""
     from app.models import Brand
+    logger.info(f"get_brand_for_user: brand_id={brand_id}, user.id={user.id}, user.is_admin={getattr(user, 'is_admin', False)}")
     result = await db.execute(select(Brand).where(Brand.id == brand_id))
     brand = result.scalar_one_or_none()
     if brand is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Brand {brand_id} not found")
+    # Admins can access any brand
+    if getattr(user, "is_admin", False):
+        logger.info(f"get_brand_for_user: admin bypass for user {user.id}")
+        return brand
     effective_owner_id = await get_data_owner_id(db, user)
     if brand.user_id != effective_owner_id:
+        logger.warning(f"get_brand_for_user: ACCESS DENIED user={user.id} brand.user_id={brand.user_id} effective_owner={effective_owner_id}")
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return brand
 

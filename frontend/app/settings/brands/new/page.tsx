@@ -229,7 +229,7 @@ export default function NewBrandPage() {
             <div key={s} className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                  done ? 'bg-[#10b981] text-white' : active ? 'bg-[#6366f1] text-white shadow-[0_0_12px_rgba(99,102,241,0.40)]' : 'bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] text-[#475569]'
+                  done ? 'bg-[#10b981] text-white' : active ? 'bg-[#6366f1] text-white shadow-md' : 'bg-[#1e293b] border border-[#334155] text-[#475569]'
                 }`}>
                   {done ? <CheckCircle size={14} /> : i + 1}
                 </div>
@@ -238,7 +238,7 @@ export default function NewBrandPage() {
                 </span>
               </div>
               {i < STEPS.length - 1 && (
-                <ChevronRight size={14} className="text-[rgba(99,102,241,0.30)]" />
+                <ChevronRight size={14} className="text-[#334155]" />
               )}
             </div>
           );
@@ -246,7 +246,7 @@ export default function NewBrandPage() {
       </div>
 
       {/* Card */}
-      <div className="relative w-full max-w-md bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl p-8 shadow-[0_8px_40px_rgba(0,0,0,0.40),inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="relative w-full max-w-md bg-[#0f172a] border border-[#334155] rounded-2xl p-8 shadow-lg">
         {error && (
           <div className="bg-[rgba(127,29,29,0.20)] border border-[rgba(153,27,27,0.30)] rounded-lg px-4 py-3 mb-5">
             <p className="text-sm text-[#f87171]">{error}</p>
@@ -274,11 +274,11 @@ export default function NewBrandPage() {
                     className={`w-full text-left rounded-xl p-4 border transition-all ${
                       locked
                         ? 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] opacity-50 cursor-not-allowed'
-                        : 'border-[rgba(99,102,241,0.22)] bg-[rgba(99,102,241,0.04)] hover:border-[#6366f1] hover:bg-[rgba(99,102,241,0.10)] cursor-pointer'
+                        : 'border-[#334155] bg-[#0f172a] hover:border-[#6366f1] hover:bg-[#1e293b] cursor-pointer'
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-[rgba(99,102,241,0.12)] border border-[rgba(99,102,241,0.25)] flex items-center justify-center flex-shrink-0">
+                      <div className="w-9 h-9 rounded-lg bg-[#1e293b] border border-[#334155] flex items-center justify-center flex-shrink-0">
                         {locked ? <Lock size={15} className="text-[#475569]" /> : <BarChart2 size={15} className="text-[#818cf8]" />}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -288,7 +288,7 @@ export default function NewBrandPage() {
                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                               standardRemaining === 0
                                 ? 'bg-[rgba(239,68,68,0.12)] text-[#f87171]'
-                                : 'bg-[rgba(99,102,241,0.15)] text-[#818cf8]'
+                                : 'bg-[#1e293b] text-[#818cf8]'
                             }`}>
                               {standardRemaining === 0 ? 'No slots' : `${standardRemaining} slot${standardRemaining === 1 ? '' : 's'} left`}
                             </span>
@@ -435,7 +435,7 @@ export default function NewBrandPage() {
                   onKeyDown={(e) => e.key === 'Enter' && handleDetails()}
                   placeholder="Your brand name"
                   autoFocus
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[#334155] text-[#F0F4F8] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
                 />
               </div>
               <div>
@@ -447,17 +447,17 @@ export default function NewBrandPage() {
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
                   placeholder="https://yourcompany.com"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[#334155] text-[#F0F4F8] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
                 />
                 <p className="text-xs text-[#475569] mt-1">Used to improve content draft quality.</p>
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="button" onClick={goBack}
-                  className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                  className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[#334155] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                   Back
                 </button>
                 <button onClick={handleDetails} disabled={saving || !brandName.trim() || !websiteUrl.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   Continue
                 </button>
@@ -496,7 +496,7 @@ export default function NewBrandPage() {
                   value={p}
                   onChange={(e) => updatePrompt(i, e.target.value)}
                   placeholder={i === 0 ? `What is ${brandName}?` : 'Add another prompt…'}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[#334155] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
                 />
               ))}
               <div className="flex items-center justify-between px-1 pt-1">
@@ -514,11 +514,11 @@ export default function NewBrandPage() {
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={goBack}
-                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[#334155] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                 Back
               </button>
               <button onClick={handlePrompts} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex-1 flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 Continue
               </button>
@@ -539,17 +539,17 @@ export default function NewBrandPage() {
                   onChange={(e) => setCompanyDescription(e.target.value)}
                   rows={3}
                   placeholder="Brief description of what your company does…"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] resize-none transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[#334155] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] resize-none transition-all"
                 />
               </div>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={goBack}
-                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[#334155] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                 Back
               </button>
               <button onClick={handleProfile} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex-1 flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 {saving ? 'Setting up…' : 'Launch brand'}
               </button>

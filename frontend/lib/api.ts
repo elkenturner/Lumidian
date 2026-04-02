@@ -4,6 +4,7 @@ const api = axios.create({
   baseURL: '/api',
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
   withCredentials: true,
 });
@@ -23,17 +24,48 @@ export function parseApiError(err: unknown, fallback = 'Something went wrong. Pl
   return fallback;
 }
 
-// ── Request deduplication ─────────────────────────────────────────────────────
-// Prevents duplicate concurrent GET requests for the same URL.
-// If the same GET is fired twice before the first resolves, both callers share
-// the same Promise. The entry is removed once the request settles.
-const _inflight = new Map<string, Promise<any>>();
+// ── Request deduplication + TTL cache ─────────────────────────────────────────
+// Two layers:
+//   1. _inflight  — deduplicates concurrent requests for the same URL (unchanged)
+//   2. _cache     — returns a fresh-enough cached response on repeat navigations
+//                   so switching tabs doesn't re-fetch data that's < CACHE_TTL ms old
+const CACHE_TTL = 45_000; // 45 seconds
 
-function dedupedGet<T>(url: string): Promise<T> {
-  if (_inflight.has(url)) return _inflight.get(url) as Promise<T>;
-  const p = api.get<T>(url).then((r) => r.data).finally(() => _inflight.delete(url));
-  _inflight.set(url, p);
+const _inflight = new Map<string, Promise<any>>();
+const _cache    = new Map<string, { data: unknown; ts: number }>();
+
+function cacheKey(url: string, params?: Record<string, unknown>): string {
+  if (!params) return url;
+  const qs = Object.entries(params)
+    .filter(([, v]) => v != null)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([k, v]) => `${k}=${String(v)}`)
+    .join('&');
+  return qs ? `${url}?${qs}` : url;
+}
+
+function dedupedGet<T>(url: string, params?: Record<string, unknown>): Promise<T> {
+  const key = cacheKey(url, params);
+
+  // Return still-valid cached response immediately
+  const hit = _cache.get(key);
+  if (hit && Date.now() - hit.ts < CACHE_TTL) return Promise.resolve(hit.data as T);
+
+  // Dedup concurrent requests for the same key
+  if (_inflight.has(key)) return _inflight.get(key) as Promise<T>;
+
+  const p = api.get<T>(url, params ? { params } : undefined)
+    .then((r) => { _cache.set(key, { data: r.data, ts: Date.now() }); return r.data; })
+    .finally(() => _inflight.delete(key));
+  _inflight.set(key, p);
   return p;
+}
+
+/** Evict one or more cache entries whose key starts with the given prefix. */
+export function invalidateCache(urlPrefix: string): void {
+  Array.from(_cache.keys()).forEach((key) => {
+    if (key.startsWith(urlPrefix)) _cache.delete(key);
+  });
 }
 
 export interface Brand {
@@ -201,8 +233,7 @@ export async function getBrands(): Promise<Brand[]> {
 }
 
 export async function getBrand(id: number): Promise<BrandDetail> {
-  const res = await api.get<BrandDetail>(`/brands/${id}`);
-  return res.data;
+  return dedupedGet<BrandDetail>(`/brands/${id}`);
 }
 
 export async function createBrand(data: {
@@ -213,6 +244,7 @@ export async function createBrand(data: {
   website_url?: string;
 }): Promise<BrandDetail> {
   const res = await api.post<BrandDetail>('/brands', data);
+  invalidateCache('/brands');
   return res.data;
 }
 
@@ -221,11 +253,13 @@ export async function updateBrand(
   data: Partial<{ name: string; tier: string; website_url: string | null }>
 ): Promise<BrandDetail> {
   const res = await api.put<BrandDetail>(`/brands/${id}`, data);
+  invalidateCache('/brands');
   return res.data;
 }
 
 export async function refreshWebsiteContext(brandId: number): Promise<void> {
   await api.post(`/brands/${brandId}/refresh-website-context`);
+  invalidateCache(`/brands/${brandId}/profile`);
 }
 
 /**
@@ -242,40 +276,50 @@ export function normaliseWebsiteUrl(raw: string): string | null {
 
 export async function deleteBrand(id: number): Promise<void> {
   await api.delete(`/brands/${id}`);
+  invalidateCache('/brands');
 }
 
 export async function addPrompt(brandId: number, text: string): Promise<Prompt> {
   const res = await api.post<Prompt>(`/brands/${brandId}/prompts`, { text });
+  invalidateCache(`/brands/${brandId}`);
   return res.data;
 }
 
 export async function deletePrompt(brandId: number, promptId: number): Promise<void> {
   await api.delete(`/brands/${brandId}/prompts/${promptId}`);
+  invalidateCache(`/brands/${brandId}`);
 }
 
 export async function triggerRun(brandId: number): Promise<{ run_id: number }> {
   const res = await api.post<{ run_id: number }>(`/tracking/run/${brandId}`);
+  invalidateCache(`/tracking/runs/${brandId}`);
   return res.data;
 }
 
 export async function triggerPromptRun(brandId: number, promptId: number): Promise<{ run_id: number }> {
   const res = await api.post<{ run_id: number }>(`/tracking/run-prompt/${brandId}/${promptId}`);
+  invalidateCache(`/tracking/runs/${brandId}`);
   return res.data;
 }
 
 export async function getRunStatus(runId: number): Promise<TrackingRun> {
   const res = await api.get<TrackingRun>(`/tracking/run/${runId}/status`);
+  // When a run completes/fails, bust all caches that depend on run results
+  // so loadData() re-fetches fresh data rather than hitting the TTL cache.
+  if (res.data.status === 'completed' || res.data.status === 'failed') {
+    invalidateCache('/tracking/runs/');
+    invalidateCache(`/results/${res.data.brand_id}/`);
+    invalidateCache(`/dashboard/${res.data.brand_id}/`);
+  }
   return res.data;
 }
 
 export async function getRecentRuns(brandId: number): Promise<TrackingRun[]> {
-  const res = await api.get<TrackingRun[]>(`/tracking/runs/${brandId}`);
-  return res.data;
+  return dedupedGet<TrackingRun[]>(`/tracking/runs/${brandId}`);
 }
 
 export async function getOverview(brandId: number): Promise<OverviewData> {
-  const res = await api.get<OverviewData>(`/results/${brandId}/overview`);
-  return res.data;
+  return dedupedGet<OverviewData>(`/results/${brandId}/overview`);
 }
 
 interface TrendsApiResponse {
@@ -292,8 +336,8 @@ interface TrendsApiResponse {
 }
 
 export async function getTrends(brandId: number): Promise<TrendPoint[]> {
-  const res = await api.get<TrendsApiResponse>(`/results/${brandId}/trends`);
-  return (res.data.trend_data ?? []).map((p) => ({
+  const res = await dedupedGet<TrendsApiResponse>(`/results/${brandId}/trends`);
+  return (res.trend_data ?? []).map((p) => ({
     run_id: p.run_id,
     score: p.overall_score ?? 0,
     completed_at: p.completed_at ?? p.created_at,
@@ -317,8 +361,8 @@ export async function getResponses(
 ): Promise<QueryResult[]> {
   const params: Record<string, unknown> = { page_size: pageSize };
   if (runId) params.run_id = runId;
-  const res = await api.get<PaginatedQueryResults>(`/results/${brandId}/responses`, { params });
-  return res.data.items;
+  const data = await dedupedGet<PaginatedQueryResults>(`/results/${brandId}/responses`, params);
+  return data.items;
 }
 
 // ── Content functions ────────────────────────────────────────────────────────
@@ -397,9 +441,8 @@ export async function getAttribution(brandId: number): Promise<ContentAttributio
   return res.data;
 }
 
-export async function generateNow(brandId: number, maxGaps = 20): Promise<ContentDraft[]> {
-  const res = await api.post<ContentDraft[]>(`/content/${brandId}/generate-now`, { max_gaps: maxGaps });
-  return res.data;
+export async function generateNow(brandId: number, maxGaps = 20): Promise<void> {
+  await api.post(`/content/${brandId}/generate-now`, { max_gaps: maxGaps });
 }
 
 export interface DraftQueueStatus {
@@ -411,31 +454,35 @@ export interface DraftQueueStatus {
   scheduled_queue_full: boolean;
   last_scan_at: string | null;
   next_generate_at?: string | null;
+  generating?: boolean;
+  weekly_drafts_remaining: number | null;  // null = admin (unlimited)
+  weekly_drafts_limit: number | null;       // null = admin (unlimited)
 }
 
 export async function getDraftStatus(brandId: number): Promise<DraftQueueStatus> {
-  const res = await api.get<DraftQueueStatus>(`/content/${brandId}/draft-status`);
-  return res.data;
+  return dedupedGet<DraftQueueStatus>(`/content/${brandId}/draft-status`);
 }
 
 // ── Opportunity functions ────────────────────────────────────────────────────
 
 export async function getOpportunities(brandId: number): Promise<ContentOpportunity[]> {
-  const res = await api.get<ContentOpportunity[]>(`/opportunities/${brandId}`);
-  return res.data;
+  return dedupedGet<ContentOpportunity[]>(`/opportunities/${brandId}`);
 }
 
 export async function dismissOpportunity(opportunityId: number): Promise<void> {
   await api.delete(`/opportunities/${opportunityId}/dismiss`);
+  invalidateCache('/opportunities/');
 }
 
 export async function draftOpportunity(opportunityId: number): Promise<ContentDraft> {
   const res = await api.post<ContentDraft>(`/opportunities/${opportunityId}/draft`);
+  invalidateCache('/opportunities/');
   return res.data;
 }
 
 export async function triggerScan(brandId: number): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>(`/opportunities/${brandId}/scan`);
+  invalidateCache('/opportunities/');
   return res.data;
 }
 
@@ -470,8 +517,7 @@ export interface Competitor {
 }
 
 export async function getCompetitors(brandId: number): Promise<Competitor[]> {
-  const res = await api.get<Competitor[]>(`/brands/${brandId}/competitors`);
-  return res.data;
+  return dedupedGet<Competitor[]>(`/brands/${brandId}/competitors`);
 }
 
 export async function addCompetitor(
@@ -483,11 +529,13 @@ export async function addCompetitor(
     name,
     website_url: websiteUrl || null,
   });
+  invalidateCache(`/brands/${brandId}/competitors`);
   return res.data;
 }
 
 export async function removeCompetitor(brandId: number, competitorId: number): Promise<void> {
   await api.delete(`/brands/${brandId}/competitors/${competitorId}`);
+  invalidateCache(`/brands/${brandId}/competitors`);
 }
 
 // ── Competitor analysis types & functions ─────────────────────────────────────
@@ -623,8 +671,7 @@ export interface DashboardAnalytics {
 }
 
 export async function getDashboardAnalytics(brandId: number): Promise<DashboardAnalytics> {
-  const res = await api.get<DashboardAnalytics>(`/dashboard/${brandId}/analytics`);
-  return res.data;
+  return dedupedGet<DashboardAnalytics>(`/dashboard/${brandId}/analytics`);
 }
 
 // ── Brand with stats (for brand switcher) ────────────────────────────────────
@@ -645,8 +692,7 @@ export interface BrandWithStats {
 }
 
 export async function getBrandsWithStats(): Promise<BrandWithStats[]> {
-  const res = await api.get<BrandWithStats[]>('/brands/with-stats');
-  return res.data;
+  return dedupedGet<BrandWithStats[]>('/brands/with-stats');
 }
 
 // ── Brand Profile functions ───────────────────────────────────────────────────
@@ -676,8 +722,7 @@ export interface BrandProfile {
 }
 
 export async function getBrandProfile(brandId: number): Promise<BrandProfile> {
-  const res = await api.get<BrandProfile>(`/brands/${brandId}/profile`);
-  return res.data;
+  return dedupedGet<BrandProfile>(`/brands/${brandId}/profile`);
 }
 
 export async function updateBrandProfile(
@@ -693,6 +738,7 @@ export async function updateBrandProfile(
   }>
 ): Promise<BrandProfile> {
   const res = await api.put<BrandProfile>(`/brands/${brandId}/profile`, data);
+  invalidateCache(`/brands/${brandId}/profile`);
   return res.data;
 }
 
@@ -745,17 +791,16 @@ export interface GapSummary {
 }
 
 export async function getContentGaps(brandId: number): Promise<ContentGap[]> {
-  const res = await api.get<ContentGap[]>(`/gaps/${brandId}`);
-  return res.data;
+  return dedupedGet<ContentGap[]>(`/gaps/${brandId}`);
 }
 
 export async function getGapSummary(brandId: number): Promise<GapSummary> {
-  const res = await api.get<GapSummary>(`/gaps/${brandId}/summary`);
-  return res.data;
+  return dedupedGet<GapSummary>(`/gaps/${brandId}/summary`);
 }
 
 export async function refreshGaps(brandId: number): Promise<{ message: string; run_id: number }> {
   const res = await api.post(`/gaps/${brandId}/refresh`);
+  invalidateCache(`/gaps/${brandId}`);
   return res.data;
 }
 
@@ -974,6 +1019,11 @@ export async function adminPauseUser(userId: number): Promise<{ user_id: number;
 
 export async function adminRemoveUser(userId: number): Promise<{ user_id: number; deleted: boolean }> {
   const res = await api.delete<{ user_id: number; deleted: boolean }>(`/analytics/admin/users/${userId}`);
+  return res.data;
+}
+
+export async function adminGenerateDraft(brandId: number): Promise<{ brand_id: number; status: string }> {
+  const res = await api.post<{ brand_id: number; status: string }>(`/analytics/admin/generate-draft/${brandId}`);
   return res.data;
 }
 

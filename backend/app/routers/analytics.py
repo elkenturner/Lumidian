@@ -375,3 +375,37 @@ async def admin_get_logs(user: CurrentUser, lines: int = 100):
         return {"lines": tail, "file": str(log_file), "exists": True, "total_lines": len(all_lines)}
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Could not read log file: {exc}")
+
+
+# ── Admin: manually generate drafts for any brand ────────────────────────────
+
+@router.post("/admin/generate-draft/{brand_id}", status_code=status.HTTP_202_ACCEPTED)
+async def admin_generate_draft(brand_id: int, db: DbDep, user: CurrentUser):
+    """Run gap analysis and generate drafts for any brand. Admin only."""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+
+    brand = await db.get(Brand, brand_id)
+    if not brand:
+        raise HTTPException(status_code=404, detail=f"Brand {brand_id} not found")
+
+    import asyncio
+
+    async def _bg():
+        from app.services.drafting_service import auto_draft_top_gaps
+        from app.database import AsyncSessionLocal
+        try:
+            async with AsyncSessionLocal() as bg_db:
+                drafts = await auto_draft_top_gaps(
+                    db=bg_db,
+                    brand_id=brand_id,
+                    max_gaps=5,
+                    clear_existing=False,
+                    source="manual",
+                )
+                logger.info("Admin generated %d draft(s) for brand %d", len(drafts), brand_id)
+        except Exception:
+            logger.exception("Admin draft generation failed for brand %d", brand_id)
+
+    asyncio.create_task(_bg(), name=f"admin-draft-{brand_id}")
+    return {"brand_id": brand_id, "status": "generating"}

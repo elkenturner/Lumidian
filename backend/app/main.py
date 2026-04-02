@@ -114,8 +114,9 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # Set ALLOWED_ORIGINS in .env as a comma-separated list.
 # Include your ngrok URL there for remote testing, e.g.:
 #   ALLOWED_ORIGINS=http://localhost:3000,https://abc123.ngrok-free.app
-_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001,http://localhost:3002")
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:3001,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:3002")
 _allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+logger.info(f"CORS allowed origins: {_allowed_origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -145,6 +146,7 @@ class CSRFOriginMiddleware(BaseHTTPMiddleware):
 
         origin = request.headers.get("origin")
         if origin is not None and origin not in _allowed_origins:
+            logger.warning(f"CSRF rejected: origin={origin} not in {_allowed_origins}")
             return JSONResponse(
                 status_code=403,
                 content={"detail": "Forbidden: cross-origin request rejected"},

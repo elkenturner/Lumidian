@@ -95,3 +95,121 @@ async def test_create_checkout_invalid_tier(client: httpx.AsyncClient):
         json={"tier": "enterprise_super_ultra"},
     )
     assert resp.status_code in (400, 422)
+
+
+async def test_create_checkout_has_no_trial(client: httpx.AsyncClient):
+    """create-checkout must NOT include trial_period_days in subscription_data."""
+    await register_and_login(client, email="billing_notrial@example.com")
+
+    mock_customer = MagicMock()
+    mock_customer.id = "cus_notrial_fake"
+
+    mock_session = MagicMock()
+    mock_session.url = "https://checkout.stripe.com/pay/cs_notrial"
+
+    captured_kwargs: dict = {}
+
+    def capture_session(**kwargs):
+        captured_kwargs.update(kwargs)
+        return mock_session
+
+    with (
+        patch("stripe.Customer.create", return_value=mock_customer),
+        patch("stripe.checkout.Session.create", side_effect=capture_session),
+    ):
+        with patch.dict("os.environ", {"STRIPE_STARTER_PRICE_ID": "price_test_starter"}):
+            resp = await client.post(
+                "/api/billing/create-checkout",
+                json={"tier": "starter"},
+            )
+
+    assert resp.status_code == 200
+    sub_data = captured_kwargs.get("subscription_data", {})
+    assert "trial_period_days" not in sub_data, "Trial period must not be set on paid checkout"
+    assert "trial_settings" not in sub_data, "Trial settings must not be set on paid checkout"
+
+
+async def test_create_checkout_session_carries_tier_metadata(client: httpx.AsyncClient):
+    """checkout session must carry tier in session-level metadata."""
+    await register_and_login(client, email="billing_meta@example.com")
+
+    mock_customer = MagicMock()
+    mock_customer.id = "cus_meta_fake"
+
+    mock_session = MagicMock()
+    mock_session.url = "https://checkout.stripe.com/pay/cs_meta"
+
+    captured_kwargs: dict = {}
+
+    def capture_session(**kwargs):
+        captured_kwargs.update(kwargs)
+        return mock_session
+
+    with (
+        patch("stripe.Customer.create", return_value=mock_customer),
+        patch("stripe.checkout.Session.create", side_effect=capture_session),
+    ):
+        with patch.dict("os.environ", {"STRIPE_STARTER_PRICE_ID": "price_test_starter"}):
+            resp = await client.post(
+                "/api/billing/create-checkout",
+                json={"tier": "starter"},
+            )
+
+    assert resp.status_code == 200
+    session_meta = captured_kwargs.get("metadata", {})
+    assert session_meta.get("tier") == "starter", "Session metadata must include tier"
+
+
+async def test_webhook_checkout_completed_sets_active_tier(client: httpx.AsyncClient):
+    """checkout.session.completed webhook must set subscription_tier and status='active'."""
+    import json
+    import stripe as _stripe
+
+    await register_and_login(client, email="billing_webhook@example.com", subscription_tier=None)
+
+    customer_id = "cus_webhook_test"
+
+    from app.database import AsyncSessionLocal
+    from sqlalchemy import update
+    from app.models import User
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            update(User)
+            .where(User.email == "billing_webhook@example.com")
+            .values(stripe_customer_id=customer_id)
+        )
+        await db.commit()
+
+    payload = {
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "customer": customer_id,
+                "subscription": "sub_webhook_test",
+                "metadata": {"tier": "starter", "user_id": "1"},
+            }
+        },
+    }
+    body = json.dumps(payload).encode()
+
+    with patch.dict("os.environ", {
+        "STRIPE_SECRET_KEY": "sk_test_fake",
+        "STRIPE_WEBHOOK_SECRET": "whsec_test_secret",
+    }):
+        with patch.object(_stripe.Webhook, "construct_event", return_value=payload):
+            resp = await client.post(
+                "/api/billing/webhook",
+                content=body,
+                headers={
+                    "stripe-signature": "t=1,v1=fake",
+                    "content-type": "application/json",
+                },
+            )
+
+    assert resp.status_code == 200
+
+    resp2 = await client.get("/api/billing/status")
+    data = resp2.json()
+    assert data["subscription_tier"] == "starter", f"Expected starter, got {data['subscription_tier']}"
+    assert data["subscription_status"] == "active", f"Expected active, got {data['subscription_status']}"
+    assert data.get("subscription_trial_end") is None, "Trial end must be None after paid checkout"

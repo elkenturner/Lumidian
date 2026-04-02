@@ -31,7 +31,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('resize', check);
   }, []);
 
-  // Sync localStorage status flags — single initial read + storage events for cross-tab sync.
+  // Sync localStorage status flags — poll every 2s (storage events are cross-tab only)
   useEffect(() => {
     const sync = () => {
       try {
@@ -40,8 +40,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       } catch {}
     };
     sync();
+    const interval = setInterval(sync, 2000);
     window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', sync);
+    };
   }, []);
 
   // Dev-mode navigation timing
@@ -68,40 +72,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <ErrorBoundary>
     <BrandProvider>
     <>
-      {/* Fixed dark base */}
-      <div style={{ position: 'fixed', inset: 0, background: '#030509', zIndex: -2 }} />
-
-      {/* Ambient gradient blobs — atmospheric depth behind all content */}
-      <div style={{ position: 'fixed', inset: 0, zIndex: -1, overflow: 'hidden', pointerEvents: 'none' }}>
-        {/* Top-left: deep indigo */}
-        <div className="orb-1" style={{
-          position: 'absolute', top: '-15%', left: '-10%',
-          width: '580px', height: '580px',
-          background: 'radial-gradient(circle, rgba(55,48,163,0.18) 0%, transparent 65%)',
-          filter: 'blur(100px)', borderRadius: '50%',
-        }} />
-        {/* Right-center: soft purple */}
-        <div className="orb-2" style={{
-          position: 'absolute', top: '30%', right: '-14%',
-          width: '500px', height: '500px',
-          background: 'radial-gradient(circle, rgba(99,102,241,0.10) 0%, transparent 65%)',
-          filter: 'blur(90px)', borderRadius: '50%',
-        }} />
-        {/* Bottom-center: dark teal */}
-        <div className="orb-3" style={{
-          position: 'absolute', bottom: '-18%', left: '20%',
-          width: '540px', height: '540px',
-          background: 'radial-gradient(circle, rgba(13,148,136,0.10) 0%, transparent 65%)',
-          filter: 'blur(110px)', borderRadius: '50%',
-        }} />
-        {/* Top-right: extra indigo accent */}
-        <div className="orb-4" style={{
-          position: 'absolute', top: '-10%', right: '15%',
-          width: '420px', height: '420px',
-          background: 'radial-gradient(circle, rgba(55,48,163,0.09) 0%, transparent 65%)',
-          filter: 'blur(80px)', borderRadius: '50%',
-        }} />
-      </div>
+      {/* Fixed slate base background */}
+      <div style={{ position: 'fixed', inset: 0, background: '#020617', zIndex: -2 }} />
 
       {/* Desktop sidebar — hidden on mobile */}
       {!isMobile && (

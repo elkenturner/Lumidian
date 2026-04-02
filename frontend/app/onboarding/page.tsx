@@ -52,6 +52,7 @@ export default function OnboardingPage() {
 
   async function handleStep1() {
     if (!brandName.trim()) return;
+    if (!websiteUrl.trim()) { setError('Please enter your company website URL.'); return; }
     setSaving(true);
     setError('');
     try {
@@ -231,7 +232,7 @@ export default function OnboardingPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">Company Website <span className="text-[#475569] font-normal">(optional)</span></label>
+                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">Company Website <span className="text-[#ef4444]">*</span></label>
                 <input
                   type="text"
                   value={websiteUrl}
@@ -243,7 +244,7 @@ export default function OnboardingPage() {
               </div>
               <button
                 onClick={handleStep1}
-                disabled={saving || !brandName.trim()}
+                disabled={saving || !brandName.trim() || !websiteUrl.trim()}
                 className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-[0_0_20px_rgba(99,102,241,0.25)]"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : null}

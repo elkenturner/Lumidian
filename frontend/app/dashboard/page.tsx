@@ -101,10 +101,10 @@ function UsageBar({ label, used, limit }: { label: string; used: number; limit: 
 
 const MODEL_ORDER = ['chatgpt', 'claude', 'perplexity', 'gemini'];
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  chatgpt:    { label: 'ChatGPT',    bg: '#064e3b', text: '#10b981' },
-  claude:     { label: 'Claude',     bg: '#451a03', text: '#f59e0b' },
-  perplexity: { label: 'Perplexity', bg: '#2e1065', text: '#a78bfa' },
-  gemini:     { label: 'Gemini',     bg: '#1e3a5f', text: '#60a5fa' },
+  chatgpt:    { label: 'ChatGPT',    bg: 'rgba(16,163,127,0.12)',  text: '#34d399' },
+  claude:     { label: 'Claude',     bg: 'rgba(217,119,87,0.12)',   text: '#fb923c' },
+  perplexity: { label: 'Perplexity', bg: 'rgba(99,102,241,0.12)',   text: '#a5b4fc' },
+  gemini:     { label: 'Gemini',     bg: 'rgba(66,133,244,0.12)',   text: '#60a5fa' },
 };
 
 function getModelCfg(model: string) {
@@ -915,7 +915,7 @@ export default function DashboardPage() {
             />
           )}
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[#F0F4F8]">
+            <h1 className="text-xl sm:text-2xl font-bold text-[#F0F4F8]" style={{ fontFamily: 'var(--font-syne)', fontWeight: 800, letterSpacing: '-0.3px' }}>
               {selectedBrand ? selectedBrand.name : 'Dashboard'}
             </h1>
             <p className="text-[13px] text-[#64748B] mt-1.5">AI visibility analytics</p>
@@ -979,6 +979,34 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Recent runs strip */}
+      {trends && trends.length > 0 && (
+        <div className="flex items-center gap-2 mb-5 flex-wrap">
+          <span className="text-[10px] font-semibold text-[#2d3a55] uppercase tracking-[0.08em] mr-1">
+            Recent Runs
+          </span>
+          {[...trends].reverse().slice(0, 4).map((t, i) => (
+            <div
+              key={t.run_id ?? i}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold"
+              style={i === 0
+                ? { background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.18)', color: '#34d399' }
+                : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: '#475569' }
+              }
+            >
+              <span
+                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                style={{ background: i === 0 ? '#34d399' : 'rgba(255,255,255,0.2)' }}
+              />
+              {t.completed_at
+                ? format(parseUTCISO(t.completed_at), 'MMM d')
+                : 'Running'
+              } · {Math.round(t.score)}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Running banner */}
       {isRunning && (

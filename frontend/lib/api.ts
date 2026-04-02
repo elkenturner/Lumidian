@@ -1215,3 +1215,18 @@ export async function verify2fa(challenge_token: string, code: string): Promise<
   const res = await api.post<AuthUser>('/auth/2fa/verify', { challenge_token, code });
   return res.data;
 }
+
+// ── Background task status ─────────────────────────────────────────────────────
+
+export async function getBackgroundStatus(): Promise<{
+  report_running: boolean;
+  drafts_generating: boolean;
+  scanning: boolean;
+}> {
+  const res = await api.get<{
+    report_running: boolean;
+    drafts_generating: boolean;
+    scanning: boolean;
+  }>('/tracking/background-status');
+  return res.data;
+}

@@ -29,7 +29,7 @@ export default function BillingPage() {
       try {
         const [s] = await Promise.all([
           getBillingStatus(),
-          successParam === 'true' ? refresh() : Promise.resolve(),
+          successParam === 'true' ? refresh().catch(() => {}) : Promise.resolve(),
         ]);
         setStatus(s);
       } catch {

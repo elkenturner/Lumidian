@@ -1155,7 +1155,7 @@ export default function DashboardPage() {
                 <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.28)] border-t-2 border-t-[#6366f1] rounded-xl p-6 shadow-[0_8px_32px_rgba(0,0,0,0.25),0_0_40px_rgba(99,102,241,0.10),inset_0_1px_0_rgba(255,255,255,0.07)]">
                   <div className="flex items-start justify-between mb-3">
                     <div>
-                      <p className="text-[13px] font-medium text-[#94A3B8] uppercase tracking-wider flex items-center">
+                      <p className="text-[13px] font-medium text-[#94A3B8] flex items-center">
                         Visibility Score
                         <HelpTooltip text="Percentage of AI responses that mention your brand when answering your tracked prompts. A higher score means AI models are more aware of your brand." />
                       </p>

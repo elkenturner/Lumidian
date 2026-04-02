@@ -691,3 +691,43 @@ async def get_run_status(run_id: int, db: DbDep, user: CurrentUser):
         )
     await get_brand_for_user(run.brand_id, db, user)
     return TrackingRunStatus.model_validate(run)
+
+
+@router.get("/background-status")
+async def get_background_status(db: DbDep, user: CurrentUser):
+    """
+    Lightweight poll endpoint for AppShell banners.
+
+    Returns three boolean flags reflecting what is currently happening
+    across all of the authenticated user's brands:
+
+    - report_running:    any TrackingRun for user's brands is pending/running
+    - drafts_generating: any brand_id is in state.generating_brands
+    - scanning:          any brand_id is in state.scanning_brands
+    """
+    from app import state as _state
+    from sqlalchemy import func as _sqlfunc
+
+    # Get all brand IDs owned by this user
+    brands_result = await db.execute(
+        select(Brand.id).where(Brand.user_id == user.id)
+    )
+    user_brand_ids: set[int] = set(brands_result.scalars().all())
+
+    if not user_brand_ids:
+        return {"report_running": False, "drafts_generating": False, "scanning": False}
+
+    # Check for active tracking runs in the DB
+    running_result = await db.execute(
+        select(_sqlfunc.count(TrackingRun.id)).where(
+            TrackingRun.brand_id.in_(user_brand_ids),
+            TrackingRun.status.in_(["pending", "running"]),
+        )
+    )
+    report_running = (running_result.scalar_one_or_none() or 0) > 0
+
+    return {
+        "report_running": report_running,
+        "drafts_generating": bool(user_brand_ids & _state.generating_brands),
+        "scanning": bool(user_brand_ids & _state.scanning_brands),
+    }

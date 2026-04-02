@@ -122,7 +122,7 @@ export default function TrackerPage() {
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+          className="flex items-center gap-2 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] hover:border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe]  rounded-lg px-4 py-2 text-sm font-medium transition-colors"
         >
           <Plus size={16} />
           Track New Brand
@@ -135,22 +135,22 @@ export default function TrackerPage() {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 animate-pulse"
+              className="bg-[#0f172a] border border-[#334155] rounded-xl p-6 animate-pulse"
             >
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-[rgba(99,102,241,0.06)] rounded-xl" />
+                <div className="w-10 h-10 bg-[#0f172a] rounded-xl" />
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-[rgba(99,102,241,0.06)] rounded w-24" />
-                  <div className="h-3 bg-[rgba(99,102,241,0.06)] rounded w-16" />
+                  <div className="h-4 bg-[#0f172a] rounded w-24" />
+                  <div className="h-3 bg-[#0f172a] rounded w-16" />
                 </div>
               </div>
               <div className="space-y-2 mb-4">
-                <div className="h-3 bg-[rgba(99,102,241,0.06)] rounded" />
-                <div className="h-3 bg-[rgba(99,102,241,0.06)] rounded w-4/5" />
+                <div className="h-3 bg-[#0f172a] rounded" />
+                <div className="h-3 bg-[#0f172a] rounded w-4/5" />
               </div>
               <div className="flex gap-2">
-                <div className="h-9 bg-[rgba(99,102,241,0.06)] rounded-lg flex-1" />
-                <div className="h-9 bg-[rgba(99,102,241,0.06)] rounded-lg flex-1" />
+                <div className="h-9 bg-[#0f172a] rounded-lg flex-1" />
+                <div className="h-9 bg-[#0f172a] rounded-lg flex-1" />
               </div>
             </div>
           ))}
@@ -160,9 +160,8 @@ export default function TrackerPage() {
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
             style={{
-              background: 'linear-gradient(135deg, rgba(99,102,241,0.14), rgba(124,58,237,0.09))',
-              border: '1px solid rgba(99,102,241,0.26)',
-              boxShadow: '0 0 28px rgba(99,102,241,0.10)',
+              background: '#1e293b',
+              border: '1px solid #334155',
             }}
           >
             <Building2 size={26} className="text-[#818cf8]" />
@@ -173,7 +172,7 @@ export default function TrackerPage() {
           </p>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
+            className="flex items-center gap-2 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] hover:border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe]  rounded-lg px-5 py-2.5 text-sm font-medium transition-colors"
           >
             <Plus size={16} />
             Track Your First Brand
@@ -187,7 +186,7 @@ export default function TrackerPage() {
             return (
               <div
                 key={brand.id}
-                className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 hover:border-[rgba(99,102,241,0.35)] transition-all duration-200 flex flex-col"
+                className="bg-[#0f172a] border border-[#334155] rounded-xl p-6 hover:border-[#475569] transition-all duration-200 flex flex-col"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -195,13 +194,13 @@ export default function TrackerPage() {
                       name={brand.name}
                       websiteUrl={brand.website_url}
                       size={40}
-                      className="rounded-xl bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)]"
+                      className="rounded-xl bg-[#0f172a] border border-[#334155]"
                       style={{ padding: 6 }}
                       textClassName="text-sm font-bold text-[#6366f1]"
                     />
                     <div>
                       <p className="text-sm font-semibold text-[#e2e8f0]">{brand.name}</p>
-                      <span className="inline-flex items-center mt-0.5 px-2 py-0.5 rounded text-xs font-medium bg-[rgba(99,102,241,0.08)] text-[#64748B] border border-[rgba(99,102,241,0.22)] capitalize">
+                      <span className="inline-flex items-center mt-0.5 px-2 py-0.5 rounded text-xs font-medium bg-[#0f172a] text-[#64748B] border border-[#334155] capitalize">
                         {brand.tier}
                       </span>
                     </div>
@@ -210,13 +209,13 @@ export default function TrackerPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mb-4">
-                  <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] rounded-lg p-3">
+                  <div className="bg-[#0f172a] border border-[#334155] rounded-lg p-3">
                     <p className="text-xs text-[#475569]">Score</p>
                     <p className="text-lg font-bold text-[#e2e8f0] mt-0.5">
                       {score != null ? `${Math.round(score)}%` : '—'}
                     </p>
                   </div>
-                  <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] rounded-lg p-3">
+                  <div className="bg-[#0f172a] border border-[#334155] rounded-lg p-3">
                     <p className="text-xs text-[#475569]">Prompts</p>
                     <p className="text-lg font-bold text-[#e2e8f0] mt-0.5">
                       {brand.prompt_count}
@@ -250,10 +249,10 @@ export default function TrackerPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60"
             onClick={() => !creating && setShowModal(false)}
           />
-          <div className="relative bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="relative bg-[#0f172a] border border-[#334155] rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-5 border-b border-[rgba(255,255,255,0.07)]">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#6366f1] flex items-center justify-center">
@@ -300,7 +299,7 @@ export default function TrackerPage() {
                         'border rounded-xl p-3 text-left transition-all duration-150',
                         formTier === tier.value
                           ? 'border-[#6366f1] bg-[#6366f1]/10'
-                          : 'border-[rgba(99,102,241,0.18)] bg-[rgba(99,102,241,0.05)] hover:border-[rgba(99,102,241,0.35)]'
+                          : 'border-[#334155] bg-[#0f172a] hover:border-[#475569]'
                       )}
                     >
                       <span className={clsx(
@@ -337,7 +336,7 @@ export default function TrackerPage() {
                   <button
                     onClick={addPrompt}
                     disabled={creating || !formPromptInput.trim()}
-                    className="bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-40 rounded-lg px-3 py-2 transition-colors"
+                    className="bg-[#1e293b] hover:bg-[#334155] border border-[#475569] hover:border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe]  disabled:opacity-40 rounded-lg px-3 py-2 transition-colors"
                   >
                     <Plus size={16} />
                   </button>
@@ -347,7 +346,7 @@ export default function TrackerPage() {
                     {formPrompts.map((p, i) => (
                       <div
                         key={i}
-                        className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.18)] rounded-lg px-3 py-2"
+                        className="flex items-center gap-2 bg-[#0f172a] border border-[#334155] rounded-lg px-3 py-2"
                       >
                         <ChevronRight size={12} className="text-[#6366f1] flex-shrink-0" />
                         <span className="text-xs text-[#94a3b8] flex-1 line-clamp-1">{p}</span>
@@ -385,7 +384,7 @@ export default function TrackerPage() {
                 <button
                   onClick={handleCreate}
                   disabled={creating}
-                  className="flex-1 flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] hover:border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe]  disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
                 >
                   {creating ? (
                     <>

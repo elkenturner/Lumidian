@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { Inter, Syne, JetBrains_Mono } from 'next/font/google';
+import { Inter, Geist_Mono } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import AppShell from '@/components/AppShell';
@@ -11,17 +11,10 @@ const inter = Inter({
   display: 'swap',
 });
 
-const syne = Syne({
+const geistMono = Geist_Mono({
   subsets: ['latin'],
-  variable: '--font-syne',
-  weight: ['700', '800'],
-  display: 'swap',
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-jetbrains',
-  weight: ['500', '600', '700'],
+  variable: '--font-geist-mono',
+  weight: ['400', '500', '600', '700'],
   display: 'swap',
 });
 
@@ -57,7 +50,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${syne.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${geistMono.variable}`}>
       <body className="bg-[#0a0a0f] text-[#e2e8f0] antialiased">
         <AuthProvider>
           <AppShell>{children}</AppShell>

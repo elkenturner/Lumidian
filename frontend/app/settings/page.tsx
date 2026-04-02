@@ -139,7 +139,7 @@ function EditableList({
         />
         <button
           onClick={addItem}
-          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg text-[#64748B] hover:text-[#6366f1] hover:border-[#6366f1]/40 hover:bg-[rgba(99,102,241,0.06)] transition-all duration-150"
+          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg text-[#64748B] hover:text-[#6366f1] hover:border-[#6366f1]/40 hover:bg-[#1e293b] transition-all duration-150"
         >
           <Plus size={16} />
         </button>
@@ -154,7 +154,7 @@ function CompletionBar({ pct }: { pct: number }) {
   const color = pct >= 80 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#6366f1';
   return (
     <div className="flex items-center gap-3">
-      <div className="flex-1 bg-[rgba(99,102,241,0.06)] rounded-full h-2">
+      <div className="flex-1 bg-[#0f172a] rounded-full h-2">
         <div
           className="h-2 rounded-full transition-all duration-500"
           style={{ width: `${pct}%`, backgroundColor: color }}
@@ -181,7 +181,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
+    <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-5 shadow-md">
       <div className="flex items-start gap-3 mb-4">
         <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] flex items-center justify-center shrink-0 mt-0.5">
           <Icon size={15} className="text-[#6366f1]" />
@@ -221,7 +221,7 @@ function PublicationsEditor({
   return (
     <div className="space-y-3">
       {items.map((pub, idx) => (
-        <div key={idx} className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-lg p-3 space-y-2">
+        <div key={idx} className="bg-[#0f172a] border border-[#334155] rounded-lg p-3 space-y-2">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-[#64748B] font-medium">Publication {idx + 1}</span>
             <button onClick={() => remove(idx)} className="text-[#475569] hover:text-[#f87171] transition-colors">
@@ -263,7 +263,7 @@ function PublicationsEditor({
       <button
         type="button"
         onClick={add}
-        className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#6366f1] border border-dashed border-[rgba(99,102,241,0.22)] hover:border-[#6366f1]/40 rounded-lg px-3 py-2 transition-colors w-full justify-center"
+        className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#6366f1] border border-dashed border-[#334155] hover:border-[#6366f1]/40 rounded-lg px-3 py-2 transition-colors w-full justify-center"
       >
         <Plus size={13} />
         Add publication
@@ -715,7 +715,7 @@ export default function SettingsPage() {
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-32" />
           <div className="h-10 bg-[rgba(255,255,255,0.06)] rounded w-64" />
-          <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
+          <div className="h-48 bg-[#0f172a] border border-[#334155] rounded-xl" />
         </div>
       </div>
     );
@@ -734,7 +734,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Tab navigation */}
-      <div className="flex gap-1 border-b border-[rgba(99,102,241,0.22)] mb-6">
+      <div className="flex gap-1 border-b border-[#334155] mb-6">
         {(['general', 'profile', 'team'] as SettingsTab[]).map((tab) => (
           <button
             key={tab}
@@ -742,7 +742,7 @@ export default function SettingsPage() {
             className={clsx(
               'px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-[3px] -mb-px transition-all',
               activeTab === tab
-                ? 'text-[#818CF8] border-[#6366f1] bg-[rgba(99,102,241,0.08)]'
+                ? 'text-[#818CF8] border-[#6366f1] bg-[#1e293b]'
                 : 'text-[#64748B] border-transparent hover:text-[#94A3B8] hover:bg-[rgba(255,255,255,0.03)]'
             )}
           >
@@ -757,7 +757,7 @@ export default function SettingsPage() {
           {/* Left column */}
           <div className="space-y-6">
           {/* Brand Settings */}
-          <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
+          <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-5 shadow-md">
             <h2 className="text-[15px] font-semibold text-[#F0F4F8] pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">Brand Settings</h2>
             <div className="space-y-4">
               <div>
@@ -805,11 +805,11 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-3 mt-5 pt-5 border-t border-[rgba(99,102,241,0.22)]">
+            <div className="flex items-center gap-3 mt-5 pt-5 border-t border-[#334155]">
               <button
                 onClick={handleSave}
                 disabled={saving || saveSuccess}
-                className="flex items-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+                className="flex items-center gap-2 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe] disabled:opacity-50 rounded-lg px-4 py-2 text-sm font-medium transition-colors"
               >
                 {saving ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -826,7 +826,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Tracking Prompts */}
-          <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
+          <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-5 shadow-md">
             <div className="flex items-center justify-between pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">
               <div>
                 <h2 className="text-[15px] font-semibold text-[#F0F4F8]">Tracking Prompts</h2>
@@ -841,7 +841,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleSuggestPrompts}
                 disabled={loadingSuggestions}
-                className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(99,102,241,0.06)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#6366f1] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[#1e293b] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#6366f1] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
               >
                 {loadingSuggestions ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                 Suggest
@@ -860,7 +860,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleAddPrompt}
                 disabled={addingPrompt || !newPromptText.trim()}
-                className="flex items-center gap-1.5 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-40 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe] disabled:opacity-40 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
               >
                 {addingPrompt ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 Add
@@ -940,7 +940,7 @@ export default function SettingsPage() {
 
           <div className="space-y-6">
           {/* Competitors */}
-          <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
+          <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-5 shadow-md">
             <div className="pb-3 mb-5 border-b border-[rgba(255,255,255,0.07)]">
               <h2 className="text-[15px] font-semibold text-[#F0F4F8]">Competitors</h2>
               <p className="text-xs text-[#64748B] mt-0.5">Track competitor mention rates alongside your brand</p>
@@ -957,7 +957,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleAddCompetitor}
                 disabled={addingCompetitor || !newCompetitorName.trim()}
-                className="flex items-center gap-1.5 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-40 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe] disabled:opacity-40 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
               >
                 {addingCompetitor ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 Add
@@ -998,12 +998,12 @@ export default function SettingsPage() {
 
       {activeTab === 'general' && !brand && (
         <div className="flex flex-col items-center justify-center py-20 text-center">
-          <div className="w-12 h-12 rounded-xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] flex items-center justify-center mb-4">
+          <div className="w-12 h-12 rounded-xl bg-[#1e293b] border border-[#334155] flex items-center justify-center mb-4">
             <Building2 size={20} className="text-[#6366f1]/50" />
           </div>
           <p className="text-sm font-medium text-[#F0F4F8] mb-1">No brand yet</p>
           <p className="text-xs text-[#64748B] mb-4">Add your first brand to start tracking AI visibility.</p>
-          <a href="/onboarding" className="inline-flex items-center gap-1.5 text-xs bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] rounded-lg px-3 py-2 font-medium transition-colors">
+          <a href="/onboarding" className="inline-flex items-center gap-1.5 text-xs bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe] rounded-lg px-3 py-2 font-medium transition-colors">
             Create a brand
           </a>
         </div>
@@ -1013,7 +1013,7 @@ export default function SettingsPage() {
       {activeTab === 'profile' && (
         <div>
           {profile && (
-            <div className="mb-5 p-4 bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
+            <div className="mb-5 p-4 bg-[#1e293b] border border-[#334155] rounded-xl shadow-md">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-[#94A3B8]">Profile Completion</span>
                 <span className="text-xs text-[#64748B]">
@@ -1029,7 +1029,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleAiFill}
                 disabled={aiFilling || profileSaving}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.18)] border border-[rgba(99,102,241,0.28)] text-[#818cf8] disabled:opacity-50 transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#818cf8] disabled:opacity-50 transition-all"
                 title="Scan website and auto-fill profile fields"
               >
                 {aiFilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
@@ -1042,7 +1042,7 @@ export default function SettingsPage() {
           </div>
 
           {aiFilling && (
-            <div className="flex items-center gap-3 px-4 py-3 mb-4 rounded-xl bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] text-[#a5b4fc] text-sm">
+            <div className="flex items-center gap-3 px-4 py-3 mb-4 rounded-xl bg-[#1e293b] border border-[#475569] text-[#a5b4fc] text-sm">
               <Loader2 size={15} className="animate-spin flex-shrink-0" />
               <span>Scanning your website and filling profile fields…</span>
             </div>
@@ -1146,7 +1146,7 @@ export default function SettingsPage() {
                 'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all',
                 profileSaved
                   ? 'bg-[#064e3b]/30 text-[#10b981] border border-[#065f46]/40'
-                  : 'bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50'
+                  : 'bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe] disabled:opacity-50'
               )}
             >
               {profileSaved ? (
@@ -1162,7 +1162,7 @@ export default function SettingsPage() {
       {/* ── TEAM TAB ─────────────────────────────────────────────────────────── */}
       {activeTab === 'team' && (
         <div className="space-y-5">
-          <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
+          <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-5 shadow-md">
             <h2 className="text-base font-semibold text-[#F0F4F8] mb-1">Invite Team Members</h2>
             <p className="text-sm text-[#64748B] mb-4">Team members get read-only access to your brands, reports, and drafts. They cannot trigger runs or change settings.</p>
 
@@ -1178,7 +1178,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleInvite}
                 disabled={inviting || !inviteEmail.trim()}
-                className="flex items-center gap-2 px-4 py-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-[#1e293b] hover:bg-[#334155] border border-[#475569] text-[#a5b4fc] hover:text-[#c7d2fe] rounded-lg text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 {inviting ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
                 Invite
@@ -1206,7 +1206,7 @@ export default function SettingsPage() {
             )}
           </div>
 
-          <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5" style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
+          <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-5 shadow-md">
             <h2 className="text-base font-semibold text-[#F0F4F8] mb-4">Team Members</h2>
             {teamLoading ? (
               <div className="flex items-center gap-2 text-[#64748B] text-sm"><Loader2 size={14} className="animate-spin" />Loading…</div>
@@ -1253,7 +1253,7 @@ export default function SettingsPage() {
       {showDeleteBrandConfirm && brand && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowDeleteBrandConfirm(false)} />
-          <div className="relative bg-[rgba(10,14,24,0.97)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+          <div className="relative bg-[#0f172a] border border-[#334155] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
             <h3 className="text-sm font-semibold text-[#F0F4F8] mb-2">Are you sure?</h3>
             <p className="text-xs text-[#64748B] mb-5 leading-relaxed">
               This will permanently delete all tracking data, runs, and results for <span className="text-[#F0F4F8] font-medium">{brand.name}</span>. This cannot be undone.
@@ -1262,7 +1262,7 @@ export default function SettingsPage() {
               <button
                 onClick={() => setShowDeleteBrandConfirm(false)}
                 disabled={deletingBrand}
-                className="flex-1 py-2 text-xs text-[#64748B] hover:text-[#94A3B8] border border-[rgba(99,102,241,0.22)] rounded-lg transition-colors"
+                className="flex-1 py-2 text-xs text-[#64748B] hover:text-[#94A3B8] border border-[#334155] rounded-lg transition-colors"
               >
                 Cancel
               </button>

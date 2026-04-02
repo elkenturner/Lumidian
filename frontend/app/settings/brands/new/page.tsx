@@ -91,6 +91,7 @@ export default function NewBrandPage() {
 
   async function handleDetails() {
     if (!brandName.trim() || !brandChoice) return;
+    if (!websiteUrl.trim()) { setError('Please enter your company website URL.'); return; }
     setSaving(true);
     setError('');
     try {
@@ -422,7 +423,7 @@ export default function NewBrandPage() {
             <p className="text-sm text-[#64748B] mb-6">
               {brandChoice === 'pitch'
                 ? 'Pitch brands run for 30 days with up to 10 prompts.'
-                : `Up to ${promptLimit} prompts. Give your brand a name and optionally link your website.`}
+                : `Up to ${promptLimit} prompts. Give your brand a name and website URL.`}
             </p>
             <div className="space-y-4">
               <div>
@@ -439,7 +440,7 @@ export default function NewBrandPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">
-                  Company Website <span className="text-[#475569] font-normal">(optional)</span>
+                  Company Website <span className="text-[#ef4444]">*</span>
                 </label>
                 <input
                   type="text"
@@ -455,8 +456,8 @@ export default function NewBrandPage() {
                   className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                   Back
                 </button>
-                <button onClick={handleDetails} disabled={saving || !brandName.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-[0_0_20px_rgba(99,102,241,0.25)]">
+                <button onClick={handleDetails} disabled={saving || !brandName.trim() || !websiteUrl.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   Continue
                 </button>
@@ -517,7 +518,7 @@ export default function NewBrandPage() {
                 Back
               </button>
               <button onClick={handlePrompts} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex-1 flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 Continue
               </button>
@@ -548,7 +549,7 @@ export default function NewBrandPage() {
                 Back
               </button>
               <button onClick={handleProfile} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex-1 flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 {saving ? 'Setting up…' : 'Launch brand'}
               </button>

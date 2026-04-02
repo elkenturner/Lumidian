@@ -663,7 +663,7 @@ function DraftCard({
                 <button
                   onClick={() => pendingQuestion && handleRegenerate(pendingQuestion)}
                   disabled={!pendingQuestion || regenerating}
-                  className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-40 text-white rounded-lg px-3 py-1.5 transition-colors"
+                  className="flex items-center gap-1.5 text-xs bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-40 rounded-lg px-3 py-1.5 transition-colors"
                 >
                   {regenerating ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
                   Regenerate with this question
@@ -733,7 +733,7 @@ function DraftCard({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors"
+              className="flex items-center gap-1.5 text-xs bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors"
             >
               {saving ? <Loader2 size={11} className="animate-spin" /> : null}
               Save
@@ -1072,7 +1072,7 @@ function WikipediaDraftCard({
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors"
+                className="flex items-center gap-1.5 text-xs bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors"
               >
                 {saving ? <Loader2 size={11} className="animate-spin" /> : null}
                 Save
@@ -1132,7 +1132,7 @@ function WikipediaDraftCard({
               className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors ${
                 copied
                   ? 'bg-[#064e3b]/20 border border-[#065f46]/25 text-[#34d399]'
-                  : 'bg-[#6366f1] hover:bg-[#4f46e5] text-white'
+                  : 'bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)]'
               }`}
             >
               {copied ? <Check size={11} /> : <Copy size={11} />}
@@ -1417,7 +1417,7 @@ function RequestDraftModal({
           <button
             onClick={handleSubmit}
             disabled={creating || (promptId === '' && !customTopic.trim())}
-            className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
           >
             {creating ? (
               <><Loader2 size={14} className="animate-spin" /> Generating…</>
@@ -1512,7 +1512,7 @@ function OpportunityCard({
           onClick={handleDraft}
           disabled={drafting || queueFull}
           title={queueFull ? 'Draft queue full — approve or dismiss drafts to make room' : undefined}
-          className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-1.5 transition-colors"
+          className="flex items-center gap-1.5 text-xs bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 py-1.5 transition-colors"
         >
           {drafting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
           {drafting ? 'Drafting…' : queueFull ? 'Queue full' : 'Draft Reply'}
@@ -2629,7 +2629,7 @@ export default function ContentHubPage() {
           <p className="text-sm text-[#64748B] max-w-sm mb-6">Add your first brand to start generating content drafts and finding opportunities.</p>
           <Link
             href="/onboarding"
-            className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            className="flex items-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] rounded-lg px-4 py-2 text-sm font-medium transition-colors"
           >
             <Plus size={16} />
             Track Your First Brand

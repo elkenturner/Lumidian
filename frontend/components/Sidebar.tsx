@@ -56,10 +56,7 @@ const NavLink = memo(function NavLink({
           : 'text-[#64748B] hover:text-[#94A3B8]',
       ].join(' ')}
       style={isActive ? {
-        background: 'rgba(99,102,241,0.15)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 0 18px rgba(99,102,241,0.12)',
+        background: 'rgba(99,102,241,0.12)',
       } : undefined}
       onMouseEnter={(e) => {
         if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';

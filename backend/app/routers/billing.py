@@ -33,9 +33,6 @@ TIER_PRICES = {
     "starter": os.getenv("STRIPE_STARTER_PRICE_ID", ""),
     "pro": os.getenv("STRIPE_PRO_PRICE_ID", ""),
 }
-# All paid tiers include a 30-day free trial (requires payment method upfront)
-TRIAL_TIERS = {"starter", "pro"}
-TRIAL_DAYS = 30
 # Brand limits per tier: {"standard": N, "pitch": M}
 # 999 = effectively unlimited (frontend hides usage bars at >= 999)
 BRAND_LIMITS = {
@@ -222,31 +219,18 @@ async def create_checkout(
         user.updated_at = utcnow()
         await db.commit()
 
-    # Append trial=true to the success URL so the frontend can display the right message
-    success_url = request.success_url
-    if request.tier in TRIAL_TIERS:
-        sep = "&" if "?" in success_url else "?"
-        success_url = f"{success_url}{sep}trial=true"
-
     session_kwargs: dict = dict(
         customer=customer_id,
         payment_method_types=["card"],
         line_items=[{"price": price_id, "quantity": 1}],
         mode="subscription",
-        success_url=success_url,
+        success_url=request.success_url,
         cancel_url=request.cancel_url,
-        # Always collect payment method upfront — required for trials
-        payment_method_collection="always",
+        metadata={"user_id": str(user.id), "tier": request.tier},
         subscription_data={
             "metadata": {"user_id": str(user.id), "tier": request.tier},
         },
     )
-    if request.tier in TRIAL_TIERS:
-        session_kwargs["subscription_data"]["trial_period_days"] = TRIAL_DAYS
-        # Allow users to cancel during trial without being charged
-        session_kwargs["subscription_data"]["trial_settings"] = {
-            "end_behavior": {"missing_payment_method": "cancel"}
-        }
 
     session = stripe.checkout.Session.create(**session_kwargs)
     return {"checkout_url": session.url}
@@ -414,10 +398,7 @@ async def stripe_webhook(request: Request, db: DbDep):
     data_obj = event.get("data", {}).get("object", {})
 
     if event_type == "checkout.session.completed":
-        # Fires immediately when the user finishes checkout.
-        # customer.subscription.created fires around the same time and carries the
-        # precise Stripe trial_end timestamp, so we only fill in trial_end here
-        # if it hasn't been set yet (belt-and-suspenders).
+        # Fires immediately when the user finishes checkout. Sets tier + active status.
         customer_id = data_obj.get("customer")
         sub_id = data_obj.get("subscription")
         result = await db.execute(
@@ -425,22 +406,18 @@ async def stripe_webhook(request: Request, db: DbDep):
         )
         user = result.scalar_one_or_none()
         if user:
-            from datetime import datetime, timedelta, timezone
+            tier = data_obj.get("metadata", {}).get("tier")
             changed = False
             if sub_id and not user.stripe_subscription_id:
                 user.stripe_subscription_id = sub_id
                 changed = True
-            if not user.subscription_trial_end:
-                # Compute trial end as now + TRIAL_DAYS; will be overwritten with
-                # Stripe's precise timestamp when customer.subscription.created arrives.
-                user.subscription_trial_end = (
-                    datetime.now(timezone.utc).replace(tzinfo=None)
-                    + timedelta(days=TRIAL_DAYS)
-                )
+            if tier and user.subscription_tier != tier:
+                user.subscription_tier = tier
                 changed = True
-            if not user.subscription_status:
-                user.subscription_status = "trialing"
+            if user.subscription_status != "active":
+                user.subscription_status = "active"
                 changed = True
+            user.subscription_trial_end = None
             if changed:
                 user.updated_at = utcnow()
                 await db.commit()

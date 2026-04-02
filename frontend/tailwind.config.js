@@ -8,8 +8,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['var(--font-inter)', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
-        mono: ['var(--font-fira-code)', 'ui-monospace', 'monospace'],
+        sans:    ['var(--font-inter)', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
+        display: ['var(--font-syne)', 'sans-serif'],
+        mono:    ['var(--font-jetbrains)', 'ui-monospace', 'monospace'],
       },
       colors: {
         'bg-primary': '#0a0a0f',

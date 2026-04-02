@@ -417,7 +417,9 @@ async def stripe_webhook(request: Request, db: DbDep):
             if user.subscription_status != "active":
                 user.subscription_status = "active"
                 changed = True
-            user.subscription_trial_end = None
+            if user.subscription_trial_end is not None:
+                user.subscription_trial_end = None
+                changed = True
             if changed:
                 user.updated_at = utcnow()
                 await db.commit()
@@ -488,18 +490,6 @@ async def stripe_webhook(request: Request, db: DbDep):
                 {"old_plan": old_tier, "customer_id": customer_id},
                 user_id=user.id,
             )
-
-    elif event_type == "customer.subscription.trial_will_end":
-        # Stripe fires this 3 days before trial end
-        customer_id = data_obj.get("customer")
-        result = await db.execute(
-            sa_select(UserModel).where(UserModel.stripe_customer_id == customer_id)
-        )
-        user = result.scalar_one_or_none()
-        if user:
-            logger.info("Trial ending soon for user %s (customer=%s)", user.email, customer_id)
-            from app.services.analytics_service import log_event
-            await log_event("trial_ending_soon", {"customer_id": customer_id}, user_id=user.id)
 
     elif event_type == "invoice.payment_failed":
         # invoice object is at data.object; customer is top-level field

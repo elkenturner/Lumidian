@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import LumidianLogo from '@/components/LumidianLogo';
 
-export const metadata = { title: 'Privacy Policy — Lumidian' };
+export const metadata = { title: 'Privacy Policy' };
 
 const SECTIONS = [
   {

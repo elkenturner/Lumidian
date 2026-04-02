@@ -68,9 +68,7 @@ export default function StatsCard({
 
   if (loading) {
     return (
-      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5"
-        style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.20), inset 0 1px 0 rgba(255,255,255,0.04)' }}
-      >
+      <div className="card">
         <div className="skeleton h-3 rounded w-24 mb-4" />
         <div className="skeleton h-8 rounded w-16 mb-2" />
         <div className="skeleton h-3 rounded w-32" />
@@ -86,11 +84,8 @@ export default function StatsCard({
 
   return (
     <div
-      className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5 hover:border-[rgba(99,102,241,0.32)] hover:bg-[rgba(99,102,241,0.11)] transition-all duration-200"
-      style={{
-        boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)',
-        ...(borderTopStyle ?? {}),
-      }}
+      className={clsx('card card-hover', accent && 'card-elevated')}
+      style={borderTopStyle}
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
@@ -98,10 +93,8 @@ export default function StatsCard({
           <p className={clsx(
             compact
               ? 'mt-2 text-lg font-semibold leading-snug'
-              : 'mt-2 text-3xl leading-none',
-            isNumeric
-              ? 'stat-value-display'
-              : 'text-[#F0F4F8] font-bold'
+              : 'mt-2 stat-value stat-value-lg',
+            !isNumeric && 'text-[#F0F4F8] font-bold'
           )}>
             {isNumeric ? animatedValue : value}
           </p>
@@ -128,9 +121,7 @@ export default function StatsCard({
           )}
         </div>
         {icon && (
-          <div className="ml-4 w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.22)] flex items-center justify-center text-[#818CF8] flex-shrink-0"
-            style={{ boxShadow: '0 0 12px rgba(99,102,241,0.12)' }}
-          >
+          <div className="ml-4 w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] flex items-center justify-center text-[#818CF8] flex-shrink-0">
             {icon}
           </div>
         )}

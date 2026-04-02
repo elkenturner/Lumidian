@@ -52,12 +52,10 @@ export default function NotificationPanel({
         maxHeight: '80vh',
         display: 'flex',
         flexDirection: 'column',
-        background: 'rgba(10,14,24,0.97)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(99,102,241,0.20)',
+        background: '#0f172a',
+        border: '1px solid #334155',
         borderRadius: 16,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
       }}
     >
       {/* Header */}
@@ -100,7 +98,7 @@ export default function NotificationPanel({
           <div className="flex flex-col items-center justify-center py-14 gap-3">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}
+              style={{ background: '#1e293b', border: '1px solid #334155' }}
             >
               <Inbox size={18} className="text-[#475569]" />
             </div>

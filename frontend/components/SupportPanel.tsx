@@ -38,12 +38,10 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
         left: panelLeft,
         bottom: 16,
         width: 340,
-        background: 'rgba(10,14,24,0.97)',
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(99,102,241,0.20)',
+        background: '#0f172a',
+        border: '1px solid #334155',
         borderRadius: 16,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.55)',
       }}
     >
       {/* Header */}

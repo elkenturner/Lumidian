@@ -21,7 +21,7 @@ function getModelConfig(model: string) {
   for (const [k, v] of Object.entries(MODEL_CONFIG)) {
     if (key.includes(k)) return { ...v, key: k };
   }
-  return { label: model, bg: 'rgba(99,102,241,0.10)', text: '#64748b', key: model };
+  return { label: model, bg: '#1e293b', text: '#64748b', key: model };
 }
 
 interface ModelStat {
@@ -68,7 +68,7 @@ function buildGroups(responses: QueryResult[]): PromptGroup[] {
 
 function SkeletonRow() {
   return (
-    <div className="border-b border-[rgba(99,102,241,0.12)] px-5 py-4 animate-pulse">
+    <div className="border-b border-[#334155] px-5 py-4 animate-pulse">
       <div className="flex items-center gap-4">
         <div className="flex-1 h-4 skeleton rounded" />
         <div className="flex gap-2">
@@ -88,9 +88,9 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
   );
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+    <div className="bg-[#0f172a] border border-[#334155] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       {/* Header */}
-      <div className="px-5 py-3.5 border-b border-[rgba(99,102,241,0.15)] flex items-center justify-between bg-[rgba(99,102,241,0.04)]">
+      <div className="px-5 py-3.5 border-b border-[#334155] flex items-center justify-between bg-[#0f172a]">
         <h3 className="text-sm font-semibold text-[#e2e8f0]">Query Responses</h3>
         {!loading && groups.length > 0 && (
           <div className="flex items-center gap-3">
@@ -106,7 +106,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                 </span>
               );
             })}
-            <span className="text-xs text-[#64748b] border-l border-[rgba(99,102,241,0.20)] pl-3">
+            <span className="text-xs text-[#64748b] border-l border-[#334155] pl-3">
               {groups.length} prompt{groups.length !== 1 ? 's' : ''}
             </span>
           </div>
@@ -123,13 +123,13 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
           No responses found for this run.
         </div>
       ) : (
-        <div className="divide-y divide-[rgba(99,102,241,0.12)]">
+        <div className="divide-y divide-[#334155]">
           {groups.map((g) => {
             const overallPct = g.total > 0 ? Math.round((g.mentioned / g.total) * 100) : 0;
             const overallColor = overallPct >= 60 ? '#10b981' : overallPct >= 30 ? '#f59e0b' : '#ef4444';
 
             return (
-              <div key={g.promptId} className="px-5 py-4 hover:bg-[rgba(99,102,241,0.04)] transition-colors">
+              <div key={g.promptId} className="px-5 py-4 hover:bg-[#1e293b] transition-colors">
                 {/* Prompt text */}
                 <p className="text-sm text-[#94a3b8] mb-3 leading-snug font-medium">
                   {g.promptText}
@@ -147,7 +147,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                     return (
                       <div
                         key={modelKey}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[rgba(99,102,241,0.22)] bg-[rgba(99,102,241,0.06)]"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#334155] bg-[#0f172a]"
                       >
                         <span
                           className="text-xs font-semibold"
@@ -155,7 +155,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                         >
                           {cfg.label}
                         </span>
-                        <span className="text-[rgba(99,102,241,0.40)]">·</span>
+                        <span className="text-[#475569]">·</span>
                         <span
                           className="text-xs font-bold tabular-nums"
                           style={{ color: mentionColor }}

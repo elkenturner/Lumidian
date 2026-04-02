@@ -91,7 +91,7 @@ export function ManagePromptsModal({
             </div>
           ) : (
             localPrompts.map((p) => (
-              <div key={p.id} className="flex items-start gap-3 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] rounded-lg px-3 py-2.5">
+              <div key={p.id} className="flex items-start gap-3 bg-[#0f172a] border border-[#334155] rounded-lg px-3 py-2.5">
                 <p className="text-sm text-[#94A3B8] flex-1 leading-snug">{p.text}</p>
                 <button
                   onClick={() => handleDelete(p.id)}
@@ -114,7 +114,7 @@ export function ManagePromptsModal({
               <button
                 key={s}
                 onClick={() => { setNewText(s); setSuggestions([]); }}
-                className="w-full text-left text-xs text-[#94A3B8] bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] hover:border-[rgba(99,102,241,0.25)] rounded-lg px-3 py-2 transition-colors"
+                className="w-full text-left text-xs text-[#94A3B8] bg-[#0f172a] border border-[#334155] hover:border-[#475569] rounded-lg px-3 py-2 transition-colors"
               >
                 {s}
               </button>

@@ -72,7 +72,7 @@ export function CompetitorModal({
           ) : local.map((c) => {
             const rate = rateByName.get(c.name.toLowerCase());
             return (
-              <div key={c.id} className="flex items-center gap-3 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] rounded-lg px-3 py-2.5">
+              <div key={c.id} className="flex items-center gap-3 bg-[#0f172a] border border-[#334155] rounded-lg px-3 py-2.5">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-[#F0F4F8] font-medium truncate">{c.name}</p>
                   {c.website_url && (

@@ -23,7 +23,7 @@ const styles: Record<ToastType, { wrapper: string; icon: JSX.Element }> = {
     icon: <AlertCircle size={15} className="text-[#fca5a5] shrink-0" />,
   },
   info: {
-    wrapper: 'bg-[rgba(10,14,24,0.95)] border-[rgba(99,102,241,0.25)] text-[#94A3B8]',
+    wrapper: 'bg-[#0f172a] border-[#334155] text-[#94A3B8]',
     icon: <Info size={15} className="text-[#6366f1] shrink-0" />,
   },
 };
@@ -31,7 +31,7 @@ const styles: Record<ToastType, { wrapper: string; icon: JSX.Element }> = {
 export function AppToast({ message, type, onDismiss }: AppToastProps) {
   const { wrapper, icon } = styles[type];
   return (
-    <div role="alert" aria-live="assertive" aria-atomic="true" className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium backdrop-blur-xl max-w-sm ${wrapper}`}>
+    <div role="alert" aria-live="assertive" aria-atomic="true" className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium max-w-sm ${wrapper}`}>
       {icon}
       <span className="flex-1">{message}</span>
       <button onClick={onDismiss} aria-label="Dismiss" className="ml-1 opacity-50 hover:opacity-100 transition-opacity">

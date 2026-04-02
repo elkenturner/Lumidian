@@ -48,7 +48,7 @@ export default function ContentDraftCard({
     : draft.content_text;
 
   return (
-    <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(99,102,241,0.35)] hover:bg-[rgba(99,102,241,0.11)] transition-all duration-200 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.055)]">
+    <div className="bg-[#0f172a] border border-[#334155] rounded-xl p-5 flex flex-col gap-3 hover:border-[#475569] hover:bg-[#1e293b] transition-all duration-200 shadow-[0_4px_24px_rgba(0,0,0,0.30)]">
       {/* Top row: platform + status */}
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={draft.platform} />

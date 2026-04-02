@@ -432,7 +432,7 @@ function QualityChecklist({
     <div className="border border-[rgba(255,255,255,0.10)] rounded-lg overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 bg-[#0f172a] hover:bg-[#1e293b] transition-colors"
       >
         <div className="flex items-center gap-2">
           <span className={`text-xs font-semibold ${scoreColor}`}>
@@ -452,7 +452,7 @@ function QualityChecklist({
         />
       </button>
       {expanded && (
-        <div className="divide-y divide-[rgba(99,102,241,0.10)]">
+        <div className="divide-y divide-[#334155]">
           {checks.map((check) => {
             const icon = check.passed === true ? '✓' : check.passed === 'warning' ? '⚠' : '✕';
             const iconColor = check.passed === true
@@ -592,11 +592,11 @@ function DraftCard({
   }
 
   const borderClass = isLowQuality
-    ? 'border-l-[3px] border-l-[#ef4444]/50 border-[rgba(99,102,241,0.22)]'
-    : 'border-[rgba(99,102,241,0.22)]';
+    ? 'border-l-[3px] border-l-[#ef4444]/50 border-[#334155]'
+    : 'border-[#334155]';
 
   return (
-    <div className={`bg-[rgba(99,102,241,0.06)] backdrop-blur-md border rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors ${borderClass}`}>
+    <div className={`bg-[#0f172a] border rounded-xl p-5 flex flex-col gap-3 hover:border-[#475569] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors ${borderClass}`}>
       {/* Top row */}
       <div className="flex items-center justify-between gap-2">
         <PlatformBadge platform={draft.platform} />
@@ -650,7 +650,7 @@ function DraftCard({
             <ExternalLink size={11} className="text-[#60a5fa]/50 flex-shrink-0 group-hover:text-[#60a5fa]" />
           </a>
           {showQuoraPicker ? (
-            <div className="border border-[rgba(99,102,241,0.22)] rounded-lg p-3 bg-[rgba(0,0,0,0.2)]">
+            <div className="border border-[#334155] rounded-lg p-3 bg-[#0f172a]">
               <QuoraQuestionPicker
                 brandId={brandId}
                 promptId={draft.prompt_id ?? ''}
@@ -748,7 +748,7 @@ function DraftCard({
           {targetPrompt && (
             <div className="flex items-start gap-1.5 mb-2">
               <span className="text-[10px] text-[#475569] uppercase tracking-wide font-medium mt-0.5 flex-shrink-0">Targeting</span>
-              <span className="text-[11px] text-[#6366f1] bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] rounded-md px-2 py-0.5 leading-relaxed">{targetPrompt.text}</span>
+              <span className="text-[11px] text-[#6366f1] bg-[#1e293b] border border-[#334155] rounded-md px-2 py-0.5 leading-relaxed">{targetPrompt.text}</span>
             </div>
           )}
           {draft.title && (
@@ -758,11 +758,11 @@ function DraftCard({
             <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
               <button
                 onClick={() => setPreviewMode(false)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${!previewMode ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${!previewMode ? 'bg-[#1e293b] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
               >Raw</button>
               <button
                 onClick={() => setPreviewMode(true)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${previewMode ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${previewMode ? 'bg-[#1e293b] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
               >Preview</button>
             </div>
             <span className="text-[10px] text-[#475569]">{wordCount} words</span>
@@ -995,7 +995,7 @@ function WikipediaDraftCard({
         </div>
       )}
 
-      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
+      <div className="bg-[#0f172a] border border-[#334155] rounded-xl p-5 flex flex-col gap-3 hover:border-[#475569] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
         <div className="flex items-start gap-2 flex-wrap">
           <PlatformBadge platform="wikipedia" />
           <div className="flex-1 min-w-0">
@@ -1016,7 +1016,7 @@ function WikipediaDraftCard({
         </div>
 
         {insertLocation && (
-          <div className="bg-[rgba(255,255,255,0.06)] border border-[rgba(99,102,241,0.22)] rounded-lg px-3 py-2.5">
+          <div className="bg-[#1e293b] border border-[#334155] rounded-lg px-3 py-2.5">
             <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1 font-medium">Where to insert</p>
             <p className="text-xs text-[#94A3B8] leading-relaxed">{insertLocation}</p>
           </div>
@@ -1058,11 +1058,11 @@ function WikipediaDraftCard({
               <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
                 <button
                   onClick={() => setViewMode('preview')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'preview' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'preview' ? 'bg-[#1e293b] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
                 >Preview</button>
                 <button
                   onClick={() => setViewMode('raw')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'raw' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'raw' ? 'bg-[#1e293b] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
                 >Raw</button>
               </div>
               <span className="text-[10px] text-[#475569]">{wordCount} words</span>
@@ -1206,7 +1206,7 @@ function QuoraQuestionPicker({
         <button
           key={q.url}
           onClick={() => onSelect(q)}
-          className="w-full text-left flex items-start gap-2.5 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(99,102,241,0.08)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(99,102,241,0.25)] rounded-lg px-3 py-2.5 transition-colors group"
+          className="w-full text-left flex items-start gap-2.5 bg-[#0f172a] hover:bg-[#1e293b] border border-[#334155] hover:border-[#475569] rounded-lg px-3 py-2.5 transition-colors group"
         >
           <span className="text-[#6366f1] text-xs mt-0.5 flex-shrink-0">Q</span>
           <div className="flex-1 min-w-0">
@@ -1324,7 +1324,7 @@ function ScheduledCard({
   const guidance = POSTING_GUIDANCE[draft.platform];
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
+    <div className="bg-[#0f172a] border border-[#334155] rounded-xl p-4 flex flex-col gap-3 hover:border-[#475569] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={draft.platform} />
         {draft.approved_at && (
@@ -1352,7 +1352,7 @@ function ScheduledCard({
       </div>
 
       {expanded && (
-        <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg p-3 relative">
+        <div className="bg-[#0f172a] border border-[#334155] rounded-lg p-3 relative">
           <pre className="text-xs text-[#94A3B8] whitespace-pre-wrap leading-relaxed font-mono pr-14">
             {draft.content_text}
           </pre>
@@ -1367,10 +1367,10 @@ function ScheduledCard({
       )}
 
       {guidance && (
-        <div className="border border-[rgba(99,102,241,0.22)] rounded-lg overflow-hidden">
+        <div className="border border-[#334155] rounded-lg overflow-hidden">
           <button
             onClick={() => setGuideOpen(!guideOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(255,255,255,0.06)] text-left transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 bg-[#0f172a] hover:bg-[#1e293b] text-left transition-colors"
           >
             <span className="flex items-center gap-1.5 text-xs text-[#64748B] font-medium">
               <BookOpen size={11} />
@@ -1511,7 +1511,7 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
   }
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.20)] hover:border-[rgba(255,255,255,0.14)] transition-colors">
+    <div className="bg-[#0f172a] border border-[#334155] rounded-xl p-4 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.20)] hover:border-[#475569] transition-colors">
       <div className="flex items-center gap-2">
         <PlatformBadge platform={draft.platform} />
         <p className="flex-1 text-sm text-[#94A3B8] truncate">{title}</p>
@@ -1576,7 +1576,7 @@ function OpportunityCard({
       : 'text-[#64748B]';
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
+    <div className="bg-[#0f172a] border border-[#334155] rounded-xl p-4 flex flex-col gap-3 hover:border-[#475569] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={opp.platform} />
         {opp.subreddit && (
@@ -1669,7 +1669,7 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.16)] flex items-center justify-center mb-4">
+      <div className="w-16 h-16 rounded-2xl bg-[#1e293b] border border-[#334155] flex items-center justify-center mb-4">
         {icon}
       </div>
       <p className="text-[15px] font-semibold text-[#F0F4F8] mb-2">{title}</p>
@@ -1697,10 +1697,10 @@ function DraftsPanel(props: ContentTabPanelsProps) {
   )).sort();
 
   const filterBar = draftPlatforms.length >= 2 ? (
-    <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 mb-4 self-start">
+    <div className="flex items-center gap-1 bg-[#0f172a] border border-[#334155] rounded-lg p-0.5 mb-4 self-start">
       <button
         onClick={() => setPlatformFilter('all')}
-        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[#1e293b] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
       >
         All
       </button>
@@ -1708,7 +1708,7 @@ function DraftsPanel(props: ContentTabPanelsProps) {
         <button
           key={p}
           onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
-          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[#1e293b] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
         >
           {p}
         </button>
@@ -1844,10 +1844,10 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
 
   const oppPlatforms = Array.from(new Set(opportunities.map((o) => o.platform))).sort();
   const oppFilterBar = oppPlatforms.length >= 2 ? (
-    <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 mb-4 self-start">
+    <div className="flex items-center gap-1 bg-[#0f172a] border border-[#334155] rounded-lg p-0.5 mb-4 self-start">
       <button
         onClick={() => setPlatformFilter('all')}
-        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[#1e293b] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
       >
         All
       </button>
@@ -1855,7 +1855,7 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
         <button
           key={p}
           onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
-          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[#1e293b] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
         >
           {p}
         </button>

@@ -541,9 +541,13 @@ function DraftCard({
   }
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(draft.content_text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(draft.content_text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable (no focus, insecure context, etc.) — fail silently
+    }
   }
 
   async function handleRegenerate(question?: QuoraQuestion) {
@@ -937,9 +941,13 @@ function WikipediaDraftCard({
   }
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(wikiFormat);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(wikiFormat);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable — fail silently
+    }
   }
 
   async function handleSave() {
@@ -1304,9 +1312,13 @@ function ScheduledCard({
   const title = draft.title ?? draft.content_text.slice(0, 80) + (draft.content_text.length > 80 ? '…' : '');
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(draft.content_text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(draft.content_text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // clipboard unavailable — fail silently
+    }
   }
 
   const guidance = POSTING_GUIDANCE[draft.platform];
@@ -1545,6 +1557,7 @@ function OpportunityCard({
   queueFull?: boolean;
 }) {
   const [drafting, setDrafting] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   async function handleDraft() {
     setDrafting(true);
@@ -1585,7 +1598,24 @@ function OpportunityCard({
       </a>
 
       {opp.body_preview && (
-        <p className="text-xs text-[#475569] leading-relaxed line-clamp-2">{opp.body_preview}</p>
+        <div className="relative">
+          <p
+            className={`text-xs text-[#475569] leading-relaxed cursor-pointer ${
+              expanded ? 'max-h-48 overflow-y-auto pr-2' : 'line-clamp-2'
+            }`}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {opp.body_preview}
+          </p>
+          {opp.body_preview.length > 150 && (
+            <button
+              onClick={() => setExpanded(!expanded)}
+              className="text-[10px] text-[#6366f1] hover:text-[#818cf8] mt-1"
+            >
+              {expanded ? 'Show less' : 'Show more'}
+            </button>
+          )}
+        </div>
       )}
 
       <div className="flex items-center gap-3 text-xs text-[#475569]">

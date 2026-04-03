@@ -16,6 +16,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.routers.billing import DAILY_RUN_LIMITS
@@ -754,7 +755,6 @@ async def get_background_status(db: DbDep, user: CurrentUser):
     - model_scores:      list of {model, score} for the active run (if any)
     """
     from app import state as _state
-    from sqlalchemy import func as _sqlfunc
 
     # Get all brand IDs owned by this user
     brands_result = await db.execute(
@@ -770,7 +770,10 @@ async def get_background_status(db: DbDep, user: CurrentUser):
         select(TrackingRun).where(
             TrackingRun.brand_id.in_(user_brand_ids),
             TrackingRun.status.in_(["pending", "running"]),
-        ).order_by(TrackingRun.created_at.desc()).limit(1)
+        )
+        .options(selectinload(TrackingRun.model_scores))
+        .order_by(TrackingRun.created_at.desc())
+        .limit(1)
     )
     active_run = running_result.scalar_one_or_none()
     report_running = active_run is not None

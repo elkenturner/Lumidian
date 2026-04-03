@@ -6,22 +6,17 @@ import { ChevronRight, Plus, Loader2, CheckCircle } from 'lucide-react';
 import LumidianLogo from '@/components/LumidianLogo';
 import {
   getBrands,
-  getBrandProfile,
   getSuggestedPromptsPreview,
   createBrand,
   updateBrandProfile,
-  refreshWebsiteContext,
+  fetchWebsiteContext,
   normaliseWebsiteUrl,
   triggerRun,
-  Brand,
 } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
-
 type Step = 1 | 2 | 3;
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { user } = useAuth();
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -30,7 +25,8 @@ export default function OnboardingPage() {
   // Step 1: brand name + website
   const [brandName, setBrandName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
-  const [createdBrandId, setCreatedBrandId] = useState<number | null>(null);
+  const [websiteContext, setWebsiteContext] = useState('');
+  const [fetching, setFetching] = useState(false);
 
   // Step 2: prompts
   const [prompts, setPrompts] = useState<string[]>(['']);
@@ -51,88 +47,83 @@ export default function OnboardingPage() {
   }, [router]);
 
   async function handleStep1() {
-    if (!brandName.trim()) return;
-    if (!websiteUrl.trim()) { setError('Please enter your company website URL.'); return; }
-    setSaving(true);
+    if (!brandName.trim() || !websiteUrl.trim()) return;
+    setFetching(true);
     setError('');
     try {
       const normalisedUrl = normaliseWebsiteUrl(websiteUrl);
-      const brand = await createBrand({
-        name: brandName.trim(),
-        tier: 'basic',
-        brand_type: 'pitch',
-        prompts: [],
-        website_url: normalisedUrl ?? undefined,
-      });
-      setCreatedBrandId(brand.id);
-      // Fire-and-forget Jina fetch if website provided
-      if (normalisedUrl) {
-        refreshWebsiteContext(brand.id).catch((err) => {
-          console.warn('[Onboarding] Jina fetch failed for brand', brand.id, err);
-        });
+      if (!normalisedUrl) {
+        setError('Please enter a valid website URL.');
+        return;
       }
+      const result = await fetchWebsiteContext(normalisedUrl);
+      setWebsiteContext(result.context);
       setStep(2);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
-      setError(e?.response?.data?.detail || 'Failed to create brand');
+      setError(e?.response?.data?.detail || 'Failed to fetch website. Please check the URL and try again.');
     } finally {
-      setSaving(false);
+      setFetching(false);
     }
   }
 
   async function handleStep2() {
-    if (!createdBrandId) return;
     setSaving(true);
     setError('');
     try {
-      const validPrompts = prompts.filter((p) => p.trim());
-      if (validPrompts.length > 0) {
-        const { addPrompt } = await import('@/lib/api');
-        await Promise.all(validPrompts.map((p) => addPrompt(createdBrandId, p.trim())));
-      }
-      // Auto-fill description from scraped website content if available
-      if (websiteUrl) {
-        try {
-          const profile = await getBrandProfile(createdBrandId);
-          if (profile.internal_brand_context && !companyDescription) {
-            const firstLine = profile.internal_brand_context
-              .split(/\n+/)
-              .map((l) => l.trim())
-              .find((l) => l.length > 20 && !l.startsWith('#') && !l.startsWith('http') && !l.startsWith('['));
-            if (firstLine) setCompanyDescription(firstLine.slice(0, 300));
-          }
-        } catch {}
+      // Pre-fill description from website context if available and not already set
+      if (websiteContext && !companyDescription) {
+        const firstLine = websiteContext
+          .split(/\n+/)
+          .map((l) => l.trim())
+          .find((l) => l.length > 20 && !l.startsWith('#') && !l.startsWith('http') && !l.startsWith('['));
+        if (firstLine) setCompanyDescription(firstLine.slice(0, 300));
       }
       setStep(3);
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { detail?: string } } };
-      setError(e?.response?.data?.detail || 'Failed to save prompts');
     } finally {
       setSaving(false);
     }
   }
 
   async function handleStep3() {
-    if (!createdBrandId) return;
     setSaving(true);
     setError('');
     try {
-      if (companyDescription) {
-        await updateBrandProfile(createdBrandId, {
-          company_description: companyDescription,
-        });
-      }
-      // Auto-trigger a tracking run for the new brand
+      // 1. Create brand with prompts
+      const validPrompts = prompts.filter((p) => p.trim());
+      const normalisedUrl = normaliseWebsiteUrl(websiteUrl);
+      const brand = await createBrand({
+        name: brandName.trim(),
+        tier: 'basic',
+        brand_type: 'pitch',
+        prompts: validPrompts.length > 0 ? validPrompts : [],
+        website_url: normalisedUrl ?? undefined,
+      });
+
+      // 2. Update profile with description + website context
       try {
-        const runResult = await triggerRun(createdBrandId);
-        console.info('[Onboarding] Auto-run triggered — brand_id=%d run_id=%d', createdBrandId, runResult.run_id);
-      } catch (err) {
-        console.warn('[Onboarding] Auto-run failed for brand_id=%d (non-fatal):', createdBrandId, err);
+        await updateBrandProfile(brand.id, {
+          company_description: companyDescription || undefined,
+          internal_brand_context: websiteContext || undefined,
+        });
+      } catch {
+        // Profile update is non-fatal
+        console.warn('[Onboarding] Profile update failed (non-fatal)');
       }
-      router.push(`/dashboard?newBrand=true&brandId=${createdBrandId}`);
-    } catch {
-      // Profile save is optional — still proceed
-      router.push(`/dashboard?newBrand=true&brandId=${createdBrandId}`);
+
+      // 3. Trigger tracking run
+      try {
+        const runResult = await triggerRun(brand.id);
+        console.info('[Onboarding] Auto-run triggered — brand_id=%d run_id=%d', brand.id, runResult.run_id);
+      } catch (err) {
+        console.warn('[Onboarding] Auto-run failed (non-fatal):', err);
+      }
+
+      // 4. Redirect
+      router.push(`/dashboard?newBrand=true&brandId=${brand.id}`);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e?.response?.data?.detail || 'Failed to create brand');
     } finally {
       setSaving(false);
     }
@@ -143,7 +134,11 @@ export default function OnboardingPage() {
     setSuggestingPrompts(true);
     setSuggestError('');
     try {
-      const suggestions = await getSuggestedPromptsPreview(brandName.trim());
+      const suggestions = await getSuggestedPromptsPreview(
+        brandName.trim(),
+        '',
+        websiteContext,
+      );
       setPrompts(suggestions.slice(0, 10));
     } catch {
       setSuggestError('Could not generate suggestions. Try again.');
@@ -244,11 +239,11 @@ export default function OnboardingPage() {
               </div>
               <button
                 onClick={handleStep1}
-                disabled={saving || !brandName.trim() || !websiteUrl.trim()}
+                disabled={fetching || !brandName.trim() || !websiteUrl.trim()}
                 className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-[0_0_20px_rgba(99,102,241,0.25)]"
               >
-                {saving ? <Loader2 size={14} className="animate-spin" /> : null}
-                Continue
+                {fetching ? <Loader2 size={14} className="animate-spin" /> : null}
+                {fetching ? 'Fetching website...' : 'Fetch & Continue'}
               </button>
             </div>
           </div>

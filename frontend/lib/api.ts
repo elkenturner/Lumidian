@@ -742,6 +742,7 @@ export async function updateBrandProfile(
     target_audience: string;
     approved_language: string[];
     publications: Publication[];
+    internal_brand_context: string;
   }>
 ): Promise<BrandProfile> {
   const res = await api.put<BrandProfile>(`/brands/${brandId}/profile`, data);

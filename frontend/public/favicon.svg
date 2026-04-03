@@ -1,12 +1,8 @@
-<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Black outer eye shape -->
-  <path d="M 5,50 C 15,20 85,20 95,50 C 85,80 15,80 5,50 Z" fill="#111111"/>
-  <!-- Blue left corner accent -->
-  <path d="M 18,50 C 20,37 38,37 40,50 C 38,63 20,63 18,50 Z" fill="#3b63e8"/>
-  <!-- Blue right corner accent -->
-  <path d="M 82,50 C 80,37 62,37 60,50 C 62,63 80,63 82,50 Z" fill="#3b63e8"/>
-  <!-- White sclera -->
-  <circle cx="50" cy="50" r="17" fill="white"/>
-  <!-- Black pupil -->
-  <circle cx="50" cy="50" r="10" fill="#111111"/>
+<svg viewBox="0 0 200 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M 3,50 C 22,4 178,4 197,50 C 178,96 22,96 3,50 Z" fill="#0d0d0d"/>
+  <path d="M 10,50 C 28,10 172,10 190,50 C 172,90 28,90 10,50 Z" fill="#3b63e8"/>
+  <path d="M 10,50 C 28,10 172,10 190,50 C 160,24 40,24 10,50 Z" fill="#0d0d0d"/>
+  <path d="M 10,50 C 40,76 160,76 190,50 C 172,90 28,90 10,50 Z" fill="#0d0d0d"/>
+  <circle cx="100" cy="50" r="35" fill="white"/>
+  <circle cx="100" cy="50" r="19" fill="#0d0d0d"/>
 </svg>

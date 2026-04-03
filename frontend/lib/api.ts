@@ -517,7 +517,6 @@ export interface Competitor {
   id: number;
   brand_id: number;
   name: string;
-  website_url?: string | null;
   created_at: string;
 }
 
@@ -525,15 +524,8 @@ export async function getCompetitors(brandId: number): Promise<Competitor[]> {
   return dedupedGet<Competitor[]>(`/brands/${brandId}/competitors`);
 }
 
-export async function addCompetitor(
-  brandId: number,
-  name: string,
-  websiteUrl?: string,
-): Promise<Competitor> {
-  const res = await api.post<Competitor>(`/brands/${brandId}/competitors`, {
-    name,
-    website_url: websiteUrl || null,
-  });
+export async function addCompetitor(brandId: number, name: string): Promise<Competitor> {
+  const res = await api.post<Competitor>(`/brands/${brandId}/competitors`, { name });
   invalidateCache(`/brands/${brandId}/competitors`);
   return res.data;
 }

@@ -461,7 +461,7 @@ async def add_competitor(brand_id: int, payload: CompetitorCreate, db: DbDep, us
                 detail=f"Competitor limit reached: your {tier} plan allows {limit} competitor(s) per brand.",
             )
 
-    competitor = Competitor(brand_id=brand_id, name=payload.name, website_url=payload.website_url)
+    competitor = Competitor(brand_id=brand_id, name=payload.name)
     db.add(competitor)
     await db.commit()
     await db.refresh(competitor)

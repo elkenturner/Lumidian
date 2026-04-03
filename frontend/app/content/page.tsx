@@ -59,7 +59,8 @@ import {
 import PlatformBadge from '@/components/PlatformBadge';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import { formatDistanceToNow, parseISO } from 'date-fns';
@@ -1896,6 +1897,10 @@ export default function ContentHubPage() {
   const [postingGuideOpen, setPostingGuideOpen] = useState(false);
   const [postingPlatform, setPostingPlatform] = useState<'reddit' | 'quora' | 'medium' | 'wikipedia'>('reddit');
 
+  // Upgrade modal (shown on 402 responses)
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeModalReason, setUpgradeModalReason] = useState('');
+
   const [savedPlatform, setSavedPlatform] = useState<string | null>(null);
   useEffect(() => {
     if (!savedPlatform) return;
@@ -2057,9 +2062,15 @@ export default function ContentHubPage() {
       if (selectedBrandId) getDraftStatus(selectedBrandId).then(setDraftStatus).catch(() => {});
       setActiveTab('drafts');
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } } };
+      const err = e as { response?: { status?: number; data?: { detail?: string } } };
       const detail = err?.response?.data?.detail ?? 'Failed to draft reply. Try again.';
-      alert(detail);
+      const httpStatus = err?.response?.status;
+      if (httpStatus === 402) {
+        setUpgradeModalReason(detail);
+        setUpgradeModalOpen(true);
+      } else {
+        alert(detail);
+      }
     }
   }
 
@@ -2890,6 +2901,35 @@ export default function ContentHubPage() {
         </div>
       )}
       {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
+
+      {/* Upgrade modal — shown when pitch user tries to draft opportunity */}
+      <Dialog open={upgradeModalOpen} onOpenChange={(o) => !o && setUpgradeModalOpen(false)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <Zap size={20} className="text-[#6366f1] mb-1" />
+            <DialogTitle>Upgrade to Draft Opportunities</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-[#64748b]">{upgradeModalReason}</p>
+          <DialogFooter className="mt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setUpgradeModalOpen(false)}
+              className="flex-1"
+            >
+              Dismiss
+            </Button>
+            <Button
+              asChild
+              size="sm"
+              variant="default"
+              className="flex-1"
+            >
+              <Link href="/settings/billing">View plans</Link>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

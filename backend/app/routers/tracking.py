@@ -71,11 +71,22 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
                 detail=f"{plan_label} includes {daily_limit} manual run{'s' if daily_limit > 1 else ''} per day. Your limit resets at midnight UTC. Upgrade to Pro for unlimited runs.",
             )
 
+    # Detect if this is the brand's first-ever run (triggers onboarding pipeline)
+    from sqlalchemy import func as sqlfunc
+    completed_runs_result = await db.execute(
+        select(sqlfunc.count(TrackingRun.id)).where(
+            TrackingRun.brand_id == brand_id,
+            TrackingRun.status == "completed",
+        )
+    )
+    is_first_run = (completed_runs_result.scalar_one() or 0) == 0
+    run_type = "onboarding" if is_first_run else "manual"
+
     # Pre-create the TrackingRun record so we can return its ID immediately.
     tracking_run = TrackingRun(
         brand_id=brand_id,
         status="pending",
-        run_type="manual",
+        run_type=run_type,
     )
     db.add(tracking_run)
     await db.commit()
@@ -472,6 +483,20 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
         logger.info("Gap analysis complete for manual run %d: %d gaps", run_id, len(gap_ids))
     except Exception as exc:
         logger.warning("Gap analysis failed for manual run %d (non-fatal): %s", run_id, exc)
+
+    # Fire onboarding post-process pipeline for first-time runs
+    async with AsyncSessionLocal() as check_db:
+        run_check = await check_db.get(TrackingRun, run_id)
+        if run_check and run_check.run_type == "onboarding":
+            logger.info(
+                "First run %d complete — firing onboarding post-process for brand_id=%d",
+                run_id, brand_id,
+            )
+            from app.services.tracking_service import _onboarding_post_process
+            asyncio.create_task(
+                _onboarding_post_process(brand_id),
+                name=f"onboarding-post-{brand_id}",
+            )
 
 
 # ── Single-prompt mini run ────────────────────────────────────────────────────

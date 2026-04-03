@@ -26,6 +26,7 @@ class RunTypeEnum(str, enum.Enum):
     manual = "manual"
     scheduled = "scheduled"
     prompt = "prompt"  # single-prompt mini run
+    onboarding = "onboarding"  # first run — triggers onboarding post-process pipeline
 
 
 class ScheduleSlotEnum(str, enum.Enum):

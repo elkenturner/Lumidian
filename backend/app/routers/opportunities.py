@@ -234,8 +234,19 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     # Log before firing so the event counts immediately on the next quota check
     await log_event("manual_scan_triggered", {"brand_id": brand_id}, brand_id=brand_id)
 
+    from app import state as _state
+
+    # Add to scanning state before starting so the banner appears immediately
+    _state.scanning_brands.add(brand_id)
+
+    async def _scan_with_state_cleanup(bid: int):
+        try:
+            await _scan_and_log(bid)
+        finally:
+            _state.scanning_brands.discard(bid)
+
     asyncio.create_task(
-        _scan_and_log(brand_id),
+        _scan_with_state_cleanup(brand_id),
         name=f"reddit-scan-{brand_id}",
     )
     return {"message": f"Scan started for brand {brand_id}", "brand_id": brand_id}

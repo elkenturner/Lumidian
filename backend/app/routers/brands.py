@@ -358,7 +358,7 @@ async def add_prompt(
     user: CurrentUser,
 ):
     # Verify brand exists and belongs to user
-    await get_brand_for_user(brand_id, db, user)
+    brand_obj = await get_brand_for_user(brand_id, db, user)
 
     text = payload.text.strip()
     if not text:
@@ -369,22 +369,17 @@ async def add_prompt(
 
     # Enforce prompt limits for non-admin users
     if not user.is_admin:
-        # Re-fetch brand to check prompt_limit
-        brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-        brand_obj = brand_result.scalar_one_or_none()
-
-        if brand_obj:
-            from sqlalchemy import func as sqlfunc
-            prompt_count_result = await db.execute(
-                select(sqlfunc.count(Prompt.id)).where(Prompt.brand_id == brand_id)
+        from sqlalchemy import func as sqlfunc
+        prompt_count_result = await db.execute(
+            select(sqlfunc.count(Prompt.id)).where(Prompt.brand_id == brand_id)
+        )
+        current_count = prompt_count_result.scalar_one()
+        limit = getattr(brand_obj, "prompt_limit", 25)
+        if current_count >= limit:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Prompt limit reached ({limit}). Delete a prompt or upgrade your brand type.",
             )
-            current_count = prompt_count_result.scalar_one()
-            limit = getattr(brand_obj, "prompt_limit", 25)
-            if current_count >= limit:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Prompt limit reached ({limit}). Delete a prompt or upgrade your brand type.",
-                )
 
     # Infer prompt_type from brand_type
     prompt_type = "pitch" if brand_obj.brand_type == "pitch" else "standard"

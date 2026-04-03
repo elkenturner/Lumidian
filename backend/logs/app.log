@@ -18606,3 +18606,707 @@ task: <Task pending name='Task-782' coro=<send_email_background.<locals>._run() 
 task: <Task pending name='Task-823' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x108a3a820>()]>>
 2026-04-02 19:31:42  ERROR     asyncio — Task was destroyed but it is pending!
 task: <Task pending name='Task-848' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x108a3df70>()]>>
+2026-04-02 19:32:51  ERROR     concurrent.futures — exception calling callback for <Future at 0x1047855b0 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:52  ERROR     concurrent.futures — exception calling callback for <Future at 0x104891580 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:52  ERROR     concurrent.futures — exception calling callback for <Future at 0x104891b80 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:53  ERROR     concurrent.futures — exception calling callback for <Future at 0x1048efb80 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:54  ERROR     concurrent.futures — exception calling callback for <Future at 0x1048a0190 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:54  ERROR     concurrent.futures — exception calling callback for <Future at 0x1048cf7f0 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:55  ERROR     concurrent.futures — exception calling callback for <Future at 0x104817850 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:55  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-111' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x1048ef5e0>()]>>
+2026-04-02 19:32:55  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-149' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x10496e3d0>()]>>
+2026-04-02 19:32:55  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-180' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x10488a940>()]>>
+2026-04-02 19:32:55  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-214' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104989eb0>()]>>
+2026-04-02 19:32:55  ERROR     concurrent.futures — exception calling callback for <Future at 0x104989310 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:56  ERROR     concurrent.futures — exception calling callback for <Future at 0x1049a97f0 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:57  ERROR     concurrent.futures — exception calling callback for <Future at 0x104994b20 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:57  ERROR     concurrent.futures — exception calling callback for <Future at 0x10498ec70 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:57  ERROR     concurrent.futures — exception calling callback for <Future at 0x1049b7100 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:58  ERROR     concurrent.futures — exception calling callback for <Future at 0x10498b130 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:58  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-317' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x10499b4f0>()]>>
+2026-04-02 19:32:58  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-354' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104978460>()]>>
+2026-04-02 19:32:58  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-379' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x1049b6310>()]>>
+2026-04-02 19:32:58  ERROR     concurrent.futures — exception calling callback for <Future at 0x104817e50 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:59  ERROR     concurrent.futures — exception calling callback for <Future at 0x104993040 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:32:59  ERROR     concurrent.futures — exception calling callback for <Future at 0x104994100 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:00  ERROR     concurrent.futures — exception calling callback for <Future at 0x104985970 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:00  ERROR     concurrent.futures — exception calling callback for <Future at 0x10499ac10 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:01  ERROR     concurrent.futures — exception calling callback for <Future at 0x104994580 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:01  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-487' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x1049b56a0>()]>>
+2026-04-02 19:33:01  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-514' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104865d60>()]>>
+2026-04-02 19:33:01  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-539' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x1048e2fa0>()]>>
+2026-04-02 19:33:01  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-573' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x1048830d0>()]>>
+2026-04-02 19:33:02  ERROR     concurrent.futures — exception calling callback for <Future at 0x10499b2e0 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:02  ERROR     concurrent.futures — exception calling callback for <Future at 0x104880820 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:02  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:33:03  ERROR     concurrent.futures — exception calling callback for <Future at 0x104a333d0 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:03  ERROR     concurrent.futures — exception calling callback for <Future at 0x104a07f40 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:04  ERROR     concurrent.futures — exception calling callback for <Future at 0x104a2c190 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:04  ERROR     concurrent.futures — exception calling callback for <Future at 0x104a3d9a0 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:04  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:33:05  ERROR     concurrent.futures — exception calling callback for <Future at 0x104972ca0 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:05  ERROR     concurrent.futures — exception calling callback for <Future at 0x10488e610 state=finished raised SMTPDataError>
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/thread.py", line 52, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 144, in send_email_verification
+    _send(
+  File "/Users/ken/Desktop/Lumidian/backend/app/services/email_service.py", line 64, in _send
+    server.sendmail(from_addr, to, msg.as_string())
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/smtplib.py", line 903, in sendmail
+    raise SMTPDataError(code, resp)
+smtplib.SMTPDataError: (550, b'You have reached your daily email sending quota.')
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/concurrent/futures/_base.py", line 329, in _invoke_callbacks
+    callback(self)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py", line 398, in _call_set_state
+    dest_loop.call_soon_threadsafe(_set_state, destination, source)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 791, in call_soon_threadsafe
+    self._check_closed()
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/base_events.py", line 510, in _check_closed
+    raise RuntimeError('Event loop is closed')
+RuntimeError: Event loop is closed
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-13' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104803f10>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-49' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104891fd0>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-80' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x1048fbac0>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-241' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x10488a160>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-279' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x1049b7dc0>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-431' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x1049720a0>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-406' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x10483ac10>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-462' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x1048ef280>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-612' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104a27a60>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-650' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104a21fd0>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-848' coro=<send_email_background.<locals>._run() done, defined at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:105> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104a788b0>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-685' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104a2cee0>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-710' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104a33850>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-741' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104a07fd0>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-782' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104a2f850>()]>>
+2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
+task: <Task pending name='Task-823' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104a4cd00>()]>>

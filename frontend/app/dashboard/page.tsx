@@ -40,7 +40,6 @@ import {
   DashboardAnalytics,
   QueryResult,
   TrackingRun,
-  ModelScore,
   Prompt,
   Competitor,
   BrandProfile,
@@ -75,30 +74,6 @@ import {
 import { format, parseISO } from 'date-fns';
 
 const parseUTCISO = (s: string) => parseISO(s.endsWith('Z') ? s : s + 'Z');
-
-// ── Usage bar sub-component ────────────────────────────────────────────────────
-function UsageBar({ label, used, limit }: { label: string; used: number; limit: number | null }) {
-  if (limit === null) return null; // unlimited (Pro / admin) — don't render
-  const pct = limit > 0 ? Math.min(100, Math.round((used / limit) * 100)) : 0;
-  const color = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#6366f1';
-  return (
-    <div className="flex-1 min-w-0">
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs text-[#64748b]">{label}</span>
-        <span className="text-xs font-semibold tabular-nums" style={{ color }}>
-          {used}/{limit}
-        </span>
-      </div>
-      <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${pct}%`, background: color }}
-        />
-      </div>
-    </div>
-  );
-}
-
 const MODEL_ORDER = ['chatgpt', 'claude', 'perplexity', 'gemini'];
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   chatgpt:    { label: 'ChatGPT',    bg: 'rgba(34,197,94,0.12)',   text: '#22c55e' },
@@ -428,7 +403,6 @@ export default function DashboardPage() {
   // Run state
   const [triggering, setTriggering] = useState(false);
   const [activeRunId, setActiveRunId] = useState<number | null>(null);
-  const [runModelScores, setRunModelScores] = useState<ModelScore[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Pending single-prompt mini-runs: promptId → runId
@@ -613,10 +587,8 @@ export default function DashboardPage() {
     pollRef.current = setInterval(async () => {
       try {
         const run = await getRunStatus(activeRunId);
-        if (run.model_scores?.length) setRunModelScores(run.model_scores);
         if (run.status === 'completed' || run.status === 'failed') {
           setActiveRunId(null);
-          setRunModelScores([]);
           if (pollRef.current) clearInterval(pollRef.current);
           if (run.status === 'completed') {
             setToast({ message: 'Report complete! Data refreshed.', type: 'success' });
@@ -694,6 +666,7 @@ export default function DashboardPage() {
   const latestRun = overview?.latest_run;
   const score = latestRun?.overall_score ?? null;
   const isRunning = activeRunId !== null || latestRun?.status === 'running' || latestRun?.status === 'pending' || (newBrandMode && newBrandStep !== 'done');
+  const isFirstRun = isRunning && !analytics?.total_responses_analyzed && trends.length === 0;
 
   const sparkData = trends.map((p) => ({
     ...p,
@@ -813,22 +786,17 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Usage indicator (non-admin, Starter plan) */}
-      {usage && !user?.is_admin && (usage.manual_run_limit !== null || usage.prompt_limit < 999999) && (
-        <div className="flex items-center gap-4 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] rounded-xl px-4 py-3 mb-6">
-          <UsageBar label="Prompts" used={usage.prompt_count} limit={usage.prompt_limit < 999999 ? usage.prompt_limit : null} />
-          {usage.manual_run_limit !== null && (
-            <>
-              <div className="w-px h-8 bg-[rgba(255,255,255,0.08)] flex-shrink-0" />
-              <UsageBar label="Manual runs today" used={usage.manual_runs_today} limit={usage.manual_run_limit} />
-            </>
-          )}
-          {usage.standard_brand_limit > 0 && usage.standard_brand_limit < 999 && (
-            <>
-              <div className="w-px h-8 bg-[rgba(255,255,255,0.08)] flex-shrink-0" />
-              <UsageBar label="Brands" used={usage.standard_brand_count} limit={usage.standard_brand_limit} />
-            </>
-          )}
+      {/* Usage indicator (non-admin, Starter plan) — compact inline */}
+      {usage && !user?.is_admin && usage.manual_run_limit !== null && (
+        <div className="flex items-center gap-3 text-[10px] text-[#475569] mb-4">
+          <span className="flex items-center gap-1.5">
+            <span className="text-[#64748b]">{totalPrompts} prompt{totalPrompts !== 1 ? 's' : ''}</span>
+          </span>
+          <span className="text-[#334155]">·</span>
+          <span className="flex items-center gap-1.5">
+            <span className="text-[#64748b]">Runs today</span>
+            <span className="font-semibold tabular-nums text-[#94a3b8]">{usage.manual_runs_today}/{usage.manual_run_limit}</span>
+          </span>
         </div>
       )}
 
@@ -872,12 +840,6 @@ export default function DashboardPage() {
             </div>
           )}
           <div>
-            {newBrandStep === 'running' && (
-              <>
-                <p className="text-sm font-medium text-[#F0F4F8]">Running your first AI visibility report…</p>
-                <p className="text-xs text-[#64748B] mt-0.5">This takes 1–2 minutes. We&apos;ll auto-generate content drafts when it&apos;s done.</p>
-              </>
-            )}
             {newBrandStep === 'drafting' && (
               <>
                 <p className="text-sm font-medium text-[#F0F4F8]">Report complete! Generating content drafts…</p>
@@ -979,66 +941,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Recent runs strip */}
-      {trends && trends.length > 0 && (
-        <div className="flex items-center gap-2 mb-5 flex-wrap">
-          <span className="text-[10px] font-semibold text-[#2d3a55] uppercase tracking-[0.08em] mr-1">
-            Recent Runs
-          </span>
-          {[...trends].reverse().slice(0, 4).map((t, i) => (
-            <div
-              key={t.run_id ?? i}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold"
-              style={i === 0
-                ? { background: 'rgba(16,185,129,0.07)', border: '1px solid rgba(16,185,129,0.18)', color: '#34d399' }
-                : { background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)', color: '#475569' }
-              }
-            >
-              <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ background: i === 0 ? '#34d399' : 'rgba(255,255,255,0.2)' }}
-              />
-              {t.completed_at
-                ? format(parseUTCISO(t.completed_at), 'MMM d')
-                : 'Running'
-              } · {Math.round(t.score)}
-            </div>
-          ))}
-        </div>
-      )}
 
-      {/* Running banner */}
-      {isRunning && (
-        <div className="bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[#6366f1]/10 flex items-center justify-center flex-shrink-0">
-              <Loader2 size={16} className="text-[#6366f1] animate-spin" />
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-[#F0F4F8]">Report in progress</p>
-              <p className="text-xs text-[#6366f1] mt-0.5">Querying AI models with your prompts. This may take a minute...</p>
-              {runModelScores.length > 0 && (
-                <div className="flex items-center gap-3 mt-2 flex-wrap">
-                  {runModelScores.map((ms) => {
-                    const cfg = getModelCfg(ms.model);
-                    const pct = ms.total_queries > 0 ? Math.round((ms.total_mentions / ms.total_queries) * 100) : 0;
-                    return (
-                      <span key={ms.model} className="flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: cfg.bg, color: cfg.text }}>
-                        <CheckCircle2 size={9} />
-                        {cfg.label}: {pct}%
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-            <span className="flex items-center gap-2 text-xs text-[#6366f1] font-medium">
-              <span className="w-2 h-2 rounded-full bg-[#6366f1] animate-pulse" />
-              Auto-updating every 3s
-            </span>
-          </div>
-        </div>
-      )}
 
       {loadingBrands ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1100,7 +1003,21 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* ── FIRST-RUN EMPTY STATE ──────────────────────────────────── */}
+          {isFirstRun && (
+            <div className="flex flex-col items-center justify-center py-20 text-center max-w-md mx-auto mb-8">
+              <div className="w-16 h-16 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.25)] rounded-2xl flex items-center justify-center mb-5">
+                <Loader2 size={28} className="text-[#6366f1] animate-spin" />
+              </div>
+              <h3 className="text-lg font-bold text-[#F0F4F8] mb-2">Running your first AI visibility report...</h3>
+              <p className="text-sm text-[#64748B] leading-relaxed">
+                This takes 1-2 minutes. We&apos;ll auto-generate content drafts when it&apos;s done.
+              </p>
+            </div>
+          )}
+
           {/* ── OVERVIEW ─────────────────────────────────────────────────── */}
+          {!isFirstRun && (
           <>
               {/* Brand profile completeness nudge */}
               {brandProfile && brandProfile.completion_pct < 100 && (
@@ -1549,6 +1466,7 @@ export default function DashboardPage() {
                 )}
               </div>
             </>
+          )}
         </>
       )}
 

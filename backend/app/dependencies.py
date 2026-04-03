@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import datetime, timezone
 from time import monotonic
 from typing import Annotated, Optional
 
@@ -142,6 +143,42 @@ async def get_current_user_optional(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AllowUnverifiedUser = Annotated[User, Depends(get_current_user_allow_unverified)]
 OptionalUser = Annotated[Optional[User], Depends(get_current_user_optional)]
+
+
+def is_brand_paused(brand, user) -> bool:
+    """
+    Check if a brand is paused (read-only).
+
+    A brand is paused when:
+    1. It's a pitch brand and pitch_expires_at has passed
+    2. User's subscription has lapsed (not active/trialing)
+    """
+    # Check pitch brand expiry
+    if getattr(brand, "brand_type", "standard") == "pitch":
+        expires_at = getattr(brand, "pitch_expires_at", None)
+        if expires_at:
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            if expires_at <= now:
+                return True
+
+    # Check subscription status
+    sub_status = getattr(user, "subscription_status", None)
+    if sub_status and sub_status not in ("active", "trialing", None):
+        return True
+
+    return False
+
+
+def require_brand_active(brand, user) -> None:
+    """
+    Raise 403 if the brand is paused.
+    Call this in endpoints that modify brand data (runs, drafts, scans).
+    """
+    if is_brand_paused(brand, user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Brand is paused. Renew your subscription or upgrade to continue.",
+        )
 
 
 def require_active_subscription(user: User) -> None:

@@ -44,7 +44,7 @@ export default function OnboardingPage() {
         else setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [router]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleStep1() {
     if (!brandName.trim() || !websiteUrl.trim()) return;

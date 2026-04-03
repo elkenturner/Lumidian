@@ -386,7 +386,9 @@ async def add_prompt(
                     detail=f"Prompt limit reached ({limit}). Delete a prompt or upgrade your brand type.",
                 )
 
-    prompt = Prompt(brand_id=brand_id, text=text)
+    # Infer prompt_type from brand_type
+    prompt_type = "pitch" if brand_obj.brand_type == "pitch" else "standard"
+    prompt = Prompt(brand_id=brand_id, text=text, prompt_type=prompt_type)
     db.add(prompt)
     await db.commit()
     await db.refresh(prompt)

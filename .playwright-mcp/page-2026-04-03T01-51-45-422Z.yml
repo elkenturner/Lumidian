@@ -1,0 +1,127 @@
+- generic [active] [ref=e1]:
+  - complementary [ref=e3]:
+    - link [ref=e5] [cursor=pointer]:
+      - /url: /dashboard
+      - img [ref=e6]
+    - button "Switch brand" [ref=e14] [cursor=pointer]:
+      - img "NovaMed AI logo" [ref=e16]
+    - navigation [ref=e17]:
+      - link "Dashboard" [ref=e18] [cursor=pointer]:
+        - /url: /dashboard
+        - img [ref=e20]
+      - link "Reports" [ref=e25] [cursor=pointer]:
+        - /url: /reports
+        - img [ref=e26]
+      - link "Content Hub" [ref=e29] [cursor=pointer]:
+        - /url: /content
+        - img [ref=e30]
+      - link "Brands" [ref=e32] [cursor=pointer]:
+        - /url: /settings
+        - img [ref=e33]
+      - link "Account" [ref=e36] [cursor=pointer]:
+        - /url: /account
+        - img [ref=e37]
+      - link "Admin" [ref=e40] [cursor=pointer]:
+        - /url: /admin
+        - img [ref=e41]
+    - button "Sign out" [ref=e45] [cursor=pointer]:
+      - img [ref=e46]
+  - main [ref=e49]:
+    - generic [ref=e50]:
+      - generic [ref=e51]:
+        - generic [ref=e52]:
+          - img "NovaMed AI logo" [ref=e54]
+          - generic [ref=e55]:
+            - heading "NovaMed AI" [level=1] [ref=e56]
+            - paragraph [ref=e57]: AI visibility analytics
+        - generic [ref=e58]:
+          - button "Prompts" [ref=e59] [cursor=pointer]:
+            - img [ref=e60]
+            - text: Prompts
+          - button "Refresh dashboard" [ref=e62] [cursor=pointer]:
+            - img [ref=e63]
+          - button "Run Report Now" [ref=e69] [cursor=pointer]:
+            - img [ref=e70]
+            - text: Run Report Now
+      - generic [ref=e72]:
+        - img [ref=e74]
+        - heading "No data yet" [level=3] [ref=e75]
+        - paragraph [ref=e76]: Run your first AI visibility report to see how often your brand appears across ChatGPT, Claude, Perplexity, and Gemini.
+        - button "Run First Report" [ref=e77] [cursor=pointer]:
+          - img [ref=e78]
+          - text: Run First Report
+      - generic [ref=e80]:
+        - generic [ref=e81]:
+          - generic [ref=e82]:
+            - generic [ref=e83]:
+              - paragraph [ref=e84]:
+                - text: Visibility Score
+                - generic [ref=e86]: "?"
+              - paragraph [ref=e87]: N/A
+            - img [ref=e89]
+          - paragraph [ref=e90]: No trend data yet
+          - paragraph [ref=e91]: Next report in 6h
+        - generic [ref=e92]:
+          - generic [ref=e93]:
+            - generic [ref=e94]:
+              - paragraph [ref=e95]:
+                - text: Best Performing Prompt
+                - generic [ref=e97]: "?"
+              - paragraph [ref=e98]: —
+              - paragraph [ref=e99]: No data yet
+            - generic [ref=e100]:
+              - generic [ref=e101]:
+                - paragraph [ref=e102]:
+                  - text: Sentiment
+                  - generic [ref=e104]: "?"
+                - img [ref=e106]
+              - paragraph [ref=e109]: —
+              - paragraph [ref=e110]: No mentions to analyze
+          - generic [ref=e111]:
+            - generic [ref=e112]:
+              - paragraph [ref=e113]:
+                - text: Share of Voice
+                - generic [ref=e115]: "?"
+              - button "Manage competitors" [ref=e116] [cursor=pointer]:
+                - img [ref=e117]
+                - text: Add competitors
+            - paragraph [ref=e122]: Add competitors to see how your brand's AI visibility compares.
+      - generic [ref=e123]:
+        - generic [ref=e124]:
+          - generic [ref=e125]:
+            - paragraph [ref=e126]:
+              - text: Avg Position
+              - generic [ref=e128]: "?"
+            - img [ref=e130]
+          - paragraph [ref=e134]: —
+          - paragraph [ref=e135]: No mentions recorded
+        - generic [ref=e136]:
+          - generic [ref=e137]:
+            - paragraph [ref=e138]:
+              - text: Top Cited Domains (across all tracked prompts)
+              - generic [ref=e140]: "?"
+            - img [ref=e141]
+          - paragraph [ref=e145]: No domain data yet
+      - generic [ref=e147]:
+        - generic [ref=e148]:
+          - img [ref=e149]
+          - heading "Performance by Model" [level=3] [ref=e150]
+          - generic [ref=e152]: "?"
+        - paragraph [ref=e153]: No model data yet
+      - generic [ref=e154]:
+        - generic [ref=e156]:
+          - img [ref=e157]
+          - heading "Recent Conversations" [level=3] [ref=e159]
+        - generic [ref=e160]:
+          - img [ref=e162]
+          - paragraph [ref=e164]: No conversations yet
+          - paragraph [ref=e165]: Run a report to start tracking how AI models respond to your prompts.
+  - alert [ref=e166]
+  - generic [ref=e167]:
+    - paragraph [ref=e168]:
+      - text: We use cookies to keep you signed in and the app running.
+      - link "Privacy Policy" [ref=e169] [cursor=pointer]:
+        - /url: /privacy
+    - generic [ref=e170]:
+      - button "Decline" [ref=e171] [cursor=pointer]
+      - button "Accept" [ref=e172] [cursor=pointer]

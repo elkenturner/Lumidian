@@ -71,6 +71,28 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
                 detail=f"{plan_label} includes {daily_limit} manual run{'s' if daily_limit > 1 else ''} per day. Your limit resets at midnight UTC. Upgrade to Pro for unlimited runs.",
             )
 
+    # Pitch brands have stricter limits (1/day) regardless of subscription tier
+    if brand.brand_type == "pitch":
+        from datetime import datetime, timezone
+        from sqlalchemy import func
+        from app.routers.billing import DAILY_RUN_LIMITS_PITCH
+        _today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
+        )
+        pitch_runs_result = await db.execute(
+            select(func.count(TrackingRun.id)).where(
+                TrackingRun.brand_id == brand_id,
+                TrackingRun.run_type == "manual",
+                TrackingRun.created_at >= _today_start,
+            )
+        )
+        pitch_runs_today = pitch_runs_result.scalar_one()
+        if pitch_runs_today >= DAILY_RUN_LIMITS_PITCH:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Pitch brands are limited to {DAILY_RUN_LIMITS_PITCH} manual run per day. Try again tomorrow.",
+            )
+
     # Detect if this is the brand's first-ever run (triggers onboarding pipeline)
     completed_runs_result = await db.execute(
         select(func.count(TrackingRun.id)).where(

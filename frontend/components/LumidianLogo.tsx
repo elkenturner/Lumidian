@@ -4,7 +4,7 @@ import type { CSSProperties } from 'react';
  * LumidianLogo — eye mark for Lumidian.
  *
  * Usage:
- *   <LumidianLogo size={32} />                        — icon only (width = size×2, height = size)
+ *   <LumidianLogo size={32} />                        — icon only (size × size square)
  *   <LumidianLogo size={32} withWordmark />            — icon + wordmark (dark bg)
  *   <LumidianLogo size={32} withWordmark variant="light" /> — icon + wordmark (light bg)
  */
@@ -25,26 +25,28 @@ export default function LumidianLogo({
   // 4. Black lower-eyelid shadow (cuts up from bottom center)
   // 5. White sclera circle
   // 6. Black pupil circle
+  // Square viewBox — eye centred horizontally, sits in upper half like the reference image.
+  // This matches how the favicon renders (browser letterboxes the 200×100 eye into a square tab).
   const icon = (
     <svg
-      width={size * 2}
+      width={size}
       height={size}
-      viewBox="0 0 200 100"
+      viewBox="0 0 100 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Black outer almond */}
-      <path d="M 3,50 C 22,4 178,4 197,50 C 178,96 22,96 3,50 Z" fill="#0d0d0d" />
-      {/* Blue interior — fills the whole inner opening */}
-      <path d="M 10,50 C 28,10 172,10 190,50 C 172,90 28,90 10,50 Z" fill="#3b63e8" />
-      {/* Upper eyelid shadow — lower boundary curves from y=50 at tips to y=24 at centre */}
-      <path d="M 10,50 C 28,10 172,10 190,50 C 160,24 40,24 10,50 Z" fill="#0d0d0d" />
-      {/* Lower eyelid shadow — mirror */}
-      <path d="M 10,50 C 40,76 160,76 190,50 C 172,90 28,90 10,50 Z" fill="#0d0d0d" />
+      {/* Black outer almond — eye fills the width, centred at y=50 */}
+      <path d="M 2,50 C 11,27 89,27 98,50 C 89,73 11,73 2,50 Z" fill="#0d0d0d" />
+      {/* Blue interior */}
+      <path d="M 5,50 C 14,32 86,32 95,50 C 86,68 14,68 5,50 Z" fill="#3b63e8" />
+      {/* Upper eyelid shadow */}
+      <path d="M 5,50 C 14,32 86,32 95,50 C 80,39 20,39 5,50 Z" fill="#0d0d0d" />
+      {/* Lower eyelid shadow */}
+      <path d="M 5,50 C 20,61 80,61 95,50 C 86,68 14,68 5,50 Z" fill="#0d0d0d" />
       {/* White sclera */}
-      <circle cx="100" cy="50" r="35" fill="white" />
+      <circle cx="50" cy="50" r="17" fill="white" />
       {/* Black pupil */}
-      <circle cx="100" cy="50" r="19" fill="#0d0d0d" />
+      <circle cx="50" cy="50" r="9.5" fill="#0d0d0d" />
     </svg>
   );
 

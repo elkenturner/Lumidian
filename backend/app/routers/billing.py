@@ -494,6 +494,21 @@ async def stripe_webhook(request: Request, db: DbDep):
                     {"old_plan": old_tier, "new_plan": tier},
                     user_id=user.id,
                 )
+            # Auto-upgrade standard brands to pro if user upgraded to pro tier
+            if tier == "pro" and tier != old_tier:
+                from sqlalchemy import update as sa_update
+                from app.models import Brand
+                upgrade_result = await db.execute(
+                    sa_update(Brand)
+                    .where(Brand.user_id == user.id, Brand.brand_type == "standard")
+                    .values(brand_type="pro", prompt_limit=100)
+                )
+                if upgrade_result.rowcount > 0:
+                    await db.commit()
+                    logger.info(
+                        "Auto-upgraded %d standard brand(s) to pro for user %d",
+                        upgrade_result.rowcount, user.id,
+                    )
 
     elif event_type == "customer.subscription.deleted":
         customer_id = data_obj.get("customer")

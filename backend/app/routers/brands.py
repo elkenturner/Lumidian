@@ -620,6 +620,7 @@ from pydantic import BaseModel as _BaseModel
 class _SuggestPreviewReq(_BaseModel):
     name: str
     description: str = ""
+    website_context: str = ""
 
 
 @router.post("/suggest-prompts-preview", response_model=list[str])
@@ -635,6 +636,10 @@ async def suggest_prompts_preview(payload: _SuggestPreviewReq, db: DbDep, user: 
     context_parts = [f"Brand name: {payload.name.strip()}"]
     if payload.description.strip():
         context_parts.append(f"Company description: {payload.description.strip()}")
+    if payload.website_context.strip():
+        # Truncate website context to avoid huge prompts
+        website_excerpt = payload.website_context.strip()[:3000]
+        context_parts.append(f"Website content:\n{website_excerpt}")
     context = "\n".join(context_parts)
 
     system_prompt = f"""You generate AI visibility tracking prompts for brands. Find the real queries users type into ChatGPT/Claude/Perplexity when researching solutions — NOT looking up a specific brand.

@@ -174,6 +174,10 @@ def require_brand_active(brand, user) -> None:
     Raise 403 if the brand is paused.
     Call this in endpoints that modify brand data (runs, drafts, scans).
     """
+    # Admins can operate on any brand
+    if getattr(user, "is_admin", False):
+        return
+
     if is_brand_paused(brand, user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

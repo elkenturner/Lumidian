@@ -495,6 +495,7 @@ async def trigger_prompt_run(
     from app.models import Prompt
 
     brand = await get_brand_for_user(brand_id, db, user)
+    require_brand_active(brand, user)
 
     # Verify the prompt belongs to this brand
     prompt_result = await db.execute(

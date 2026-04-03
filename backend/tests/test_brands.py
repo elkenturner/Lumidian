@@ -33,7 +33,7 @@ async def test_create_brand_success(client: httpx.AsyncClient):
     await register_and_login(client, email="create@example.com")
     resp = await client.post(
         "/api/brands",
-        json={"name": "Acme Corp", "tier": "basic", "prompts": ["Best CRM tools?"]},
+        json={"name": "Acme Corp", "tier": "basic", "website_url": "https://acme.com", "prompts": ["Best CRM tools?"]},
     )
     assert resp.status_code == 201
     data = resp.json()
@@ -46,18 +46,22 @@ async def test_create_brand_slugifies_name(client: httpx.AsyncClient):
     await register_and_login(client, email="slug@example.com")
     resp = await client.post(
         "/api/brands",
-        json={"name": "Hello World! 123", "tier": "basic", "prompts": []},
+        json={"name": "Hello World! 123", "tier": "basic", "website_url": "https://helloworld.com", "prompts": []},
     )
     assert resp.status_code == 201
     assert resp.json()["slug"] == "hello-world-123"
 
 
 async def test_create_brand_duplicate_slug(client: httpx.AsyncClient):
-    await register_and_login(client, email="dupslug@example.com")
-    await create_brand(client, name="Duplicate Brand")
+    # Use a second user (pro tier allows 2 pitch brands) to test global slug uniqueness
+    await register_and_login(client, email="dupslug@example.com", subscription_tier="pro")
+    await client.post(
+        "/api/brands",
+        json={"name": "Duplicate Brand", "tier": "basic", "website_url": "https://duplicate1.com", "brand_type": "pitch", "prompts": []},
+    )
     resp = await client.post(
         "/api/brands",
-        json={"name": "Duplicate Brand", "tier": "basic", "prompts": []},
+        json={"name": "Duplicate Brand", "tier": "basic", "website_url": "https://duplicate2.com", "brand_type": "pitch", "prompts": []},
     )
     assert resp.status_code == 409
 
@@ -69,6 +73,7 @@ async def test_create_brand_multiple_prompts(client: httpx.AsyncClient):
         json={
             "name": "Multi Prompt Co",
             "tier": "basic",
+            "website_url": "https://multiprompt.com",
             "prompts": ["Prompt A", "Prompt B", "Prompt C"],
         },
     )

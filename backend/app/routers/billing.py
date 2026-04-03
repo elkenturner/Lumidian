@@ -75,6 +75,27 @@ WEEKLY_SCAN_LIMITS: dict = {
     "pro": 25,
 }
 
+# Prompt limits per brand type
+PROMPT_LIMITS: dict[str, int] = {
+    "pitch": 10,
+    "standard": 25,
+    "pro": 100,
+}
+
+# Brand type limits per subscription tier: {tier: {brand_type: max_count}}
+BRAND_TYPE_LIMITS: dict = {
+    None: {"pitch": 1, "standard": 0, "pro": 0},
+    "": {"pitch": 1, "standard": 0, "pro": 0},
+    "starter": {"pitch": 1, "standard": 1, "pro": 0},
+    "pro": {"pitch": 3, "standard": 0, "pro": 2},  # Pro users create pro brands, not standard
+}
+
+# Daily manual run limit for pitch brands (all tiers)
+DAILY_RUN_LIMITS_PITCH: int = 1
+
+# Weekly manual scan limit for pitch brands (all tiers)
+WEEKLY_SCAN_LIMITS_PITCH: int = 1
+
 
 def get_stripe():
     import stripe as _stripe

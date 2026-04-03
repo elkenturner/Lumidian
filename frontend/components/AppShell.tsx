@@ -10,6 +10,13 @@ import { BrandProvider } from '@/contexts/BrandContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getBackgroundStatus } from '@/lib/api';
 
+const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  chatgpt: { label: 'ChatGPT', bg: 'rgba(16,163,127,0.15)', text: '#10a37f' },
+  claude: { label: 'Claude', bg: 'rgba(217,119,87,0.15)', text: '#d97757' },
+  perplexity: { label: 'Perplexity', bg: 'rgba(32,170,215,0.15)', text: '#20aad7' },
+  gemini: { label: 'Gemini', bg: 'rgba(66,133,244,0.15)', text: '#4285f4' },
+};
+
 const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email'];
 
 const MOBILE_NAV = [
@@ -25,6 +32,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [reportRunning, setReportRunning] = useState(false);
   const [draftsGenerating, setDraftsGenerating] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [modelScores, setModelScores] = useState<Array<{ model: string; score: number }>>([]);
   const [isMobile, setIsMobile] = useState(false);
   const { user } = useAuth();
 
@@ -66,6 +74,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           setReportRunning(status.report_running);
           setDraftsGenerating(status.drafts_generating);
           setScanning(status.scanning);
+          setModelScores(status.model_scores || []);
         }
       } catch {
         // Silently ignore poll errors — don't flash misleading banners
@@ -132,10 +141,39 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             display: 'flex',
             alignItems: 'center',
             gap: 10,
+            flexWrap: 'wrap',
           }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366f1', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
             <span style={{ fontSize: 12, color: '#818cf8', fontWeight: 600 }}>Report in progress</span>
-            <span style={{ fontSize: 12, color: '#6366f1' }}>— querying AI models with your prompts, this may take a minute.</span>
+            <span style={{ fontSize: 12, color: '#6366f1' }}>— querying AI models with your prompts.</span>
+            {modelScores.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
+                {modelScores.map((ms) => {
+                  const cfg = MODEL_CONFIG[ms.model] || { label: ms.model, bg: 'rgba(100,116,139,0.15)', text: '#64748b' };
+                  return (
+                    <span
+                      key={ms.model}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                        fontSize: 10,
+                        fontWeight: 600,
+                        padding: '2px 8px',
+                        borderRadius: 9999,
+                        background: cfg.bg,
+                        color: cfg.text,
+                      }}
+                    >
+                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      {cfg.label}: {ms.score}%
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
         {draftsGenerating && (

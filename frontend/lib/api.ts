@@ -257,6 +257,11 @@ export async function updateBrand(
   return res.data;
 }
 
+export async function fetchWebsiteContext(url: string): Promise<{ context: string }> {
+  const res = await api.post<{ context: string }>('/brands/fetch-website-context', { url });
+  return res.data;
+}
+
 export async function refreshWebsiteContext(brandId: number): Promise<void> {
   await api.post(`/brands/${brandId}/refresh-website-context`);
   invalidateCache(`/brands/${brandId}/profile`);
@@ -586,10 +591,12 @@ export async function getSuggestedPrompts(brandId: number): Promise<string[]> {
 export async function getSuggestedPromptsPreview(
   name: string,
   description?: string,
+  websiteContext?: string,
 ): Promise<string[]> {
   const res = await api.post<string[]>('/brands/suggest-prompts-preview', {
     name,
     description: description ?? '',
+    website_context: websiteContext ?? '',
   });
   return res.data;
 }

@@ -751,6 +751,7 @@ async def get_background_status(db: DbDep, user: CurrentUser):
     - report_running:    any TrackingRun for user's brands is pending/running
     - drafts_generating: any brand_id is in state.generating_brands
     - scanning:          any brand_id is in state.scanning_brands
+    - model_scores:      list of {model, score} for the active run (if any)
     """
     from app import state as _state
     from sqlalchemy import func as _sqlfunc
@@ -762,19 +763,33 @@ async def get_background_status(db: DbDep, user: CurrentUser):
     user_brand_ids: set[int] = set(brands_result.scalars().all())
 
     if not user_brand_ids:
-        return {"report_running": False, "drafts_generating": False, "scanning": False}
+        return {"report_running": False, "drafts_generating": False, "scanning": False, "model_scores": []}
 
     # Check for active tracking runs in the DB
     running_result = await db.execute(
-        select(_sqlfunc.count(TrackingRun.id)).where(
+        select(TrackingRun).where(
             TrackingRun.brand_id.in_(user_brand_ids),
             TrackingRun.status.in_(["pending", "running"]),
-        )
+        ).order_by(TrackingRun.created_at.desc()).limit(1)
     )
-    report_running = (running_result.scalar_one_or_none() or 0) > 0
+    active_run = running_result.scalar_one_or_none()
+    report_running = active_run is not None
+
+    # Get model scores for the active run
+    model_scores = []
+    if active_run and active_run.model_scores:
+        model_scores = [
+            {"model": ms.model, "score": round((ms.total_mentions / ms.total_queries) * 100) if ms.total_queries > 0 else 0}
+            for ms in active_run.model_scores
+        ]
+
+    # Check in-memory sets for drafts and scanning
+    drafts_generating = bool(user_brand_ids & _state.generating_brands)
+    scanning = bool(user_brand_ids & _state.scanning_brands)
 
     return {
         "report_running": report_running,
-        "drafts_generating": bool(user_brand_ids & _state.generating_brands),
-        "scanning": bool(user_brand_ids & _state.scanning_brands),
+        "drafts_generating": drafts_generating,
+        "scanning": scanning,
+        "model_scores": model_scores,
     }

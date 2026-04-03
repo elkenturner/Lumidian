@@ -657,3 +657,13 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     timestamp: datetime
+
+
+# ── Onboarding ────────────────────────────────────────────────────────────────
+
+class FetchWebsiteContextRequest(BaseModel):
+    url: str
+
+
+class FetchWebsiteContextResponse(BaseModel):
+    context: str

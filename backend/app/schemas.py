@@ -396,7 +396,6 @@ class ContentAttributionSummary(BaseModel):
 
 class CompetitorCreate(BaseModel):
     name: str
-    website_url: Optional[str] = None
 
     @field_validator("name")
     @classmethod
@@ -411,7 +410,6 @@ class CompetitorResponse(BaseModel):
     id: int
     brand_id: int
     name: str
-    website_url: Optional[str] = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

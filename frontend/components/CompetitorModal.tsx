@@ -20,7 +20,6 @@ export function CompetitorModal({
 }) {
   const [local, setLocal] = useState(competitors);
   const [newName, setNewName] = useState('');
-  const [newWebsite, setNewWebsite] = useState('');
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
 
@@ -31,11 +30,10 @@ export function CompetitorModal({
     if (!newName.trim()) return;
     setAdding(true);
     try {
-      const c = await addCompetitor(brandId, newName.trim(), newWebsite.trim() || undefined);
+      const c = await addCompetitor(brandId, newName.trim());
       const updated = [...local, c];
       setLocal(updated);
       setNewName('');
-      setNewWebsite('');
       onChanged(updated);
     } finally {
       setAdding(false);
@@ -75,9 +73,6 @@ export function CompetitorModal({
               <div key={c.id} className="flex items-center gap-3 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] rounded-lg px-3 py-2.5">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-[#F0F4F8] font-medium truncate">{c.name}</p>
-                  {c.website_url && (
-                    <p className="text-[10px] text-[#475569] truncate">{c.website_url}</p>
-                  )}
                 </div>
                 {rate !== undefined && (
                   <span className="text-xs font-bold tabular-nums text-[#94A3B8] flex-shrink-0">
@@ -116,13 +111,6 @@ export function CompetitorModal({
               Add
             </button>
           </div>
-          <input
-            type="text"
-            value={newWebsite}
-            onChange={(e) => setNewWebsite(e.target.value)}
-            placeholder="Website URL (optional)"
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
-          />
         </div>
 
         {local.length > 0 && (

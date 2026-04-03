@@ -31,6 +31,18 @@ logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler(timezone="UTC")
 
 
+def _is_brand_paused(brand) -> bool:
+    """Check if a brand should be skipped in scheduled sweeps."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+
+    # Skip expired pitch brands
+    if brand.brand_type == "pitch" and brand.pitch_expires_at and brand.pitch_expires_at <= now:
+        return True
+
+    return False
+
+
 async def _is_scheduler_paused() -> bool:
     """Return True if the scheduler has been paused via the settings API."""
     from app.database import AsyncSessionLocal
@@ -50,7 +62,6 @@ async def _run_all_brands(schedule_slot: str) -> None:
         logger.info("Scheduler paused — skipping %s sweep", schedule_slot)
         return
 
-    from datetime import datetime, timezone
     from app.database import AsyncSessionLocal
     from app.models import Brand
     from app.services.tracking_service import run_tracking
@@ -66,12 +77,11 @@ async def _run_all_brands(schedule_slot: str) -> None:
         logger.info("Scheduler: no brands found, skipping %s sweep", schedule_slot)
         return
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
     for brand in brands:
-        # Skip pitch brands that have expired (cleanup job handles deletion)
-        if brand.brand_type == "pitch" and brand.pitch_expires_at and brand.pitch_expires_at <= now:
+        # Skip paused brands
+        if _is_brand_paused(brand):
             logger.info(
-                "Scheduler: skipping expired pitch brand %d (%s) [%s]",
+                "Scheduler: skipping paused brand %d (%s) [%s]",
                 brand.id, brand.name, schedule_slot,
             )
             continue
@@ -130,6 +140,9 @@ async def _reddit_scanner_sweep() -> None:
         brands = result.scalars().all()
 
     for brand in brands:
+        if _is_brand_paused(brand):
+            logger.info("Scheduler: skipping paused brand %d in Reddit sweep", brand.id)
+            continue
         state.scanning_brands.add(brand.id)
         try:
             await scan_brand_opportunities(brand.id)
@@ -160,6 +173,9 @@ async def _quora_scanner_sweep() -> None:
         brands = result.scalars().all()
 
     for brand in brands:
+        if _is_brand_paused(brand):
+            logger.info("Scheduler: skipping paused brand %d in Quora sweep", brand.id)
+            continue
         state.scanning_brands.add(brand.id)
         try:
             await scan_brand_opportunities(brand.id)
@@ -183,7 +199,6 @@ async def _auto_draft_sweep() -> None:
         logger.info("Scheduler paused — skipping auto-draft sweep")
         return
 
-    from datetime import datetime, timezone
     from app.database import AsyncSessionLocal
     from app.models import Brand, BrandContentSettings
     from sqlalchemy import select
@@ -194,12 +209,11 @@ async def _auto_draft_sweep() -> None:
         result = await db.execute(select(Brand))
         brands = result.scalars().all()
 
-    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
     for brand in brands:
-        # Skip pitch brands that have expired
-        if brand.brand_type == "pitch" and brand.pitch_expires_at and brand.pitch_expires_at <= now_utc:
+        # Skip paused brands
+        if _is_brand_paused(brand):
             logger.info(
-                "Scheduler: skipping expired pitch brand %d (%s) in auto-draft sweep",
+                "Scheduler: skipping paused brand %d (%s) in auto-draft sweep",
                 brand.id, brand.name,
             )
             continue

@@ -3,7 +3,7 @@ import pytest
 from datetime import datetime, timezone, timedelta
 from httpx import AsyncClient
 
-from tests.conftest import register_and_login, create_brand
+from tests.conftest import register_and_login
 
 
 @pytest.mark.asyncio
@@ -57,3 +57,34 @@ async def test_paused_brand_allows_read(client: AsyncClient):
     # Reading brand should still work
     get_resp = await client.get(f"/api/brands/{brand_id}")
     assert get_resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_lapsed_subscription_blocks_run(client: AsyncClient):
+    """Lapsed subscription should block tracking runs."""
+    token = await register_and_login(client, "lapsed@test.com", "password123")
+
+    # Create a brand
+    brand_resp = await client.post(
+        "/api/brands",
+        json={"name": "LapsedBrand", "tier": "basic", "brand_type": "pitch", "prompts": ["test"], "website_url": "https://lapsed.com"},
+        cookies={"clarity_token": token},
+    )
+    brand_id = brand_resp.json()["id"]
+
+    # Set subscription status to canceled
+    from app.database import AsyncSessionLocal
+    from app.models import User
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User).where(User.email == "lapsed@test.com"))
+        user = result.scalar_one()
+        user.subscription_status = "canceled"
+        await db.commit()
+
+    # Attempt to trigger a run — should be blocked.
+    # require_active_subscription fires before require_brand_active, so a
+    # canceled subscription returns 402 (payment required) rather than 403.
+    run_resp = await client.post(f"/api/tracking/run/{brand_id}", cookies={"clarity_token": token})
+    assert run_resp.status_code in (402, 403)
+    assert run_resp.status_code != 202, "Run should be blocked for a canceled subscription"

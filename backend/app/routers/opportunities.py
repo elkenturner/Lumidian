@@ -118,6 +118,12 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     opp = await _get_opportunity_or_404(db, opportunity_id)
     await get_brand_for_user(opp.brand_id, db, user)
 
+    # Check if brand is paused
+    brand_result = await db.execute(select(Brand).where(Brand.id == opp.brand_id))
+    brand = brand_result.scalar_one()
+    from app.dependencies import require_brand_active
+    require_brand_active(brand, user)
+
     try:
         draft = await generate_opportunity_draft(db=db, opportunity_id=opportunity_id)
     except ValueError as exc:
@@ -196,6 +202,12 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
 
     check_rate_limit(user.id, limit=3)  # burst guard: 3 per minute
     await get_brand_for_user(brand_id, db, user)
+
+    # Check if brand is paused
+    brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
+    brand = brand_result.scalar_one()
+    from app.dependencies import require_brand_active
+    require_brand_active(brand, user)
 
     if not user.is_admin:
         scan_limit = WEEKLY_SCAN_LIMITS.get(user.subscription_tier or "", 0)

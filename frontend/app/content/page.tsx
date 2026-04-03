@@ -706,6 +706,27 @@ function DraftCard({
         </p>
       ) : null}
 
+      {/* Standalone Reddit draft: link to subreddit */}
+      {draft.opportunity_id == null && draft.platform === 'reddit' && (() => {
+        const sub = extractSubreddit(draft.content_brief);
+        const url = sub ? `https://reddit.com/r/${sub}` : 'https://reddit.com/submit';
+        const label = sub ? `Post to r/${sub}` : 'Post to Reddit';
+        return (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-[rgba(249,115,22,0.07)] border border-[rgba(249,115,22,0.20)] rounded-lg px-3 py-2 group transition-colors hover:border-[rgba(249,115,22,0.35)] hover:bg-[rgba(249,115,22,0.11)]"
+          >
+            <span className="text-[#f97316] text-xs flex-shrink-0">↗</span>
+            <span className="text-xs text-[#f97316] font-medium flex-1 min-w-0 truncate">
+              {label}
+            </span>
+            <ExternalLink size={11} className="text-[#f97316]/60 flex-shrink-0 group-hover:text-[#f97316]" />
+          </a>
+        );
+      })()}
+
       {/* Title or inline editor */}
       {editing ? (
         <div className="flex flex-col gap-2">

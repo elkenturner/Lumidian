@@ -121,6 +121,13 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     # Check if brand is paused
     require_brand_active(brand, user)
 
+    # Pitch brands cannot draft from opportunities — paid feature
+    if brand.brand_type == "pitch":
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="Opportunity drafting is available on Starter and Pro plans. Upgrade to draft replies from live opportunities.",
+        )
+
     try:
         draft = await generate_opportunity_draft(db=db, opportunity_id=opportunity_id)
     except ValueError as exc:

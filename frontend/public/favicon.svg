@@ -1,17 +1,12 @@
-<svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Refracted rays first -->
-  <line x1="10" y1="15" x2="32" y2="5"  stroke="#10a37f" stroke-width="1.2" stroke-linecap="round"/>
-  <line x1="10" y1="15" x2="32" y2="11" stroke="#d97757" stroke-width="1.0" stroke-linecap="round"/>
-  <line x1="10" y1="15" x2="32" y2="17" stroke="#6366f1" stroke-width="0.9" stroke-linecap="round"/>
-  <line x1="10" y1="15" x2="32" y2="23" stroke="#4285f4" stroke-width="0.8" stroke-linecap="round"/>
-  <line x1="10" y1="15" x2="32" y2="29" stroke="#93c5fd" stroke-width="0.7" stroke-linecap="round" opacity="0.3"/>
-
-  <!-- Upright prism triangle: apex top, base bottom -->
-  <path d="M16 2 L3 30 L29 30 Z" stroke="#c8c8d8" stroke-width="1.2" stroke-linejoin="round"/>
-
-  <!-- Incoming ray -->
-  <line x1="0" y1="14" x2="10" y2="15" stroke="#94a3b8" stroke-width="0.8" stroke-linecap="round" opacity="0.7"/>
-
-  <!-- Refraction dot -->
-  <circle cx="10" cy="15" r="1.8" fill="#a0a0b8"/>
+<svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Black outer eye shape -->
+  <path d="M 5,50 C 15,20 85,20 95,50 C 85,80 15,80 5,50 Z" fill="#111111"/>
+  <!-- Blue left corner accent -->
+  <path d="M 18,50 C 20,37 38,37 40,50 C 38,63 20,63 18,50 Z" fill="#3b63e8"/>
+  <!-- Blue right corner accent -->
+  <path d="M 82,50 C 80,37 62,37 60,50 C 62,63 80,63 82,50 Z" fill="#3b63e8"/>
+  <!-- White sclera -->
+  <circle cx="50" cy="50" r="17" fill="white"/>
+  <!-- Black pupil -->
+  <circle cx="50" cy="50" r="10" fill="#111111"/>
 </svg>

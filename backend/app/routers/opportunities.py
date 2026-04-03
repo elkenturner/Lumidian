@@ -231,6 +231,24 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
                 ),
             )
 
+    # Pitch brands have stricter limits (1/week) regardless of subscription tier
+    if brand.brand_type == "pitch":
+        from app.routers.billing import WEEKLY_SCAN_LIMITS_PITCH
+        _week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        pitch_scan_result = await db.execute(
+            select(sqlfunc.count(AnalyticsEvent.id)).where(
+                AnalyticsEvent.brand_id == brand_id,
+                AnalyticsEvent.event_type == "manual_scan_triggered",
+                AnalyticsEvent.created_at >= _week_ago,
+            )
+        )
+        pitch_scans = pitch_scan_result.scalar_one_or_none() or 0
+        if pitch_scans >= WEEKLY_SCAN_LIMITS_PITCH:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Pitch brands are limited to {WEEKLY_SCAN_LIMITS_PITCH} manual scan per week. Try again next week.",
+            )
+
     # Log before firing so the event counts immediately on the next quota check
     await log_event("manual_scan_triggered", {"brand_id": brand_id}, brand_id=brand_id)
 

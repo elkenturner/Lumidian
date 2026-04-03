@@ -72,9 +72,8 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
             )
 
     # Detect if this is the brand's first-ever run (triggers onboarding pipeline)
-    from sqlalchemy import func as sqlfunc
     completed_runs_result = await db.execute(
-        select(sqlfunc.count(TrackingRun.id)).where(
+        select(func.count(TrackingRun.id)).where(
             TrackingRun.brand_id == brand_id,
             TrackingRun.status == "completed",
         )

@@ -39,12 +39,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   // Falls back to localStorage fast-path so pages that write flags immediately
   // still get instant banner feedback before the first API response.
   useEffect(() => {
-    // Fast-path: sync from localStorage immediately for instant feedback
+    // Fast-path: sync from localStorage for instant feedback on report/drafts
+    // (scanning state comes purely from API since no page writes it)
     const syncLocal = () => {
       try {
         if (localStorage.getItem('clarity_report_running')) setReportRunning(true);
         if (localStorage.getItem('clarity_drafts_generating')) setDraftsGenerating(true);
-        if (localStorage.getItem('clarity_scanning')) setScanning(true);
+        // Note: scanning state comes from API only
       } catch {}
     };
     syncLocal();

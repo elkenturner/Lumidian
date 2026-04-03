@@ -45,15 +45,17 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
     # Check if brand is paused (expired pitch brand or lapsed subscription)
     require_brand_active(brand, user)
 
+    # Calculate today's start once for all limit checks
+    from datetime import datetime, timezone
+    from sqlalchemy import func
+    today_start = datetime.now(timezone.utc).replace(
+        hour=0, minute=0, second=0, microsecond=0, tzinfo=None
+    )
+
     # Enforce daily manual run limits by tier (source of truth: billing.DAILY_RUN_LIMITS)
     tier = user.subscription_tier or None
     daily_limit = DAILY_RUN_LIMITS.get(tier) if not user.is_admin else None
     if daily_limit is not None:
-        from datetime import datetime, timezone
-        from sqlalchemy import func
-        today_start = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
-        )
         runs_today_result = await db.execute(
             select(func.count(TrackingRun.id)).where(
                 TrackingRun.brand_id.in_(
@@ -73,17 +75,12 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
 
     # Pitch brands have stricter limits (1/day) regardless of subscription tier
     if brand.brand_type == "pitch":
-        from datetime import datetime, timezone
-        from sqlalchemy import func
         from app.routers.billing import DAILY_RUN_LIMITS_PITCH
-        _today_start = datetime.now(timezone.utc).replace(
-            hour=0, minute=0, second=0, microsecond=0, tzinfo=None
-        )
         pitch_runs_result = await db.execute(
             select(func.count(TrackingRun.id)).where(
                 TrackingRun.brand_id == brand_id,
                 TrackingRun.run_type == "manual",
-                TrackingRun.created_at >= _today_start,
+                TrackingRun.created_at >= today_start,
             )
         )
         pitch_runs_today = pitch_runs_result.scalar_one()

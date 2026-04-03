@@ -19310,3 +19310,66 @@ task: <Task pending name='Task-741' coro=<send_email_background.<locals>._run() 
 task: <Task pending name='Task-782' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104a2f850>()]>>
 2026-04-02 19:33:05  ERROR     asyncio — Task was destroyed but it is pending!
 task: <Task pending name='Task-823' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x104a4cd00>()]>>
+2026-04-02 19:34:46  WARNING   app.routers.auth — failed login attempt email=wrongpw@example.com ip=127.0.0.1
+2026-04-02 19:34:47  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-02 19:34:51  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-02 19:34:53  WARNING   app.main — CSRF rejected: origin=https://evil.com not in ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-02 19:34:53  WARNING   app.routers.auth — failed login attempt email=nonexistent@test.com ip=127.0.0.1
+2026-04-02 19:34:56  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-02 19:35:10  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 1
+2026-04-02 19:35:30  ERROR     asyncio — Task exception was never retrieved
+future: <Task finished name='reddit-scan-1' coro=<trigger_scan.<locals>._scan_with_state_cleanup() done, defined at /Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py:260> exception=RuntimeError('simulated scan failure')>
+Traceback (most recent call last):
+  File "/Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py", line 262, in _scan_with_state_cleanup
+    await _scan_and_log(bid)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py", line 2165, in _execute_mock_call
+    result = await effect(*args, **kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/tests/test_banner_state.py", line 75, in mock_scan_and_log_raises
+    raise RuntimeError("simulated scan failure")
+RuntimeError: simulated scan failure
+2026-04-02 19:36:13  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:36:15  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:36:46  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:36:51  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:36:55  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:37:01  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:37:18  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:37:29  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:37:46  WARNING   app.services.tracking_service — Onboarding draft generation failed for brand_id=55 (non-fatal): LLM timeout
+2026-04-02 19:38:05  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:38:10  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:38:16  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:38:21  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:38:40  ERROR     app.routers.support — Failed to send support email from user@example.com: SMTP down
+2026-04-02 19:38:56  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:39:01  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:39:06  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 19:39:12  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-02 21:18:05  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:06  WARNING   app.services.email_service — Background email failed (send_email_verification): (550, b'You have reached your daily email sending quota.')
+2026-04-02 21:18:08  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:11  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:14  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:17  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:20  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:23  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:26  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:29  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:32  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:35  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:38  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:41  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:45  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:18:50  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 9
+2026-04-02 21:20:37  ERROR     asyncio — Task exception was never retrieved
+future: <Task finished name='Task-340' coro=<AsyncClient.aclose() done, defined at /Users/ken/Library/Python/3.9/lib/python/site-packages/httpx/_client.py:1978> exception=AttributeError("'AsyncHttpxClientWrapper' object has no attribute '_state'")>
+Traceback (most recent call last):
+  File "/Users/ken/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 1982, in aclose
+    if self._state != ClientState.CLOSED:
+AttributeError: 'AsyncHttpxClientWrapper' object has no attribute '_state'
+2026-04-02 21:20:38  ERROR     asyncio — Task exception was never retrieved
+future: <Task finished name='Task-351' coro=<AsyncClient.aclose() done, defined at /Users/ken/Library/Python/3.9/lib/python/site-packages/httpx/_client.py:1978> exception=AttributeError("'AsyncHttpxClientWrapper' object has no attribute '_state'")>
+Traceback (most recent call last):
+  File "/Users/ken/Library/Python/3.9/lib/python/site-packages/httpx/_client.py", line 1982, in aclose
+    if self._state != ClientState.CLOSED:
+AttributeError: 'AsyncHttpxClientWrapper' object has no attribute '_state'

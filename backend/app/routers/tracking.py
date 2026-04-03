@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.routers.billing import DAILY_RUN_LIMITS
-from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_active_subscription
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_active_subscription, require_brand_active
 from app.models import Brand, TrackingRun
 from app.schemas import ManualRunResponse, TrackingRunStatus, TrackingRunSummary
 
@@ -40,7 +40,10 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDep, user: CurrentUser):
     require_active_subscription(user)
     check_rate_limit(user.id, limit=3)  # 3 manual runs per minute per user (burst protection)
-    await get_brand_for_user(brand_id, db, user)
+    brand = await get_brand_for_user(brand_id, db, user)
+
+    # Check if brand is paused (expired pitch brand or lapsed subscription)
+    require_brand_active(brand, user)
 
     # Enforce daily manual run limits by tier (source of truth: billing.DAILY_RUN_LIMITS)
     tier = user.subscription_tier or None

@@ -13,9 +13,12 @@ DELETE /api/brands/{brand_id}/prompts/{prompt_id} — remove a prompt
 """
 
 import json as _json
+import logging
 import os as _os
 import re
 from typing import Annotated, Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select, func
@@ -40,6 +43,8 @@ from app.schemas import (
     OverallSOV,
     CompetitorPromptResult,
     CompetitorByModel,
+    FetchWebsiteContextRequest,
+    FetchWebsiteContextResponse,
 )
 
 router = APIRouter(prefix="/brands", tags=["brands"])
@@ -573,6 +578,39 @@ The goal is to find queries where a user is researching a problem or category, a
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Suggestion generation failed: {exc}",
+        )
+
+
+# ── Fetch website context without an existing brand (onboarding) ─────────────
+
+@router.post("/fetch-website-context", response_model=FetchWebsiteContextResponse)
+async def fetch_website_context_endpoint(
+    payload: FetchWebsiteContextRequest,
+    user: CurrentUser,
+):
+    """
+    Fetch website content via Jina Reader without requiring a brand.
+    Used by onboarding wizard to get context before brand creation.
+    Rate limited to 5 calls/minute per user.
+    """
+    from app.services.jina_service import fetch_website_context
+    from app.dependencies import check_rate_limit
+
+    check_rate_limit(user.id, limit=5)  # 5 per minute
+
+    try:
+        context = await fetch_website_context(payload.url)
+        return FetchWebsiteContextResponse(context=context)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid URL: {e}",
+        )
+    except Exception as e:
+        logger.warning("Jina fetch failed for %s: %s", payload.url, e)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to fetch website content. Please check the URL and try again.",
         )
 
 

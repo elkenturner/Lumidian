@@ -60,8 +60,8 @@ class BrandCreate(BaseModel):
     @field_validator("brand_type")
     @classmethod
     def validate_brand_type(cls, v: str) -> str:
-        if v not in ("standard", "pitch"):
-            raise ValueError("brand_type must be 'standard' or 'pitch'")
+        if v not in ("standard", "pitch", "pro"):
+            raise ValueError("brand_type must be 'standard', 'pitch', or 'pro'")
         return v
 
     @field_validator("name")

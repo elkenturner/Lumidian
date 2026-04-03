@@ -7,8 +7,30 @@ import { getBillingStatus, createCheckoutSession, createPortalSession, cancelSub
 import { useAuth } from '@/contexts/AuthContext';
 
 const TIER_FEATURES: Record<string, string[]> = {
-  starter: ['25 tracked prompts per brand', '2 standard brands', '3 pitch decks (30-day each)', '1 manual run per day', '4 AI models', 'Twice-daily reports', 'Gap analysis', 'Content drafts', 'Email support'],
-  pro: ['100 tracked prompts per brand', '4 standard brands', 'Unlimited pitch decks', 'Unlimited manual runs', '4 AI models', 'Twice-daily reports', 'Advanced gap analysis', 'Priority content drafts', 'Priority support'],
+  starter: [
+    '1 standard brand',
+    '1 pitch deck (30-day)',
+    '25 tracked prompts per brand',
+    '3 manual runs per day',
+    '10 manual drafts per week',
+    '10 manual opportunity scans per week',
+    '5 competitors tracked per brand',
+    '1 additional team member',
+    '4 AI models tracked',
+    'Email support',
+  ],
+  pro: [
+    '2 pro brands',
+    '3 pitch decks (30-day each)',
+    '100 tracked prompts per brand',
+    'Unlimited manual runs',
+    '25 manual drafts per week',
+    '25 manual opportunity scans per week',
+    '15 competitors tracked per brand',
+    '3 additional team members',
+    '4 AI models tracked',
+    'Priority support',
+  ],
 };
 
 export default function BillingPage() {

@@ -107,6 +107,7 @@ class Brand(Base):
     # "standard" | "pitch" — pitch brands expire after 30 days and cap at 10 prompts
     brand_type: Mapped[str] = mapped_column(String(20), nullable=False, default="standard")
     pitch_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    prompt_limit: Mapped[int] = mapped_column(Integer, default=25)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 

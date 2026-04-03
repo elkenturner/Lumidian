@@ -297,6 +297,8 @@ async def run_migrations():
         "CREATE INDEX IF NOT EXISTS idx_query_results_run_created ON query_results(tracking_run_id, created_at DESC)",
         # BrandContentSettings: drafting_frequency was added to DB but was missing from the ORM model
         "ALTER TABLE brand_content_settings ADD COLUMN drafting_frequency TEXT NOT NULL DEFAULT 'weekly'",
+        # 2026-04-02: Add prompt_limit column to brands
+        "ALTER TABLE brands ADD COLUMN prompt_limit INTEGER DEFAULT 25",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

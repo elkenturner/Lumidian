@@ -184,10 +184,22 @@ async def list_brands(db: DbDep, user: CurrentUser):
 @router.post("", response_model=BrandDetail, status_code=status.HTTP_201_CREATED)
 async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
     if not user.is_admin:
-        from app.routers.auth import BRAND_TYPE_LIMITS
+        from app.routers.billing import BRAND_TYPE_LIMITS
         limits = BRAND_TYPE_LIMITS.get(user.subscription_tier, BRAND_TYPE_LIMITS[None])
-        brand_type_limit = limits.get(payload.brand_type, 0)
 
+        # Validate brand_type is allowed for this tier
+        if payload.brand_type not in limits or limits[payload.brand_type] == 0:
+            if payload.brand_type == "pro":
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Pro brands require a Pro subscription. Upgrade to create pro brands.",
+                )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Your subscription does not allow creating {payload.brand_type} brands.",
+            )
+
+        brand_type_limit = limits[payload.brand_type]
         existing_of_type = await db.execute(
             select(func.count(Brand.id)).where(
                 Brand.user_id == user.id,
@@ -245,11 +257,16 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
     if payload.brand_type == "pitch":
         pitch_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30)
 
+    from app.routers.billing import PROMPT_LIMITS
+    # Set prompt limit based on brand type
+    prompt_limit = PROMPT_LIMITS.get(payload.brand_type, 25)
+
     brand = Brand(
         name=payload.name,
         slug=slug,
         tier=payload.tier,
         brand_type=payload.brand_type,
+        prompt_limit=prompt_limit,
         pitch_expires_at=pitch_expires_at,
         user_id=user.id,
         website_url=payload.website_url,
@@ -257,9 +274,8 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
     db.add(brand)
     await db.flush()  # gets brand.id without committing
 
-    # Pitch brands cap at 10 prompts
-    pitch_limit = 10
-    prompt_list = payload.prompts[:pitch_limit] if payload.brand_type == "pitch" else payload.prompts
+    # Cap initial prompts at the brand's prompt_limit
+    prompt_list = payload.prompts[:prompt_limit]
     for text in prompt_list:
         text = text.strip()
         if text:
@@ -353,37 +369,21 @@ async def add_prompt(
 
     # Enforce prompt limits for non-admin users
     if not user.is_admin:
-        # Re-fetch brand to check brand_type and pitch expiry
+        # Re-fetch brand to check prompt_limit
         brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
         brand_obj = brand_result.scalar_one_or_none()
 
-        if brand_obj and brand_obj.brand_type == "pitch":
-            # Pitch brand: hard cap of 10 prompts per brand
-            pitch_prompt_count_result = await db.execute(
-                select(func.count(Prompt.id)).where(Prompt.brand_id == brand_id)
+        if brand_obj:
+            from sqlalchemy import func as sqlfunc
+            prompt_count_result = await db.execute(
+                select(sqlfunc.count(Prompt.id)).where(Prompt.brand_id == brand_id)
             )
-            pitch_count = pitch_prompt_count_result.scalar_one()
-            if pitch_count >= 10:
+            current_count = prompt_count_result.scalar_one()
+            limit = getattr(brand_obj, "prompt_limit", 25)
+            if current_count >= limit:
                 raise HTTPException(
-                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                    detail="Pitch brands are limited to 10 prompts. Upgrade to a standard brand for more.",
-                )
-        else:
-            # Standard brand: check total prompt count against tier limit
-            from app.routers.auth import TIER_LIMITS
-            limit = TIER_LIMITS.get(user.subscription_tier or "", 10)
-            count_result = await db.execute(
-                select(func.count(Prompt.id)).where(
-                    Prompt.brand_id.in_(
-                        select(Brand.id).where(Brand.user_id == user.id, Brand.brand_type == "standard")
-                    )
-                )
-            )
-            total_prompts = count_result.scalar_one()
-            if total_prompts >= limit:
-                raise HTTPException(
-                    status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                    detail="Prompt limit reached. Upgrade to Pro for up to 100 prompts.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Prompt limit reached ({limit}). Delete a prompt or upgrade your brand type.",
                 )
 
     prompt = Prompt(brand_id=brand_id, text=text)

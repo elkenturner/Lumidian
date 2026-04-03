@@ -25,7 +25,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_active_subscription
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_active_subscription, require_brand_active
 from app.models import Brand, ContentDraft, ContentPost, ContentAttribution, BrandContentSettings, TrackingRun
 from app.schemas import (
     ContentDraftSchema,
@@ -211,7 +211,6 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
         )
     check_rate_limit(user.id, limit=10)  # burst guard (per minute)
     brand = await get_brand_for_user(brand_id, db, user)
-    from app.dependencies import require_brand_active
     require_brand_active(brand, user)
     if not user.is_admin:
         await _check_weekly_manual_draft_limit(db, brand, user.subscription_tier)
@@ -473,7 +472,6 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
         )
 
     brand = await get_brand_for_user(brand_id, db, user)
-    from app.dependencies import require_brand_active
     require_brand_active(brand, user)
 
     if not user.is_admin:
@@ -612,7 +610,6 @@ async def create_gap_draft(brand_id: int, request: CreateDraftRequest, db: DbDep
             detail="Content drafting requires a Starter or Pro plan. Upgrade to unlock this feature.",
         )
     brand = await get_brand_for_user(brand_id, db, user)
-    from app.dependencies import require_brand_active
     require_brand_active(brand, user)
     if not user.is_admin:
         await _check_weekly_manual_draft_limit(db, brand, user.subscription_tier)

@@ -21,7 +21,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_brand_active
 from app.models import Brand, ContentOpportunity, Prompt, utcnow
 from app.schemas import ContentDraftSchema, ContentOpportunitySchema
 
@@ -116,12 +116,9 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     from app.services.drafting_service import generate_opportunity_draft
 
     opp = await _get_opportunity_or_404(db, opportunity_id)
-    await get_brand_for_user(opp.brand_id, db, user)
+    brand = await get_brand_for_user(opp.brand_id, db, user)
 
     # Check if brand is paused
-    brand_result = await db.execute(select(Brand).where(Brand.id == opp.brand_id))
-    brand = brand_result.scalar_one()
-    from app.dependencies import require_brand_active
     require_brand_active(brand, user)
 
     try:
@@ -201,12 +198,9 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     from app.services.analytics_service import log_event
 
     check_rate_limit(user.id, limit=3)  # burst guard: 3 per minute
-    await get_brand_for_user(brand_id, db, user)
+    brand = await get_brand_for_user(brand_id, db, user)
 
     # Check if brand is paused
-    brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-    brand = brand_result.scalar_one()
-    from app.dependencies import require_brand_active
     require_brand_active(brand, user)
 
     if not user.is_admin:

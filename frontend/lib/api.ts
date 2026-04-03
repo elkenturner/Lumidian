@@ -1218,15 +1218,14 @@ export async function verify2fa(challenge_token: string, code: string): Promise<
 
 // ── Background task status ─────────────────────────────────────────────────────
 
-export async function getBackgroundStatus(): Promise<{
+export interface BackgroundStatus {
   report_running: boolean;
   drafts_generating: boolean;
   scanning: boolean;
-}> {
-  const res = await api.get<{
-    report_running: boolean;
-    drafts_generating: boolean;
-    scanning: boolean;
-  }>('/tracking/background-status');
+  model_scores: Array<{ model: string; score: number }>;
+}
+
+export async function getBackgroundStatus(): Promise<BackgroundStatus> {
+  const res = await api.get<BackgroundStatus>('/tracking/background-status');
   return res.data;
 }

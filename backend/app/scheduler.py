@@ -322,6 +322,9 @@ async def _website_context_refresh_sweep() -> None:
         brands = result.scalars().all()
 
     for brand in brands:
+        if _is_brand_paused(brand):
+            logger.info("Scheduler: skipping paused brand %d in website context refresh", brand.id)
+            continue
         try:
             ok = await refresh_brand_website_context(brand.id)
             if ok:
@@ -383,6 +386,8 @@ async def _visibility_alert_sweep() -> None:
         brands = brands_result.scalars().all()
 
         for brand in brands:
+            if _is_brand_paused(brand):
+                continue  # No need to log - this is a silent skip for alert processing
             if brand.user_id is None:
                 continue
 

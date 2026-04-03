@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_current_user, get_brand_for_user, get_data_owner_id, CurrentUser
+from app.dependencies import get_current_user, get_brand_for_user, get_data_owner_id, CurrentUser, check_rate_limit
 from app.models import Brand, Prompt, Competitor, TrackingRun, User
 from datetime import datetime, timezone, timedelta
 from app.schemas import (
@@ -594,7 +594,6 @@ async def fetch_website_context_endpoint(
     Rate limited to 5 calls/minute per user.
     """
     from app.services.jina_service import fetch_website_context
-    from app.dependencies import check_rate_limit
 
     check_rate_limit(user.id, limit=5)  # 5 per minute
 

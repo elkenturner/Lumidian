@@ -15,14 +15,14 @@ import {
 
 function StatCard({ label, value, icon: Icon }: { label: string; value: number | string; icon: React.ElementType }) {
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl p-5">
+    <div className="card" style={{ padding: 20 }}>
       <div className="flex items-center gap-3 mb-2">
-        <div className="w-8 h-8 rounded-lg bg-[rgba(99,102,241,0.12)] border border-[rgba(99,102,241,0.22)] flex items-center justify-center">
-          <Icon size={16} className="text-[#818cf8]" />
+        <div className="w-8 h-8 rounded-lg bg-[var(--accent-muted)] border border-[var(--border-subtle)] flex items-center justify-center">
+          <Icon size={16} className="text-[var(--accent-foreground)]" />
         </div>
-        <span className="text-xs text-[#64748B] font-medium uppercase tracking-wide">{label}</span>
+        <span className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-wide">{label}</span>
       </div>
-      <div className="text-2xl font-bold text-[#F0F4F8]">{value}</div>
+      <div className="text-2xl font-bold font-mono text-[var(--text-primary)]">{value}</div>
     </div>
   );
 }
@@ -35,19 +35,19 @@ function StatusBadge({ status }: { status: string }) {
     failed:    'bg-red-500/15 text-red-400 border-red-500/30',
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${styles[status] ?? 'bg-[rgba(255,255,255,0.06)] text-[#94A3B8] border-[rgba(255,255,255,0.10)]'}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${styles[status] ?? 'bg-[rgba(255,255,255,0.06)] text-[var(--text-secondary)] border-[var(--border-subtle)]'}`}>
       {status}
     </span>
   );
 }
 
 function TierBadge({ tier }: { tier: string | null }) {
-  if (!tier) return <span className="text-[#475569] text-[10px]">free</span>;
+  if (!tier) return <span className="text-[var(--text-faint)] text-[10px]">free</span>;
   const cls = tier === 'pro'
-    ? 'bg-[#6366f1]/20 text-[#818cf8] border-[#6366f1]/30'
+    ? 'bg-[var(--accent)]/20 text-[var(--accent-foreground)] border-[var(--accent)]/30'
     : tier === 'starter'
-    ? 'bg-[rgba(255,255,255,0.08)] text-[#94A3B8] border-[rgba(255,255,255,0.10)]'
-    : 'bg-[rgba(255,255,255,0.04)] text-[#475569] border-[rgba(255,255,255,0.06)]';
+    ? 'bg-[rgba(255,255,255,0.08)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
+    : 'bg-[rgba(255,255,255,0.04)] text-[var(--text-faint)] border-[rgba(255,255,255,0.06)]';
   return (
     <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${cls}`}>{tier}</span>
   );
@@ -154,41 +154,41 @@ export default function AdminPage() {
     return (
       <div className="p-8 max-w-4xl animate-pulse space-y-4">
         <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-40" />
-        <div className="h-32 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
-        <div className="h-64 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
+        <div className="h-32 card rounded-xl" />
+        <div className="h-64 card rounded-xl" />
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[var(--bg-base)] flex items-center justify-center px-4">
         <div className="bg-[#7f1d1d]/20 border border-[#991b1b]/30 rounded-xl p-6 text-center max-w-sm">
-          <Shield size={32} className="text-[#f87171] mx-auto mb-3" />
-          <p className="text-[#f87171] text-sm">{error}</p>
+          <Shield size={32} className="text-[var(--danger)] mx-auto mb-3" />
+          <p className="text-[var(--danger)] text-sm">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] p-6">
+    <div className="min-h-screen bg-[var(--bg-base)] p-6">
       <div className="max-w-7xl mx-auto space-y-6">
 
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[rgba(99,102,241,0.20)] flex items-center justify-center">
-              <Shield size={18} className="text-[#818cf8]" />
+            <div className="w-9 h-9 rounded-xl bg-[var(--accent-muted)] flex items-center justify-center">
+              <Shield size={18} className="text-[var(--accent-foreground)]" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-[#F0F4F8]">Admin Dashboard</h1>
-              <p className="text-xs text-[#64748B]">System overview — visible to admins only</p>
+              <h1 className="text-xl font-bold text-[var(--text-primary)]">Admin Dashboard</h1>
+              <p className="text-xs text-[var(--text-muted)]">System overview — visible to admins only</p>
             </div>
           </div>
           <button
             onClick={load}
-            className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#94A3B8] transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors cursor-pointer"
           >
             <RefreshCw size={13} />
             Refresh
@@ -207,37 +207,37 @@ export default function AdminPage() {
         )}
 
         {/* Users Table */}
-        <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[rgba(99,102,241,0.12)]">
-            <h2 className="text-sm font-semibold text-[#F0F4F8] flex items-center gap-2">
-              <Users size={14} className="text-[#818cf8]" />
+        <div className="card rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--border-subtle)]">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              <Users size={14} className="text-[var(--accent-foreground)]" />
               Users ({users.length})
             </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-[rgba(255,255,255,0.05)]">
-                  <th className="text-left text-[#475569] px-4 py-2.5 font-medium">User</th>
-                  <th className="text-left text-[#475569] px-4 py-2.5 font-medium">Plan</th>
-                  <th className="text-left text-[#475569] px-4 py-2.5 font-medium">Brands</th>
-                  <th className="text-left text-[#475569] px-4 py-2.5 font-medium">Joined</th>
-                  <th className="text-left text-[#475569] px-4 py-2.5 font-medium">Account</th>
+                <tr className="border-b border-[var(--border-subtle)]">
+                  <th className="text-left text-[var(--text-faint)] px-4 py-2.5 font-medium">User</th>
+                  <th className="text-left text-[var(--text-faint)] px-4 py-2.5 font-medium">Plan</th>
+                  <th className="text-left text-[var(--text-faint)] px-4 py-2.5 font-medium">Brands</th>
+                  <th className="text-left text-[var(--text-faint)] px-4 py-2.5 font-medium">Joined</th>
+                  <th className="text-left text-[var(--text-faint)] px-4 py-2.5 font-medium">Account</th>
                 </tr>
               </thead>
               <tbody>
                 {users.map((u) => (
-                  <tr key={u.id} className={`border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)] ${u.is_paused ? 'opacity-60' : ''}`}>
+                  <tr key={u.id} className={`border-b border-[var(--border-subtle)] hover:bg-[rgba(255,255,255,0.02)] ${u.is_paused ? 'opacity-60' : ''}`}>
                     {/* User */}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">
-                        {u.is_admin && <Shield size={11} className="text-[#818cf8] shrink-0" />}
-                        {u.is_paused && <PauseCircle size={11} className="text-[#f59e0b] shrink-0" />}
-                        <span className="text-[#E2E8F0] font-medium">{u.email}</span>
+                        {u.is_admin && <Shield size={11} className="text-[var(--accent-foreground)] shrink-0" />}
+                        {u.is_paused && <PauseCircle size={11} className="text-[var(--warning)] shrink-0" />}
+                        <span className="text-[var(--text-primary)] font-medium">{u.email}</span>
                       </div>
-                      {u.name && <div className="text-[#475569] mt-0.5">{u.name}</div>}
+                      {u.name && <div className="text-[var(--text-faint)] mt-0.5">{u.name}</div>}
                       {u.last_active && (
-                        <div className="text-[#475569] mt-0.5">
+                        <div className="text-[var(--text-faint)] mt-0.5">
                           active {new Date(u.last_active + 'Z').toLocaleDateString()}
                         </div>
                       )}
@@ -247,7 +247,7 @@ export default function AdminPage() {
                       <div className="flex flex-col gap-1">
                         <TierBadge tier={u.subscription_tier ?? null} />
                         {u.subscription_status === 'trialing' && (
-                          <span className="text-[10px] text-[#10b981]">trialing</span>
+                          <span className="text-[10px] text-[var(--success)]">trialing</span>
                         )}
                       </div>
                     </td>
@@ -257,16 +257,16 @@ export default function AdminPage() {
                         <div className="flex flex-col gap-1.5">
                           {u.brands.map((b) => (
                             <div key={b.id} className="flex items-center gap-2 group">
-                              <span className="text-[#CBD5E1]">{b.name}</span>
+                              <span className="text-[var(--text-primary)]">{b.name}</span>
                               {b.brand_type === 'pitch' && (
-                                <span className="text-[10px] px-1 rounded bg-[#6366f1]/15 text-[#818cf8] border border-[#6366f1]/20">pitch</span>
+                                <span className="text-[10px] px-1 rounded bg-[var(--accent)]/15 text-[var(--accent-foreground)] border border-[var(--accent)]/20">pitch</span>
                               )}
                               {/* Run */}
                               <button
                                 onClick={() => handleTriggerRun(b.id)}
                                 disabled={triggeringBrand === b.id}
                                 title="Trigger tracking run"
-                                className="flex items-center gap-1 text-[#475569] hover:text-[#6366f1] disabled:opacity-40 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                                className="flex items-center gap-1 text-[var(--text-faint)] hover:text-[var(--accent)] disabled:opacity-40 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
                               >
                                 {triggeringBrand === b.id
                                   ? <Loader2 size={11} className="animate-spin" />
@@ -280,8 +280,8 @@ export default function AdminPage() {
                                 title="Generate content drafts"
                                 className={`flex items-center gap-1 disabled:opacity-40 transition-colors cursor-pointer opacity-0 group-hover:opacity-100 ${
                                   draftedBrands.has(b.id)
-                                    ? 'text-[#10b981]'
-                                    : 'text-[#475569] hover:text-[#10b981]'
+                                    ? 'text-[var(--success)]'
+                                    : 'text-[var(--text-faint)] hover:text-[var(--success)]'
                                 }`}
                               >
                                 {draftingBrand === b.id
@@ -293,11 +293,11 @@ export default function AdminPage() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-[#475569]">—</span>
+                        <span className="text-[var(--text-faint)]">—</span>
                       )}
                     </td>
                     {/* Joined */}
-                    <td className="px-4 py-3 text-[#475569] whitespace-nowrap">
+                    <td className="px-4 py-3 text-[var(--text-faint)] whitespace-nowrap">
                       {u.created_at ? new Date(u.created_at + 'Z').toLocaleDateString() : '—'}
                     </td>
                     {/* Account actions */}
@@ -308,7 +308,7 @@ export default function AdminPage() {
                             onClick={() => handlePauseUser(u.id)}
                             disabled={pausingUser === u.id}
                             title={u.is_paused ? 'Unpause account' : 'Pause account'}
-                            className="flex items-center gap-1 text-[#64748B] hover:text-[#f59e0b] disabled:opacity-50 transition-colors cursor-pointer"
+                            className="flex items-center gap-1 text-[var(--text-muted)] hover:text-[var(--warning)] disabled:opacity-50 transition-colors cursor-pointer"
                           >
                             {pausingUser === u.id
                               ? <Loader2 size={11} className="animate-spin" />
@@ -322,7 +322,7 @@ export default function AdminPage() {
                               onClick={() => setConfirmRemove(u)}
                               disabled={removingUser === u.id}
                               title="Permanently remove user"
-                              className="flex items-center gap-1 text-[#64748B] hover:text-[#f87171] disabled:opacity-50 transition-colors cursor-pointer"
+                              className="flex items-center gap-1 text-[var(--text-muted)] hover:text-[var(--danger)] disabled:opacity-50 transition-colors cursor-pointer"
                             >
                               {removingUser === u.id
                                 ? <Loader2 size={11} className="animate-spin" />
@@ -336,7 +336,7 @@ export default function AdminPage() {
                   </tr>
                 ))}
                 {users.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-[#475569]">No users found</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--text-faint)]">No users found</td></tr>
                 )}
               </tbody>
             </table>
@@ -344,43 +344,43 @@ export default function AdminPage() {
         </div>
 
         {/* Recent Runs Table */}
-        <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)] overflow-hidden">
-          <div className="px-5 py-4 border-b border-[rgba(99,102,241,0.12)]">
-            <h2 className="text-sm font-semibold text-[#F0F4F8] flex items-center gap-2">
-              <Activity size={14} className="text-[#818cf8]" />
+        <div className="card rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--border-subtle)]">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+              <Activity size={14} className="text-[var(--accent-foreground)]" />
               Recent Tracking Runs
             </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-[rgba(255,255,255,0.05)]">
-                  <th className="text-left text-[#475569] px-4 py-2.5 font-medium">Brand</th>
-                  <th className="text-left text-[#475569] px-4 py-2.5 font-medium">Status</th>
-                  <th className="text-left text-[#475569] px-4 py-2.5 font-medium">Score</th>
-                  <th className="text-left text-[#475569] px-4 py-2.5 font-medium">When</th>
-                  <th className="text-left text-[#475569] px-4 py-2.5 font-medium">Action</th>
+                <tr className="border-b border-[var(--border-subtle)]">
+                  <th className="text-left text-[var(--text-faint)] px-4 py-2.5 font-medium">Brand</th>
+                  <th className="text-left text-[var(--text-faint)] px-4 py-2.5 font-medium">Status</th>
+                  <th className="text-left text-[var(--text-faint)] px-4 py-2.5 font-medium">Score</th>
+                  <th className="text-left text-[var(--text-faint)] px-4 py-2.5 font-medium">When</th>
+                  <th className="text-left text-[var(--text-faint)] px-4 py-2.5 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
                 {runs.slice(0, 30).map((r) => (
-                  <tr key={r.id} className="border-b border-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.02)]">
+                  <tr key={r.id} className="border-b border-[var(--border-subtle)] hover:bg-[rgba(255,255,255,0.02)]">
                     <td className="px-4 py-2.5">
-                      <div className="text-[#E2E8F0]">{r.brand_name}</div>
-                      <div className="text-[#475569]">{r.user_email}</div>
+                      <div className="text-[var(--text-primary)]">{r.brand_name}</div>
+                      <div className="text-[var(--text-faint)]">{r.user_email}</div>
                     </td>
                     <td className="px-4 py-2.5"><StatusBadge status={r.status} /></td>
-                    <td className="px-4 py-2.5 text-[#94A3B8]">
+                    <td className="px-4 py-2.5 text-[var(--text-secondary)] font-mono">
                       {r.overall_score != null ? `${r.overall_score.toFixed(1)}%` : '—'}
                     </td>
-                    <td className="px-4 py-2.5 text-[#475569] whitespace-nowrap">
+                    <td className="px-4 py-2.5 text-[var(--text-faint)] whitespace-nowrap">
                       {r.created_at ? new Date(r.created_at + 'Z').toLocaleDateString() : '—'}
                     </td>
                     <td className="px-4 py-2.5">
                       <button
                         onClick={() => handleTriggerRun(r.brand_id)}
                         disabled={triggeringBrand === r.brand_id}
-                        className="flex items-center gap-1 text-[#6366f1] hover:text-[#818cf8] disabled:opacity-50 transition-colors cursor-pointer"
+                        className="flex items-center gap-1 text-[var(--accent)] hover:text-[var(--accent-foreground)] disabled:opacity-50 transition-colors cursor-pointer"
                       >
                         {triggeringBrand === r.brand_id
                           ? <Loader2 size={11} className="animate-spin" />
@@ -391,7 +391,7 @@ export default function AdminPage() {
                   </tr>
                 ))}
                 {runs.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-[#475569]">No runs yet</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-[var(--text-faint)]">No runs yet</td></tr>
                 )}
               </tbody>
             </table>
@@ -399,23 +399,23 @@ export default function AdminPage() {
         </div>
 
         {/* Logs Panel — collapsible */}
-        <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl shadow-[0_4px_24px_rgba(0,0,0,0.20)] overflow-hidden">
+        <div className="card rounded-xl overflow-hidden">
           <button
             onClick={() => setLogsOpen((v) => !v)}
-            className="w-full px-5 py-4 border-b border-[rgba(99,102,241,0.12)] flex items-center justify-between cursor-pointer hover:bg-[rgba(255,255,255,0.01)] transition-colors"
+            className="w-full px-5 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between cursor-pointer hover:bg-[rgba(255,255,255,0.01)] transition-colors"
           >
-            <span className="text-sm font-semibold text-[#F0F4F8]">Error Log (last 100 lines)</span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">Error Log (last 100 lines)</span>
             <div className="flex items-center gap-3">
-              <span className="text-xs text-[#475569]">backend/logs/app.log</span>
-              {logsOpen ? <ChevronUp size={14} className="text-[#475569]" /> : <ChevronDown size={14} className="text-[#475569]" />}
+              <span className="text-xs text-[var(--text-faint)]">backend/logs/app.log</span>
+              {logsOpen ? <ChevronUp size={14} className="text-[var(--text-faint)]" /> : <ChevronDown size={14} className="text-[var(--text-faint)]" />}
             </div>
           </button>
           {logsOpen && (
-            <div className="p-4 bg-[#0a0a0f] rounded-b-xl max-h-80 overflow-y-auto">
+            <div className="p-4 bg-[var(--bg-base)] rounded-b-xl max-h-80 overflow-y-auto">
               {logs.length === 0 ? (
-                <p className="text-xs text-[#475569] font-mono">No log entries yet.</p>
+                <p className="text-xs text-[var(--text-faint)] font-mono">No log entries yet.</p>
               ) : (
-                <pre className="text-[11px] text-[#64748B] font-mono whitespace-pre-wrap leading-relaxed">
+                <pre className="text-[11px] text-[var(--text-muted)] font-mono whitespace-pre-wrap leading-relaxed">
                   {[...logs].reverse().join('\n')}
                 </pre>
               )}
@@ -429,25 +429,25 @@ export default function AdminPage() {
       {confirmRemove && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setConfirmRemove(null)} />
-          <div className="relative bg-[rgba(10,14,24,0.97)] border border-[rgba(248,113,113,0.25)] rounded-2xl p-6 max-w-sm w-full shadow-2xl">
+          <div className="relative bg-[rgba(10,14,24,0.97)] border border-[var(--danger)]/25 rounded-2xl p-6 max-w-sm w-full shadow-2xl">
             <div className="flex items-center gap-2 mb-3">
-              <Trash2 size={16} className="text-[#f87171]" />
-              <h3 className="text-sm font-semibold text-[#F0F4F8]">Remove user?</h3>
+              <Trash2 size={16} className="text-[var(--danger)]" />
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Remove user?</h3>
             </div>
-            <p className="text-xs text-[#64748B] mb-1">
-              This will permanently delete <span className="text-[#E2E8F0] font-medium">{confirmRemove.email}</span> and all their brands, prompts, and drafts.
+            <p className="text-xs text-[var(--text-muted)] mb-1">
+              This will permanently delete <span className="text-[var(--text-primary)] font-medium">{confirmRemove.email}</span> and all their brands, prompts, and drafts.
             </p>
-            <p className="text-xs text-[#f87171] mb-5">This action cannot be undone.</p>
+            <p className="text-xs text-[var(--danger)] mb-5">This action cannot be undone.</p>
             <div className="flex gap-2">
               <button
                 onClick={() => setConfirmRemove(null)}
-                className="flex-1 py-2 text-xs text-[#64748B] hover:text-[#94A3B8] border border-[rgba(255,255,255,0.10)] rounded-lg transition-colors cursor-pointer"
+                className="flex-1 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[var(--border-subtle)] rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleRemoveUser(confirmRemove.id)}
-                className="flex-1 py-2 text-xs font-medium text-white bg-[#f87171]/20 hover:bg-[#f87171]/30 border border-[#f87171]/30 rounded-lg transition-colors cursor-pointer"
+                className="flex-1 py-2 text-xs font-medium text-white bg-[var(--danger)]/20 hover:bg-[var(--danger)]/30 border border-[var(--danger)]/30 rounded-lg transition-colors cursor-pointer"
               >
                 Remove permanently
               </button>

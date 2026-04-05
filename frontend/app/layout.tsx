@@ -51,7 +51,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${geistMono.variable}`}>
-      <body className="bg-[#0a0a0f] text-[#e2e8f0] antialiased">
+      <body className="bg-[var(--bg-base)] text-[var(--text-primary)] antialiased">
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>

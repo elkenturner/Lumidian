@@ -1,5 +1,4 @@
 import Link from 'next/link';
-import LumidianLogo from '@/components/LumidianLogo';
 
 export const metadata = { title: 'Terms of Service' };
 
@@ -56,61 +55,28 @@ const SECTIONS = [
 
 export default function TermsPage() {
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        backgroundColor: '#F8F7F4',
-        color: '#0F0F12',
-        fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      }}
-    >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-3xl">
+      <div className="mb-10">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Terms of Service</h1>
+        <p className="text-xs text-[var(--text-faint)] mt-2">Last updated: March 27, 2026</p>
+      </div>
 
-      {/* Nav */}
-      <nav style={{ borderBottom: '1px solid rgba(0,0,0,0.06)', padding: '16px 24px' }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
-            <LumidianLogo size={28} withWordmark variant="light" />
-          </Link>
-          <Link href="/register" style={{ fontSize: 13, fontWeight: 600, color: '#4F46E5', textDecoration: 'none' }}>
-            Get started →
-          </Link>
-        </div>
-      </nav>
-
-      {/* Content */}
-      <main style={{ maxWidth: 760, margin: '0 auto', padding: '64px 24px 96px' }}>
-        <div style={{ marginBottom: 48 }}>
-          <h1 style={{ fontSize: 36, fontWeight: 800, color: '#0F0F12', letterSpacing: '-0.03em', margin: '0 0 12px' }}>
-            Terms of Service
-          </h1>
-          <p style={{ fontSize: 14, color: '#9CA3AF', margin: 0 }}>Last updated: March 27, 2026</p>
-        </div>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 40 }}>
-          {SECTIONS.map((section) => (
-            <div key={section.title}>
-              <h2 style={{ fontSize: 16, fontWeight: 700, color: '#0F0F12', margin: '0 0 10px', letterSpacing: '-0.01em' }}>
-                {section.title}
-              </h2>
-              <p style={{ fontSize: 15, color: '#4B5563', lineHeight: 1.75, margin: 0 }}>
-                {section.body}
-              </p>
-            </div>
-          ))}
-        </div>
-      </main>
-
-      {/* Footer */}
-      <footer style={{ borderTop: '1px solid rgba(0,0,0,0.06)', padding: '24px' }}>
-        <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-          <p style={{ fontSize: 12, color: '#9CA3AF', margin: 0 }}>&copy; 2026 Lumidian. All rights reserved.</p>
-          <div style={{ display: 'flex', gap: 20 }}>
-            <Link href="/terms" style={{ fontSize: 12, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Terms</Link>
-            <Link href="/privacy" style={{ fontSize: 12, color: '#9CA3AF', textDecoration: 'none', fontWeight: 500 }}>Privacy</Link>
+      <div className="space-y-8">
+        {SECTIONS.map((section) => (
+          <div key={section.title}>
+            <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-2">{section.title}</h2>
+            <p className="text-sm text-[var(--text-muted)] leading-relaxed">{section.body}</p>
           </div>
+        ))}
+      </div>
+
+      <div className="mt-12 pt-6 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px] text-[var(--text-faint)]">
+        <p>&copy; 2026 Lumidian. All rights reserved.</p>
+        <div className="flex gap-4">
+          <Link href="/terms" className="hover:text-[var(--text-muted)] transition-colors">Terms</Link>
+          <Link href="/privacy" className="hover:text-[var(--text-muted)] transition-colors">Privacy</Link>
         </div>
-      </footer>
+      </div>
     </div>
   );
 }

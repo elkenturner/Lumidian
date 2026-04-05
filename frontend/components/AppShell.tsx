@@ -75,9 +75,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           setDraftsGenerating(status.drafts_generating);
           setScanning(status.scanning);
           setModelScores(status.model_scores || []);
+          // Clear stale localStorage flags so they don't flash on next page load
+          try {
+            if (!status.report_running) localStorage.removeItem('clarity_report_running');
+            if (!status.drafts_generating) localStorage.removeItem('clarity_drafts_generating');
+          } catch {}
         }
       } catch {
-        // Silently ignore poll errors — don't flash misleading banners
+        // On poll error, clear banners to avoid stale state
+        if (!cancelled) {
+          setReportRunning(false);
+          setDraftsGenerating(false);
+          setScanning(false);
+          setModelScores([]);
+        }
       }
     };
 
@@ -116,7 +127,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <BrandProvider>
     <>
       {/* Fixed slate base background */}
-      <div style={{ position: 'fixed', inset: 0, background: '#020617', zIndex: -2 }} />
+      <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-base)', zIndex: -2 }} />
 
       {/* Desktop sidebar — hidden on mobile */}
       {!isMobile && (
@@ -135,21 +146,21 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         {/* Global status banners — written by dashboard/content pages via localStorage */}
         {reportRunning && (
           <div style={{
-            background: 'rgba(99,102,241,0.08)',
-            borderBottom: '1px solid rgba(99,102,241,0.20)',
+            background: 'rgba(99,102,241,0.06)',
+            borderBottom: '1px solid rgba(99,102,241,0.18)',
             padding: '8px 28px',
             display: 'flex',
             alignItems: 'center',
             gap: 10,
             flexWrap: 'wrap',
           }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#6366f1', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
-            <span style={{ fontSize: 12, color: '#818cf8', fontWeight: 600 }}>Report in progress</span>
-            <span style={{ fontSize: 12, color: '#6366f1' }}>— querying AI models with your prompts.</span>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
+            <span style={{ fontSize: 12, color: 'var(--accent-light)', fontWeight: 600 }}>Report in progress</span>
+            <span style={{ fontSize: 12, color: 'var(--accent)' }}>— querying AI models with your prompts.</span>
             {modelScores.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
                 {modelScores.map((ms) => {
-                  const cfg = MODEL_CONFIG[ms.model] || { label: ms.model, bg: 'rgba(100,116,139,0.15)', text: '#64748b' };
+                  const cfg = MODEL_CONFIG[ms.model] || { label: ms.model, bg: 'rgba(100,116,139,0.15)', text: 'var(--text-muted)' };
                   return (
                     <span
                       key={ms.model}
@@ -185,9 +196,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             alignItems: 'center',
             gap: 10,
           }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#10b981', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
-            <span style={{ fontSize: 12, color: '#34d399', fontWeight: 600 }}>Drafts generating</span>
-            <span style={{ fontSize: 12, color: '#10b981' }}>— writing new content drafts for your top visibility gaps.</span>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
+            <span style={{ fontSize: 12, color: 'var(--success-text)', fontWeight: 600 }}>Drafts generating</span>
+            <span style={{ fontSize: 12, color: 'var(--success)' }}>— writing new content drafts for your top visibility gaps.</span>
           </div>
         )}
         {scanning && (
@@ -202,6 +213,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#06b6d4', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
             <span style={{ fontSize: 12, color: '#67e8f9', fontWeight: 600 }}>Scanning live opportunities</span>
             <span style={{ fontSize: 12, color: '#06b6d4' }}>— finding relevant discussions on Reddit and Quora.</span>
+
           </div>
         )}
         {children}
@@ -237,7 +249,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   gap: 3,
                   flex: 1,
                   padding: '6px 0',
-                  color: isActive ? '#818cf8' : '#475569',
+                  color: isActive ? 'var(--accent-light)' : 'var(--text-faint)',
                   textDecoration: 'none',
                   fontSize: 10,
                   fontWeight: 500,

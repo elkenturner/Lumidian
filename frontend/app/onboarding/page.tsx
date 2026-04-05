@@ -159,8 +159,8 @@ export default function OnboardingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#080C14] flex items-center justify-center">
-        <Loader2 size={24} className="animate-spin text-[#6366f1]" />
+      <div className="min-h-screen bg-[var(--bg-base)] flex items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
       </div>
     );
   }
@@ -168,7 +168,7 @@ export default function OnboardingPage() {
   const stepLabels = ['Brand', 'Prompts', 'Profile'];
 
   return (
-    <div className="min-h-screen bg-[#080C14] flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-[var(--bg-base)] flex flex-col items-center justify-center px-4 py-12">
       {/* Logo */}
       <div className="flex items-center gap-3 mb-10">
         <LumidianLogo size={36} withWordmark />
@@ -184,11 +184,11 @@ export default function OnboardingPage() {
             <div key={label} className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                  done ? 'bg-[#10b981] text-white' : active ? 'bg-[#6366f1] text-white shadow-[0_0_12px_rgba(99,102,241,0.40)]' : 'bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] text-[#475569]'
+                  done ? 'bg-[var(--success)] text-white' : active ? 'bg-[var(--accent)] text-white shadow-[0_0_12px_rgba(99,102,241,0.40)]' : 'bg-[rgba(99,102,241,0.08)] border border-[var(--border-default)] text-[var(--text-faint)]'
                 }`}>
                   {done ? <CheckCircle size={14} /> : s}
                 </div>
-                <span className={`text-sm font-medium ${active ? 'text-[#F0F4F8]' : done ? 'text-[#64748b]' : 'text-[#475569]'}`}>
+                <span className={`text-sm font-medium ${active ? 'text-[var(--text-primary)]' : done ? 'text-[var(--text-muted)]' : 'text-[var(--text-faint)]'}`}>
                   {label}
                 </span>
               </div>
@@ -201,21 +201,21 @@ export default function OnboardingPage() {
       </div>
 
       {/* Card */}
-      <div className="w-full max-w-md bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl p-8 shadow-[0_8px_40px_rgba(0,0,0,0.40),inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="card w-full max-w-md rounded-2xl p-8">
         {error && (
           <div className="bg-[rgba(127,29,29,0.20)] border border-[rgba(153,27,27,0.30)] rounded-lg px-4 py-3 mb-5">
-            <p className="text-sm text-[#f87171]">{error}</p>
+            <p className="text-sm text-[var(--danger)]">{error}</p>
           </div>
         )}
 
         {/* Step 1: Brand name */}
         {step === 1 && (
           <div>
-            <h2 className="text-xl font-bold text-[#F0F4F8] mb-1">What&apos;s your brand?</h2>
-            <p className="text-sm text-[#64748B] mb-6">We&apos;ll track how AI models mention your brand and generate a pitch deck with your visibility data. Free for 30 days.</p>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-1">What&apos;s your brand?</h2>
+            <p className="text-sm text-[var(--text-muted)] mb-6">We&apos;ll track how AI models mention your brand and generate a pitch deck with your visibility data. Free for 30 days.</p>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">Brand Name</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Brand Name</label>
                 <input
                   type="text"
                   value={brandName}
@@ -223,24 +223,24 @@ export default function OnboardingPage() {
                   onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
                   placeholder="Your brand name"
                   autoFocus
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">Company Website <span className="text-[#ef4444]">*</span></label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Company Website <span className="text-[var(--danger)]">*</span></label>
                 <input
                   type="text"
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
                   placeholder="https://yourcompany.com"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
                 />
-                <p className="text-xs text-[#475569] mt-1">We&apos;ll use this to improve content draft quality.</p>
+                <p className="text-xs text-[var(--text-faint)] mt-1">We&apos;ll use this to improve content draft quality.</p>
               </div>
               <button
                 onClick={handleStep1}
                 disabled={fetching || !brandName.trim() || !websiteUrl.trim()}
-                className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-[0_0_20px_rgba(99,102,241,0.25)]"
+                className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-[0_0_20px_rgba(99,102,241,0.25)]"
               >
                 {fetching ? <Loader2 size={14} className="animate-spin" /> : null}
                 {fetching ? 'Fetching website...' : 'Fetch & Continue'}
@@ -253,20 +253,20 @@ export default function OnboardingPage() {
         {step === 2 && (
           <div>
             <div className="flex items-start justify-between mb-1">
-              <h2 className="text-xl font-bold text-[#F0F4F8]">What do you want to track?</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">What do you want to track?</h2>
               <button
                 type="button"
                 onClick={handleSuggestPrompts}
                 disabled={suggestingPrompts}
-                className="flex items-center gap-1.5 text-xs font-medium text-[#a78bfa] hover:text-[#c4b5fd] disabled:opacity-50 transition-colors shrink-0 ml-3 mt-0.5"
+                className="flex items-center gap-1.5 text-xs font-medium text-[var(--accent-foreground)] hover:text-[var(--accent-light)] disabled:opacity-50 transition-colors shrink-0 ml-3 mt-0.5"
               >
                 {suggestingPrompts ? <Loader2 size={12} className="animate-spin" /> : <span>✦</span>}
                 {suggestingPrompts ? 'Generating…' : 'Generate with AI'}
               </button>
             </div>
-            <p className="text-sm text-[#64748B] mb-6">Add questions that people might ask AI models where your brand could come up.</p>
+            <p className="text-sm text-[var(--text-muted)] mb-6">Add questions that people might ask AI models where your brand could come up.</p>
             {suggestError && (
-              <p className="text-xs text-[#f87171] mb-3">{suggestError}</p>
+              <p className="text-xs text-[var(--danger)] mb-3">{suggestError}</p>
             )}
             <div className="space-y-2 mb-4">
               {prompts.map((p, i) => (
@@ -276,20 +276,20 @@ export default function OnboardingPage() {
                   value={p}
                   onChange={(e) => updatePrompt(i, e.target.value)}
                   placeholder={i === 0 ? `What is ${brandName}?` : 'Add another prompt…'}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
                 />
               ))}
               <div className="flex items-center justify-between px-1 pt-1">
                 {prompts.length < 10 ? (
                   <button
                     onClick={addPromptRow}
-                    className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#94A3B8] transition-colors py-1"
+                    className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors py-1"
                   >
                     <Plus size={13} />
                     Add another prompt
                   </button>
                 ) : <span />}
-                <span className={`text-[11px] font-medium tabular-nums ${prompts.length >= 10 ? 'text-[#f59e0b]' : 'text-[#475569]'}`}>
+                <span className={`text-[11px] font-medium tabular-nums ${prompts.length >= 10 ? 'text-[var(--warning)]' : 'text-[var(--text-faint)]'}`}>
                   {prompts.length}/10
                 </span>
               </div>
@@ -297,14 +297,14 @@ export default function OnboardingPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setStep(1)}
-                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[var(--border-default)] text-[var(--text-secondary)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={handleStep2}
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : null}
                 Continue
@@ -316,38 +316,38 @@ export default function OnboardingPage() {
         {/* Step 3: Profile basics */}
         {step === 3 && (
           <div>
-            <h2 className="text-xl font-bold text-[#F0F4F8] mb-1">Tell us about your brand</h2>
-            <p className="text-sm text-[#64748B] mb-6">Optional — helps generate better content drafts. You can update this later.</p>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-1">Tell us about your brand</h2>
+            <p className="text-sm text-[var(--text-muted)] mb-6">Optional — helps generate better content drafts. You can update this later.</p>
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">Company description</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Company description</label>
                 <textarea
                   value={companyDescription}
                   onChange={(e) => setCompanyDescription(e.target.value)}
                   rows={3}
                   placeholder="Brief description of what your company does…"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] resize-none transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] resize-none transition-all"
                 />
               </div>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={() => setStep(2)}
-                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[var(--border-default)] text-[var(--text-secondary)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={handleStep3}
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : null}
                 {saving ? 'Setting up…' : 'Go to Dashboard'}
               </button>
             </div>
-            <p className="text-center text-xs text-[#475569] mt-4">
-              <button onClick={handleStep3} className="text-[#64748B] hover:text-[#94A3B8] underline transition-colors">
+            <p className="text-center text-xs text-[var(--text-faint)] mt-4">
+              <button onClick={handleStep3} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] underline transition-colors">
                 Skip for now
               </button>
             </p>

@@ -308,3 +308,32 @@ async def run_migrations():
             except Exception:
                 # Column/index already exists — safe to ignore
                 pass
+
+
+async def cleanup_stale_runs(max_age_minutes: int = 30):
+    """Mark tracking runs stuck in pending/running for > max_age_minutes as failed.
+
+    Called on startup to clear runs that never completed (e.g., server crash).
+    """
+    from datetime import datetime, timedelta, timezone
+    from sqlalchemy import update, and_
+    from app.models import TrackingRun
+
+    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=max_age_minutes)
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            update(TrackingRun)
+            .where(
+                and_(
+                    TrackingRun.status.in_(["pending", "running"]),
+                    TrackingRun.created_at < cutoff,
+                )
+            )
+            .values(status="failed")
+            .returning(TrackingRun.id)
+        )
+        stale_ids = result.scalars().all()
+        await db.commit()
+        if stale_ids:
+            logger.info("Marked %d stale tracking runs as failed: %s", len(stale_ids), stale_ids)

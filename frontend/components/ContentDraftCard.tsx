@@ -48,7 +48,7 @@ export default function ContentDraftCard({
     : draft.content_text;
 
   return (
-    <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(99,102,241,0.35)] hover:bg-[rgba(99,102,241,0.11)] transition-all duration-200 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.055)]">
+    <div className="bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.20)] rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(99,102,241,0.35)] hover:bg-[rgba(99,102,241,0.11)] transition-all duration-200 shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.055)]">
       {/* Top row: platform + status */}
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={draft.platform} />
@@ -58,22 +58,22 @@ export default function ContentDraftCard({
       {/* Title or preview */}
       <div>
         {draft.title ? (
-          <p className="text-sm font-semibold text-[#e2e8f0] leading-snug">{draft.title}</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] leading-snug">{draft.title}</p>
         ) : (
-          <p className="text-sm italic text-[#64748b] leading-snug">{preview}</p>
+          <p className="text-sm italic text-[var(--text-muted)] leading-snug">{preview}</p>
         )}
       </div>
 
       {/* Target prompt */}
       {draft.prompt_text && (
-        <p className="text-xs text-[#475569]">
-          <span className="text-[#64748b]">Targeting: </span>
+        <p className="text-xs text-[var(--text-faint)]">
+          <span className="text-[var(--text-muted)]">Targeting: </span>
           {draft.prompt_text}
         </p>
       )}
 
       {/* Meta row */}
-      <div className="flex items-center gap-4 text-xs text-[#475569]">
+      <div className="flex items-center gap-4 text-xs text-[var(--text-faint)]">
         {draft.visibility_score_at_draft != null && (
           <span className="flex items-center gap-1">
             <BarChart2 size={11} />

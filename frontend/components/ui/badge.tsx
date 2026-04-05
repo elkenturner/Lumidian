@@ -8,17 +8,17 @@ const badgeVariants = cva(
     variants: {
       variant: {
         default:
-          "border-[rgba(99,102,241,0.30)] bg-[rgba(99,102,241,0.12)] text-[#818cf8]",
+          "border-[rgba(99,102,241,0.30)] bg-[rgba(99,102,241,0.12)] text-[var(--accent-light)]",
         secondary:
-          "border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] text-[#64748b]",
+          "border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] text-[var(--text-muted)]",
         destructive:
-          "border-[rgba(153,27,27,0.30)] bg-[rgba(127,29,29,0.20)] text-[#f87171]",
+          "border-[rgba(153,27,27,0.30)] bg-[rgba(127,29,29,0.20)] text-[var(--danger-text)]",
         success:
-          "border-[rgba(6,95,70,0.40)] bg-[rgba(6,78,59,0.30)] text-[#10b981]",
+          "border-[rgba(6,95,70,0.40)] bg-[rgba(6,78,59,0.30)] text-[var(--success)]",
         warning:
-          "border-[rgba(146,64,14,0.40)] bg-[rgba(120,53,15,0.25)] text-[#f59e0b]",
+          "border-[rgba(146,64,14,0.40)] bg-[rgba(120,53,15,0.25)] text-[var(--warning)]",
         outline:
-          "border-[rgba(255,255,255,0.12)] bg-transparent text-[#94a3b8]",
+          "border-[rgba(255,255,255,0.12)] bg-transparent text-[var(--text-secondary)]",
       },
     },
     defaultVariants: {

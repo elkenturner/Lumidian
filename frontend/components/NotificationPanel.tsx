@@ -16,10 +16,10 @@ import { formatDistanceToNow, parseISO } from 'date-fns';
 import type { AppNotification } from '@/lib/api';
 
 const TYPE_META: Record<string, { icon: React.ElementType; dot: string; border: string }> = {
-  report_ready:    { icon: FileCheck2,   dot: '#6366f1', border: 'rgba(99,102,241,0.50)' },
-  visibility_drop: { icon: TrendingDown, dot: '#ef4444', border: 'rgba(239,68,68,0.50)' },
-  draft_ready:     { icon: Sparkles,     dot: '#10b981', border: 'rgba(16,185,129,0.50)' },
-  info:            { icon: Info,         dot: '#64748b', border: 'rgba(100,116,139,0.30)' },
+  report_ready:    { icon: FileCheck2,   dot: 'var(--accent)', border: 'rgba(99,102,241,0.50)' },
+  visibility_drop: { icon: TrendingDown, dot: 'var(--danger)', border: 'rgba(239,68,68,0.50)' },
+  draft_ready:     { icon: Sparkles,     dot: 'var(--success)', border: 'rgba(16,185,129,0.50)' },
+  info:            { icon: Info,         dot: 'var(--text-muted)', border: 'rgba(100,116,139,0.30)' },
 };
 
 function relTime(iso: string) {
@@ -64,12 +64,12 @@ export default function NotificationPanel({
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-[rgba(255,255,255,0.07)] flex-shrink-0">
         <div className="flex items-center gap-2">
           {unreadCount > 0
-            ? <BellRing size={14} className="text-[#6366f1]" />
-            : <Bell size={14} className="text-[#6366f1]" />
+            ? <BellRing size={14} className="text-[var(--accent)]" />
+            : <Bell size={14} className="text-[var(--accent)]" />
           }
-          <span className="text-sm font-semibold text-[#F0F4F8]">Notifications</span>
+          <span className="text-sm font-semibold text-[var(--text-primary)]">Notifications</span>
           {unreadCount > 0 && (
-            <span className="bg-[#6366f1] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+            <span className="bg-[var(--accent)] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
               {unreadCount}
             </span>
           )}
@@ -78,7 +78,7 @@ export default function NotificationPanel({
           {unreadCount > 0 && (
             <button
               onClick={onMarkAllRead}
-              className="flex items-center gap-1 text-[10px] text-[#64748B] hover:text-[#94A3B8] px-2 py-1 rounded-md hover:bg-[rgba(255,255,255,0.05)] transition-colors"
+              className="flex items-center gap-1 text-[10px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] px-2 py-1 rounded-md hover:bg-[rgba(255,255,255,0.05)] transition-colors"
               title="Mark all as read"
             >
               <CheckCheck size={11} />
@@ -87,7 +87,7 @@ export default function NotificationPanel({
           )}
           <button
             onClick={onClose}
-            className="text-[#475569] hover:text-[#94A3B8] transition-colors p-1 rounded-md hover:bg-[rgba(255,255,255,0.05)]"
+            className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors p-1 rounded-md hover:bg-[rgba(255,255,255,0.05)]"
           >
             <X size={14} />
           </button>
@@ -102,9 +102,9 @@ export default function NotificationPanel({
               className="w-10 h-10 rounded-full flex items-center justify-center"
               style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}
             >
-              <Inbox size={18} className="text-[#475569]" />
+              <Inbox size={18} className="text-[var(--text-faint)]" />
             </div>
-            <p className="text-sm text-[#475569]">You&apos;re all caught up</p>
+            <p className="text-sm text-[var(--text-faint)]">You&apos;re all caught up</p>
           </div>
         ) : (
           notifications.map((n) => {
@@ -126,13 +126,13 @@ export default function NotificationPanel({
                     <Icon size={13} style={{ color: meta.dot }} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`text-xs font-semibold leading-snug ${n.read ? 'text-[#64748B]' : 'text-[#E2E8F0]'}`}>
+                    <p className={`text-xs font-semibold leading-snug ${n.read ? 'text-[var(--text-muted)]' : 'text-[var(--text-primary)]'}`}>
                       {n.title}
                     </p>
                     {n.body && (
-                      <p className="text-[11px] text-[#475569] mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
+                      <p className="text-[11px] text-[var(--text-faint)] mt-0.5 leading-relaxed line-clamp-2">{n.body}</p>
                     )}
-                    <p className="text-[10px] text-[#475569] mt-1.5">{relTime(n.created_at)}</p>
+                    <p className="text-[10px] text-[var(--text-faint)] mt-1.5">{relTime(n.created_at)}</p>
                   </div>
                   {!n.read && (
                     <div className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5" style={{ background: meta.dot }} />

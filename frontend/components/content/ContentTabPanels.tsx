@@ -423,23 +423,23 @@ function QualityChecklist({
   const passed = checks.length - hardFails;
   const total = checks.length;
   const scoreColor = hardFails === 0 && warnings === 0
-    ? 'text-[#10b981]'
+    ? 'text-[var(--success)]'
     : hardFails === 0
-    ? 'text-[#f59e0b]'
-    : hardFails >= 2 ? 'text-[#ef4444]' : 'text-[#f59e0b]';
+    ? 'text-[var(--warning)]'
+    : hardFails >= 2 ? 'text-[var(--danger)]' : 'text-[var(--warning)]';
 
   return (
-    <div className="border border-[rgba(255,255,255,0.10)] rounded-lg overflow-hidden">
+    <div className="border border-[var(--border-subtle)] rounded-lg overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] transition-colors"
       >
         <div className="flex items-center gap-2">
-          <span className={`text-xs font-semibold ${scoreColor}`}>
+          <span className={`text-xs font-semibold font-mono ${scoreColor}`}>
             {passed}/{total} checks passed
           </span>
           {(hardFails > 0 || warnings > 0) && (
-            <span className="text-[10px] text-[#64748B]">
+            <span className="text-[10px] text-[var(--text-muted)]">
               {hardFails > 0 && `${hardFails} fail${hardFails !== 1 ? 's' : ''}`}
               {hardFails > 0 && warnings > 0 && ', '}
               {warnings > 0 && `${warnings} warning${warnings !== 1 ? 's' : ''}`}
@@ -448,25 +448,25 @@ function QualityChecklist({
         </div>
         <ChevronDown
           size={12}
-          className={`text-[#475569] transition-transform ${expanded ? 'rotate-180' : ''}`}
+          className={`text-[var(--text-faint)] transition-transform ${expanded ? 'rotate-180' : ''}`}
         />
       </button>
       {expanded && (
-        <div className="divide-y divide-[rgba(99,102,241,0.10)]">
+        <div className="divide-y divide-[var(--border-subtle)]">
           {checks.map((check) => {
             const icon = check.passed === true ? '✓' : check.passed === 'warning' ? '⚠' : '✕';
             const iconColor = check.passed === true
-              ? 'text-[#10b981]'
+              ? 'text-[var(--success)]'
               : check.passed === 'warning'
-              ? 'text-[#f59e0b]'
-              : 'text-[#ef4444]';
+              ? 'text-[var(--warning)]'
+              : 'text-[var(--danger)]';
             return (
               <div key={check.label} className="flex items-start gap-2.5 px-3 py-2">
                 <span className={`text-xs mt-0.5 flex-shrink-0 font-bold ${iconColor}`}>{icon}</span>
                 <div className="flex-1 min-w-0">
-                  <span className="text-xs text-[#94A3B8]">{check.label}</span>
+                  <span className="text-xs text-[var(--text-secondary)]">{check.label}</span>
                   {check.detail && (
-                    <span className="text-[10px] text-[#64748B] ml-2">{check.detail}</span>
+                    <span className="text-[10px] text-[var(--text-muted)] ml-2">{check.detail}</span>
                   )}
                 </div>
               </div>
@@ -592,15 +592,15 @@ function DraftCard({
   }
 
   const borderClass = isLowQuality
-    ? 'border-l-[3px] border-l-[#ef4444]/50 border-[rgba(99,102,241,0.22)]'
-    : 'border-[rgba(99,102,241,0.22)]';
+    ? 'border-l-[3px] border-l-[var(--danger)]/50 border-[var(--border-default)]'
+    : 'border-[var(--border-default)]';
 
   return (
-    <div className={`bg-[rgba(99,102,241,0.06)] backdrop-blur-md border rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors ${borderClass}`}>
+    <div className={`card p-5 flex flex-col gap-3 transition-colors ${borderClass}`}>
       {/* Top row */}
       <div className="flex items-center justify-between gap-2">
         <PlatformBadge platform={draft.platform} />
-        <span className="text-[10px] text-[#475569] shrink-0">
+        <span className="text-[10px] text-[var(--text-faint)] shrink-0">
           {relativeTime(draft.created_at)}
         </span>
       </div>
@@ -613,19 +613,19 @@ function DraftCard({
             href={draft.platform_guidelines_applied}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 bg-[rgba(249,115,22,0.07)] border border-[rgba(249,115,22,0.20)] rounded-lg px-3 py-2 group transition-colors hover:border-[rgba(249,115,22,0.35)] hover:bg-[rgba(249,115,22,0.11)]"
+            className="flex items-center gap-2 bg-[color-mix(in_srgb,var(--color-claude)_7%,transparent)] border border-[color-mix(in_srgb,var(--color-claude)_20%,transparent)] rounded-lg px-3 py-2 group transition-colors hover:border-[color-mix(in_srgb,var(--color-claude)_35%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-claude)_11%,transparent)]"
           >
-            <span className="text-[#f97316] text-xs flex-shrink-0">↗</span>
-            <span className="text-xs text-[#f97316] font-medium flex-1 min-w-0 truncate">
+            <span className="text-[var(--color-claude)] text-xs flex-shrink-0">↗</span>
+            <span className="text-xs text-[var(--color-claude)] font-medium flex-1 min-w-0 truncate">
               {draft.content_brief ?? 'Reply directly in this thread'}
             </span>
-            <ExternalLink size={11} className="text-[#f97316]/60 flex-shrink-0 group-hover:text-[#f97316]" />
+            <ExternalLink size={11} className="text-[var(--color-claude)]/60 flex-shrink-0 group-hover:text-[var(--color-claude)]" />
           </a>
           {(() => {
             const sub = extractSubreddit(draft.content_brief);
             if (!sub || !isPromoRestricted(sub)) return null;
             return (
-              <div className="flex items-center gap-1.5 text-[10px] text-[#f59e0b] bg-[rgba(245,158,11,0.08)] border border-[rgba(245,158,11,0.20)] rounded-md px-2.5 py-1.5">
+              <div className="flex items-center gap-1.5 text-[10px] text-[var(--warning)] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)] rounded-md px-2.5 py-1.5">
                 <AlertTriangle size={10} className="flex-shrink-0" />
                 <span>
                   <span className="font-semibold">r/{sub} bans promotion</span>
@@ -641,16 +641,16 @@ function DraftCard({
             href={draft.content_brief}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 bg-[#172554]/30 border border-[#1d4ed8]/25 rounded-lg px-3 py-2 group transition-colors hover:border-[#1d4ed8]/50 hover:bg-[#172554]/50"
+            className="flex items-center gap-2 bg-[color-mix(in_srgb,var(--color-gemini)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-gemini)_25%,transparent)] rounded-lg px-3 py-2 group transition-colors hover:border-[color-mix(in_srgb,var(--color-gemini)_50%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-gemini)_15%,transparent)]"
           >
-            <span className="text-[#60a5fa] text-xs flex-shrink-0">Q</span>
-            <span className="text-xs text-[#93c5fd] font-medium flex-1 min-w-0 line-clamp-2">
+            <span className="text-[var(--color-gemini)] text-xs flex-shrink-0">Q</span>
+            <span className="text-xs text-[var(--color-gemini)] font-medium flex-1 min-w-0 line-clamp-2">
               {draft.platform_guidelines_applied || draft.content_brief}
             </span>
-            <ExternalLink size={11} className="text-[#60a5fa]/50 flex-shrink-0 group-hover:text-[#60a5fa]" />
+            <ExternalLink size={11} className="text-[var(--color-gemini)]/50 flex-shrink-0 group-hover:text-[var(--color-gemini)]" />
           </a>
           {showQuoraPicker ? (
-            <div className="border border-[rgba(99,102,241,0.22)] rounded-lg p-3 bg-[rgba(0,0,0,0.2)]">
+            <div className="border border-[var(--border-default)] rounded-lg p-3 bg-[var(--bg-base)]">
               <QuoraQuestionPicker
                 brandId={brandId}
                 promptId={draft.prompt_id ?? ''}
@@ -661,14 +661,14 @@ function DraftCard({
                 <button
                   onClick={() => pendingQuestion && handleRegenerate(pendingQuestion)}
                   disabled={!pendingQuestion || regenerating}
-                  className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-40 text-white rounded-lg px-3 py-1.5 transition-colors"
+                  className="flex items-center gap-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-white rounded-lg px-3 py-1.5 transition-colors"
                 >
                   {regenerating ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
                   Regenerate with this question
                 </button>
                 <button
                   onClick={() => { setShowQuoraPicker(false); setPendingQuestion(null); }}
-                  className="text-xs text-[#475569] hover:text-[#94A3B8] transition-colors px-2 py-1.5"
+                  className="text-xs text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors px-2 py-1.5"
                 >
                   Cancel
                 </button>
@@ -677,7 +677,7 @@ function DraftCard({
           ) : (
             <button
               onClick={() => setShowQuoraPicker(true)}
-              className="flex items-center gap-1.5 text-[10px] text-[#475569] hover:text-[#818cf8] transition-colors self-start"
+              className="flex items-center gap-1.5 text-[10px] text-[var(--text-faint)] hover:text-[var(--accent-foreground)] transition-colors self-start"
             >
               <RefreshCw size={10} />
               Find different question
@@ -685,20 +685,20 @@ function DraftCard({
           )}
         </div>
       ) : draft.content_brief && draft.platform === 'quora' ? (
-        <div className="flex items-start gap-2 bg-[#172554]/30 border border-[#1d4ed8]/25 rounded-lg px-3 py-2">
-          <span className="text-[#6366f1] text-xs mt-0.5">→</span>
-          <p className="text-xs text-[#60a5fa] leading-relaxed">{draft.content_brief}</p>
+        <div className="flex items-start gap-2 bg-[color-mix(in_srgb,var(--color-gemini)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-gemini)_25%,transparent)] rounded-lg px-3 py-2">
+          <span className="text-[var(--accent)] text-xs mt-0.5">→</span>
+          <p className="text-xs text-[var(--color-gemini)] leading-relaxed">{draft.content_brief}</p>
         </div>
       ) : draft.content_brief && draft.platform === 'reddit' ? (
-        <p className="text-xs text-[#475569] leading-relaxed">
-          <span className="text-[#f97316] font-medium">{draft.content_brief.split(' — ')[0]}</span>
+        <p className="text-xs text-[var(--text-faint)] leading-relaxed">
+          <span className="text-[var(--color-claude)] font-medium">{draft.content_brief.split(' — ')[0]}</span>
           {draft.content_brief.includes(' — ') && (
-            <span className="text-[#475569]"> — {draft.content_brief.split(' — ').slice(1).join(' — ')}</span>
+            <span className="text-[var(--text-faint)]"> — {draft.content_brief.split(' — ').slice(1).join(' — ')}</span>
           )}
         </p>
       ) : draft.content_brief ? (
-        <p className="text-xs text-[#475569] leading-relaxed line-clamp-2">
-          <span className="text-[#64748B]">Targeting: </span>
+        <p className="text-xs text-[var(--text-faint)] leading-relaxed line-clamp-2">
+          <span className="text-[var(--text-muted)]">Targeting: </span>
           {draft.content_brief}
         </p>
       ) : null}
@@ -718,26 +718,26 @@ function DraftCard({
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
             placeholder="Title (optional)"
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm placeholder:text-[#475569] focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50"
+            className="w-full bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
           />
           <textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             rows={8}
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none font-mono"
+            className="w-full bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none font-mono"
           />
           <div className="flex gap-2">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors"
+              className="flex items-center gap-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors"
             >
               {saving ? <Loader2 size={11} className="animate-spin" /> : null}
               Save
             </button>
             <button
               onClick={() => setEditing(false)}
-              className="text-xs text-[#64748B] hover:text-[#94A3B8] px-3 py-1.5 transition-colors"
+              className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] px-3 py-1.5 transition-colors"
             >
               Cancel
             </button>
@@ -747,36 +747,36 @@ function DraftCard({
         <div>
           {targetPrompt && (
             <div className="flex items-start gap-1.5 mb-2">
-              <span className="text-[10px] text-[#475569] uppercase tracking-wide font-medium mt-0.5 flex-shrink-0">Targeting</span>
-              <span className="text-[11px] text-[#6366f1] bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] rounded-md px-2 py-0.5 leading-relaxed">{targetPrompt.text}</span>
+              <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide font-medium mt-0.5 flex-shrink-0">Targeting</span>
+              <span className="text-[11px] text-[var(--accent)] bg-[var(--bg-raised)] border border-[var(--border-default)] rounded-md px-2 py-0.5 leading-relaxed">{targetPrompt.text}</span>
             </div>
           )}
           {draft.title && (
-            <p className="text-sm font-semibold text-[#F0F4F8] leading-snug mb-1">{draft.title}</p>
+            <p className="text-sm font-semibold text-[var(--text-primary)] leading-snug mb-1">{draft.title}</p>
           )}
           <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
+            <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-md p-0.5">
               <button
                 onClick={() => setPreviewMode(false)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${!previewMode ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${!previewMode ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
               >Raw</button>
               <button
                 onClick={() => setPreviewMode(true)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${previewMode ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${previewMode ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
               >Preview</button>
             </div>
-            <span className="text-[10px] text-[#475569]">{wordCount} words</span>
+            <span className="text-[10px] text-[var(--text-faint)] font-mono">{wordCount} words</span>
           </div>
           {previewMode ? (
             <div
-              className="text-sm text-[#94A3B8] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3"
-              style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+              className="text-sm text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-3"
+              style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--border-subtle) transparent' }}
               dangerouslySetInnerHTML={{ __html: `<p style="margin:0">${renderPreviewHtml(draft.content_text)}</p>` }}
             />
           ) : (
             <div
-              className="text-sm text-[#64748B] leading-relaxed overflow-y-auto"
-              style={{ maxHeight: '9rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+              className="text-sm text-[var(--text-muted)] leading-relaxed overflow-y-auto"
+              style={{ maxHeight: '9rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--border-subtle) transparent' }}
             >
               {draft.content_text}
             </div>
@@ -793,7 +793,7 @@ function DraftCard({
           <button
             onClick={() => setEditing(true)}
             aria-label="Edit draft"
-            className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0a0e18]"
+            className="flex items-center gap-1.5 text-xs bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-base)]"
           >
             <Edit2 size={11} />
             Edit
@@ -801,10 +801,10 @@ function DraftCard({
           <button
             onClick={handleCopy}
             aria-label="Copy draft to clipboard"
-            className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0a0e18] ${
+            className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-base)] ${
               copied
-                ? 'bg-[#064e3b]/20 border-[#065f46]/25 text-[#34d399]'
-                : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] hover:bg-[rgba(255,255,255,0.10)]'
+                ? 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)] border-[color-mix(in_srgb,var(--success)_25%,transparent)] text-[var(--success)]'
+                : 'bg-[var(--bg-raised)] border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-card)]'
             }`}
           >
             {copied ? <Check size={11} /> : <Copy size={11} />}
@@ -815,7 +815,7 @@ function DraftCard({
             onClick={handleApproveClick}
             disabled={approving}
             aria-label={approving ? 'Approving, please wait' : 'Approve draft'}
-            className="flex items-center gap-1.5 text-xs bg-[#064e3b]/20 hover:bg-[#064e3b]/30 disabled:opacity-50 border border-[#065f46]/25 text-[#34d399] rounded-lg px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0a0e18]"
+            className="flex items-center gap-1.5 text-xs bg-[color-mix(in_srgb,var(--success)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--success)_15%,transparent)] disabled:opacity-50 border border-[color-mix(in_srgb,var(--success)_25%,transparent)] text-[var(--success)] rounded-lg px-3 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-base)]"
           >
             {approving ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
             {approving ? 'Approving…' : 'Approve'}
@@ -824,7 +824,7 @@ function DraftCard({
             onClick={() => onDelete(draft.id)}
             disabled={approving}
             aria-label="Dismiss draft"
-            className="flex items-center gap-1.5 text-xs text-[#ef4444]/70 hover:text-[#f87171] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[#0a0e18]"
+            className="flex items-center gap-1.5 text-xs text-[var(--danger)]/70 hover:text-[var(--danger)] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors ml-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]/60 focus-visible:ring-offset-1 focus-visible:ring-offset-[var(--bg-base)]"
           >
             <Trash2 size={11} />
             Dismiss
@@ -979,7 +979,7 @@ function WikipediaDraftCard({
   return (
     <>
       {showCOI && (
-        <div className="flex items-center gap-2 text-xs text-[#f59e0b] px-1 -mb-1">
+        <div className="flex items-center gap-2 text-xs text-[var(--warning)] px-1 -mb-1">
           <AlertTriangle size={11} className="shrink-0" />
           <span>
             Conflict of interest disclosure may be required if this content references your brand.{' '}
@@ -987,7 +987,7 @@ function WikipediaDraftCard({
               href="https://en.wikipedia.org/wiki/Wikipedia:Conflict_of_interest"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline decoration-[#f59e0b]/50 hover:decoration-[#f59e0b]"
+              className="underline decoration-[var(--warning)]/50 hover:decoration-[var(--warning)]"
             >
               See Wikipedia&apos;s COI guidelines.
             </a>
@@ -995,7 +995,7 @@ function WikipediaDraftCard({
         </div>
       )}
 
-      <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
+      <div className="card p-5 flex flex-col gap-3 transition-colors">
         <div className="flex items-start gap-2 flex-wrap">
           <PlatformBadge platform="wikipedia" />
           <div className="flex-1 min-w-0">
@@ -1004,21 +1004,21 @@ function WikipediaDraftCard({
                 href={articleUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm font-medium text-[#F0F4F8] hover:text-[#6366f1] transition-colors flex items-center gap-1 leading-snug"
+                className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors flex items-center gap-1 leading-snug"
               >
                 {articleTitle}
-                <ExternalLink size={11} className="shrink-0 text-[#475569]" />
+                <ExternalLink size={11} className="shrink-0 text-[var(--text-faint)]" />
               </a>
             ) : (
-              <p className="text-sm font-medium text-[#F0F4F8] leading-snug">{articleTitle}</p>
+              <p className="text-sm font-medium text-[var(--text-primary)] leading-snug">{articleTitle}</p>
             )}
           </div>
         </div>
 
         {insertLocation && (
-          <div className="bg-[rgba(255,255,255,0.06)] border border-[rgba(99,102,241,0.22)] rounded-lg px-3 py-2.5">
-            <p className="text-xs text-[#64748B] uppercase tracking-wide mb-1 font-medium">Where to insert</p>
-            <p className="text-xs text-[#94A3B8] leading-relaxed">{insertLocation}</p>
+          <div className="bg-[var(--bg-raised)] border border-[var(--border-default)] rounded-lg px-3 py-2.5">
+            <p className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-1 font-medium">Where to insert</p>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{insertLocation}</p>
           </div>
         )}
 
@@ -1029,24 +1029,24 @@ function WikipediaDraftCard({
               value={plainText}
               onChange={(e) => handlePlainChange(e.target.value)}
               rows={7}
-              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 resize-none leading-relaxed font-sans"
+              className="w-full bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none leading-relaxed font-sans"
               placeholder="Edit the plain text. Wiki formatting and citations are applied automatically."
             />
-            <p className="text-[10px] text-[#475569]">
+            <p className="text-[10px] text-[var(--text-faint)]">
               Edit in plain text — wiki links, citations, and markup are applied automatically when you copy.
             </p>
             <div className="flex gap-2">
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors"
+                className="flex items-center gap-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-3 py-1.5 transition-colors"
               >
                 {saving ? <Loader2 size={11} className="animate-spin" /> : null}
                 Save
               </button>
               <button
                 onClick={() => setEditing(false)}
-                className="text-xs text-[#64748B] hover:text-[#94A3B8] px-3 py-1.5 transition-colors"
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] px-3 py-1.5 transition-colors"
               >
                 Cancel
               </button>
@@ -1055,30 +1055,30 @@ function WikipediaDraftCard({
         ) : (
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
+              <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-md p-0.5">
                 <button
                   onClick={() => setViewMode('preview')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'preview' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'preview' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
                 >Preview</button>
                 <button
                   onClick={() => setViewMode('raw')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'raw' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#64748B]'}`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'raw' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
                 >Raw</button>
               </div>
-              <span className="text-[10px] text-[#475569]">{wordCount} words</span>
+              <span className="text-[10px] text-[var(--text-faint)] font-mono">{wordCount} words</span>
             </div>
 
             {viewMode === 'raw' ? (
               <pre
-                className="text-xs text-[#94A3B8] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3 whitespace-pre-wrap font-mono"
-                style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+                className="text-xs text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-3 whitespace-pre-wrap font-mono"
+                style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--border-subtle) transparent' }}
               >
                 {wikiFormat}
               </pre>
             ) : (
               <div
-                className="text-sm text-[#94A3B8] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3"
-                style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+                className="text-sm text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-3"
+                style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--border-subtle) transparent' }}
                 dangerouslySetInnerHTML={{ __html: `<p style="margin:0">${renderPreviewHtml(plainText)}</p>` }}
               />
             )}
@@ -1095,8 +1095,8 @@ function WikipediaDraftCard({
               onClick={handleCopy}
               className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors ${
                 copied
-                  ? 'bg-[#064e3b]/20 border border-[#065f46]/25 text-[#34d399]'
-                  : 'bg-[#6366f1] hover:bg-[#4f46e5] text-white'
+                  ? 'bg-[color-mix(in_srgb,var(--success)_10%,transparent)] border border-[color-mix(in_srgb,var(--success)_25%,transparent)] text-[var(--success)]'
+                  : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
               }`}
             >
               {copied ? <Check size={11} /> : <Copy size={11} />}
@@ -1104,14 +1104,14 @@ function WikipediaDraftCard({
             </button>
             <button
               onClick={() => setEditing(true)}
-              className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-1.5 transition-colors"
+              className="flex items-center gap-1.5 text-xs bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 transition-colors"
             >
               <Edit2 size={11} />
               Edit
             </button>
             <button
               onClick={() => onDelete(draft.id)}
-              className="flex items-center gap-1.5 text-xs text-[#475569] hover:text-[#f87171] rounded-lg px-3 py-1.5 transition-colors ml-auto"
+              className="flex items-center gap-1.5 text-xs text-[var(--text-faint)] hover:text-[var(--danger)] rounded-lg px-3 py-1.5 transition-colors ml-auto"
             >
               <Trash2 size={11} />
               Dismiss
@@ -1154,7 +1154,7 @@ function QuoraQuestionPicker({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 py-2 text-xs text-[#64748B]">
+      <div className="flex items-center gap-2 py-2 text-xs text-[var(--text-muted)]">
         <Loader2 size={12} className="animate-spin" />
         Finding relevant Quora questions…
       </div>
@@ -1163,24 +1163,24 @@ function QuoraQuestionPicker({
 
   if (selected) {
     return (
-      <div className="flex items-start gap-2 bg-[#172554]/30 border border-[#1d4ed8]/30 rounded-lg px-3 py-2.5">
-        <span className="text-[#60a5fa] text-xs mt-0.5 flex-shrink-0">↗</span>
+      <div className="flex items-start gap-2 bg-[color-mix(in_srgb,var(--color-gemini)_10%,transparent)] border border-[color-mix(in_srgb,var(--color-gemini)_30%,transparent)] rounded-lg px-3 py-2.5">
+        <span className="text-[var(--color-gemini)] text-xs mt-0.5 flex-shrink-0">↗</span>
         <div className="flex-1 min-w-0">
           <a
             href={selected.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-[#93c5fd] font-medium hover:text-white transition-colors line-clamp-2"
+            className="text-xs text-[var(--color-gemini)] font-medium hover:text-white transition-colors line-clamp-2"
           >
             {selected.title}
           </a>
           {selected.snippet && (
-            <p className="text-[10px] text-[#475569] mt-1 line-clamp-2 leading-relaxed">{selected.snippet}</p>
+            <p className="text-[10px] text-[var(--text-faint)] mt-1 line-clamp-2 leading-relaxed">{selected.snippet}</p>
           )}
         </div>
         <button
           onClick={() => onSelect(null)}
-          className="flex-shrink-0 text-[#475569] hover:text-[#94A3B8] transition-colors ml-1"
+          className="flex-shrink-0 text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors ml-1"
           aria-label="Remove selected question"
         >
           <X size={12} />
@@ -1191,7 +1191,7 @@ function QuoraQuestionPicker({
 
   if (searched && questions.length === 0) {
     return (
-      <p className="text-xs text-[#475569] py-1">
+      <p className="text-xs text-[var(--text-faint)] py-1">
         No Quora questions found — the draft will be a general answer. You can find a question manually at quora.com.
       </p>
     );
@@ -1199,27 +1199,27 @@ function QuoraQuestionPicker({
 
   return (
     <div className="space-y-1.5">
-      <p className="text-[10px] text-[#64748B] uppercase tracking-wide font-medium">
+      <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide font-medium">
         Select a Quora question to target
       </p>
       {questions.map((q) => (
         <button
           key={q.url}
           onClick={() => onSelect(q)}
-          className="w-full text-left flex items-start gap-2.5 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(99,102,241,0.08)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(99,102,241,0.25)] rounded-lg px-3 py-2.5 transition-colors group"
+          className="w-full text-left flex items-start gap-2.5 bg-[var(--bg-base)] hover:bg-[var(--bg-raised)] border border-[var(--border-subtle)] hover:border-[var(--border-default)] rounded-lg px-3 py-2.5 transition-colors group"
         >
-          <span className="text-[#6366f1] text-xs mt-0.5 flex-shrink-0">Q</span>
+          <span className="text-[var(--accent)] text-xs mt-0.5 flex-shrink-0">Q</span>
           <div className="flex-1 min-w-0">
-            <span className="text-xs text-[#CBD5E1] group-hover:text-[#F0F4F8] transition-colors line-clamp-2 block">
+            <span className="text-xs text-[var(--text-primary)] group-hover:text-[var(--text-primary)] transition-colors line-clamp-2 block">
               {q.title}
             </span>
             {q.snippet && (
-              <span className="text-[10px] text-[#475569] line-clamp-1 block mt-0.5 leading-relaxed">
+              <span className="text-[10px] text-[var(--text-faint)] line-clamp-1 block mt-0.5 leading-relaxed">
                 {q.snippet}
               </span>
             )}
           </div>
-          <span className="text-[10px] text-[#475569] group-hover:text-[#6366f1] flex-shrink-0 mt-0.5 transition-colors">
+          <span className="text-[10px] text-[var(--text-faint)] group-hover:text-[var(--accent)] flex-shrink-0 mt-0.5 transition-colors">
             Select →
           </span>
         </button>
@@ -1234,14 +1234,14 @@ const POSTING_GUIDANCE: Record<string, (brief: string | null) => React.ReactNode
   reddit: (brief) => {
     const subreddit = brief?.match(/r\/([^\s,)]+)/)?.[1] ?? 'relevant subreddit';
     return (
-      <ol className="list-decimal list-inside space-y-1 text-xs text-[#94A3B8] leading-relaxed">
-        <li>Go to <span className="text-[#6366f1]">reddit.com/r/{subreddit}</span></li>
-        <li>Click <span className="text-[#F0F4F8] font-medium">New Post</span></li>
-        <li>Choose <span className="text-[#F0F4F8] font-medium">Text post</span></li>
+      <ol className="list-decimal list-inside space-y-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+        <li>Go to <span className="text-[var(--accent)]">reddit.com/r/{subreddit}</span></li>
+        <li>Click <span className="text-[var(--text-primary)] font-medium">New Post</span></li>
+        <li>Choose <span className="text-[var(--text-primary)] font-medium">Text post</span></li>
         <li>Paste the title and body from the draft above</li>
         <li>Add relevant flair if available</li>
-        <li>Click <span className="text-[#F0F4F8] font-medium">Submit</span></li>
-        <p className="mt-1 text-[#475569] not-italic">Tip: Post between 9 am–12 pm in your target audience&apos;s timezone for best engagement.</p>
+        <li>Click <span className="text-[var(--text-primary)] font-medium">Submit</span></li>
+        <p className="mt-1 text-[var(--text-faint)] not-italic">Tip: Post between 9 am–12 pm in your target audience&apos;s timezone for best engagement.</p>
       </ol>
     );
   },
@@ -1249,48 +1249,48 @@ const POSTING_GUIDANCE: Record<string, (brief: string | null) => React.ReactNode
     const isDirectUrl = brief?.startsWith('https://www.quora.com') || brief?.startsWith('https://quora.com');
     if (isDirectUrl) {
       return (
-        <ol className="list-decimal list-inside space-y-1 text-xs text-[#94A3B8] leading-relaxed">
-          <li>Open <a href={brief!} target="_blank" rel="noopener noreferrer" className="text-[#6366f1] hover:underline break-all">{brief}</a></li>
-          <li>Click <span className="text-[#F0F4F8] font-medium">Answer</span></li>
+        <ol className="list-decimal list-inside space-y-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+          <li>Open <a href={brief!} target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline break-all">{brief}</a></li>
+          <li>Click <span className="text-[var(--text-primary)] font-medium">Answer</span></li>
           <li>Paste your draft</li>
           <li>Add your credentials if relevant</li>
-          <li>Click <span className="text-[#F0F4F8] font-medium">Submit</span></li>
-          <p className="mt-1 text-[#475569] not-italic">Tip: Answer questions posted within the last 30 days for maximum visibility.</p>
+          <li>Click <span className="text-[var(--text-primary)] font-medium">Submit</span></li>
+          <p className="mt-1 text-[var(--text-faint)] not-italic">Tip: Answer questions posted within the last 30 days for maximum visibility.</p>
         </ol>
       );
     }
     const topic = brief ? brief.split(' — ')[0].replace(/^Targeting: /i, '') : 'your topic';
     return (
-      <ol className="list-decimal list-inside space-y-1 text-xs text-[#94A3B8] leading-relaxed">
-        <li>Go to <span className="text-[#6366f1]">quora.com</span> and search for <span className="text-[#F0F4F8] font-medium">&ldquo;{topic.slice(0, 40)}&rdquo;</span></li>
+      <ol className="list-decimal list-inside space-y-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+        <li>Go to <span className="text-[var(--accent)]">quora.com</span> and search for <span className="text-[var(--text-primary)] font-medium">&ldquo;{topic.slice(0, 40)}&rdquo;</span></li>
         <li>Find a relevant question</li>
-        <li>Click <span className="text-[#F0F4F8] font-medium">Answer</span></li>
+        <li>Click <span className="text-[var(--text-primary)] font-medium">Answer</span></li>
         <li>Paste your draft</li>
         <li>Add your credentials if relevant</li>
-        <li>Click <span className="text-[#F0F4F8] font-medium">Submit</span></li>
-        <p className="mt-1 text-[#475569] not-italic">Tip: Answer questions posted within the last 30 days for maximum visibility.</p>
+        <li>Click <span className="text-[var(--text-primary)] font-medium">Submit</span></li>
+        <p className="mt-1 text-[var(--text-faint)] not-italic">Tip: Answer questions posted within the last 30 days for maximum visibility.</p>
       </ol>
     );
   },
   medium: () => (
-    <ol className="list-decimal list-inside space-y-1 text-xs text-[#94A3B8] leading-relaxed">
-      <li>Go to <a href="https://medium.com/new-story" target="_blank" rel="noopener noreferrer" className="text-[#6366f1] hover:underline">medium.com/new-story</a></li>
+    <ol className="list-decimal list-inside space-y-1 text-xs text-[var(--text-secondary)] leading-relaxed">
+      <li>Go to <a href="https://medium.com/new-story" target="_blank" rel="noopener noreferrer" className="text-[var(--accent)] hover:underline">medium.com/new-story</a></li>
       <li>Paste your title and body</li>
       <li>Add tags relevant to your topic (up to 5)</li>
       <li>Set a featured image if possible</li>
-      <li>Click <span className="text-[#F0F4F8] font-medium">Publish</span></li>
-      <p className="mt-1 text-[#475569] not-italic">Tip: Add your company publication if you have one set up.</p>
+      <li>Click <span className="text-[var(--text-primary)] font-medium">Publish</span></li>
+      <p className="mt-1 text-[var(--text-faint)] not-italic">Tip: Add your company publication if you have one set up.</p>
     </ol>
   ),
   wikipedia: () => (
-    <ol className="list-decimal list-inside space-y-1 text-xs text-[#94A3B8] leading-relaxed">
+    <ol className="list-decimal list-inside space-y-1 text-xs text-[var(--text-secondary)] leading-relaxed">
       <li>Find the target article on Wikipedia</li>
-      <li>Click <span className="text-[#F0F4F8] font-medium">Edit</span></li>
+      <li>Click <span className="text-[var(--text-primary)] font-medium">Edit</span></li>
       <li>Navigate to the suggested section</li>
       <li>Paste the wiki-formatted text (use Copy Wiki Format button)</li>
       <li>Add an edit summary explaining your addition</li>
-      <li>Click <span className="text-[#F0F4F8] font-medium">Save</span></li>
-      <p className="mt-1 text-[#f59e0b] not-italic flex items-start gap-1"><AlertTriangle size={10} className="shrink-0 mt-0.5" />Disclose any conflict of interest on the article talk page first.</p>
+      <li>Click <span className="text-[var(--text-primary)] font-medium">Save</span></li>
+      <p className="mt-1 text-[var(--warning)] not-italic flex items-start gap-1"><AlertTriangle size={10} className="shrink-0 mt-0.5" />Disclose any conflict of interest on the article talk page first.</p>
     </ol>
   ),
 };
@@ -1324,59 +1324,59 @@ function ScheduledCard({
   const guidance = POSTING_GUIDANCE[draft.platform];
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
+    <div className="card p-4 flex flex-col gap-3 transition-colors">
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={draft.platform} />
         {draft.approved_at && (
-          <span className="text-xs text-[#64748B] flex items-center gap-1">
-            <CheckCircle2 size={11} className="text-[#10b981]" />
+          <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
+            <CheckCircle2 size={11} className="text-[var(--success)]" />
             Approved {relativeTime(draft.approved_at)}
           </span>
         )}
       </div>
 
       {draft.content_brief && (
-        <p className="text-xs text-[#475569] leading-relaxed line-clamp-2">
-          <span className="text-[#64748B]">Targeting: </span>
+        <p className="text-xs text-[var(--text-faint)] leading-relaxed line-clamp-2">
+          <span className="text-[var(--text-muted)]">Targeting: </span>
           {draft.content_brief}
         </p>
       )}
 
       <div>
         {draft.title && (
-          <p className="text-sm font-semibold text-[#F0F4F8] leading-snug mb-1">{draft.title}</p>
+          <p className="text-sm font-semibold text-[var(--text-primary)] leading-snug mb-1">{draft.title}</p>
         )}
         {!draft.title && (
-          <p className="text-sm text-[#94A3B8] leading-relaxed truncate">{title}</p>
+          <p className="text-sm text-[var(--text-secondary)] leading-relaxed truncate">{title}</p>
         )}
       </div>
 
       {expanded && (
-        <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg p-3 relative">
-          <pre className="text-xs text-[#94A3B8] whitespace-pre-wrap leading-relaxed font-mono pr-14">
+        <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-lg p-3 relative">
+          <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed font-mono pr-14">
             {draft.content_text}
           </pre>
           <button
             onClick={handleCopy}
-            className="absolute top-2 right-2 flex items-center gap-1 text-[10px] text-[#475569] hover:text-[#94A3B8] transition-colors"
+            className="absolute top-2 right-2 flex items-center gap-1 text-[10px] text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors"
           >
-            {copied ? <Check size={11} className="text-[#10b981]" /> : <Copy size={11} />}
+            {copied ? <Check size={11} className="text-[var(--success)]" /> : <Copy size={11} />}
             {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
       )}
 
       {guidance && (
-        <div className="border border-[rgba(99,102,241,0.22)] rounded-lg overflow-hidden">
+        <div className="border border-[var(--border-default)] rounded-lg overflow-hidden">
           <button
             onClick={() => setGuideOpen(!guideOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(255,255,255,0.06)] text-left transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] text-left transition-colors"
           >
-            <span className="flex items-center gap-1.5 text-xs text-[#64748B] font-medium">
+            <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-medium">
               <BookOpen size={11} />
               How to Post on {draft.platform.charAt(0).toUpperCase() + draft.platform.slice(1)}
             </span>
-            <ChevronDown size={11} className={`text-[#475569] transition-transform ${guideOpen ? 'rotate-180' : ''}`} />
+            <ChevronDown size={11} className={`text-[var(--text-faint)] transition-transform ${guideOpen ? 'rotate-180' : ''}`} />
           </button>
           {guideOpen && (
             <div className="px-3 py-3 bg-transparent">
@@ -1386,33 +1386,33 @@ function ScheduledCard({
         </div>
       )}
 
-      <div className="bg-[rgba(16,185,129,0.05)] border border-[rgba(16,185,129,0.12)] rounded-lg px-3 py-2 flex items-start gap-2">
-        <HelpCircle size={11} className="text-[#10b981] mt-0.5 shrink-0" />
-        <p className="text-[11px] text-[#475569] leading-relaxed">
-          <span className="text-[#64748B] font-medium">This draft needs to be posted manually.</span>
+      <div className="bg-[color-mix(in_srgb,var(--success)_5%,transparent)] border border-[color-mix(in_srgb,var(--success)_12%,transparent)] rounded-lg px-3 py-2 flex items-start gap-2">
+        <HelpCircle size={11} className="text-[var(--success)] mt-0.5 shrink-0" />
+        <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+          <span className="text-[var(--text-muted)] font-medium">This draft needs to be posted manually.</span>
           {' '}Use the View Draft button to copy the content, post it on {draft.platform.charAt(0).toUpperCase() + draft.platform.slice(1)}, then click{' '}
-          <span className="text-[#34d399]">Mark as Posted</span> to record it and start tracking visibility changes.
+          <span className="text-[var(--success)]">Mark as Posted</span> to record it and start tracking visibility changes.
         </p>
       </div>
 
       <div className="flex items-center gap-2 pt-1 flex-wrap">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[#94A3B8] hover:text-[#F0F4F8] rounded-lg px-3 py-1.5 transition-colors"
+          className="flex items-center gap-1.5 text-xs bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 transition-colors"
         >
           <FileText size={11} />
           {expanded ? 'Hide Draft' : 'View Draft'}
         </button>
         <button
           onClick={() => onMarkPosted(draft.id)}
-          className="flex items-center gap-1.5 text-xs bg-[#064e3b]/20 hover:bg-[#064e3b]/30 border border-[#065f46]/25 text-[#34d399] rounded-lg px-3 py-1.5 transition-all duration-150"
+          className="flex items-center gap-1.5 text-xs bg-[color-mix(in_srgb,var(--success)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--success)_15%,transparent)] border border-[color-mix(in_srgb,var(--success)_25%,transparent)] text-[var(--success)] rounded-lg px-3 py-1.5 transition-all duration-150"
         >
           <CheckCircle2 size={11} />
           Mark as Posted
         </button>
         <button
           onClick={() => onMoveToDrafts(draft.id)}
-          className="flex items-center gap-1.5 text-xs text-[#475569] hover:text-[#64748B] rounded-lg px-3 py-1.5 transition-colors ml-auto"
+          className="flex items-center gap-1.5 text-xs text-[var(--text-faint)] hover:text-[var(--text-muted)] rounded-lg px-3 py-1.5 transition-colors ml-auto"
         >
           <Edit2 size={11} />
           Move back to Drafts
@@ -1442,10 +1442,10 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
     established: 'Established',
   };
   const TIER_COLORS: Record<ConfidenceTier, string> = {
-    awaiting: '#475569',
-    early: '#64748B',
-    developing: '#818cf8',
-    established: '#10b981',
+    awaiting: 'var(--text-faint)',
+    early: 'var(--text-muted)',
+    developing: 'var(--accent-foreground)',
+    established: 'var(--success)',
   };
 
   let attributionNode: JSX.Element | null = null;
@@ -1457,17 +1457,17 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
     if (tier === 'awaiting') {
       attributionNode = (
         <div className="flex items-center gap-1.5 mt-1">
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `${tierColor}40`, backgroundColor: `${tierColor}10` }}>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `color-mix(in srgb, ${tierColor} 25%, transparent)`, backgroundColor: `color-mix(in srgb, ${tierColor} 6%, transparent)` }}>
             {tierLabel}
           </span>
-          <span className="text-xs text-[#475569]">Next tracking run will measure visibility change.</span>
+          <span className="text-xs text-[var(--text-faint)]">Next tracking run will measure visibility change.</span>
         </div>
       );
     } else {
       const scoreBefore = attribution.score_at_posting;
       const scoreNow = attribution.current_score ?? 0;
       const delta = attribution.delta;
-      const deltaColor = delta == null ? '#94A3B8' : delta > 0 ? '#10b981' : delta < 0 ? '#f87171' : '#94A3B8';
+      const deltaColor = delta == null ? 'var(--text-secondary)' : delta > 0 ? 'var(--success)' : delta < 0 ? 'var(--danger)' : 'var(--text-secondary)';
       const deltaLabel = delta == null ? '—' : delta > 0 ? `+${delta.toFixed(1)}pp` : `${delta.toFixed(1)}pp`;
       const runs = attribution.runs_since_posting;
 
@@ -1476,23 +1476,23 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
           <div className="flex items-center gap-3 flex-wrap">
             {scoreBefore != null && (
               <div className="flex items-center gap-1">
-                <span className="text-[10px] text-[#475569]">At posting</span>
-                <span className="text-xs font-medium text-[#94A3B8]">{scoreBefore.toFixed(1)}%</span>
+                <span className="text-[10px] text-[var(--text-faint)]">At posting</span>
+                <span className="text-xs font-medium font-mono text-[var(--text-secondary)]">{scoreBefore.toFixed(1)}%</span>
               </div>
             )}
-            {scoreBefore != null && <ArrowRight size={10} className="text-[#475569]" />}
+            {scoreBefore != null && <ArrowRight size={10} className="text-[var(--text-faint)]" />}
             <div className="flex items-center gap-1">
-              <span className="text-[10px] text-[#475569]">Now</span>
-              <span className="text-xs font-medium text-[#E2E8F0]">{scoreNow.toFixed(1)}%</span>
+              <span className="text-[10px] text-[var(--text-faint)]">Now</span>
+              <span className="text-xs font-medium font-mono text-[var(--text-primary)]">{scoreNow.toFixed(1)}%</span>
             </div>
             {delta != null && (
-              <span className="text-xs font-semibold" style={{ color: deltaColor }}>{deltaLabel}</span>
+              <span className="text-xs font-semibold font-mono" style={{ color: deltaColor }}>{deltaLabel}</span>
             )}
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full border ml-auto" style={{ color: tierColor, borderColor: `${tierColor}40`, backgroundColor: `${tierColor}10` }}>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full border ml-auto" style={{ color: tierColor, borderColor: `color-mix(in srgb, ${tierColor} 25%, transparent)`, backgroundColor: `color-mix(in srgb, ${tierColor} 6%, transparent)` }}>
               {tierLabel}
             </span>
           </div>
-          <p className="text-[10px] text-[#475569] leading-relaxed">
+          <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
             Based on {runs} tracking run{runs !== 1 ? 's' : ''} since posting.{' '}
             {tier === 'early' && 'More data needed before drawing conclusions.'}
             {tier === 'developing' && 'Trend is forming — keep an eye on the next few runs.'}
@@ -1504,35 +1504,35 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
   } else if (draft.visibility_at_post != null) {
     attributionNode = (
       <div className="flex items-center gap-1 mt-1">
-        <span className="text-[10px] text-[#475569]">Brand visibility at time of posting:</span>
-        <span className="text-xs font-medium text-[#94A3B8]">{draft.visibility_at_post.toFixed(1)}%</span>
+        <span className="text-[10px] text-[var(--text-faint)]">Brand visibility at time of posting:</span>
+        <span className="text-xs font-medium font-mono text-[var(--text-secondary)]">{draft.visibility_at_post.toFixed(1)}%</span>
       </div>
     );
   }
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-2 shadow-[0_4px_24px_rgba(0,0,0,0.20)] hover:border-[rgba(255,255,255,0.14)] transition-colors">
+    <div className="card p-4 flex flex-col gap-2 transition-colors">
       <div className="flex items-center gap-2">
         <PlatformBadge platform={draft.platform} />
-        <p className="flex-1 text-sm text-[#94A3B8] truncate">{title}</p>
+        <p className="flex-1 text-sm text-[var(--text-secondary)] truncate">{title}</p>
         <button
           onClick={() => setExpanded(!expanded)}
-          className="text-[10px] text-[#475569] hover:text-[#64748B] transition-colors shrink-0"
+          className="text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors shrink-0"
         >
           {expanded ? 'Hide' : 'View'}
         </button>
-        <span className="text-xs text-[#475569] shrink-0">{relativeTime(draft.updated_at)}</span>
+        <span className="text-xs text-[var(--text-faint)] shrink-0">{relativeTime(draft.updated_at)}</span>
       </div>
 
       {expanded && (
-        <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3">
-          <pre className="text-xs text-[#64748B] whitespace-pre-wrap leading-relaxed font-mono">{draft.content_text}</pre>
+        <div className="bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-3">
+          <pre className="text-xs text-[var(--text-muted)] whitespace-pre-wrap leading-relaxed font-mono">{draft.content_text}</pre>
         </div>
       )}
 
       {attributionNode && (
-        <div className="border-t border-[rgba(255,255,255,0.05)] pt-2">
-          <p className="text-[10px] text-[#475569] uppercase tracking-wide mb-1 flex items-center gap-1">
+        <div className="border-t border-[var(--border-subtle)] pt-2">
+          <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide mb-1 flex items-center gap-1">
             <BarChart2 size={9} />
             Visibility change since posting
           </p>
@@ -1570,19 +1570,19 @@ function OpportunityCard({
 
   const relevanceColor =
     opp.relevance_score >= 70
-      ? 'text-[#10b981]'
+      ? 'text-[var(--success)]'
       : opp.relevance_score >= 40
-      ? 'text-[#f59e0b]'
-      : 'text-[#64748B]';
+      ? 'text-[var(--warning)]'
+      : 'text-[var(--text-muted)]';
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-4 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] shadow-[0_4px_24px_rgba(0,0,0,0.20)] transition-colors">
+    <div className="card p-4 flex flex-col gap-3 transition-colors">
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={opp.platform} />
         {opp.subreddit && (
-          <span className="text-xs text-[#64748B] font-medium">r/{opp.subreddit}</span>
+          <span className="text-xs text-[var(--text-muted)] font-medium">r/{opp.subreddit}</span>
         )}
-        <span className={`text-xs font-semibold ml-auto ${relevanceColor}`}>
+        <span className={`text-xs font-semibold font-mono ml-auto ${relevanceColor}`}>
           {Math.round(opp.relevance_score)}% relevance
         </span>
       </div>
@@ -1591,16 +1591,16 @@ function OpportunityCard({
         href={opp.thread_url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm font-medium text-[#F0F4F8] hover:text-[#6366f1] transition-colors leading-snug flex items-start gap-1.5"
+        className="text-sm font-medium text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors leading-snug flex items-start gap-1.5"
       >
         {opp.thread_title || opp.thread_url}
-        <ExternalLink size={11} className="shrink-0 mt-0.5 text-[#475569]" />
+        <ExternalLink size={11} className="shrink-0 mt-0.5 text-[var(--text-faint)]" />
       </a>
 
       {opp.body_preview && (
         <div className="relative">
           <p
-            className={`text-xs text-[#475569] leading-relaxed cursor-pointer ${
+            className={`text-xs text-[var(--text-faint)] leading-relaxed cursor-pointer ${
               expanded ? 'max-h-48 overflow-y-auto pr-2' : 'line-clamp-2'
             }`}
             onClick={() => setExpanded(!expanded)}
@@ -1610,7 +1610,7 @@ function OpportunityCard({
           {opp.body_preview.length > 150 && (
             <button
               onClick={() => setExpanded(!expanded)}
-              className="text-[10px] text-[#6366f1] hover:text-[#818cf8] mt-1"
+              className="text-[10px] text-[var(--accent)] hover:text-[var(--accent-foreground)] mt-1"
             >
               {expanded ? 'Show less' : 'Show more'}
             </button>
@@ -1618,7 +1618,7 @@ function OpportunityCard({
         </div>
       )}
 
-      <div className="flex items-center gap-3 text-xs text-[#475569]">
+      <div className="flex items-center gap-3 text-xs text-[var(--text-faint)]">
         {opp.posted_at && (
           <span className="flex items-center gap-1">
             <Clock size={10} />
@@ -1626,7 +1626,7 @@ function OpportunityCard({
           </span>
         )}
         {opp.prompt_text && (
-          <span className="text-[#475569] truncate max-w-[200px]">
+          <span className="text-[var(--text-faint)] truncate max-w-[200px]">
             Prompt: {opp.prompt_text}
           </span>
         )}
@@ -1637,14 +1637,14 @@ function OpportunityCard({
           onClick={handleDraft}
           disabled={drafting || queueFull}
           title={queueFull ? 'Draft queue full — approve or dismiss drafts to make room' : undefined}
-          className="flex items-center gap-1.5 text-xs bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-1.5 transition-colors"
+          className="flex items-center gap-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-1.5 transition-colors"
         >
           {drafting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
           {drafting ? 'Drafting…' : queueFull ? 'Queue full' : 'Draft Reply'}
         </button>
         <button
           onClick={() => onDismiss(opp.id)}
-          className="flex items-center gap-1.5 text-xs text-[#ef4444]/70 hover:text-[#f87171] rounded-lg px-3 py-1.5 transition-colors ml-auto"
+          className="flex items-center gap-1.5 text-xs text-[var(--danger)]/70 hover:text-[var(--danger)] rounded-lg px-3 py-1.5 transition-colors ml-auto"
         >
           <X size={11} />
           Dismiss
@@ -1669,11 +1669,11 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.16)] flex items-center justify-center mb-4">
+      <div className="w-16 h-16 rounded-2xl bg-[var(--bg-raised)] border border-[var(--border-subtle)] flex items-center justify-center mb-4">
         {icon}
       </div>
-      <p className="text-[15px] font-semibold text-[#F0F4F8] mb-2">{title}</p>
-      <p className="text-[13px] text-[#64748B] mb-6 max-w-xs leading-relaxed">{description}</p>
+      <p className="text-[15px] font-semibold text-[var(--text-primary)] mb-2">{title}</p>
+      <p className="text-[13px] text-[var(--text-muted)] mb-6 max-w-xs leading-relaxed">{description}</p>
       {action}
     </div>
   );
@@ -1697,10 +1697,10 @@ function DraftsPanel(props: ContentTabPanelsProps) {
   )).sort();
 
   const filterBar = draftPlatforms.length >= 2 ? (
-    <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 mb-4 self-start">
+    <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 mb-4 self-start">
       <button
         onClick={() => setPlatformFilter('all')}
-        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
       >
         All
       </button>
@@ -1708,7 +1708,7 @@ function DraftsPanel(props: ContentTabPanelsProps) {
         <button
           key={p}
           onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
-          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
         >
           {p}
         </button>
@@ -1721,7 +1721,7 @@ function DraftsPanel(props: ContentTabPanelsProps) {
       <>
         {filterBar}
         <EmptyState
-          icon={<FileText size={48} className="text-[#818cf8]" />}
+          icon={<FileText size={48} className="text-[var(--accent-foreground)]" />}
           title={platformFilter !== 'all' ? `No ${platformFilter} drafts` : 'No drafts yet'}
           description={platformFilter !== 'all' ? 'Try switching to "All" or generate new drafts.' : 'Use "Regenerate Drafts" or request a custom draft to get started.'}
           action={platformFilter === 'all' && (user?.subscription_tier || user?.is_admin) ? (() => {
@@ -1732,13 +1732,13 @@ function DraftsPanel(props: ContentTabPanelsProps) {
                 <button
                   onClick={handleGenerateNow}
                   disabled={generating || !!draftStatus?.draft_queue_full || onCooldown}
-                  className="flex items-center gap-2 bg-[#5b5ef4] hover:bg-[#4f46e5] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[#6366f1]/30 hover:shadow-[#6366f1]/45"
+                  className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[var(--accent)]/30 hover:shadow-[var(--accent)]/45"
                 >
                   {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
                   {generating ? 'Generating…' : 'Regenerate Drafts'}
                 </button>
                 {onCooldown && (
-                  <p className="text-xs text-[#475569]">{cooldownLabel}</p>
+                  <p className="text-xs text-[var(--text-faint)]">{cooldownLabel}</p>
                 )}
               </div>
             );
@@ -1757,10 +1757,10 @@ function DraftsPanel(props: ContentTabPanelsProps) {
   return (
     <div className="flex flex-col gap-3">
       {filterBar}
-      <div className="flex items-start gap-2 bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.07)] rounded-lg px-3 py-2.5">
-        <RefreshCw size={12} className="text-[#475569] flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-[#475569]">
-          Unreviewed drafts are replaced when new drafts are generated. Move anything you want to keep to <span className="text-[#94A3B8]">Scheduled</span> first.
+      <div className="flex items-start gap-2 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg px-3 py-2.5">
+        <RefreshCw size={12} className="text-[var(--text-faint)] flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-[var(--text-faint)]">
+          Unreviewed drafts are replaced when new drafts are generated. Move anything you want to keep to <span className="text-[var(--text-secondary)]">Scheduled</span> first.
         </p>
       </div>
       {sorted.map((d) =>
@@ -1799,7 +1799,7 @@ function ScheduledPanel(props: ContentTabPanelsProps) {
   if (visibleScheduledItems.length === 0) {
     return (
       <EmptyState
-        icon={<Clock size={26} className="text-[#818cf8]" />}
+        icon={<Clock size={26} className="text-[var(--accent-foreground)]" />}
         title="Nothing scheduled yet"
         description="Approve a draft from the Drafts tab — it will appear here ready to post."
       />
@@ -1828,12 +1828,12 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
   const header = (
     <>
       <div className="flex items-center justify-between mb-4">
-        <p className="text-xs text-[#64748B]">
+        <p className="text-xs text-[var(--text-muted)]">
           Threads and questions matched to your tracked prompts
         </p>
         <button
           onClick={() => setOppHelpOpen(true)}
-          className="text-[#475569] hover:text-[#6366f1] transition-colors"
+          className="text-[var(--text-faint)] hover:text-[var(--accent)] transition-colors"
           title="How do Live Opportunities work?"
         >
           <HelpCircle size={14} />
@@ -1844,10 +1844,10 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
 
   const oppPlatforms = Array.from(new Set(opportunities.map((o) => o.platform))).sort();
   const oppFilterBar = oppPlatforms.length >= 2 ? (
-    <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 mb-4 self-start">
+    <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 mb-4 self-start">
       <button
         onClick={() => setPlatformFilter('all')}
-        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
       >
         All
       </button>
@@ -1855,7 +1855,7 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
         <button
           key={p}
           onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
-          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
         >
           {p}
         </button>
@@ -1868,7 +1868,7 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
       <>
         {header}
         <EmptyState
-          icon={<Radio size={26} className="text-[#818cf8]" />}
+          icon={<Radio size={26} className="text-[var(--accent-foreground)]" />}
           title="No live opportunities"
           description="Reddit and Quora are scanned daily. Check back after the next scan or run a tracking report to generate fresh prompts."
         />
@@ -1891,7 +1891,7 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
         ))}
         {visibleOpportunities.length === 0 && (
           <EmptyState
-            icon={<Radio size={26} className="text-[#818cf8]" />}
+            icon={<Radio size={26} className="text-[var(--accent-foreground)]" />}
             title={`No ${platformFilter} opportunities`}
             description='Try "All" or switch platform.'
           />
@@ -1907,7 +1907,7 @@ function PostedPanel(props: ContentTabPanelsProps) {
   if (postedItems.length === 0) {
     return (
       <EmptyState
-        icon={<CheckCircle2 size={26} className="text-[#818cf8]" />}
+        icon={<CheckCircle2 size={26} className="text-[var(--accent-foreground)]" />}
         title="Nothing posted yet"
         description="Approved drafts will appear here once marked as posted."
       />

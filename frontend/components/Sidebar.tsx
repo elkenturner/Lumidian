@@ -52,8 +52,8 @@ const NavLink = memo(function NavLink({
         'flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden',
         expanded ? 'px-3.5' : 'px-0 justify-center',
         isActive
-          ? 'text-[#818CF8]'
-          : 'text-[#64748B] hover:text-[#94A3B8]',
+          ? 'text-[var(--accent-light)]'
+          : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]',
       ].join(' ')}
       style={isActive ? {
         background: 'rgba(99,102,241,0.12)',
@@ -66,11 +66,11 @@ const NavLink = memo(function NavLink({
       }}
     >
       {isActive && (
-        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[18px] rounded-r-full" style={{ background: 'linear-gradient(180deg, #c7d2fe, #6366F1)' }} />
+        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-[18px] rounded-r-full" style={{ background: 'linear-gradient(180deg, var(--accent-light), var(--accent))' }} />
       )}
       <Icon
         size={17}
-        className={`flex-shrink-0 ${isActive ? 'text-[#818CF8]' : 'text-[#475569]'}`}
+        className={`flex-shrink-0 ${isActive ? 'text-[var(--accent-light)]' : 'text-[var(--text-faint)]'}`}
         strokeWidth={isActive ? 2 : 1.75}
       />
       {expanded && (
@@ -193,16 +193,16 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 size={22}
                 className="rounded-md flex-shrink-0"
                 style={{ background: 'rgba(99,102,241,0.20)', border: '1px solid rgba(99,102,241,0.30)', padding: 3 }}
-                textClassName="text-[9px] font-bold text-[#818CF8]"
+                textClassName="text-[9px] font-bold text-[var(--accent-light)]"
               />
               {expanded && (
                 <>
-                  <span className="flex-1 text-left text-[12px] font-medium text-[#CBD5E1] truncate leading-tight min-w-0">
+                  <span className="flex-1 text-left text-[12px] font-medium text-[var(--text-secondary)] truncate leading-tight min-w-0">
                     {activeBrand?.name ?? 'Select brand'}
                   </span>
                   <ChevronDown
                     size={12}
-                    className="flex-shrink-0 text-[#475569] transition-transform duration-150"
+                    className="flex-shrink-0 text-[var(--text-faint)] transition-transform duration-150"
                     style={{ transform: brandOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}
                   />
                 </>
@@ -229,7 +229,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
               >
                 {/* Header */}
                 <div className="px-3 pt-2.5 pb-1.5 border-b border-[rgba(255,255,255,0.06)]">
-                  <p className="text-[10px] font-semibold text-[#475569] uppercase tracking-wider">Your brands</p>
+                  <p className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider">Your brands</p>
                 </div>
 
                 {/* Brand list */}
@@ -256,17 +256,17 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                             padding: 3,
                           }}
                           textClassName="text-[10px] font-bold"
-                          textStyle={{ color: isActive ? '#818CF8' : '#64748B' }}
+                          textStyle={{ color: isActive ? 'var(--accent-light)' : 'var(--text-muted)' }}
                         />
                         <div className="flex-1 min-w-0">
-                          <p className={`text-[12px] font-medium truncate leading-tight ${isActive ? 'text-[#E2E8F0]' : 'text-[#94A3B8]'}`}>
+                          <p className={`text-[12px] font-medium truncate leading-tight ${isActive ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
                             {brand.name}
                           </p>
                           {brand.brand_type === 'pitch' && (
-                            <p className="text-[10px] text-[#F59E0B] leading-tight">Pitch brand</p>
+                            <p className="text-[10px] text-[var(--warning)] leading-tight">Pitch brand</p>
                           )}
                         </div>
-                        {isActive && <Check size={12} className="flex-shrink-0 text-[#6366F1]" />}
+                        {isActive && <Check size={12} className="flex-shrink-0 text-[var(--accent)]" />}
                       </button>
                     );
                   })}
@@ -277,7 +277,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                   <Link
                     href="/settings/brands/new"
                     onClick={() => setBrandOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] text-[#475569] hover:text-[#94A3B8] transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors"
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
                     onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                   >
@@ -341,22 +341,22 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
             {expanded ? (
               <>
                 <div className="flex items-center gap-1.5 px-3.5 py-2">
-                  <CreditCard size={12} className="flex-shrink-0 text-[#475569]" />
+                  <CreditCard size={12} className="flex-shrink-0 text-[var(--text-faint)]" />
                   <Link
                     href="/settings/billing"
-                    className="text-xs whitespace-nowrap text-[#475569] hover:text-[#64748b] transition-colors"
+                    className="text-xs whitespace-nowrap text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors"
                   >
                     {planLabel} Plan
                   </Link>
                   {(user?.subscription_status === 'past_due' || user?.subscription_status === 'unpaid') && (
-                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#7f1d1d]/30 text-[#f87171] border border-[#7f1d1d]/40 leading-none">
+                    <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#7f1d1d]/30 text-[var(--danger-text)] border border-[#7f1d1d]/40 leading-none">
                       PAST DUE
                     </span>
                   )}
                   {!user?.is_admin && (!user?.subscription_tier || user.subscription_tier === 'starter') && (
                     <Link
                       href="/settings/billing"
-                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[#6366f1]/20 text-[#818cf8] border border-[#6366f1]/30 hover:bg-[#6366f1]/30 transition-colors leading-none whitespace-nowrap"
+                      className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--accent)]/20 text-[var(--accent-light)] border border-[var(--accent)]/30 hover:bg-[var(--accent)]/30 transition-colors leading-none whitespace-nowrap"
                     >
                       Upgrade
                     </Link>
@@ -366,29 +366,29 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 <div
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
                   style={{
-                    background: 'rgba(99,102,241,0.06)',
-                    border: '1px solid rgba(99,102,241,0.12)',
+                    background: 'var(--bg-raised)',
+                    border: '1px solid var(--border-subtle)',
                   }}
                 >
                   <div
                     className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
                     style={{ background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.30)' }}
                   >
-                    <User size={11} className="text-[#818CF8]" />
+                    <User size={11} className="text-[var(--accent-light)]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-medium text-[#94A3B8] truncate leading-tight">
+                    <p className="text-[11px] font-medium text-[var(--text-secondary)] truncate leading-tight">
                       {user.name || user.email}
                     </p>
                     {user.name && (
-                      <p className="text-[10px] text-[#475569] truncate leading-tight mt-0.5">
+                      <p className="text-[10px] text-[var(--text-faint)] truncate leading-tight mt-0.5">
                         {user.email}
                       </p>
                     )}
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="text-[#475569] hover:text-[#94A3B8] transition-colors flex-shrink-0 p-1 rounded-md"
+                    className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors flex-shrink-0 p-1 rounded-md"
                     aria-label="Sign out"
                     title="Sign out"
                     onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
@@ -397,10 +397,10 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                     <LogOut size={13} />
                   </button>
                 </div>
-                <div className="flex items-center gap-2 px-3.5 pb-1">
-                  <Link href="/privacy" className="text-[10px] text-[#334155] hover:text-[#475569] transition-colors">Privacy</Link>
-                  <span className="text-[10px] text-[#334155]">·</span>
-                  <Link href="/terms" className="text-[10px] text-[#334155] hover:text-[#475569] transition-colors">Terms</Link>
+                <div className="flex items-center gap-2 px-3.5 pb-2 pt-1">
+                  <Link href="/privacy" className="text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">Privacy</Link>
+                  <span className="text-[10px] text-[var(--text-faint)]">·</span>
+                  <Link href="/terms" className="text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">Terms</Link>
                 </div>
               </>
             ) : (
@@ -412,7 +412,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                   className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
                   style={{ background: 'rgba(99,102,241,0.18)', border: '1px solid rgba(99,102,241,0.30)' }}
                 >
-                  <User size={12} className="text-[#818CF8]" />
+                  <User size={12} className="text-[var(--accent-light)]" />
                 </button>
               </div>
             )}

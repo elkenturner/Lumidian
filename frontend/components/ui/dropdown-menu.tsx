@@ -16,7 +16,7 @@ function DropdownMenuSubTrigger({ className, inset, children, ...props }: React.
   return (
     <DropdownMenuPrimitive.SubTrigger
       className={cn(
-        "flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[#94a3b8] outline-none focus:bg-[rgba(255,255,255,0.06)] data-[state=open]:bg-[rgba(255,255,255,0.06)]",
+        "flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--text-secondary)] outline-none focus:bg-[rgba(255,255,255,0.06)] data-[state=open]:bg-[rgba(255,255,255,0.06)]",
         inset && "pl-8",
         className
       )}
@@ -32,7 +32,7 @@ function DropdownMenuSubContent({ className, ...props }: React.ComponentProps<ty
   return (
     <DropdownMenuPrimitive.SubContent
       className={cn(
-        "z-50 min-w-[8rem] overflow-hidden rounded-xl bg-[rgba(10,14,24,0.97)] backdrop-blur-xl border border-[rgba(99,102,241,0.20)] p-1 shadow-xl",
+        "z-50 min-w-[8rem] overflow-hidden rounded-xl bg-[rgba(10,14,24,0.97)] backdrop-blur-xl border border-[var(--border-default)] p-1 shadow-xl",
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         className
       )}
@@ -47,7 +47,7 @@ function DropdownMenuContent({ className, sideOffset = 4, ...props }: React.Comp
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
         className={cn(
-          "z-50 min-w-[8rem] overflow-hidden rounded-xl bg-[rgba(10,14,24,0.97)] backdrop-blur-xl border border-[rgba(99,102,241,0.20)] p-1 shadow-xl",
+          "z-50 min-w-[8rem] overflow-hidden rounded-xl bg-[rgba(10,14,24,0.97)] backdrop-blur-xl border border-[var(--border-default)] p-1 shadow-xl",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           className
         )}
@@ -62,7 +62,7 @@ function DropdownMenuItem({ className, inset, variant = "default", ...props }: R
     <DropdownMenuPrimitive.Item
       className={cn(
         "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors focus:bg-[rgba(255,255,255,0.06)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-        variant === "default" ? "text-[#94a3b8] focus:text-[#e2e8f0]" : "text-[#f87171] focus:text-[#fca5a5] focus:bg-[rgba(127,29,29,0.20)]",
+        variant === "default" ? "text-[var(--text-secondary)] focus:text-[var(--text-primary)]" : "text-[var(--danger)] focus:text-[var(--danger-text)] focus:bg-[rgba(127,29,29,0.20)]",
         inset && "pl-8",
         className
       )}
@@ -75,7 +75,7 @@ function DropdownMenuCheckboxItem({ className, children, checked, ...props }: Re
   return (
     <DropdownMenuPrimitive.CheckboxItem
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm text-[#94a3b8] outline-none transition-colors focus:bg-[rgba(255,255,255,0.06)] focus:text-[#e2e8f0] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm text-[var(--text-secondary)] outline-none transition-colors focus:bg-[rgba(255,255,255,0.06)] focus:text-[var(--text-primary)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className
       )}
       checked={checked}
@@ -95,7 +95,7 @@ function DropdownMenuRadioItem({ className, children, ...props }: React.Componen
   return (
     <DropdownMenuPrimitive.RadioItem
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm text-[#94a3b8] outline-none transition-colors focus:bg-[rgba(255,255,255,0.06)] focus:text-[#e2e8f0] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm text-[var(--text-secondary)] outline-none transition-colors focus:bg-[rgba(255,255,255,0.06)] focus:text-[var(--text-primary)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className
       )}
       {...props}
@@ -113,7 +113,7 @@ function DropdownMenuRadioItem({ className, children, ...props }: React.Componen
 function DropdownMenuLabel({ className, inset, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Label> & { inset?: boolean }) {
   return (
     <DropdownMenuPrimitive.Label
-      className={cn("px-2 py-1.5 text-xs font-semibold text-[#475569] uppercase tracking-wider", inset && "pl-8", className)}
+      className={cn("px-2 py-1.5 text-xs font-semibold text-[var(--text-faint)] uppercase tracking-wider", inset && "pl-8", className)}
       {...props}
     />
   )

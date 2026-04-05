@@ -519,7 +519,7 @@ function DraftCard({
   onRegenerated: (d: ContentDraft) => void;
 }) {
   const [editing, setEditing] = useState(false);
-  const [previewMode, setPreviewMode] = useState(false);
+
   const [editTitle, setEditTitle] = useState(draft.title ?? '');
   const [editContent, setEditContent] = useState(draft.content_text);
   const [saving, setSaving] = useState(false);
@@ -754,33 +754,14 @@ function DraftCard({
           {draft.title && (
             <p className="text-sm font-semibold text-[var(--text-primary)] leading-snug mb-1">{draft.title}</p>
           )}
-          <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-md p-0.5">
-              <button
-                onClick={() => setPreviewMode(false)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${!previewMode ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
-              >Raw</button>
-              <button
-                onClick={() => setPreviewMode(true)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${previewMode ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
-              >Preview</button>
-            </div>
+          <div className="flex items-center justify-end mb-1.5">
             <span className="text-[10px] text-[var(--text-faint)] font-mono">{wordCount} words</span>
           </div>
-          {previewMode ? (
-            <div
-              className="text-sm text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-3"
-              style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--border-subtle) transparent' }}
-              dangerouslySetInnerHTML={{ __html: `<p style="margin:0">${renderPreviewHtml(draft.content_text)}</p>` }}
-            />
-          ) : (
-            <div
-              className="text-sm text-[var(--text-muted)] leading-relaxed overflow-y-auto"
-              style={{ maxHeight: '9rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--border-subtle) transparent' }}
-            >
-              {draft.content_text}
-            </div>
-          )}
+          <div
+            className="text-sm text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-3"
+            style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--border-subtle) transparent' }}
+            dangerouslySetInnerHTML={{ __html: `<p style="margin:0">${renderPreviewHtml(draft.content_text)}</p>` }}
+          />
         </div>
       )}
 

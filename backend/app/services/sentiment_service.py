@@ -113,11 +113,11 @@ async def _classify_batch_claude(
         labels = json.loads(raw)
         if isinstance(labels, list) and len(labels) == len(samples):
             valid = {"positive", "neutral", "negative"}
-            cleaned = [str(l).lower() if str(l).lower() in valid else "neutral" for l in labels]
+            cleaned = [str(lbl).lower() if str(lbl).lower() in valid else "neutral" for lbl in labels]
             logger.info(
                 "[sentiment] Claude classified %d responses: %s",
                 len(cleaned),
-                {l: cleaned.count(l) for l in valid},
+                {v: cleaned.count(v) for v in valid},
             )
             return cleaned
         logger.warning(
@@ -134,7 +134,7 @@ async def _classify_batch_claude(
 # ── Public entry point ────────────────────────────────────────────────────────
 
 async def classify_sentiments_for_run(
-    query_results: list["QueryResult"],
+    query_results: list[QueryResult],
     brand_name: str,
 ) -> None:
     """
@@ -192,9 +192,10 @@ async def classify_sentiments_for_run(
         logger.warning("[sentiment] Nothing to persist — all IDs were None or label unknown")
         return
 
+    from sqlalchemy import update
+
     from app.database import AsyncSessionLocal
     from app.models import QueryResult as QRModel
-    from sqlalchemy import update
 
     async with AsyncSessionLocal() as db:
         for label, ids in ids_by_label.items():

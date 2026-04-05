@@ -13,6 +13,7 @@ import {
   normaliseWebsiteUrl,
   triggerRun,
 } from '@/lib/api';
+import { logError } from '@/lib/utils/errors';
 type Step = 1 | 2 | 3;
 
 export default function OnboardingPage() {
@@ -43,7 +44,7 @@ export default function OnboardingPage() {
         if (brands.length > 0) router.replace('/dashboard');
         else setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => { logError(err, 'Onboarding: check existing brands'); setLoading(false); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleStep1() {

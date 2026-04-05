@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import { logError } from '@/lib/utils/errors';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User,
@@ -356,21 +357,21 @@ export default function SettingsPage() {
         // Start brand details fetching as soon as getBrands resolves —
         // don't wait for getSchedulerStatus (independent, slower).
         const brandsPromise = getBrands();
-        const schedulerPromise = getSchedulerStatus().catch(() => null);
+        const schedulerPromise = getSchedulerStatus().catch((err) => { logError(err, 'Settings: fetch scheduler status'); return null; });
         const detailsPromise = brandsPromise.then((brands) => {
           if (brands.length === 0) return null;
           const targetId = contextBrandId ?? brands[0].id;
           return Promise.all([
             getBrand(targetId),
             getCompetitors(targetId),
-            getBrandProfile(targetId).catch(() => null),
+            getBrandProfile(targetId).catch((err) => { logError(err, 'Settings: fetch brand profile'); return null; }),
           ]);
         });
 
         const [brands, schedulerStatus, details] = await Promise.all([
           brandsPromise,
           schedulerPromise,
-          detailsPromise.catch(() => null),
+          detailsPromise.catch((err) => { logError(err, 'Settings: fetch brand details'); return null; }),
         ]);
 
         if (schedulerStatus) {
@@ -389,7 +390,7 @@ export default function SettingsPage() {
         const [brandDetail, comps, prof] = (details ?? await Promise.all([
           getBrand(targetBrandId),
           getCompetitors(targetBrandId),
-          getBrandProfile(targetBrandId).catch(() => null),
+          getBrandProfile(targetBrandId).catch((err) => { logError(err, 'Settings: fetch brand profile fallback'); return null; }),
         ])) as [BrandDetail, Competitor[], BrandProfile | null];
 
         setBrand(brandDetail);
@@ -434,7 +435,7 @@ export default function SettingsPage() {
     setTeamLoading(true);
     getTeamMembers()
       .then(setTeamMembers)
-      .catch(() => setTeamLoadError('Could not load team members. Please refresh the page.'))
+      .catch((err) => { logError(err, 'Settings: fetch team members'); setTeamLoadError('Could not load team members. Please refresh the page.'); })
       .finally(() => setTeamLoading(false));
   }, [activeTab]);
 

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { CreditCard, Check, Loader2, Zap, AlertTriangle, CheckCircle2, X } from 'lucide-react';
 import { getBillingStatus, createCheckoutSession, createPortalSession, cancelSubscription, BillingStatus } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { logError } from '@/lib/utils/errors';
 
 const TIER_FEATURES: Record<string, string[]> = {
   starter: [
@@ -51,7 +52,7 @@ export default function BillingPage() {
       try {
         const [s] = await Promise.all([
           getBillingStatus(),
-          successParam === 'true' ? refresh().catch(() => {}) : Promise.resolve(),
+          successParam === 'true' ? refresh().catch((err) => logError(err, 'Billing: refresh auth after checkout success')) : Promise.resolve(),
         ]);
         setStatus(s);
       } catch {

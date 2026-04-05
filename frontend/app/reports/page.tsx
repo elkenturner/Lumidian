@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState, useRef, useCallback } from 'react';
+import { logError } from '@/lib/utils/errors';
 import {
   BarChart2,
   ChevronDown,
@@ -155,15 +156,15 @@ export default function ReportsPage() {
         return Promise.all([
           getResponses(brandId, latestCompleted.id),
           prevCompleted ? getResponses(brandId, prevCompleted.id) : Promise.resolve([]),
-          getCompetitorAnalysis(brandId, latestCompleted.id).catch(() => null),
+          getCompetitorAnalysis(brandId, latestCompleted.id).catch((err) => { logError(err, 'Reports: fetch competitor analysis'); return null; }),
         ]).then(([resps, prevResps, compAnalysis]) => ({ resps, prevResps, compAnalysis }));
       });
 
       const [tr, , detail, runData] = await Promise.all([
         getTrends(brandId),
         runsPromise,
-        getBrand(brandId).catch(() => null),
-        runsDataPromise.catch(() => ({ resps: [], prevResps: [], compAnalysis: null })),
+        getBrand(brandId).catch((err) => { logError(err, 'Reports: fetch brand detail'); return null; }),
+        runsDataPromise.catch((err) => { logError(err, 'Reports: fetch runs data'); return { resps: [], prevResps: [], compAnalysis: null }; }),
       ]);
 
       if (signal?.aborted) return;
@@ -185,7 +186,7 @@ export default function ReportsPage() {
       setPrevResponses(Array.isArray(prevResps) ? prevResps.filter((r: QueryResult) => r.response_text) : []);
       if (compAnalysis?.has_data) setCompetitorAnalysis(compAnalysis);
       // Check case study eligibility
-      getCaseStudyEligibility(brandId).then(setCaseStudyEligibility).catch(() => {});
+      getCaseStudyEligibility(brandId).then(setCaseStudyEligibility).catch((err) => logError(err, 'Reports: fetch case study eligibility'));
     } catch { /* ignore */ } finally {
       if (!signal?.aborted) setLoading(false);
     }

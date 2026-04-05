@@ -38,6 +38,7 @@ import {
 } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
 import { formatDistanceToNow, parseISO } from 'date-fns';
+import { logError } from '@/lib/utils/errors';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1183,7 +1184,7 @@ function QuoraQuestionPicker({
     setSearched(false);
     getQuoraQuestions(brandId, promptId as number)
       .then((qs) => { setQuestions(qs); setSearched(true); })
-      .catch(() => { setQuestions([]); setSearched(true); })
+      .catch((err) => { logError(err, 'ContentTabPanels: fetch Quora questions'); setQuestions([]); setSearched(true); })
       .finally(() => setLoading(false));
   }, [brandId, promptId]);
 

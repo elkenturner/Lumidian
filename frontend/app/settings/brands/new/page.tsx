@@ -17,6 +17,7 @@ import {
   BillingUsage,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { logError } from '@/lib/utils/errors';
 
 type Step = 'type' | 'details' | 'prompts' | 'profile';
 type BrandChoice = 'starter' | 'pro' | 'pitch';
@@ -64,7 +65,7 @@ export default function NewBrandPage() {
   useEffect(() => {
     getBillingUsage()
       .then((b) => setBilling(b))
-      .catch(() => {})
+      .catch((err) => logError(err, 'NewBrand: fetch billing usage'))
       .finally(() => setLoadingBilling(false));
   }, []);
 
@@ -105,7 +106,7 @@ export default function NewBrandPage() {
       });
       setCreatedBrandId(brand.id);
       if (normalisedUrl) {
-        refreshWebsiteContext(brand.id).catch(() => {});
+        refreshWebsiteContext(brand.id).catch((err) => logError(err, 'NewBrand: refresh website context'));
       }
       setStep('prompts');
     } catch (err: unknown) {

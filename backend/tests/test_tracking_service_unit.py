@@ -130,9 +130,9 @@ class TestMentionDetectionEdgeCases:
     def test_brand_name_mixed_case(self):
         assert _detect_mention("MixedCase", "mixedcase is great", None, "chatgpt") is True
 
-    def test_brand_name_unicode_stripped_by_normalize(self):
-        # normalize strips non-alphanumeric; brand with hyphen vs response with it removed
-        assert _detect_mention("Café-Brand", "cafebrand is recommended", None, "chatgpt") is True
+    def test_brand_name_punctuation_stripped_by_normalize(self):
+        # normalize strips hyphens; "cafe-brand" and "cafebrand" both normalize to "cafebrand"
+        assert _detect_mention("cafe-brand", "cafebrand is recommended", None, "chatgpt") is True
 
     def test_whitespace_only_response(self):
         # Whitespace-only string is falsy via `not response_text` after strip? Let's check:

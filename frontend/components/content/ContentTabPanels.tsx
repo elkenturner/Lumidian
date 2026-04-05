@@ -731,6 +731,27 @@ function DraftCard({
             );
           })()}
         </>
+      ) : draft.platform === 'medium' ? (
+        <>
+          <a
+            href="https://medium.com/new-story"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-[rgba(148,163,184,0.07)] border border-[rgba(148,163,184,0.18)] rounded-lg px-3 py-2 group transition-colors hover:border-[rgba(148,163,184,0.35)] hover:bg-[rgba(148,163,184,0.11)]"
+          >
+            <span className="text-[var(--text-secondary)] text-xs flex-shrink-0">↗</span>
+            <span className="text-xs text-[var(--text-secondary)] font-medium flex-1 min-w-0 truncate">
+              Write on Medium
+            </span>
+            <ExternalLink size={11} className="text-[var(--text-secondary)]/60 flex-shrink-0 group-hover:text-[var(--text-secondary)]" />
+          </a>
+          {draft.content_brief && (
+            <p className="text-xs text-[var(--text-faint)] leading-relaxed line-clamp-2">
+              <span className="text-[var(--text-muted)]">Targeting: </span>
+              {draft.content_brief}
+            </p>
+          )}
+        </>
       ) : draft.content_brief ? (
         <p className="text-xs text-[var(--text-faint)] leading-relaxed line-clamp-2">
           <span className="text-[var(--text-muted)]">Targeting: </span>

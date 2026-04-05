@@ -519,7 +519,6 @@ function DraftCard({
   onRegenerated: (d: ContentDraft) => void;
 }) {
   const [editing, setEditing] = useState(false);
-
   const [editTitle, setEditTitle] = useState(draft.title ?? '');
   const [editContent, setEditContent] = useState(draft.content_text);
   const [saving, setSaving] = useState(false);
@@ -690,12 +689,48 @@ function DraftCard({
           <p className="text-xs text-[var(--color-gemini)] leading-relaxed">{draft.content_brief}</p>
         </div>
       ) : draft.content_brief && draft.platform === 'reddit' ? (
-        <p className="text-xs text-[var(--text-faint)] leading-relaxed">
-          <span className="text-[var(--color-claude)] font-medium">{draft.content_brief.split(' — ')[0]}</span>
-          {draft.content_brief.includes(' — ') && (
-            <span className="text-[var(--text-faint)]"> — {draft.content_brief.split(' — ').slice(1).join(' — ')}</span>
-          )}
-        </p>
+        <>
+          {(() => {
+            const sub = extractSubreddit(draft.content_brief);
+            const contextText = draft.content_brief.includes(' — ')
+              ? draft.content_brief.split(' — ').slice(1).join(' — ')
+              : null;
+            return (
+              <>
+                {sub ? (
+                  <a
+                    href={`https://www.reddit.com/r/${sub}/submit`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 bg-[color-mix(in_srgb,var(--color-claude)_7%,transparent)] border border-[color-mix(in_srgb,var(--color-claude)_20%,transparent)] rounded-lg px-3 py-2 group transition-colors hover:border-[color-mix(in_srgb,var(--color-claude)_35%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-claude)_11%,transparent)]"
+                  >
+                    <span className="text-[var(--color-claude)] text-xs flex-shrink-0">↗</span>
+                    <span className="text-xs text-[var(--color-claude)] font-medium flex-1 min-w-0 truncate">
+                      Post in r/{sub}
+                    </span>
+                    <ExternalLink size={11} className="text-[var(--color-claude)]/60 flex-shrink-0 group-hover:text-[var(--color-claude)]" />
+                  </a>
+                ) : (
+                  <p className="text-xs text-[var(--text-faint)] leading-relaxed">
+                    <span className="text-[var(--color-claude)] font-medium">{draft.content_brief.split(' — ')[0]}</span>
+                  </p>
+                )}
+                {contextText && (
+                  <p className="text-xs text-[var(--text-faint)] leading-relaxed">{contextText}</p>
+                )}
+                {sub && isPromoRestricted(sub) && (
+                  <div className="flex items-center gap-1.5 text-[10px] text-[var(--warning)] bg-[color-mix(in_srgb,var(--warning)_8%,transparent)] border border-[color-mix(in_srgb,var(--warning)_20%,transparent)] rounded-md px-2.5 py-1.5">
+                    <AlertTriangle size={10} className="flex-shrink-0" />
+                    <span>
+                      <span className="font-semibold">r/{sub} bans promotion</span>
+                      {' '}— this draft avoids direct brand mentions. You may cite sources or reference research indirectly.
+                    </span>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </>
       ) : draft.content_brief ? (
         <p className="text-xs text-[var(--text-faint)] leading-relaxed line-clamp-2">
           <span className="text-[var(--text-muted)]">Targeting: </span>

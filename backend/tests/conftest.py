@@ -92,7 +92,7 @@ async def db_session():
 
 @pytest_asyncio.fixture
 async def client():
-    """Async HTTP test client with scheduler mocked out."""
+    """Async HTTP test client with scheduler and email mocked out."""
     with (
         patch("app.scheduler.start_scheduler"),
         patch("app.scheduler.stop_scheduler"),
@@ -100,6 +100,8 @@ async def client():
             "app.services.auth_seeder.seed_admin_user",
             new_callable=lambda: lambda: AsyncMock(return_value=None),
         ),
+        # Mock email background sender to prevent dangling async tasks
+        patch("app.services.email_service.send_email_background"),
     ):
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),

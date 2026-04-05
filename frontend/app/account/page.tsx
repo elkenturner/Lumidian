@@ -17,6 +17,7 @@ import {
   BillingStatus,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { logError } from '@/lib/utils/errors';
 
 const BLOCKED_STATUSES = new Set(['canceled', 'past_due', 'unpaid']);
 
@@ -61,7 +62,7 @@ export default function AccountPage() {
   useEffect(() => {
     getBillingStatus()
       .then(setBilling)
-      .catch(() => {})
+      .catch((err) => logError(err, 'Account: fetch billing status'))
       .finally(() => setBillingLoading(false));
   }, []);
 

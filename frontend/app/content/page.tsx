@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
+import { logError } from '@/lib/utils/errors';
 import {
   Plus,
   FileText,
@@ -1204,7 +1205,7 @@ function QuoraQuestionPicker({
     setSearched(false);
     getQuoraQuestions(brandId, promptId as number)
       .then((qs) => { setQuestions(qs); setSearched(true); })
-      .catch(() => { setQuestions([]); setSearched(true); })
+      .catch((err) => { logError(err, 'Content: fetch Quora questions'); setQuestions([]); setSearched(true); })
       .finally(() => setLoading(false));
   }, [brandId, promptId]);
 
@@ -1978,11 +1979,11 @@ export default function ContentHubPage() {
         getDrafts(brandId, undefined, 'approved'),
         getDrafts(brandId, undefined, 'posted'),
         getOpportunities(brandId),
-        getBrandProfile(brandId).catch(() => null),
-        getBrand(brandId).catch(() => null),
-        getContentSettings(brandId).catch(() => [] as BrandContentSettings[]),
-        getDraftStatus(brandId).catch(() => null),
-        getDraftAttributions(brandId).catch(() => [] as DraftAttribution[]),
+        getBrandProfile(brandId).catch((err) => { logError(err, 'Content: fetch brand profile'); return null; }),
+        getBrand(brandId).catch((err) => { logError(err, 'Content: fetch brand detail'); return null; }),
+        getContentSettings(brandId).catch((err) => { logError(err, 'Content: fetch content settings'); return [] as BrandContentSettings[]; }),
+        getDraftStatus(brandId).catch((err) => { logError(err, 'Content: fetch draft status'); return null; }),
+        getDraftAttributions(brandId).catch((err) => { logError(err, 'Content: fetch draft attributions'); return [] as DraftAttribution[]; }),
       ]);
 
       // Ignore results if the user switched to a different brand while fetching
@@ -2091,7 +2092,7 @@ export default function ContentHubPage() {
       setDraftItems((prev) => [draft, ...prev]);
       setPinnedDraftId(draft.id);
       // Refresh status so the count is accurate
-      if (selectedBrandId) getDraftStatus(selectedBrandId).then(setDraftStatus).catch(() => {});
+      if (selectedBrandId) getDraftStatus(selectedBrandId).then(setDraftStatus).catch((err) => logError(err, 'Content: refresh draft status after drafting opportunity'));
       setActiveTab('drafts');
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { detail?: string | Array<{ msg?: string }> } } };
@@ -2155,7 +2156,7 @@ export default function ContentHubPage() {
         if (currentStatus.draft_count !== prevCount) {
           prevCount = currentStatus.draft_count;
           unchangedStreak = 0;
-          loadAll(brandId).catch(() => {});
+          loadAll(brandId).catch((err) => logError(err, 'Content: reload during generation poll'));
         } else {
           unchangedStreak++;
         }
@@ -2165,9 +2166,9 @@ export default function ContentHubPage() {
       }
 
       setGenerating(false);
-      loadAll(brandId).catch(() => {});
+      loadAll(brandId).catch((err) => logError(err, 'Content: reload after generation complete'));
 
-      const finalStatus = await getDraftStatus(brandId).catch(() => null);
+      const finalStatus = await getDraftStatus(brandId).catch((err) => { logError(err, 'Content: fetch final draft status'); return null; });
       const count = finalStatus?.draft_count ?? prevCount;
       const promptCount = brandPrompts.length;
       if (count >= 20) {
@@ -2195,8 +2196,8 @@ export default function ContentHubPage() {
         : raw;
       setGenerateError(detail);
       setGenerating(false);
-      getDraftStatus(brandId).then(setDraftStatus).catch(() => {});
-      loadAll(brandId).catch(() => {});
+      getDraftStatus(brandId).then(setDraftStatus).catch((err) => logError(err, 'Content: refresh draft status after generation error'));
+      loadAll(brandId).catch((err) => logError(err, 'Content: reload after generation error'));
     }
   }
 
@@ -2299,7 +2300,7 @@ export default function ContentHubPage() {
 
   async function handleTogglePlatform(platform: string, enabled: boolean) {
     if (!selectedBrandId) return;
-    const updated = await updateContentSettings(selectedBrandId, platform, { enabled }).catch(() => null);
+    const updated = await updateContentSettings(selectedBrandId, platform, { enabled }).catch((err) => { logError(err, 'Content: toggle platform setting'); return null; });
     if (updated) {
       setContentSettings((prev) =>
         prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))

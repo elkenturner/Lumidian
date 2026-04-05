@@ -7,6 +7,7 @@ import {
   Shield, Clock, PauseCircle, PlayCircle, Trash2, FileText, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { logError } from '@/lib/utils/errors';
 import {
   adminGetUsers, adminGetRuns, adminGetStats, adminTriggerRun, adminGetLogs,
   adminPauseUser, adminRemoveUser, adminGenerateDraft,
@@ -79,7 +80,7 @@ export default function AdminPage() {
         adminGetStats(),
         adminGetUsers(),
         adminGetRuns(),
-        adminGetLogs().catch(() => ({ lines: [] as string[] })),
+        adminGetLogs().catch((err) => { logError(err, 'Admin: fetch logs'); return { lines: [] as string[] }; }),
       ]);
       setStats(s);
       setUsers(u);

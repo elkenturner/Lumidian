@@ -2,6 +2,7 @@
 
 import React from 'react';
 import LumidianLogo from '@/components/LumidianLogo';
+import { logError } from '@/lib/utils/errors';
 
 interface Props {
   children: React.ReactNode;
@@ -34,7 +35,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           url: typeof window !== 'undefined' ? window.location.href : null,
           user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : null,
         }),
-      }).catch(() => {});
+      }).catch((err) => logError(err, 'ErrorBoundary: report client error to backend'));
     } catch {}
   }
 

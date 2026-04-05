@@ -1019,19 +1019,25 @@ export default function DashboardPage() {
           {/* ── OVERVIEW ─────────────────────────────────────────────────── */}
           {!isFirstRun && (
           <>
-              {/* Brand profile completeness nudge */}
+              {/* Brand profile completeness notification */}
               {brandProfile && brandProfile.completion_pct < 100 && (
-                <div className="mb-4 flex items-center gap-4 card px-5 py-3">
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <p className="text-xs font-medium text-[var(--text-secondary)]">Brand Profile — {brandProfile.completion_pct}% complete</p>
-                      <Link href="/settings?tab=profile" className="text-xs text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors font-medium">Complete profile →</Link>
-                    </div>
-                    <div className="h-1.5 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
-                      <div className="h-full bg-[var(--accent)] rounded-full transition-all" style={{ width: `${brandProfile.completion_pct}%` }} />
-                    </div>
-                    <p className="text-[11px] text-[var(--text-faint)] mt-1">A complete brand profile improves draft quality and visibility tracking accuracy.</p>
-                  </div>
+                <div
+                  className="mb-4 flex items-center justify-between px-4 py-2"
+                  style={{
+                    background: 'rgba(99,102,241,0.06)',
+                    borderBottom: '1px solid rgba(99,102,241,0.12)',
+                    borderRadius: '8px',
+                  }}
+                >
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Complete your brand profile to improve draft quality
+                  </p>
+                  <Link
+                    href="/settings?tab=profile"
+                    className="text-xs text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors font-medium whitespace-nowrap ml-4"
+                  >
+                    Complete profile →
+                  </Link>
                 </div>
               )}
 

@@ -194,7 +194,7 @@ export default function VerifyEmailPage() {
               style={{
                 background: 'none',
                 border: 'none',
-                color: '#6366f1',
+                color: 'var(--accent)',
                 fontWeight: 500,
                 cursor: resending ? 'not-allowed' : 'pointer',
                 fontSize: 13,

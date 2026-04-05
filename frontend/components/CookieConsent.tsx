@@ -25,23 +25,23 @@ export default function CookieConsent() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl border border-[#1e293b] bg-[#0a0a0f] p-4 shadow-lg">
-      <p className="text-sm text-[#94a3b8] mb-3">
+    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl border border-[var(--bg-card)] bg-[var(--bg-base)] p-4 shadow-lg">
+      <p className="text-sm text-[var(--text-secondary)] mb-3">
         We use cookies to keep you signed in and the app running.{' '}
-        <a href="/privacy" className="underline hover:text-[#e2e8f0] transition-colors">
+        <a href="/privacy" className="underline hover:text-[var(--text-primary)] transition-colors">
           Privacy Policy
         </a>
       </p>
       <div className="flex gap-2">
         <button
           onClick={handleDecline}
-          className="flex-1 rounded-md border border-[#1e293b] px-3 py-1.5 text-sm text-[#94a3b8] transition-colors hover:border-[#334155] hover:text-[#e2e8f0]"
+          className="flex-1 rounded-md border border-[var(--bg-card)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
         >
           Decline
         </button>
         <button
           onClick={handleAccept}
-          className="flex-1 rounded-md bg-[#6366f1] px-3 py-1.5 text-sm text-white transition-colors hover:bg-[#4f46e5]"
+          className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm text-white transition-colors hover:bg-[var(--accent-hover)]"
         >
           Accept
         </button>

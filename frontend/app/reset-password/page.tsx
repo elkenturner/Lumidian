@@ -99,7 +99,7 @@ export default function ResetPasswordPage() {
           {success ? (
             <div style={{ textAlign: 'center' }}>
               <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(16,185,129,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2.5">
                   <polyline points="20 6 9 17 4 12" />
                 </svg>
               </div>
@@ -198,7 +198,7 @@ export default function ResetPasswordPage() {
                 <Link
                   href="/login"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: '#6B7280', textDecoration: 'none', fontWeight: 500 }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#4F46E5')}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-hover)')}
                   onMouseLeave={(e) => (e.currentTarget.style.color = '#6B7280')}
                 >
                   <ArrowLeft size={14} />

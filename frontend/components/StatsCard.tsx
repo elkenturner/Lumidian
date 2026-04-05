@@ -79,7 +79,7 @@ export default function StatsCard({
   const borderTopStyle = accentColor
     ? { borderTopColor: accentColor, borderTopWidth: 2 }
     : accent
-      ? { borderTopColor: '#6366f1', borderTopWidth: 2 }
+      ? { borderTopColor: 'var(--accent)', borderTopWidth: 2 }
       : undefined;
 
   return (
@@ -89,23 +89,23 @@ export default function StatsCard({
     >
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-[13px] font-medium text-[#94A3B8]">{title}</p>
+          <p className="text-[13px] font-medium text-[var(--text-secondary)]">{title}</p>
           <p className={clsx(
             compact
               ? 'mt-2 text-lg font-semibold leading-snug'
               : 'mt-2 stat-value stat-value-lg',
-            !isNumeric && 'text-[#F0F4F8] font-bold'
+            !isNumeric && 'text-[var(--text-primary)] font-bold'
           )}>
             {isNumeric ? animatedValue : value}
           </p>
           {subtitle && (
-            <p className="mt-1 text-xs text-[#64748B]">{subtitle}</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">{subtitle}</p>
           )}
           {trend !== undefined && (
             <div
               className={clsx(
                 'mt-2 flex items-center gap-1 text-sm font-medium',
-                trendDirection === 'up' ? 'text-[#10b981]' : 'text-[#ef4444]'
+                trendDirection === 'up' ? 'text-[var(--success)]' : 'text-[var(--danger)]'
               )}
             >
               {trendDirection === 'up' ? (
@@ -121,7 +121,7 @@ export default function StatsCard({
           )}
         </div>
         {icon && (
-          <div className="ml-4 w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] flex items-center justify-center text-[#818CF8] flex-shrink-0">
+          <div className="ml-4 w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] flex items-center justify-center text-[var(--accent-light)] flex-shrink-0">
             {icon}
           </div>
         )}

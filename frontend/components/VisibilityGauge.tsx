@@ -6,10 +6,10 @@ interface VisibilityGaugeProps {
 }
 
 function getScoreColor(score: number): string {
-  if (score >= 75) return '#10b981';
-  if (score >= 50) return '#f59e0b';
-  if (score >= 25) return '#f97316';
-  return '#ef4444';
+  if (score >= 75) return 'var(--success)';
+  if (score >= 50) return 'var(--warning)';
+  if (score >= 25) return 'var(--color-claude)';
+  return 'var(--danger)';
 }
 
 function getScoreLabel(score: number): string {
@@ -21,7 +21,7 @@ function getScoreLabel(score: number): string {
 
 export default function VisibilityGauge({ score, size = 'md' }: VisibilityGaugeProps) {
   const displayScore = score ?? 0;
-  const color = score !== null ? getScoreColor(displayScore) : '#475569';
+  const color = score !== null ? getScoreColor(displayScore) : 'var(--text-faint)';
   const label = score !== null ? getScoreLabel(displayScore) : 'No data';
 
   const sizeMap = {
@@ -74,13 +74,13 @@ export default function VisibilityGauge({ score, size = 'md' }: VisibilityGaugeP
         {/* Center content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span
-            className="font-bold leading-none"
-            style={{ fontSize: dims.fontSize, color: score !== null ? color : '#475569' }}
+            className="font-bold leading-none font-mono"
+            style={{ fontSize: dims.fontSize, color: score !== null ? color : 'var(--text-faint)' }}
           >
             {score !== null ? `${Math.round(displayScore)}` : '--'}
           </span>
           <span
-            className="text-[#64748b] mt-1 font-medium"
+            className="text-[var(--text-muted)] mt-1 font-medium"
             style={{ fontSize: dims.labelSize }}
           >
             {score !== null ? '%' : ''}
@@ -89,7 +89,7 @@ export default function VisibilityGauge({ score, size = 'md' }: VisibilityGaugeP
       </div>
 
       <div className="text-center -mt-2">
-        <p className="text-sm font-semibold text-[#94a3b8]">Visibility Score</p>
+        <p className="text-sm font-semibold text-[var(--text-secondary)]">Visibility Score</p>
         <p className="text-xs mt-0.5 font-medium" style={{ color }}>
           {label}
         </p>

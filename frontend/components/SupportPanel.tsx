@@ -49,12 +49,12 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-[rgba(255,255,255,0.07)]">
         <div className="flex items-center gap-2">
-          <LifeBuoy size={14} className="text-[#6366f1]" />
-          <span className="text-sm font-semibold text-[#F0F4F8]">Contact Support</span>
+          <LifeBuoy size={14} className="text-[var(--accent)]" />
+          <span className="text-sm font-semibold text-[var(--text-primary)]">Contact Support</span>
         </div>
         <button
           onClick={onClose}
-          className="text-[#475569] hover:text-[#94A3B8] transition-colors p-1 rounded-md hover:bg-[rgba(255,255,255,0.05)]"
+          className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors p-1 rounded-md hover:bg-[rgba(255,255,255,0.05)]"
         >
           <X size={14} />
         </button>
@@ -67,22 +67,22 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
               className="w-11 h-11 rounded-full flex items-center justify-center"
               style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.30)' }}
             >
-              <Send size={17} className="text-[#10b981]" />
+              <Send size={17} className="text-[var(--success)]" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-[#E2E8F0]">Message sent</p>
-              <p className="text-xs text-[#64748B] mt-1">We&apos;ll get back to you as soon as possible.</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Message sent</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">We&apos;ll get back to you as soon as possible.</p>
             </div>
-            <button onClick={onClose} className="mt-1 text-xs text-[#6366f1] hover:text-[#818cf8] transition-colors">
+            <button onClick={onClose} className="mt-1 text-xs text-[var(--accent)] hover:text-[var(--accent-foreground)] transition-colors">
               Close
             </button>
           </div>
         ) : (
           <>
-            <p className="text-xs text-[#64748B] mb-4">We typically reply within 24 hours.</p>
+            <p className="text-xs text-[var(--text-muted)] mb-4">We typically reply within 24 hours.</p>
             <form onSubmit={handleSubmit} className="flex flex-col gap-3">
               <div>
-                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">Subject</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Subject</label>
                 <input
                   type="text"
                   value={subject}
@@ -90,14 +90,14 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
                   placeholder="What can we help with?"
                   maxLength={200}
                   required
-                  className="w-full px-3 py-2.5 text-xs text-[#E2E8F0] placeholder-[#475569] rounded-lg outline-none transition-colors"
+                  className="w-full px-3 py-2.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] rounded-lg outline-none transition-colors"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}
                   onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.50)'; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; }}
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">Message</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Message</label>
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
@@ -105,13 +105,13 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
                   maxLength={5000}
                   required
                   rows={5}
-                  className="w-full px-3 py-2.5 text-xs text-[#E2E8F0] placeholder-[#475569] rounded-lg outline-none transition-colors resize-none"
+                  className="w-full px-3 py-2.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] rounded-lg outline-none transition-colors resize-none"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}
                   onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.50)'; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; }}
                 />
               </div>
-              {error && <p className="text-[11px] text-[#f87171]">{error}</p>}
+              {error && <p className="text-[11px] text-[var(--danger)]">{error}</p>}
               <button
                 type="submit"
                 disabled={sending || !subject.trim() || !message.trim()}

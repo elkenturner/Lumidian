@@ -16,20 +16,20 @@ export default function PlatformGuidelinesPanel({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+    <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       <button
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[rgba(99,102,241,0.06)] transition-colors"
         onClick={() => setOpen(!open)}
       >
         <div>
-          <span className="text-sm font-semibold text-[#e2e8f0] capitalize">
+          <span className="text-sm font-semibold text-[var(--text-primary)] capitalize">
             {platform} Guidelines
           </span>
-          <span className="ml-3 text-xs text-[#64748b]">{guidelines.tone}</span>
+          <span className="ml-3 text-xs text-[var(--text-muted)]">{guidelines.tone}</span>
         </div>
         <ChevronDown
           size={16}
-          className={`text-[#64748b] transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`text-[var(--text-muted)] transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -37,26 +37,26 @@ export default function PlatformGuidelinesPanel({
         <div className="px-5 pb-5 border-t border-[rgba(99,102,241,0.15)] pt-4 space-y-4">
           {/* Tone */}
           <div>
-            <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-1">
+            <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
               Tone
             </p>
-            <p className="text-sm text-[#94a3b8]">{guidelines.tone}</p>
+            <p className="text-sm text-[var(--text-secondary)]">{guidelines.tone}</p>
           </div>
 
           {/* Workflow */}
           {guidelines.workflow && (
             <div>
-              <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-1">
+              <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">
                 Workflow
               </p>
-              <p className="text-sm text-[#94a3b8]">{guidelines.workflow}</p>
+              <p className="text-sm text-[var(--text-secondary)]">{guidelines.workflow}</p>
             </div>
           )}
 
           {/* Rules */}
           {guidelines.rules.length > 0 && (
             <div>
-              <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-2">
+              <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-2">
                 Rules
               </p>
               <ul className="space-y-1.5">
@@ -64,9 +64,9 @@ export default function PlatformGuidelinesPanel({
                   <li key={i} className="flex items-start gap-2">
                     <CheckCircle2
                       size={14}
-                      className="text-[#22c55e] flex-shrink-0 mt-0.5"
+                      className="text-[var(--success)] flex-shrink-0 mt-0.5"
                     />
-                    <span className="text-sm text-[#94a3b8]">{rule}</span>
+                    <span className="text-sm text-[var(--text-secondary)]">{rule}</span>
                   </li>
                 ))}
               </ul>

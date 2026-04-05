@@ -126,7 +126,7 @@ export default function LoginPage() {
             boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-              <ShieldCheck size={20} color="#4F46E5" />
+              <ShieldCheck size={20} color="var(--accent-hover)" />
               <h1 style={{ fontSize: 20, fontWeight: 800, color: '#0F0F12', margin: 0, letterSpacing: '-0.03em' }}>Two-factor authentication</h1>
             </div>
             <p style={{ fontSize: 14, color: '#6B7280', margin: '0 0 24px', fontWeight: 400 }}>
@@ -243,7 +243,7 @@ export default function LoginPage() {
 
             <div style={{ textAlign: 'right', marginTop: -6 }}>
               <Link href="/forgot-password" style={{ fontSize: 12, color: '#6B7280', textDecoration: 'none', fontWeight: 500 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#4F46E5')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.color = '#6B7280')}
               >
                 Forgot password?
@@ -333,9 +333,9 @@ export default function LoginPage() {
         {!challengeToken && (
           <p style={{ textAlign: 'center', fontSize: 14, color: '#6B7280', marginTop: 24, fontWeight: 400 }}>
             Don&apos;t have an account?{' '}
-            <Link href="/register" style={{ color: '#4F46E5', fontWeight: 600, textDecoration: 'none' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#3730a3')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = '#4F46E5')}
+            <Link href="/register" style={{ color: 'var(--accent-hover)', fontWeight: 600, textDecoration: 'none' }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--accent-hover)')}
             >
               Create one
             </Link>

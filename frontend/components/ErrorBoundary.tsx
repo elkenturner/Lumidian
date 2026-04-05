@@ -46,7 +46,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
     return (
       <div style={{
         position: 'fixed', inset: 0,
-        background: '#080C14',
+        background: 'var(--bg-base)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         zIndex: 9999,
         padding: '24px',
@@ -86,7 +86,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
           <h1 style={{
             fontSize: '20px',
             fontWeight: 700,
-            color: '#e2e8f0',
+            color: 'var(--text-primary)',
             marginBottom: '12px',
           }}>
             Something went wrong
@@ -94,7 +94,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
 
           <p style={{
             fontSize: '14px',
-            color: '#94a3b8',
+            color: 'var(--text-secondary)',
             lineHeight: 1.6,
             marginBottom: '32px',
           }}>
@@ -110,7 +110,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
               gap: '8px',
               padding: '10px 24px',
               borderRadius: '10px',
-              background: 'linear-gradient(135deg, #6366f1, #8b5cf6)',
+              background: 'linear-gradient(135deg, var(--accent), var(--color-perplexity))',
               border: 'none',
               color: '#fff',
               fontSize: '14px',

@@ -11,7 +11,7 @@ interface PlatformBadgeProps {
 const PLATFORM_STYLES: Record<string, { bg: string; text: string; border: string }> = {
   reddit:    { bg: 'rgba(194,91,52,0.12)',  text: '#c2713a', border: 'rgba(194,91,52,0.25)'  },
   quora:     { bg: 'rgba(179,43,39,0.10)',  text: '#b36461', border: 'rgba(179,43,39,0.22)'  },
-  medium:    { bg: 'rgba(148,163,184,0.10)', text: '#94a3b8', border: 'rgba(148,163,184,0.18)' },
+  medium:    { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
   wikipedia: { bg: 'rgba(45,157,147,0.10)', text: '#4aada4', border: 'rgba(45,157,147,0.22)' },
 };
 
@@ -26,7 +26,7 @@ const PlatformBadge = memo(function PlatformBadge({ platform, size = 'md' }: Pla
   const key = platform.toLowerCase();
   const styles = PLATFORM_STYLES[key] ?? {
     bg: 'rgba(71,85,105,0.12)',
-    text: '#64748b',
+    text: 'var(--text-muted)',
     border: 'rgba(71,85,105,0.2)',
   };
   const label = PLATFORM_LABELS[key] ?? platform;

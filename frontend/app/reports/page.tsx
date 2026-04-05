@@ -661,7 +661,7 @@ export default function ReportsPage() {
 
             <TabsContent value="competitors" className="mt-0">
           {/* Competitors section */}
-          {!loading && competitorAnalysis && !competitorAnalysis.has_data && (
+          {!loading && (!competitorAnalysis || !competitorAnalysis.has_data) && (
             <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-8 text-center shadow-[0_4px_24px_rgba(0,0,0,0.30)]">
               <div className="w-10 h-10 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.20)] rounded-xl flex items-center justify-center mb-3 mx-auto">
                 <BarChart2 size={18} className="text-[var(--accent)]" />

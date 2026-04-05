@@ -197,8 +197,8 @@ export default function NewBrandPage() {
 
   if (loadingBilling) {
     return (
-      <div className="min-h-screen bg-[#080C14] flex items-center justify-center">
-        <Loader2 size={24} className="animate-spin text-[#6366f1]" />
+      <div className="min-h-screen bg-[var(--bg-base)] flex items-center justify-center">
+        <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
       </div>
     );
   }
@@ -206,13 +206,13 @@ export default function NewBrandPage() {
   const stepIdx = STEPS.indexOf(step);
 
   return (
-    <div className="min-h-screen bg-[#080C14] flex flex-col items-center justify-center px-4 py-12">
+    <div className="min-h-screen bg-[var(--bg-base)] flex flex-col items-center justify-center px-4 py-12">
       {/* Background orbs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-[15%] -left-[10%] w-[580px] h-[580px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(55,48,163,0.15) 0%, transparent 65%)', filter: 'blur(100px)' }} />
+          style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 65%)', filter: 'blur(100px)' }} />
         <div className="absolute -bottom-[18%] -right-[5%] w-[480px] h-[480px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(124,58,237,0.10) 0%, transparent 65%)', filter: 'blur(90px)' }} />
+          style={{ background: 'radial-gradient(circle, color-mix(in srgb, var(--color-perplexity) 10%, transparent) 0%, transparent 65%)', filter: 'blur(90px)' }} />
       </div>
 
       {/* Logo */}
@@ -229,16 +229,16 @@ export default function NewBrandPage() {
             <div key={s} className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                  done ? 'bg-[#10b981] text-white' : active ? 'bg-[#6366f1] text-white shadow-[0_0_12px_rgba(99,102,241,0.40)]' : 'bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] text-[#475569]'
+                  done ? 'bg-[var(--success)] text-white' : active ? 'bg-[var(--accent)] text-white shadow-[0_0_12px_var(--accent-muted)]' : 'bg-[var(--accent-muted)] border border-[var(--border-default)] text-[var(--text-faint)]'
                 }`}>
                   {done ? <CheckCircle size={14} /> : i + 1}
                 </div>
-                <span className={`text-sm font-medium ${active ? 'text-[#F0F4F8]' : done ? 'text-[#64748b]' : 'text-[#475569]'}`}>
+                <span className={`text-sm font-medium ${active ? 'text-[var(--text-primary)]' : done ? 'text-[var(--text-muted)]' : 'text-[var(--text-faint)]'}`}>
                   {STEP_LABELS[s]}
                 </span>
               </div>
               {i < STEPS.length - 1 && (
-                <ChevronRight size={14} className="text-[rgba(99,102,241,0.30)]" />
+                <ChevronRight size={14} className="text-[var(--accent-muted)]" />
               )}
             </div>
           );
@@ -246,18 +246,18 @@ export default function NewBrandPage() {
       </div>
 
       {/* Card */}
-      <div className="relative w-full max-w-md bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-2xl p-8 shadow-[0_8px_40px_rgba(0,0,0,0.40),inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="card relative w-full max-w-md rounded-2xl p-8 shadow-[0_8px_40px_rgba(0,0,0,0.40),inset_0_1px_0_rgba(255,255,255,0.06)]">
         {error && (
           <div className="bg-[rgba(127,29,29,0.20)] border border-[rgba(153,27,27,0.30)] rounded-lg px-4 py-3 mb-5">
-            <p className="text-sm text-[#f87171]">{error}</p>
+            <p className="text-sm text-[var(--danger)]">{error}</p>
           </div>
         )}
 
         {/* ── Step: Type selection ── */}
         {step === 'type' && (
           <div>
-            <h2 className="text-xl font-bold text-[#F0F4F8] mb-1">Choose brand type</h2>
-            <p className="text-sm text-[#64748B] mb-6">Select the tracking scope for this brand. Your plan determines slot availability.</p>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-1">Choose brand type</h2>
+            <p className="text-sm text-[var(--text-muted)] mb-6">Select the tracking scope for this brand. Your plan determines slot availability.</p>
 
             <div className="space-y-3 mb-6">
 
@@ -274,30 +274,30 @@ export default function NewBrandPage() {
                     className={`w-full text-left rounded-xl p-4 border transition-all ${
                       locked
                         ? 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] opacity-50 cursor-not-allowed'
-                        : 'border-[rgba(99,102,241,0.22)] bg-[rgba(99,102,241,0.04)] hover:border-[#6366f1] hover:bg-[rgba(99,102,241,0.10)] cursor-pointer'
+                        : 'border-[var(--accent-muted)] bg-[var(--accent-muted)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] cursor-pointer'
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-[rgba(99,102,241,0.12)] border border-[rgba(99,102,241,0.25)] flex items-center justify-center flex-shrink-0">
-                        {locked ? <Lock size={15} className="text-[#475569]" /> : <BarChart2 size={15} className="text-[#818cf8]" />}
+                      <div className="w-9 h-9 rounded-lg bg-[var(--accent-muted)] border border-[var(--accent-muted)] flex items-center justify-center flex-shrink-0">
+                        {locked ? <Lock size={15} className="text-[var(--text-faint)]" /> : <BarChart2 size={15} className="text-[var(--accent-foreground)]" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p className="text-sm font-semibold text-[#E2E8F0]">Starter brand</p>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">Starter brand</p>
                           {!isAdmin && billing && (
                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                               standardRemaining === 0
-                                ? 'bg-[rgba(239,68,68,0.12)] text-[#f87171]'
-                                : 'bg-[rgba(99,102,241,0.15)] text-[#818cf8]'
+                                ? 'bg-[var(--danger)]/12 text-[var(--danger)]'
+                                : 'bg-[var(--accent-muted)] text-[var(--accent-foreground)]'
                             }`}>
                               {standardRemaining === 0 ? 'No slots' : `${standardRemaining} slot${standardRemaining === 1 ? '' : 's'} left`}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-[#64748B] leading-relaxed">
-                          Up to <span className="text-[#94A3B8] font-medium">25 prompts</span>. Full tracking with visibility reports and content drafts.
+                        <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                          Up to <span className="text-[var(--text-secondary)] font-medium">25 prompts</span>. Full tracking with visibility reports and content drafts.
                         </p>
-                        {locked && <p className="text-[11px] text-[#f87171] mt-1.5">{lockedMsg}</p>}
+                        {locked && <p className="text-[11px] text-[var(--danger)] mt-1.5">{lockedMsg}</p>}
                       </div>
                     </div>
                   </button>
@@ -317,19 +317,19 @@ export default function NewBrandPage() {
                     className={`w-full text-left rounded-xl p-4 border transition-all ${
                       locked
                         ? 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] opacity-50 cursor-not-allowed'
-                        : 'border-[rgba(139,92,246,0.28)] bg-[rgba(139,92,246,0.06)] hover:border-[#8b5cf6] hover:bg-[rgba(139,92,246,0.12)] cursor-pointer'
+                        : 'border-[var(--color-perplexity)]/28 bg-[var(--color-perplexity)]/6 hover:border-[var(--accent)] hover:bg-[var(--color-perplexity)]/12 cursor-pointer'
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-[rgba(139,92,246,0.12)] border border-[rgba(139,92,246,0.28)] flex items-center justify-center flex-shrink-0">
-                        {locked ? <Lock size={15} className="text-[#475569]" /> : <Zap size={15} className="text-[#a78bfa]" />}
+                      <div className="w-9 h-9 rounded-lg bg-[var(--color-perplexity)]/12 border border-[var(--color-perplexity)]/28 flex items-center justify-center flex-shrink-0">
+                        {locked ? <Lock size={15} className="text-[var(--text-faint)]" /> : <Zap size={15} className="text-[var(--accent-foreground)]" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-[#E2E8F0]">Pro brand</p>
+                            <p className="text-sm font-semibold text-[var(--text-primary)]">Pro brand</p>
                             {!isPro && (
-                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[rgba(139,92,246,0.18)] text-[#a78bfa] border border-[rgba(139,92,246,0.30)]">
+                              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--color-perplexity)]/18 text-[var(--accent-foreground)] border border-[var(--color-perplexity)]/30">
                                 PRO
                               </span>
                             )}
@@ -337,17 +337,17 @@ export default function NewBrandPage() {
                           {isAdmin || (isPro && billing) ? (
                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                               standardRemaining === 0
-                                ? 'bg-[rgba(239,68,68,0.12)] text-[#f87171]'
-                                : 'bg-[rgba(139,92,246,0.15)] text-[#a78bfa]'
+                                ? 'bg-[var(--danger)]/12 text-[var(--danger)]'
+                                : 'bg-[var(--color-perplexity)]/15 text-[var(--accent-foreground)]'
                             }`}>
                               {standardRemaining === 0 ? 'No slots' : isAdmin ? 'Unlimited' : `${standardRemaining} slot${standardRemaining === 1 ? '' : 's'} left`}
                             </span>
                           ) : null}
                         </div>
-                        <p className="text-xs text-[#64748B] leading-relaxed">
-                          Up to <span className="text-[#94A3B8] font-medium">100 prompts</span>. Deeper tracking with higher prompt coverage.
+                        <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                          Up to <span className="text-[var(--text-secondary)] font-medium">100 prompts</span>. Deeper tracking with higher prompt coverage.
                         </p>
-                        {locked && <p className="text-[11px] text-[#f87171] mt-1.5">{lockedMsg}</p>}
+                        {locked && <p className="text-[11px] text-[var(--danger)] mt-1.5">{lockedMsg}</p>}
                       </div>
                     </div>
                   </button>
@@ -364,32 +364,32 @@ export default function NewBrandPage() {
                     className={`w-full text-left rounded-xl p-4 border transition-all ${
                       locked
                         ? 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] opacity-50 cursor-not-allowed'
-                        : 'border-[rgba(245,158,11,0.22)] bg-[rgba(245,158,11,0.04)] hover:border-[#f59e0b] hover:bg-[rgba(245,158,11,0.10)] cursor-pointer'
+                        : 'border-[var(--warning)]/22 bg-[var(--warning)]/4 hover:border-[var(--warning)] hover:bg-[var(--warning)]/10 cursor-pointer'
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-lg bg-[rgba(245,158,11,0.12)] border border-[rgba(245,158,11,0.25)] flex items-center justify-center flex-shrink-0">
-                        {locked ? <Lock size={15} className="text-[#475569]" /> : <FileText size={15} className="text-[#f59e0b]" />}
+                      <div className="w-9 h-9 rounded-lg bg-[var(--warning)]/12 border border-[var(--warning)]/25 flex items-center justify-center flex-shrink-0">
+                        {locked ? <Lock size={15} className="text-[var(--text-faint)]" /> : <FileText size={15} className="text-[var(--warning)]" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p className="text-sm font-semibold text-[#E2E8F0]">Pitch brand</p>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">Pitch brand</p>
                           {!isAdmin && billing && (
                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                               locked
-                                ? 'bg-[rgba(239,68,68,0.12)] text-[#f87171]'
+                                ? 'bg-[var(--danger)]/12 text-[var(--danger)]'
                                 : pitchRemaining! >= 999
-                                ? 'bg-[rgba(245,158,11,0.12)] text-[#f59e0b]'
-                                : 'bg-[rgba(245,158,11,0.12)] text-[#f59e0b]'
+                                ? 'bg-[var(--warning)]/12 text-[var(--warning)]'
+                                : 'bg-[var(--warning)]/12 text-[var(--warning)]'
                             }`}>
                               {locked ? 'No slots' : pitchRemaining! >= 999 ? 'Unlimited' : `${pitchRemaining} slot${pitchRemaining === 1 ? '' : 's'} left`}
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-[#64748B] leading-relaxed">
-                          Up to <span className="text-[#94A3B8] font-medium">10 prompts</span>, expires after <span className="text-[#94A3B8] font-medium">30 days</span>. Ideal for one-off snapshots and pitch decks.
+                        <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                          Up to <span className="text-[var(--text-secondary)] font-medium">10 prompts</span>, expires after <span className="text-[var(--text-secondary)] font-medium">30 days</span>. Ideal for one-off snapshots and pitch decks.
                         </p>
-                        {locked && <p className="text-[11px] text-[#f87171] mt-1.5">No slots remaining — upgrade to add more.</p>}
+                        {locked && <p className="text-[11px] text-[var(--danger)] mt-1.5">No slots remaining — upgrade to add more.</p>}
                       </div>
                     </div>
                   </button>
@@ -400,7 +400,7 @@ export default function NewBrandPage() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex items-center gap-1.5 text-xs text-[#475569] hover:text-[#94A3B8] transition-colors"
+              className="flex items-center gap-1.5 text-xs text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors"
             >
               <ArrowLeft size={12} />
               Cancel
@@ -412,22 +412,22 @@ export default function NewBrandPage() {
         {step === 'details' && (
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl font-bold text-[#F0F4F8]">Name your brand</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Name your brand</h2>
               {brandChoice === 'pitch' && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(245,158,11,0.12)] text-[#f59e0b] border border-[rgba(245,158,11,0.20)]">Pitch</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--warning)]/12 text-[var(--warning)] border border-[var(--warning)]/20">Pitch</span>
               )}
               {brandChoice === 'pro' && (
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[rgba(139,92,246,0.15)] text-[#a78bfa] border border-[rgba(139,92,246,0.25)]">Pro</span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[var(--color-perplexity)]/15 text-[var(--accent-foreground)] border border-[var(--color-perplexity)]/25">Pro</span>
               )}
             </div>
-            <p className="text-sm text-[#64748B] mb-6">
+            <p className="text-sm text-[var(--text-muted)] mb-6">
               {brandChoice === 'pitch'
                 ? 'Pitch brands run for 30 days with up to 10 prompts.'
                 : `Up to ${promptLimit} prompts. Give your brand a name and website URL.`}
             </p>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">Brand Name</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Brand Name</label>
                 <input
                   type="text"
                   value={brandName}
@@ -435,29 +435,29 @@ export default function NewBrandPage() {
                   onKeyDown={(e) => e.key === 'Enter' && handleDetails()}
                   placeholder="Your brand name"
                   autoFocus
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">
-                  Company Website <span className="text-[#ef4444]">*</span>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                  Company Website <span className="text-[var(--danger)]">*</span>
                 </label>
                 <input
                   type="text"
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
                   placeholder="https://yourcompany.com"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
                 />
-                <p className="text-xs text-[#475569] mt-1">Used to improve content draft quality.</p>
+                <p className="text-xs text-[var(--text-faint)] mt-1">Used to improve content draft quality.</p>
               </div>
               <div className="flex gap-2 pt-1">
                 <button type="button" onClick={goBack}
-                  className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                  className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[var(--border-default)] text-[var(--text-secondary)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                   Back
                 </button>
                 <button onClick={handleDetails} disabled={saving || !brandName.trim() || !websiteUrl.trim()}
-                  className="flex-1 flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                  className="flex-1 flex items-center justify-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] hover:border-[var(--accent-muted)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_var(--accent-muted)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                   {saving && <Loader2 size={14} className="animate-spin" />}
                   Continue
                 </button>
@@ -470,23 +470,23 @@ export default function NewBrandPage() {
         {step === 'prompts' && (
           <div>
             <div className="flex items-start justify-between mb-1">
-              <h2 className="text-xl font-bold text-[#F0F4F8]">What do you want to track?</h2>
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">What do you want to track?</h2>
               <button
                 type="button"
                 onClick={handleSuggestPrompts}
                 disabled={suggestingPrompts}
-                className="flex items-center gap-1.5 text-xs font-medium text-[#a78bfa] hover:text-[#c4b5fd] disabled:opacity-50 transition-colors shrink-0 ml-3 mt-0.5"
+                className="flex items-center gap-1.5 text-xs font-medium text-[var(--accent-foreground)] hover:text-[var(--text-primary)] disabled:opacity-50 transition-colors shrink-0 ml-3 mt-0.5"
               >
                 {suggestingPrompts ? <Loader2 size={12} className="animate-spin" /> : <span>✦</span>}
                 {suggestingPrompts ? 'Generating…' : 'Generate with AI'}
               </button>
             </div>
-            <p className="text-sm text-[#64748B] mb-6">
+            <p className="text-sm text-[var(--text-muted)] mb-6">
               Add questions people might ask AI models where your brand should appear.{' '}
-              <span className="text-[#64748B]">Up to {promptLimit} prompts.</span>
+              <span className="text-[var(--text-muted)]">Up to {promptLimit} prompts.</span>
             </p>
             {suggestError && (
-              <p className="text-xs text-[#f87171] mb-3">{suggestError}</p>
+              <p className="text-xs text-[var(--danger)] mb-3">{suggestError}</p>
             )}
             <div className="space-y-2 mb-4">
               {prompts.map((p, i) => (
@@ -496,29 +496,29 @@ export default function NewBrandPage() {
                   value={p}
                   onChange={(e) => updatePrompt(i, e.target.value)}
                   placeholder={i === 0 ? `What is ${brandName}?` : 'Add another prompt…'}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
                 />
               ))}
               <div className="flex items-center justify-between px-1 pt-1">
                 {prompts.length < promptLimit ? (
                   <button onClick={addPromptRow}
-                    className="flex items-center gap-1.5 text-xs text-[#64748B] hover:text-[#94A3B8] transition-colors py-1">
+                    className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors py-1">
                     <Plus size={13} />
                     Add another prompt
                   </button>
                 ) : <span />}
-                <span className={`text-[11px] font-medium tabular-nums ${prompts.length >= promptLimit ? 'text-[#f59e0b]' : 'text-[#475569]'}`}>
+                <span className={`text-[11px] font-medium tabular-nums ${prompts.length >= promptLimit ? 'text-[var(--warning)]' : 'text-[var(--text-faint)]'}`}>
                   {prompts.length}/{promptLimit}
                 </span>
               </div>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={goBack}
-                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[var(--border-default)] text-[var(--text-secondary)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                 Back
               </button>
               <button onClick={handlePrompts} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex-1 flex items-center justify-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] hover:border-[var(--accent-muted)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_var(--accent-muted)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 Continue
               </button>
@@ -529,33 +529,33 @@ export default function NewBrandPage() {
         {/* ── Step: Profile ── */}
         {step === 'profile' && (
           <div>
-            <h2 className="text-xl font-bold text-[#F0F4F8] mb-1">Tell us about the brand</h2>
-            <p className="text-sm text-[#64748B] mb-6">Optional — helps generate better content drafts. You can update this later.</p>
+            <h2 className="text-xl font-bold text-[var(--text-primary)] mb-1">Tell us about the brand</h2>
+            <p className="text-sm text-[var(--text-muted)] mb-6">Optional — helps generate better content drafts. You can update this later.</p>
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-xs font-medium text-[#94A3B8] mb-1.5">Company description</label>
+                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Company description</label>
                 <textarea
                   value={companyDescription}
                   onChange={(e) => setCompanyDescription(e.target.value)}
                   rows={3}
                   placeholder="Brief description of what your company does…"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(99,102,241,0.22)] text-[#F0F4F8] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 placeholder:text-[#475569] resize-none transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] resize-none transition-all"
                 />
               </div>
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={goBack}
-                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[var(--border-default)] text-[var(--text-secondary)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                 Back
               </button>
               <button onClick={handleProfile} disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-[rgba(99,102,241,0.15)] hover:bg-[rgba(99,102,241,0.22)] border border-[rgba(99,102,241,0.30)] hover:border-[rgba(99,102,241,0.45)] text-[#a5b4fc] hover:text-[#c7d2fe] hover:shadow-[0_0_24px_rgba(99,102,241,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
+                className="flex-1 flex items-center justify-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] hover:border-[var(--accent-muted)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_var(--accent-muted)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors">
                 {saving && <Loader2 size={14} className="animate-spin" />}
                 {saving ? 'Setting up…' : 'Launch brand'}
               </button>
             </div>
-            <p className="text-center text-xs text-[#475569] mt-4">
-              <button onClick={handleProfile} className="text-[#64748B] hover:text-[#94A3B8] underline transition-colors">
+            <p className="text-center text-xs text-[var(--text-faint)] mt-4">
+              <button onClick={handleProfile} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)] underline transition-colors">
                 Skip for now
               </button>
             </p>

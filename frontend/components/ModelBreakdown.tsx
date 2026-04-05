@@ -12,26 +12,26 @@ const MODEL_CONFIG: Record<
 > = {
   chatgpt: {
     label: 'ChatGPT',
-    color: '#22c55e',
-    bgColor: 'rgba(34, 197, 94, 0.15)',
+    color: 'var(--color-chatgpt)',
+    bgColor: 'var(--color-chatgpt-muted)',
     letter: 'G',
   },
   claude: {
     label: 'Claude',
-    color: '#f97316',
-    bgColor: 'rgba(249, 115, 22, 0.15)',
+    color: 'var(--color-claude)',
+    bgColor: 'var(--color-claude-muted)',
     letter: 'C',
   },
   perplexity: {
     label: 'Perplexity',
-    color: '#8b5cf6',
-    bgColor: 'rgba(139, 92, 246, 0.15)',
+    color: 'var(--color-perplexity)',
+    bgColor: 'var(--color-perplexity-muted)',
     letter: 'P',
   },
   gemini: {
     label: 'Gemini',
-    color: '#3b82f6',
-    bgColor: 'rgba(59, 130, 246, 0.15)',
+    color: 'var(--color-gemini)',
+    bgColor: 'var(--color-gemini-muted)',
     letter: 'G',
   },
 };
@@ -43,7 +43,7 @@ function getModelConfig(model: string) {
   }
   return {
     label: model,
-    color: '#64748b',
+    color: 'var(--text-muted)',
     bgColor: 'rgba(99,102,241,0.10)',
     letter: model.charAt(0).toUpperCase(),
   };
@@ -57,8 +57,8 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
   if (!modelScores || modelScores.length === 0) {
     return (
       <div className="card">
-        <h3 className="text-base font-semibold text-[#f8fafc] mb-4">Model Breakdown</h3>
-        <p className="text-sm text-[#64748b] text-center py-4">No model data available</p>
+        <h3 className="text-base font-semibold text-[var(--text-primary)] mb-4">Model Breakdown</h3>
+        <p className="text-sm text-[var(--text-muted)] text-center py-4">No model data available</p>
       </div>
     );
   }
@@ -73,7 +73,7 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
 
   return (
     <div className="card">
-      <h3 className="text-base font-semibold text-[#f8fafc] mb-5">Model Breakdown</h3>
+      <h3 className="text-base font-semibold text-[var(--text-primary)] mb-5">Model Breakdown</h3>
       <div className="space-y-4">
         {sorted.map((ms) => {
           const config = getModelConfig(ms.model);
@@ -89,13 +89,13 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
               <div className="flex items-center justify-between mb-2">
                 <span
                   className="text-sm font-medium"
-                  style={{ color: unconfigured ? '#475569' : '#f8fafc' }}
+                  style={{ color: unconfigured ? 'var(--text-faint)' : 'var(--text-primary)' }}
                 >
                   {config.label}
                 </span>
 
                 {unconfigured ? (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(71,85,105,0.3)] text-[#64748b] border border-[rgba(71,85,105,0.3)]">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[rgba(71,85,105,0.3)] text-[var(--text-muted)] border border-[rgba(71,85,105,0.3)]">
                     Not configured
                   </span>
                 ) : (
@@ -119,14 +119,14 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
                       }}
                     />
                   </div>
-                  <span className="text-xs text-[#64748b]">
+                  <span className="text-xs text-[var(--text-muted)]">
                     {ms.total_mentions}/{ms.total_queries} mentions
                   </span>
                 </>
               )}
 
               {unconfigured && (
-                <p className="text-xs text-[#475569]">Add API key in Settings to enable</p>
+                <p className="text-xs text-[var(--text-faint)]">Add API key in Settings to enable</p>
               )}
             </div>
           );

@@ -35,8 +35,8 @@ function DialogContent({
         className={cn(
           "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
           "w-full max-w-md max-h-[90vh] overflow-y-auto",
-          "bg-[rgba(10,14,24,0.97)] backdrop-blur-xl",
-          "border border-[rgba(99,102,241,0.22)] rounded-2xl p-6 shadow-2xl",
+          "bg-[rgba(10,14,24,0.97)]",
+          "border border-[var(--border-default)] rounded-2xl p-6 shadow-2xl",
           "data-[state=open]:animate-in data-[state=closed]:animate-out",
           "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -48,7 +48,7 @@ function DialogContent({
       >
         {children}
         {showCloseButton && (
-          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-[#475569] hover:text-[#94A3B8] transition-colors focus:outline-none focus:ring-2 focus:ring-[#6366f1]">
+          <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent)]">
             <X size={16} />
             <span className="sr-only">Close</span>
           </DialogPrimitive.Close>
@@ -73,7 +73,7 @@ function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (
     <DialogPrimitive.Title
-      className={cn("text-base font-semibold text-[#F0F4F8]", className)}
+      className={cn("text-base font-semibold text-[var(--text-primary)]", className)}
       {...props}
     />
   )
@@ -82,7 +82,7 @@ function DialogTitle({ className, ...props }: React.ComponentProps<typeof Dialog
 function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
   return (
     <DialogPrimitive.Description
-      className={cn("text-sm text-[#64748b]", className)}
+      className={cn("text-sm text-[var(--text-muted)]", className)}
       {...props}
     />
   )

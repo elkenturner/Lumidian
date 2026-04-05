@@ -7,8 +7,8 @@ interface RunStatusBadgeProps {
 const CONFIG = {
   pending: {
     label: 'Pending',
-    className: 'bg-[rgba(255,255,255,0.04)] text-[#64748B] border-[rgba(100,116,139,0.25)]',
-    dot: 'bg-[#475569]',
+    className: 'bg-[rgba(255,255,255,0.04)] text-[var(--text-muted)] border-[rgba(100,116,139,0.25)]',
+    dot: 'bg-[var(--text-faint)]',
     animate: false,
   },
   running: {
@@ -19,14 +19,14 @@ const CONFIG = {
   },
   completed: {
     label: 'Completed',
-    className: 'bg-[#064e3b]/20 text-[#34d399] border-[#065f46]/25',
-    dot: 'bg-[#34d399]',
+    className: 'bg-[#064e3b]/20 text-[var(--success-text)] border-[#065f46]/25',
+    dot: 'bg-[var(--success-text)]',
     animate: false,
   },
   failed: {
     label: 'Failed',
-    className: 'bg-[#7f1d1d]/15 text-[#f87171] border-[#991b1b]/25',
-    dot: 'bg-[#f87171]',
+    className: 'bg-[#7f1d1d]/15 text-[var(--danger-text)] border-[#991b1b]/25',
+    dot: 'bg-[var(--danger-text)]',
     animate: false,
   },
 };

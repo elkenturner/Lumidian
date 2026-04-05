@@ -256,9 +256,9 @@ export default function RegisterPage() {
 
         <p style={{ textAlign: 'center', fontSize: 14, color: '#6B7280', marginTop: 24, fontWeight: 400 }}>
           Already have an account?{' '}
-          <Link href="/login" style={{ color: '#4F46E5', fontWeight: 600, textDecoration: 'none' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = '#3730a3')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = '#4F46E5')}
+          <Link href="/login" style={{ color: 'var(--accent-hover)', fontWeight: 600, textDecoration: 'none' }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--accent-hover)')}
           >
             Sign in
           </Link>

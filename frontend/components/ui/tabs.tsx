@@ -19,7 +19,7 @@ function TabsList({ className, ...props }: React.ComponentProps<typeof TabsPrimi
     <TabsPrimitive.List
       data-slot="tabs-list"
       className={cn(
-        "inline-flex items-center gap-0 border-b border-[rgba(99,102,241,0.22)]",
+        "inline-flex items-center gap-0 border-b border-[var(--border-default)]",
         className
       )}
       {...props}
@@ -33,8 +33,8 @@ function TabsTrigger({ className, ...props }: React.ComponentProps<typeof TabsPr
       data-slot="tabs-trigger"
       className={cn(
         "inline-flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-[3px] -mb-px transition-all whitespace-nowrap",
-        "text-[#64748B] border-transparent hover:text-[#94A3B8] hover:bg-[rgba(255,255,255,0.03)]",
-        "data-[state=active]:text-[#818CF8] data-[state=active]:border-[#6366f1] data-[state=active]:bg-[rgba(99,102,241,0.08)]",
+        "text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)]",
+        "data-[state=active]:text-[var(--accent-foreground)] data-[state=active]:border-[var(--accent)] data-[state=active]:bg-[rgba(99,102,241,0.08)]",
         "disabled:pointer-events-none disabled:opacity-50",
         className
       )}

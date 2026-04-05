@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 # ── Prompt schemas ────────────────────────────────────────────────────────────
@@ -341,16 +341,16 @@ class ContentAttributionSchema(BaseModel):
 
 class CreateDraftRequest(BaseModel):
     brand_id: int
-    platform: str
+    platform: str = Field(max_length=30)
     prompt_id: Optional[int] = None
-    custom_brief: Optional[str] = None
-    quora_question_url: Optional[str] = None
-    quora_question_title: Optional[str] = None
-    quora_question_snippet: Optional[str] = None
+    custom_brief: Optional[str] = Field(None, max_length=2000)
+    quora_question_url: Optional[str] = Field(None, max_length=500)
+    quora_question_title: Optional[str] = Field(None, max_length=300)
+    quora_question_snippet: Optional[str] = Field(None, max_length=1000)
 
 
 class GenerateNowRequest(BaseModel):
-    max_gaps: int = 20
+    max_gaps: int = Field(20, ge=1, le=50)
 
 
 class UpdateDraftRequest(BaseModel):

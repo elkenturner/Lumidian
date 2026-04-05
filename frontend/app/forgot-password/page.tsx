@@ -78,7 +78,7 @@ export default function ForgotPasswordPage() {
           {sent ? (
             <div style={{ textAlign: 'center' }}>
               <div style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(79,70,229,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#4F46E5" strokeWidth="2">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--accent-hover)" strokeWidth="2">
                   <path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2z"/>
                   <polyline points="22,6 12,13 2,6"/>
                 </svg>
@@ -90,7 +90,7 @@ export default function ForgotPasswordPage() {
               <Link
                 href="/login"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, color: '#6B7280', textDecoration: 'none', fontWeight: 500 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#4F46E5')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-hover)')}
                 onMouseLeave={(e) => (e.currentTarget.style.color = '#6B7280')}
               >
                 <ArrowLeft size={14} />
@@ -157,7 +157,7 @@ export default function ForgotPasswordPage() {
                 <Link
                   href="/login"
                   style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#6B7280', textDecoration: 'none', fontWeight: 500 }}
-                  onMouseEnter={(e) => (e.currentTarget.style.color = '#4F46E5')}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent-hover)')}
                   onMouseLeave={(e) => (e.currentTarget.style.color = '#6B7280')}
                 >
                   <ArrowLeft size={14} />

@@ -29,12 +29,12 @@ const TIMEFRAME_OPTIONS: { label: string; value: Timeframe }[] = [
 ];
 
 const MODEL_LINES: { key: string; label: string; color: string }[] = [
-  { key: 'chatgpt',    label: 'ChatGPT',    color: '#22c55e' },
-  { key: 'claude',     label: 'Claude',     color: '#f97316' },
-  { key: 'perplexity', label: 'Perplexity', color: '#8b5cf6' },
-  { key: 'gemini',     label: 'Gemini',     color: '#3b82f6' },
+  { key: 'chatgpt',    label: 'ChatGPT',    color: 'var(--color-chatgpt)' },
+  { key: 'claude',     label: 'Claude',     color: 'var(--color-claude)' },
+  { key: 'perplexity', label: 'Perplexity', color: 'var(--color-perplexity)' },
+  { key: 'gemini',     label: 'Gemini',     color: 'var(--color-gemini)' },
 ];
-const AVG_COLOR = '#6366f1';
+const AVG_COLOR = 'var(--accent)';
 
 interface TrendChartProps {
   data: TrendPoint[];
@@ -70,7 +70,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
       boxShadow: '0 8px 32px rgba(0,0,0,0.50), 0 0 0 1px rgba(99,102,241,0.06)',
       minWidth: 155,
     }}>
-      <p style={{ fontSize: 11, color: '#475569', marginBottom: 8, fontWeight: 500 }}>{label}</p>
+      <p style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 8, fontWeight: 500 }}>{label}</p>
       {avg && (
         <p style={{
           fontSize: 14,
@@ -87,8 +87,8 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
         const cfg = MODEL_LINES.find((ml) => ml.key === m.dataKey);
         return (
           <div key={m.dataKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 20, marginTop: 3 }}>
-            <span style={{ fontSize: 11, color: cfg?.color ?? '#94a3b8' }}>{cfg?.label ?? m.dataKey}</span>
-            <span style={{ fontSize: 11, fontWeight: 600, color: cfg?.color ?? '#94a3b8', fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' }}>
+            <span style={{ fontSize: 11, color: cfg?.color ?? 'var(--text-secondary)' }}>{cfg?.label ?? m.dataKey}</span>
+            <span style={{ fontSize: 11, fontWeight: 600, color: cfg?.color ?? 'var(--text-secondary)', fontFamily: 'var(--font-geist-mono), ui-monospace, monospace' }}>
               {Math.round(m.value)}%
             </span>
           </div>
@@ -112,31 +112,32 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
   };
 
   const chartData: ChartPoint[] = useMemo(() => {
-    const all = (data ?? []).map((point) => {
-      const pt: ChartPoint = {
-        formattedDate: point.completed_at
-          ? format(parseUTCISO(point.completed_at), 'MMM d, yyyy')
-          : 'Unknown',
-        shortDate: point.completed_at
-          ? format(parseUTCISO(point.completed_at), 'MMM d')
-          : '',
-        score: Math.round(point.score),
-        total_mentions: point.total_mentions,
-        total_queries: point.total_queries,
-      };
-      for (const ml of MODEL_LINES) {
-        const v = point.model_scores?.[ml.key];
-        if (v != null) pt[ml.key] = Math.round(v);
-      }
-      return pt;
-    });
+    if (!data || data.length === 0) return [];
 
-    if (timeframe === 'all') return all;
-    const days = timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90;
-    const cutoff = subDays(new Date(), days);
-    return all.filter((p) => p.formattedDate !== 'Unknown' &&
-      parseUTCISO((data.find((d) => format(parseUTCISO(d.completed_at), 'MMM d, yyyy') === p.formattedDate)?.completed_at ?? '')) >= cutoff
-    );
+    const cutoff = timeframe === 'all'
+      ? null
+      : subDays(new Date(), timeframe === '7d' ? 7 : timeframe === '30d' ? 30 : 90);
+
+    return data
+      .filter((point) => {
+        if (!point.completed_at) return false;
+        if (!cutoff) return true;
+        return parseUTCISO(point.completed_at) >= cutoff;
+      })
+      .map((point) => {
+        const pt: ChartPoint = {
+          formattedDate: format(parseUTCISO(point.completed_at), 'MMM d, yyyy'),
+          shortDate: format(parseUTCISO(point.completed_at), 'MMM d'),
+          score: Math.round(point.score),
+          total_mentions: point.total_mentions,
+          total_queries: point.total_queries,
+        };
+        for (const ml of MODEL_LINES) {
+          const v = point.model_scores?.[ml.key];
+          if (v != null) pt[ml.key] = Math.round(v);
+        }
+        return pt;
+      });
   }, [data, timeframe]);
 
   const activeModels = MODEL_LINES.filter((ml) =>
@@ -145,9 +146,9 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
 
   if (!data || data.length === 0) {
     return (
-      <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-6"
+      <div className="bg-[var(--accent-muted)] border border-[var(--border-default)] rounded-xl p-6"
         style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
-        <h3 className="text-base font-semibold text-[#e2e8f0] mb-4">Visibility Trend</h3>
+        <h3 className="text-base font-semibold text-[var(--text-primary)] mb-4">Visibility Trend</h3>
         <div className="empty-state">
           <div className="empty-state-icon">
             <Activity size={22} />
@@ -160,17 +161,17 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
   }
 
   return (
-    <div className="bg-[rgba(99,102,241,0.08)] backdrop-blur-md border border-[rgba(99,102,241,0.20)] rounded-xl p-6"
+    <div className="bg-[var(--accent-muted)] border border-[var(--border-default)] rounded-xl p-6"
       style={{ boxShadow: '0 4px 24px rgba(0,0,0,0.30), inset 0 1px 0 rgba(255,255,255,0.055)' }}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base font-semibold text-[#e2e8f0]">Visibility Trend</h3>
+        <h3 className="text-base font-semibold text-[var(--text-primary)]">Visibility Trend</h3>
         <Tabs value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}>
           <TabsList className="bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 h-auto gap-0 border-b-0">
             {TIMEFRAME_OPTIONS.map(({ label, value }) => (
               <TabsTrigger
                 key={value}
                 value={value}
-                className="px-2.5 py-1 rounded-md text-xs font-medium h-auto border-b-0 data-[state=active]:bg-[rgba(99,102,241,0.25)] data-[state=active]:text-[#818cf8] data-[state=active]:border-transparent data-[state=inactive]:text-[#475569]"
+                className="px-2.5 py-1 rounded-md text-xs font-medium h-auto border-b-0 data-[state=active]:bg-[rgba(99,102,241,0.25)] data-[state=active]:text-[var(--accent-light)] data-[state=active]:border-transparent data-[state=inactive]:text-[var(--text-faint)]"
               >
                 {label}
               </TabsTrigger>
@@ -184,7 +185,7 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
         <div className="flex items-center gap-4 mb-4 flex-wrap">
           <div className="flex items-center gap-1.5 text-xs">
             <span className="w-5 h-0.5 rounded-full inline-block" style={{ background: AVG_COLOR }} />
-            <span className="text-[#818cf8] font-medium">Average</span>
+            <span className="text-[var(--accent-light)] font-medium">Average</span>
           </div>
           {activeModels.map((ml) => (
             <button
@@ -201,7 +202,7 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
       )}
 
       {chartData.length === 0 ? (
-        <div className="flex items-center justify-center h-[220px] text-[#475569] text-sm">
+        <div className="flex items-center justify-center h-[220px] text-[var(--text-faint)] text-sm">
           No data in this timeframe.
         </div>
       ) : (
@@ -209,8 +210,8 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
           <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
             <defs>
               <linearGradient id="avgAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%"  stopColor="#818cf8" stopOpacity={0.28} />
-                <stop offset="95%" stopColor="#818cf8" stopOpacity={0} />
+                <stop offset="5%"  stopColor="var(--accent-light)" stopOpacity={0.28} />
+                <stop offset="95%" stopColor="var(--accent-light)" stopOpacity={0} />
               </linearGradient>
               <filter id="lineGlow" x="-20%" y="-20%" width="140%" height="140%">
                 <feGaussianBlur stdDeviation="2.5" result="blur" />
@@ -224,13 +225,13 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.07)" vertical={false} />
             <XAxis
               dataKey="shortDate"
-              tick={{ fill: '#475569', fontSize: 11 }}
+              tick={{ fill: 'var(--text-faint)', fontSize: 11 }}
               axisLine={{ stroke: 'rgba(99,102,241,0.10)' }}
               tickLine={false}
             />
             <YAxis
               domain={[0, (dataMax: number) => dataMax < 20 ? 25 : 100]}
-              tick={{ fill: '#475569', fontSize: 11 }}
+              tick={{ fill: 'var(--text-faint)', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
               tickFormatter={(v) => `${v}%`}
@@ -250,7 +251,7 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
               fill="url(#avgAreaGradient)"
               fillOpacity={1}
               dot={false}
-              activeDot={{ fill: '#818cf8', r: 5, strokeWidth: 2, stroke: 'rgba(129,140,248,0.30)' }}
+              activeDot={{ fill: 'var(--accent-light)', r: 5, strokeWidth: 2, stroke: 'rgba(129,140,248,0.30)' }}
               isAnimationActive={true}
               animationDuration={1200}
               animationEasing="ease-out"
@@ -265,7 +266,7 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
                   x={last.shortDate}
                   y={last.score}
                   r={5}
-                  fill="#818cf8"
+                  fill="var(--accent-light)"
                   stroke="rgba(129,140,248,0.30)"
                   strokeWidth={6}
                 />

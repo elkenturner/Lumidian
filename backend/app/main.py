@@ -33,7 +33,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.database import create_tables, run_migrations
+from app.database import create_tables, run_migrations, cleanup_stale_runs
 from app.scheduler import start_scheduler, stop_scheduler
 from app.routers import brands, tracking, results, content, accounts, dashboard
 from app.routers import brand_profile, gaps, opportunities, settings
@@ -73,6 +73,7 @@ async def lifespan(app: FastAPI):
     logger.info("Lumidian startup: creating database tables...")
     await create_tables()
     await run_migrations()
+    await cleanup_stale_runs()
     logger.info("Database tables ready.")
 
     # Seed admin user

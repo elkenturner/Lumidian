@@ -1,12 +1,12 @@
 import type { CSSProperties } from 'react';
 
 /**
- * LumidianLogo — eye mark for Lumidian.
+ * LumidianLogo -- eye mark for Lumidian.
  *
  * Usage:
- *   <LumidianLogo size={32} />                        — icon only (size × size square)
- *   <LumidianLogo size={32} withWordmark />            — icon + wordmark (dark bg)
- *   <LumidianLogo size={32} withWordmark variant="light" /> — icon + wordmark (light bg)
+ *   <LumidianLogo size={32} />                        -- icon only (size x size square)
+ *   <LumidianLogo size={32} withWordmark />            -- icon + wordmark (dark bg)
+ *   <LumidianLogo size={32} withWordmark variant="light" /> -- icon + wordmark (light bg)
  */
 
 export default function LumidianLogo({
@@ -25,8 +25,8 @@ export default function LumidianLogo({
   // 4. Black lower-eyelid shadow (cuts up from bottom center)
   // 5. White sclera circle
   // 6. Black pupil circle
-  // Square viewBox — eye centred horizontally, sits in upper half like the reference image.
-  // This matches how the favicon renders (browser letterboxes the 200×100 eye into a square tab).
+  // Square viewBox -- eye centred horizontally, sits in upper half like the reference image.
+  // This matches how the favicon renders (browser letterboxes the 200x100 eye into a square tab).
   const icon = (
     <svg
       width={size}
@@ -35,7 +35,7 @@ export default function LumidianLogo({
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Black outer almond — eye fills the width, centred at y=50 */}
+      {/* Black outer almond -- eye fills the width, centred at y=50 */}
       <path d="M 2,50 C 11,27 89,27 98,50 C 89,73 11,73 2,50 Z" fill="#0d0d0d" />
       {/* Blue interior */}
       <path d="M 5,50 C 14,32 86,32 95,50 C 86,68 14,68 5,50 Z" fill="#3b63e8" />
@@ -58,7 +58,7 @@ export default function LumidianLogo({
         fontWeight: 700,
         letterSpacing: '0.06em',
         fontFamily: 'var(--font-inter, system-ui, sans-serif)',
-        color: '#1e1b4b',
+        color: 'var(--logo-wordmark-light, #1e1b4b)',
       }
     : {
         fontSize: Math.round(size * 0.5),

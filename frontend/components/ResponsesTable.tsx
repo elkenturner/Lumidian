@@ -8,10 +8,10 @@ interface ResponsesTableProps {
 }
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  chatgpt:    { label: 'ChatGPT',    bg: '#064e3b', text: '#10b981' },
-  claude:     { label: 'Claude',     bg: '#451a03', text: '#f59e0b' },
-  perplexity: { label: 'Perplexity', bg: '#2e1065', text: '#a78bfa' },
-  gemini:     { label: 'Gemini',     bg: '#172554', text: '#60a5fa' },
+  chatgpt:    { label: 'ChatGPT',    bg: 'var(--color-chatgpt-muted)', text: 'var(--color-chatgpt)' },
+  claude:     { label: 'Claude',     bg: 'var(--color-claude-muted)', text: 'var(--color-claude)' },
+  perplexity: { label: 'Perplexity', bg: 'var(--color-perplexity-muted)', text: 'var(--color-perplexity)' },
+  gemini:     { label: 'Gemini',     bg: 'var(--color-gemini-muted)', text: 'var(--color-gemini)' },
 };
 
 const MODEL_ORDER = ['chatgpt', 'claude', 'perplexity', 'gemini'];
@@ -21,7 +21,7 @@ function getModelConfig(model: string) {
   for (const [k, v] of Object.entries(MODEL_CONFIG)) {
     if (key.includes(k)) return { ...v, key: k };
   }
-  return { label: model, bg: 'rgba(99,102,241,0.10)', text: '#64748b', key: model };
+  return { label: model, bg: 'rgba(99,102,241,0.10)', text: 'var(--text-muted)', key: model };
 }
 
 interface ModelStat {
@@ -88,10 +88,10 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
   );
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+    <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       {/* Header */}
       <div className="px-5 py-3.5 border-b border-[rgba(99,102,241,0.15)] flex items-center justify-between bg-[rgba(99,102,241,0.04)]">
-        <h3 className="text-sm font-semibold text-[#e2e8f0]">Query Responses</h3>
+        <h3 className="text-sm font-semibold text-[var(--text-primary)]">Query Responses</h3>
         {!loading && groups.length > 0 && (
           <div className="flex items-center gap-3">
             {modelsPresent.map(m => {
@@ -106,7 +106,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                 </span>
               );
             })}
-            <span className="text-xs text-[#64748b] border-l border-[rgba(99,102,241,0.20)] pl-3">
+            <span className="text-xs text-[var(--text-muted)] border-l border-[rgba(99,102,241,0.20)] pl-3">
               {groups.length} prompt{groups.length !== 1 ? 's' : ''}
             </span>
           </div>
@@ -119,19 +119,19 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
           {Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)}
         </div>
       ) : groups.length === 0 ? (
-        <div className="px-5 py-12 text-center text-[#64748b] text-sm">
+        <div className="px-5 py-12 text-center text-[var(--text-muted)] text-sm">
           No responses found for this run.
         </div>
       ) : (
         <div className="divide-y divide-[rgba(99,102,241,0.12)]">
           {groups.map((g) => {
             const overallPct = g.total > 0 ? Math.round((g.mentioned / g.total) * 100) : 0;
-            const overallColor = overallPct >= 60 ? '#10b981' : overallPct >= 30 ? '#f59e0b' : '#ef4444';
+            const overallColor = overallPct >= 60 ? 'var(--success)' : overallPct >= 30 ? 'var(--warning)' : 'var(--danger)';
 
             return (
               <div key={g.promptId} className="px-5 py-4 hover:bg-[rgba(99,102,241,0.04)] transition-colors">
                 {/* Prompt text */}
-                <p className="text-sm text-[#94a3b8] mb-3 leading-snug font-medium">
+                <p className="text-sm text-[var(--text-secondary)] mb-3 leading-snug font-medium">
                   {g.promptText}
                 </p>
 
@@ -142,7 +142,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                     const cfg = getModelConfig(modelKey);
                     if (!ms) return null;
                     const pct = ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : 0;
-                    const mentionColor = pct >= 60 ? '#10b981' : pct >= 30 ? '#f59e0b' : '#ef4444';
+                    const mentionColor = pct >= 60 ? 'var(--success)' : pct >= 30 ? 'var(--warning)' : 'var(--danger)';
 
                     return (
                       <div
@@ -155,14 +155,14 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                         >
                           {cfg.label}
                         </span>
-                        <span className="text-[rgba(99,102,241,0.40)]">·</span>
+                        <span className="text-[rgba(99,102,241,0.40)]">&middot;</span>
                         <span
-                          className="text-xs font-bold tabular-nums"
+                          className="text-xs font-bold tabular-nums font-mono"
                           style={{ color: mentionColor }}
                         >
                           {pct}%
                         </span>
-                        <span className="text-[10px] text-[#475569] tabular-nums">
+                        <span className="text-[10px] text-[var(--text-faint)] tabular-nums font-mono">
                           ({ms.mentioned}/{ms.total})
                         </span>
                       </div>
@@ -171,9 +171,9 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
 
                   {/* Overall */}
                   <div className="ml-auto flex items-center gap-1.5">
-                    <span className="text-xs text-[#64748b]">Overall</span>
+                    <span className="text-xs text-[var(--text-muted)]">Overall</span>
                     <span
-                      className="text-sm font-bold tabular-nums"
+                      className="text-sm font-bold tabular-nums font-mono"
                       style={{ color: overallColor }}
                     >
                       {overallPct}%

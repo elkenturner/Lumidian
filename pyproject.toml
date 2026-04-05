@@ -5,7 +5,23 @@ exclude = [".git", ".venv", "venv", "__pycache__", "*.pyc"]
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP"]
-ignore = ["E501", "B008", "B904"]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # function call in default argument (FastAPI Depends)
+    "B904",   # raise without from (too noisy)
+    "B905",   # zip without strict (fine for known-length sequences)
+    "E712",   # SQLAlchemy requires == True/False for boolean comparisons
+    "UP042",  # StrEnum requires Python 3.11+, keep str+Enum for compatibility
+    "C408",   # dict() vs {} is style preference
+]
+
+[tool.ruff.lint.per-file-ignores]
+"app/main.py" = ["E402"]  # load_dotenv() must run before imports
+"app/routers/*.py" = ["E402"]  # logger setup before imports
+"app/routers/reports.py" = ["E402", "F841"]  # unused style constants are intentional
+"app/routers/results.py" = ["E402", "F841"]  # brand var used for access control side effect
+"app/services/*.py" = ["E402", "F841"]  # module setup, some unused vars are intentional
+"tests/*.py" = ["E402", "UP017", "B007"]  # test setup, datetime aliases, unused loop vars OK
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]

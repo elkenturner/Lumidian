@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from time import monotonic
-from typing import Annotated, Optional
+from typing import Annotated
 
 import jwt
 from fastapi import Cookie, Depends, HTTPException, status
@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.models import User
+from app.models import Brand, User
 
 JWT_SECRET = os.getenv("JWT_SECRET", "")
 if not JWT_SECRET:
@@ -68,7 +68,7 @@ def decode_token(token: str) -> dict:
 
 async def get_current_user(
     db: Annotated[AsyncSession, Depends(get_db)],
-    clarity_token: Optional[str] = Cookie(default=None),
+    clarity_token: str | None = Cookie(default=None),
 ) -> User:
     if not clarity_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
@@ -98,7 +98,7 @@ async def get_current_user(
 
 async def get_current_user_allow_unverified(
     db: Annotated[AsyncSession, Depends(get_db)],
-    clarity_token: Optional[str] = Cookie(default=None),
+    clarity_token: str | None = Cookie(default=None),
 ) -> User:
     """Like get_current_user but does NOT block unverified email addresses.
     Use only for /auth/me and the email verification endpoints themselves."""
@@ -122,8 +122,8 @@ async def get_current_user_allow_unverified(
 
 async def get_current_user_optional(
     db: Annotated[AsyncSession, Depends(get_db)],
-    clarity_token: Optional[str] = Cookie(default=None),
-) -> Optional[User]:
+    clarity_token: str | None = Cookie(default=None),
+) -> User | None:
     if not clarity_token:
         return None
     try:
@@ -142,7 +142,7 @@ async def get_current_user_optional(
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 AllowUnverifiedUser = Annotated[User, Depends(get_current_user_allow_unverified)]
-OptionalUser = Annotated[Optional[User], Depends(get_current_user_optional)]
+OptionalUser = Annotated[User | None, Depends(get_current_user_optional)]
 
 
 def is_brand_paused(brand, user) -> bool:
@@ -157,7 +157,7 @@ def is_brand_paused(brand, user) -> bool:
     if getattr(brand, "brand_type", "standard") == "pitch":
         expires_at = getattr(brand, "pitch_expires_at", None)
         if expires_at:
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            now = datetime.now(UTC).replace(tzinfo=None)
             if expires_at <= now:
                 return True
 
@@ -210,8 +210,8 @@ async def get_data_owner_id(db: AsyncSession, user: User) -> int:
     If the user is a team member (viewer), return the account_owner_id.
     Otherwise return the user's own id.
     """
+
     from app.models import TeamMember
-    from datetime import datetime, timezone
 
     result = await db.execute(
         select(TeamMember).where(
@@ -225,9 +225,8 @@ async def get_data_owner_id(db: AsyncSession, user: User) -> int:
     return user.id
 
 
-async def get_brand_for_user(brand_id: int, db: AsyncSession, user: User) -> "Brand":
+async def get_brand_for_user(brand_id: int, db: AsyncSession, user: User) -> Brand:
     """Load a brand and verify it belongs to the authenticated user or their team owner. Raises 404/403. Admins can access any brand."""
-    from app.models import Brand
     logger.info(f"get_brand_for_user: brand_id={brand_id}, user.id={user.id}, user.is_admin={getattr(user, 'is_admin', False)}")
     result = await db.execute(select(Brand).where(Brand.id == brand_id))
     brand = result.scalar_one_or_none()

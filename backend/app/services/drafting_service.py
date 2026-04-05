@@ -39,6 +39,14 @@ from app.models import (
     BrandContentSettings,
     utcnow as _utcnow,
 )
+from app.services.drafting import (
+    PLATFORM_SPECS, ALL_PLATFORMS, CONTENT_PLATFORMS, PLATFORM_MAX_TOKENS,
+    classify_subreddit, build_subreddit_strategy,
+    build_prompt, build_wikipedia_prompt, WIKIPEDIA_SYSTEM_PROMPT,
+    call_claude,
+    remove_hedging, clean_wiki_text, parse_wikipedia_draft,
+    extract_title_and_body, estimate_visibility_impact,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -55,186 +63,16 @@ def _sanitize_user_input(text, max_length: int = 500) -> str:
     return cleaned[:max_length]
 
 
-# ── Extended platform guidelines ──────────────────────────────────────────────
+# ── Build citation ref (re-exported from prompts module for local use) ─────────
 
-PLATFORM_SPECS: dict[str, dict] = {
-    "reddit": {
-        "format": "standalone_post",
-        "word_range": (150, 400),
-        "tone": "conversational, genuine community member voice — like a person talking, not an article being written",
-        "rules": [
-            "Write as a genuine community member, not a marketer — conversational and first-person where natural",
-            "NO formal headers, NO markdown formatting (no ##, no bold headers) — at most 1 to 2 bullet points maximum, only if a short list genuinely helps",
-            "CRITICAL: Do NOT pose a question and then answer it yourself. You are writing a comment or contribution to an existing discussion — not a standalone Q&A post. Write as if you are directly responding to something, sharing a perspective, or contributing a genuine insight.",
-            "Add genuine value — answer a question, share a personal experience, contribute a real insight",
-            "Mention the brand only if it fits naturally into the conversation; never force it",
-            "No promotional language, no calls to action, no links unless absolutely essential",
-            "Disclose brand affiliation if the brand is mentioned",
-            "Sound like a real person talking — not an article, not a press release, not a structured essay",
-        ],
-        "disclaimer": "Always disclose brand affiliation per Reddit's rules.",
-        "posting_tip": "Choose the most relevant subreddit for your brand's niche.",
-    },
-    "reddit_reply": {
-        "format": "thread_reply",
-        "word_range": (20, 80),
-        "tone": "direct, helpful, brief",
-        "rules": [
-            "1 to 4 sentences only — replies should be direct and concise",
-            "Answer the specific question or comment being replied to",
-            "Mention the brand only if it directly answers the question",
-            "No hedging, no preamble — get to the point immediately",
-        ],
-        "disclaimer": "Disclose brand affiliation if mentioning the brand.",
-        "posting_tip": "Reply directly to the original poster's question.",
-    },
-    "quora": {
-        "format": "answer",
-        "word_range": (250, 550),
-        "tone": "practitioner — direct, specific, written like a knowledgeable person explaining something they've actually done or seen, not a brand spokesperson",
-        "rules": [
-            "The VERY FIRST SENTENCE must state the direct answer concretely — no 'great question', no setup, no 'it depends'. If the question is 'what tool should I use for X?', sentence 1 names the tool or approach, not background on X.",
-            "Structure: (1) one clear direct-answer sentence, (2) 2–4 short paragraphs with concrete supporting evidence or examples, (3) one practical takeaway sentence at the end",
-            "Write as a practitioner who has solved this problem, not as a brand representative writing copy. No corporate voice, no superlatives, no buzzwords",
-            "Every claim must be specific and concrete — replace vague statements ('it's very effective') with precise ones ('it reduced false-positive alerts by cutting noise from 300 to under 20 per day')",
-            "Vary sentence length: short punchy sentences for key points, longer ones for explanation. Never three sentences in a row of similar length.",
-            "Brand mentions: only include if the brand is a direct, specific answer to the question. If mentioned, do so in a concrete context ('X uses this approach to do Y') — never as a recommendation or pitch",
-            "Do NOT re-state or paraphrase the question anywhere in the answer",
-            "No parenthetical asides, no hedging, no qualifications that undermine the answer",
-        ],
-        "disclaimer": "Disclose any brand affiliation in your Quora credentials.",
-        "posting_tip": "Find a relevant question on Quora and post this as your answer.",
-    },
-    "medium": {
-        "format": "article",
-        "word_range": (800, 2000),
-        "tone": "thought leadership, editorial, analytical — structured like a quality article with a clear arc",
-        "rules": [
-            "Open with a strong hook in the first 1-2 sentences — a surprising fact, a provocative question, or a bold statement that earns the reader's attention",
-            "Structure the article clearly with flowing prose sections: hook → context/problem → main argument → strong conclusion. Separate sections with a blank line — do NOT use ## markdown headers",
-            "NO ## headings, NO markdown headers of any kind — write in editorial prose that flows naturally from one idea to the next",
-            "The brand name MUST appear at least once in the article. Find a natural, earned place for it: a concrete claim, an example of the approach in action, a specific data point, or a direct mention of a capability. The brand name must appear in the body text.",
-            "Where the Brand Profile includes peer-reviewed publications, cite them naturally in the body (e.g. 'A study published in...' or 'Research from...')",
-            "Include concrete data, examples, or evidence to support every major claim — never make unsupported assertions",
-            "End with a strong, specific conclusion that delivers an actionable insight — not a generic 'in conclusion' paragraph",
-            "Brand references must be contextual and earned — not promotional",
-        ],
-        "disclaimer": None,
-        "posting_tip": "Publish to your personal Medium profile or a relevant publication.",
-    },
-    "wikipedia": {
-        "format": "suggested_edit",
-        "word_range": (100, 300),
-        "tone": "neutral, encyclopedic, sourced",
-        "rules": [
-            "Use neutral, third-person encyclopedic language only",
-            "Every claim must be verifiable and cite a reliable independent source",
-            "Suggest edits to existing articles only — do not create brand articles",
-            "No promotional language, superlatives, or marketing claims whatsoever",
-            "Present only facts that pass Wikipedia's notability threshold",
-        ],
-        "disclaimer": (
-            "⚠️ Wikipedia COI Policy: Editing Wikipedia to promote your brand may violate "
-            "WP:COI guidelines. Disclose your affiliation on the article talk page and "
-            "request an edit rather than making it directly."
-        ),
-        "posting_tip": "Post as a requested edit on the article's Talk page.",
-    },
-}
-
-ALL_PLATFORMS = list(PLATFORM_SPECS.keys())
-CONTENT_PLATFORMS = [p for p in ALL_PLATFORMS if p != "reddit_reply"]
-
-# Per-platform max_tokens for gap drafts (opportunity reply uses its own limit)
-PLATFORM_MAX_TOKENS: dict[str, int] = {
-    "reddit": 1200,
-    "quora": 1800,
-    "medium": 3500,
-    "wikipedia": 900,  # handled in separate branch, kept here for reference
-}
-
-
-# ── Subreddit promotion classification ───────────────────────────────────────
-
-# Subreddits with documented rules against self-promotion / advertising.
-# Content in these subs must be purely value-driven — no brand naming.
-_PROMO_RESTRICTED_SUBREDDITS: frozenset[str] = frozenset({
-    # Finance / Legal
-    "personalfinance", "legaladvice", "tax", "investing", "financialindependence",
-    "frugal", "povertyfinance", "studentloans", "debtfree", "fire",
-    # Health / Medicine
-    "medicine", "askdocs", "medical", "medicaladvice", "nursing", "pharmacy",
-    "mentalhealth", "depression", "anxiety", "bipolar", "schizophrenia",
-    "chronicpain", "diabetes", "cancer", "epilepsy", "ibs", "autoimmune",
-    "ems", "emergencymedicine", "veterinary",
-    # Science / Academia
-    "science", "biology", "chemistry", "physics", "neuroscience",
-    "psychology", "datascience", "statistics", "academicphilosophy",
-    "compsci", "machinelearning", "artificial",
-    # Support / Advice communities
-    "relationships", "amitheasshole", "relationship_advice", "tifu",
-    "confessions", "grief", "survivorsofabuse", "ptsd", "addiction",
-    # General large subs with anti-spam rules
-    "askreddit", "todayilearned", "explainlikeimfive", "changemyview",
-    "nostupidquestions", "worldnews", "news", "nottheonion",
-    # Tech / Career — strong no-spam norms
-    "programming", "learnprogramming", "cscareerquestions", "devops",
-    "sysadmin", "netsec", "cybersecurity",
-})
-
-# Keywords in subreddit names that suggest promo-friendly or promo-restricted posture
-_RESTRICTED_NAME_SIGNALS = ("help", "advice", "support", "care", "recover", "survivor", "anon")
-_ALLOWED_NAME_SIGNALS = (
-    "entrepreneur", "startup", "business", "marketing", "growth",
-    "smallbusiness", "b2b", "saas", "productmanagement", "venturecapital",
-    "growthhacking", "digitalmarketing", "contentmarketing",
-)
-
-
-def _classify_subreddit(subreddit: str) -> str:
-    """Returns 'restricted', 'allowed', or 'cautious' for a given subreddit name."""
-    sub = subreddit.lower().strip().lstrip("r/")
-    if sub in _PROMO_RESTRICTED_SUBREDDITS:
-        return "restricted"
-    if any(kw in sub for kw in _RESTRICTED_NAME_SIGNALS):
-        return "restricted"
-    if any(kw in sub for kw in _ALLOWED_NAME_SIGNALS):
-        return "allowed"
-    return "cautious"
-
-
-def _build_subreddit_strategy(subreddit: str, brand_name: str, strategy: str) -> str:
-    """Returns the prompt block telling Claude how to handle promotion for this subreddit."""
-    sub = subreddit.lstrip("r/")
-    if strategy == "restricted":
-        return (
-            f"\nCOMMUNITY STRATEGY — CRITICAL:\n"
-            f"r/{sub} strictly prohibits self-promotion and direct brand advertising. "
-            f"You MUST NOT mention {brand_name} by name or make any promotional claims about it.\n"
-            f"You MAY reference {brand_name}'s knowledge, data, or research indirectly:\n"
-            f"  - Cite published papers or studies by title/journal without attributing them to {brand_name} "
-            f"(e.g. 'A 2024 study in Nature found...' rather than '{brand_name} published a study...')\n"
-            f"  - Share factual insights drawn from {brand_name}'s expertise as your own informed perspective "
-            f"(e.g. 'Research suggests...' or 'In my experience working in this space...')\n"
-            f"  - Link to independent sources, papers, or data — not to {brand_name}'s website directly\n"
-            f"  - Goal: be the most genuinely helpful reply in the thread. Earn credibility through expertise, "
-            f"not brand recognition."
-        )
-    elif strategy == "allowed":
-        return (
-            f"\nCOMMUNITY STRATEGY:\n"
-            f"r/{sub} allows relevant brand mentions. You may reference {brand_name} naturally "
-            f"once if it directly and clearly answers the question being asked. Lead with genuine "
-            f"insight or value — the brand mention, if present, should feel earned and secondary."
-        )
-    else:  # cautious
-        return (
-            f"\nCOMMUNITY STRATEGY:\n"
-            f"r/{sub}'s stance on self-promotion is unclear — default to value-first. "
-            f"Only name {brand_name} if it is the most direct, obvious answer to the exact "
-            f"question asked and nothing else would serve better. If in doubt, omit the brand "
-            f"name entirely and focus on being the most helpful reply in the thread."
-        )
+def _build_citation_ref(
+    publications: list[dict],
+    brand_name: str,
+    website_url: Optional[str] = None,
+) -> str:
+    """Build a <ref> citation from publications, website URL, or {{citation needed}}."""
+    from app.services.drafting.prompts import _build_citation_ref as _impl
+    return _impl(publications, brand_name, website_url)
 
 
 # ── Brand profile loader ──────────────────────────────────────────────────────
@@ -463,7 +301,6 @@ async def _estimate_impact(
     )
     visibility_fraction = vis_result.scalar_one_or_none() or 0.0
     visibility_pct = float(visibility_fraction) * 100.0
-    low_vis_bonus = max(0.0, (50.0 - visibility_pct))  # 0-50
 
     # Platform activity — if no content posted on this platform recently, higher impact
     from datetime import timedelta
@@ -479,408 +316,11 @@ async def _estimate_impact(
         )
     )
     recent_posts = post_result.scalar_one_or_none() or 0
-    platform_bonus = 20.0 if recent_posts == 0 else max(0.0, 10.0 - recent_posts * 2)
 
-    raw = gap_score * 0.8 + platform_bonus
-    return round(min(100.0, raw), 1)
-
-
-# ── Wikipedia-specific prompt builder and parser ─────────────────────────────
-
-import re as _re
-
-# Patterns that indicate the LLM leaked analysis/instructions into the wiki text
-_ANALYSIS_LINE_RE = _re.compile(
-    r"^\s*(\*{0,3}\s*)?"
-    r"(analysis|missing (angle|information|context)|article to edit|"
-    r"suggested (edit|insertion|text|paragraph)|what (is )?missing|"
-    r"current narrative|note[:\s]|explanation|insight|instructions?"
-    r")\b",
-    _re.IGNORECASE,
-)
-
-
-def _clean_wiki_text(text: str) -> str:
-    """
-    Strip analysis/instruction lines that Claude sometimes leaks into wiki output.
-    Also remove markdown headers that aren't valid wiki syntax.
-    """
-    lines = text.splitlines()
-    cleaned: list[str] = []
-    for line in lines:
-        # Drop analysis commentary lines
-        if _ANALYSIS_LINE_RE.match(line):
-            continue
-        # Drop markdown headers (## Foo) — these are not wiki syntax
-        if _re.match(r"^#{1,6}\s+\S", line):
-            continue
-        # Drop standalone bold-wrapped headings (**Heading**)
-        if _re.match(r"^\s*\*{2,3}[^*\n]+\*{2,3}\s*$", line):
-            continue
-        cleaned.append(line)
-    # Collapse runs of blank lines
-    result = _re.sub(r"\n{3,}", "\n\n", "\n".join(cleaned))
-    return result.strip()
-
-
-def _build_citation_ref(
-    publications: list[dict],
-    brand_name: str,
-    website_url: Optional[str] = None,
-) -> str:
-    """Build a <ref> citation from publications, website URL, or {{citation needed}}."""
-    if publications:
-        p = publications[0]
-        url = p.get("url", "")
-        title = p.get("title", "")
-        publisher = p.get("publisher", brand_name)
-        date = p.get("date", "")
-        return f"<ref>{{{{cite journal|url={url}|title={title}|publisher={publisher}|date={date}}}}}</ref>"
-    if website_url:
-        from datetime import date as _date
-        accessdate = _date.today().strftime("%Y-%m-%d")
-        return (
-            f"<ref>{{{{cite web"
-            f"|url={website_url}"
-            f"|title={brand_name}"
-            f"|publisher={brand_name}"
-            f"|accessdate={accessdate}"
-            f"}}}}</ref>"
-        )
-    return "{{citation needed}}"
-
-
-def _build_wikipedia_prompt(
-    brand_name: str,
-    prompt_text: str,
-    profile_context: str,
-    response_analysis: str,
-    publications: Optional[List[dict]] = None,
-    website_url: Optional[str] = None,
-) -> str:
-    citation_ref = _build_citation_ref(publications or [], brand_name, website_url)
-    pub_note = ""
-    if publications:
-        p = publications[0]
-        pub_note = (
-            f"\nCITATION TO USE: The citation is already provided below — copy it exactly as-is:\n"
-            f"  {citation_ref}\n"
-            f"  (Source: {p.get('title', '')} — {p.get('publisher', '')} {p.get('date', '')})"
-        )
-    elif website_url:
-        pub_note = (
-            f"\nCITATION TO USE: No peer-reviewed publications available. "
-            f"Use this cite web citation — copy it exactly as-is:\n"
-            f"  {citation_ref}"
-        )
-    else:
-        pub_note = (
-            "\nCITATION: No source is available. "
-            "End the wikitext with {{citation needed}} exactly as shown — do NOT invent any citation data."
-        )
-
-    return f"""You are an experienced Wikipedia editor. Given a brand profile and a target query, you must:
-1. Identify ONE specific, real, existing Wikipedia article to edit.
-2. Write the exact wikitext sentence(s) to insert into it.
-3. Specify exactly where in the article to insert the text.
-
-BRAND PROFILE:
-{profile_context}
-
-TARGET QUERY:
-"{prompt_text}"
-
-WHAT AI SYSTEMS CURRENTLY SAY:
-{response_analysis}
-{pub_note}
-
-ARTICLE SELECTION — choose the article whose topic most directly matches the key terms in the target query. The article title and section should use the same vocabulary as the query (e.g. if the query mentions "breath test", target the "Breath test" article; if it mentions "cancer detection", target "Cancer screening" or a disease article). Examples of good targets:
-  - A technology article (e.g. "Breath test", "Liquid biopsy", "Volatile organic compound")
-  - A medical procedure article (e.g. "Cancer screening", "Colonoscopy", "Mammography")
-  - A disease article (e.g. "Lung cancer", "Colorectal cancer")
-  - A science/method article (e.g. "Gas chromatography", "Mass spectrometry")
-  Never target: brand articles, disambiguation pages, or articles you are inventing.
-
-WIKI TEXT RULES (absolute — every rule is mandatory):
-  - Neutral encyclopedic tone only — no promotional language, no superlatives, no brand advocacy of any kind
-  - NEVER use first person ("we", "our", "I", "us") — third person only
-  - No marketing language whatsoever — if a sentence sounds like it belongs in a press release, rewrite it completely
-  - Every factual claim must be attributable to the citation provided — do not state facts that cannot be sourced to it
-  - Only verifiable, citable facts — nothing invented, nothing approximated
-  - Use [[wikilinks]] around key terms that have Wikipedia articles
-  - The wikitext must naturally use key noun phrases from the target query (e.g. if the query is "breath test for cancer detection", the sentence must use those exact terms)
-  - Structure: 1 to 3 sentences maximum, written as a natural addition to an existing article section — not a standalone paragraph
-  - End with the citation ref provided above — copy it exactly, do not modify it
-  - The text must read as encyclopedia prose; if it sounds like an advertisement or press release at any point, it is wrong
-
-⚠ OUTPUT ONLY THE FIVE FIELDS BELOW. No analysis. No explanation. No preamble. No other text.
-
-ARTICLE_TITLE: [exact title of the existing Wikipedia article, e.g. Cancer screening]
-ARTICLE_URL: https://en.wikipedia.org/wiki/[Title_With_Underscores]
-SECTION: [exact section heading where the text belongs, e.g. Emerging technologies]
-INSERT_LOCATION: [One complete sentence telling the user exactly where to paste — include the article name, section name, and precise position. Example: "In the 'Cancer screening' article, find the 'Emerging technologies' section and add this text after the first paragraph." or "In the 'Breath test' article, add this text at the end of the 'Medical applications' section, before the References."]
-WIKI_TEXT:
-[the wikitext to insert — 1 to 2 sentences, nothing else]"""
-
-
-def _parse_wikipedia_draft(raw: str) -> tuple[str, str, str, str, str]:
-    """
-    Robustly parse LLM output for Wikipedia drafts.
-    Returns (article_title, article_url, section, insert_location, wiki_text).
-    Handles bold markers, extra whitespace, and leading prose the LLM adds.
-    """
-    # Strip markdown bold/italic that Claude sometimes adds to field labels or values
-    clean = _re.sub(r"\*{1,3}([^*\n]+)\*{1,3}", r"\1", raw)
-
-    def _field(pattern: str) -> str:
-        m = _re.search(pattern, clean, _re.IGNORECASE | _re.MULTILINE)
-        if not m:
-            return ""
-        return _re.sub(r"\*+", "", m.group(1)).strip()
-
-    article_title   = _field(r"^ARTICLE_TITLE:\s*(.+)$")
-    article_url     = _field(r"^ARTICLE_URL:\s*(https?://[^\s]+)$")
-    section         = _field(r"^SECTION:\s*(.+)$")
-    insert_location = _field(r"^INSERT_LOCATION:\s*(.+)$")
-
-    # Everything after WIKI_TEXT: (possibly on the same line or the next)
-    wiki_match = _re.search(r"^WIKI_TEXT:\s*(.*)", clean, _re.MULTILINE)
-    if wiki_match:
-        inline = wiki_match.group(1).strip()
-        rest_start = wiki_match.end()
-        rest = clean[rest_start:].strip()
-        wiki_raw = (inline + "\n" + rest).strip() if inline else rest
-    else:
-        wiki_raw = ""
-
-    wiki_text = _clean_wiki_text(wiki_raw) if wiki_raw else ""
-    return article_title, article_url, section, insert_location, wiki_text
-
-
-# ── Prompt builder ────────────────────────────────────────────────────────────
-
-def _build_prompt(
-    brand_name: str,
-    platform: str,
-    prompt_text: str,
-    visibility_pct: float,
-    profile_context: str,
-    response_analysis: str,
-    platform_spec: dict,
-    opportunity_context: Optional[str] = None,
-    existing_drafts_context: Optional[str] = None,
-) -> str:
-    spec = platform_spec
-    word_min, word_max = spec["word_range"]
-    rules_text = "\n".join(f"  - {r}" for r in spec["rules"])
-
-    opportunity_section = ""
-    if opportunity_context:
-        if platform == "quora":
-            opportunity_section = f"""
-QUORA QUESTION TO ANSWER:
-{opportunity_context}
-
-Your task: write an answer to this specific Quora question. If existing answers are shown above, study them carefully and write from a DIFFERENT angle — add concrete value that is not already covered. Do not summarise what others said. Go straight to the answer.
-"""
-        else:
-            opportunity_section = f"""
-THREAD/QUESTION TO RESPOND TO:
-{opportunity_context}
-
-Your task is to write a reply to this specific thread that naturally adds value.
-"""
-
-    existing_section = ""
-    if existing_drafts_context:
-        existing_section = f"""
-{existing_drafts_context}
-"""
-
-    return f"""You are a senior content strategist writing on behalf of a brand. Your goal is to create content that will cause AI systems (ChatGPT, Claude, Perplexity, Gemini) to mention "{brand_name}" when answering the exact query below.
-
-AI systems retrieve content that directly addresses the specific words someone searches. The content you write must be written as a direct, substantive answer to the target query — using the query's exact phrasing and key terms naturally throughout, so the content is unambiguously about that topic.
-
-INFORMATION HIERARCHY — follow this strictly:
-  1. Brand Profile fields below (company description, key stats, approved language, what not to say, publications) are your PRIMARY source. Use them first.
-  2. The "SUPPLEMENTARY context from company website" section (if present in the Brand Profile) is secondary — use it only to fill gaps the primary fields don't cover.
-  3. NEVER invent facts, statistics, or claims not present in either source.
-  4. NEVER approximate or paraphrase statistics — use the EXACT figures as written. If a stat says "94% accuracy in a study of 1,400 participants", write exactly that — not "nearly 95%", not "over 90%", not "about 1,400".
-
-BRAND PROFILE:
-{profile_context}
-
-TARGET QUERY (this is the exact question the content must answer):
-"{prompt_text}"
-
-CURRENT VISIBILITY:
-{visibility_pct:.1f}% of AI responses mention {brand_name} for this query. The analysis below shows what is currently being said and what specific angle is missing.
-
-WHAT AI SYSTEMS ARE CURRENTLY SAYING:
-{response_analysis}
-{opportunity_section}{existing_section}
-PLATFORM: {platform}
-FORMAT: {spec['format']}
-TONE: {spec['tone']}
-TARGET LENGTH: {word_min} to {word_max} words
-
-PLATFORM RULES (follow all of these):
-{rules_text}
-
-UNIVERSAL STYLE RULES (absolute — no exceptions):
-  - NEVER use em dashes (—) or en dashes used as separators. Replace with commas, colons, or rewrite the sentence.
-  - NEVER use these words or phrases: "honestly", "straightforward", "genuinely", "notably", "importantly", "it's worth noting", "it's important to mention", "it should be noted", "it's important to note", "one thing to note", "it bears mentioning", "needless to say", "of course", "delve", "dive into", "unpack", "let's explore", "the bottom line"
-  - NEVER use triple parallel structures ("not only X, but also Y, and even Z")
-  - NEVER start a sentence with "Additionally," or "Furthermore," or "Moreover," or "This is"
-  - NEVER use hedging language of any kind ("may", "might", "could potentially", "perhaps", "it seems")
-  - Vary sentence length — mix short punchy sentences with longer analytical ones
-  - Use contractions naturally (it's, we're, you'll, don't)
-  - Only reference facts and statistics that appear in the Brand Profile above — never invent data or statistics
-  - Only use clinical or technical language that appears in the Brand Profile
-  - Mention {brand_name} only if it fits naturally in the context — never force it
-  - Content must read as written by a knowledgeable human expert, not by an AI
-  - Do not include meta-commentary about what the content does ("This post addresses...", "This answer explains...")
-
-QUERY MIRRORING RULES (critical for AI retrieval — these are checked):
-  - The FIRST SENTENCE of the content body must directly address, answer, or engage with the target query using its specific subject matter — not with generic background. If the query is "Can cancer be detected through breath analysis?", the first sentence must talk specifically about breath analysis and cancer detection — NOT start with "Cancer affects millions of people worldwide."
-  - The title or opening sentence must contain the core topic of the query using its exact words or a close restatement
-  - Key noun phrases from the query must appear naturally in the body throughout
-  - The content must read as a direct, authoritative answer to someone who typed that exact query — not as a general brand article
-  - Do not substitute query terms with synonyms only — use the actual words from the query
-
-INSTRUCTIONS:
-1. Identify what specific angle or information is MISSING from the current AI responses above.
-2. Write content that fills that gap AND directly answers the target query using its exact language.
-3. OUTPUT FORMAT — follow exactly:
-   - Reddit post: Line 1 = post title (plain text, ≤120 chars, no trailing punctuation, no markdown). Blank line. Then the post body.
-   - Medium article: Line 1 = article title (plain text, ≤120 chars, no trailing punctuation, no markdown). Blank line. Then the article body.
-   - Quora answer, Wikipedia edit: no title line — start directly with the content.
-4. Write the full content body.
-
-⚠ OUTPUT THE CONTENT ONLY. Do not include any analysis, commentary, explanation, or notes about what the content does or why you wrote it. No separators followed by analysis sections. The output must be exactly what would be published — nothing more."""
-
-
-# ── Claude caller ─────────────────────────────────────────────────────────────
-
-async def _call_claude(
-    prompt: str,
-    max_tokens: int = 2500,
-    model: str = "claude-sonnet-4-6",
-) -> str:
-    api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise ValueError(
-            "ANTHROPIC_API_KEY is not configured. "
-            "Add your key in Settings to enable draft generation."
-        )
-    import anthropic
-    client = anthropic.AsyncAnthropic(api_key=api_key)
-    response = await client.messages.create(
-        model=model,
-        max_tokens=max_tokens,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    return response.content[0].text if response.content else ""
-
-
-# ── Post-processing ───────────────────────────────────────────────────────────
-
-import re as _re2
-
-_HEDGING_RE = _re2.compile(
-    # Compound forms must come before their standalone components so the full
-    # phrase is consumed rather than leaving "More" or "Even more" dangling.
-    r"\b(even more importantly,?|most importantly,?|more importantly,?|"
-    r"even more notably,?|most notably,?|more notably,?|"
-    r"it['']s worth noting|it['']s important to (note|mention)|notably,?|importantly,?|"
-    r"it should be noted|it['']s important to note|one thing to note|it bears mentioning|"
-    r"needless to say|of course,?|additionally,|furthermore,|moreover,|"
-    r"honestly,?|straightforward(ly)?,?|genuinely,?|delve into|dive into|unpack,?|"
-    r"let['']s explore|the bottom line is|the bottom line:|at the end of the day,?)\s*",
-    _re2.IGNORECASE,
-)
-
-# Matches lines that are internal analysis notes the LLM sometimes appends
-_ANALYSIS_SECTION_RE = _re2.compile(
-    r"\n[\-\*_]{3,}\n.*?(analysis of missing angle|what this (reply|post|content) (does|fills|addresses)|"
-    r"current (narrative|ai response)|missing angle|this (post|reply|answer|draft) (fills|addresses|explains)|"
-    r"grounding theory|why this (works|matters|fills))",
-    _re2.IGNORECASE | _re2.DOTALL,
-)
-
-# Match a separator line followed by an all-caps or bold analysis header
-_ANALYSIS_HEADER_RE = _re2.compile(
-    r"(\n[\-\*_]{3,}\n|\n{2,})\*{0,2}(ANALYSIS OF MISSING ANGLE|MISSING ANGLE|WHAT THIS (POST|REPLY|CONTENT|DRAFT) (DOES|FILLS|ADDRESSES)|NOTE TO EDITOR)\*{0,2}[:\s].*",
-    _re2.IGNORECASE | _re2.DOTALL,
-)
-
-
-def _post_process(text: str) -> str:
-    """
-    Strip em dashes, AI hedging phrases, markdown headers, and internal analysis
-    notes from generated content. Em dashes (—) are replaced with a comma + space.
-    """
-    if not text:
-        return text
-
-    # Strip any internal analysis section the LLM appended after the actual content
-    processed = _ANALYSIS_HEADER_RE.sub("", text)
-    processed = _ANALYSIS_SECTION_RE.sub("", processed)
-
-    # Strip markdown headers (## Heading, ### Heading) — not appropriate in any platform
-    processed = _re2.sub(r"^#{1,6}\s+(.+)$", r"\1", processed, flags=_re2.MULTILINE)
-
-    # Replace em dash used as a separator: "word — word" → "word, word"
-    processed = _re2.sub(r"\s*—\s*", ", ", processed)
-
-    # Remove hedging phrases (they're filler, replace with nothing)
-    processed = _HEDGING_RE.sub("", processed)
-
-    # Clean up double spaces or leading comma artifacts
-    processed = _re2.sub(r"  +", " ", processed)
-    processed = _re2.sub(r"^,\s*", "", processed, flags=_re2.MULTILINE)
-    processed = processed.strip()
-
-    return processed
+    return estimate_visibility_impact(gap_score, visibility_pct, recent_posts)
 
 
 # ── Draft creation helpers ────────────────────────────────────────────────────
-
-def _split_title_body(raw_text: str, platform: str) -> tuple[Optional[str], str]:
-    """
-    Extract title from the first line for Reddit and Medium.
-    The prompt instructs Claude to separate title from body with a blank line.
-    Strips markdown bold (**) and 'Title:' prefix if Claude adds them anyway.
-    """
-    title_platforms = {"reddit", "medium"}
-    text = raw_text.strip()
-    if platform not in title_platforms:
-        return None, text
-
-    # Split on first blank line so we cleanly separate title from body
-    # when Claude uses the blank-line-separated format.
-    if "\n\n" in text:
-        first_block, rest = text.split("\n\n", 1)
-        # Title block must be a single line (no internal newlines)
-        if "\n" not in first_block.strip():
-            candidate = first_block.strip()
-            candidate = candidate.lstrip("#").strip().strip("*").strip()
-            if candidate.lower().startswith("title:"):
-                candidate = candidate[len("title:"):].strip()
-            if 5 < len(candidate) <= 150 and not candidate.endswith((".","?")):
-                return candidate, rest.strip()
-
-    # Fallback: try first newline only
-    lines = text.split("\n", 1)
-    first = lines[0].strip()
-    first = first.lstrip("#").strip().strip("*").strip()
-    if first.lower().startswith("title:"):
-        first = first[len("title:"):].strip()
-    if 5 < len(first) <= 150 and not first.endswith((".","?")):
-        body = lines[1].strip() if len(lines) > 1 else text
-        return first, body
-    return None, text
-
 
 async def _store_draft(
     db: AsyncSession,
@@ -1043,7 +483,7 @@ async def generate_gap_draft(
                 "Add one in your brand settings."
             )
         publications = await _load_publications(db, brand_id)
-        wiki_prompt = _build_wikipedia_prompt(
+        wiki_prompt = build_wikipedia_prompt(
             brand_name=brand.name,
             prompt_text=prompt.text,
             profile_context=profile_context,
@@ -1051,8 +491,8 @@ async def generate_gap_draft(
             publications=publications,
             website_url=brand.website_url or None,
         )
-        raw_text = await _call_claude(wiki_prompt, max_tokens=900)
-        article_title, article_url, section, insert_location, wiki_text = _parse_wikipedia_draft(raw_text)
+        raw_text = await call_claude(wiki_prompt, max_tokens=900)
+        article_title, article_url, section, insert_location, wiki_text = parse_wikipedia_draft(raw_text)
 
         # Append section anchor to URL so the link jumps to the right section
         if article_url and section:
@@ -1129,7 +569,7 @@ async def generate_gap_draft(
     # For restricted subreddits, brand name must NOT appear — skip mention retry
     _reddit_strategy: Optional[str] = None
     if platform == "reddit" and suggested_subreddit:
-        _reddit_strategy = _classify_subreddit(suggested_subreddit)
+        _reddit_strategy = classify_subreddit(suggested_subreddit)
 
     spec = PLATFORM_SPECS[platform]
 
@@ -1195,7 +635,7 @@ async def generate_gap_draft(
                 + (f"\n\n{_sanitize_user_input(custom_brief)}" if custom_brief else "")
             )
 
-    claude_prompt = _build_prompt(
+    claude_prompt = build_prompt(
         brand_name=brand.name,
         platform=platform,
         prompt_text=prompt.text,
@@ -1207,8 +647,8 @@ async def generate_gap_draft(
         existing_drafts_context=existing_drafts_context,
     )
 
-    raw_text = await _call_claude(claude_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform, 2500))
-    raw_text = _post_process(raw_text)
+    raw_text = await call_claude(claude_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform, 2500))
+    raw_text = remove_hedging(raw_text)
 
     # Quality check: brand name must appear in the content.
     # Skip retry for restricted subreddits — the prompt intentionally omits the brand.
@@ -1218,8 +658,8 @@ async def generate_gap_draft(
             + f"\n\n⚠ QUALITY REQUIREMENT: Your previous output did not mention '{brand.name}'."
             f" You MUST include '{brand.name}' naturally at least once in the content body."
         )
-        _retry_raw = await _call_claude(_retry_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform, 2500))
-        _retry_raw = _post_process(_retry_raw)
+        _retry_raw = await call_claude(_retry_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform, 2500))
+        _retry_raw = remove_hedging(_retry_raw)
         if brand.name.lower() in _retry_raw.lower():
             raw_text = _retry_raw
         else:
@@ -1232,7 +672,7 @@ async def generate_gap_draft(
                 f"[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
             )
 
-    title, body = _split_title_body(raw_text, platform)
+    title, body = extract_title_and_body(raw_text, platform)
 
     if platform == "quora" and quora_question_url and quora_question_title:
         # Targeted draft: store URL in brief, title in guidelines_override
@@ -1338,11 +778,11 @@ async def generate_opportunity_draft(
 
     # Subreddit promotion strategy is Reddit-specific
     if opp.platform == "reddit":
-        promo_strategy = _classify_subreddit(opp.subreddit) if opp.subreddit else "cautious"
+        promo_strategy = classify_subreddit(opp.subreddit) if opp.subreddit else "cautious"
         if opp.subreddit:
             opp_context_lines.append(f"Subreddit: r/{opp.subreddit}")
         opp_context_lines.append(
-            _build_subreddit_strategy(opp.subreddit or "this subreddit", brand.name, promo_strategy)
+            build_subreddit_strategy(opp.subreddit or "this subreddit", brand.name, promo_strategy)
         )
 
     opportunity_context = "\n".join(opp_context_lines)
@@ -1351,7 +791,7 @@ async def generate_opportunity_draft(
     if opp.prompt_id:
         response_analysis = await _analyze_responses_for_prompt(db, opp.brand_id, opp.prompt_id)
 
-    claude_prompt = _build_prompt(
+    claude_prompt = build_prompt(
         brand_name=brand.name,
         platform=platform_key,
         prompt_text=prompt_text or opp.thread_title or "brand visibility",
@@ -1367,8 +807,8 @@ async def generate_opportunity_draft(
         "claude-haiku-4-5-20251001" if platform_key == "reddit_reply"
         else "claude-sonnet-4-6"
     )
-    raw_text = await _call_claude(claude_prompt, max_tokens=max_tokens, model=_opp_model)
-    raw_text = _post_process(raw_text)
+    raw_text = await call_claude(claude_prompt, max_tokens=max_tokens, model=_opp_model)
+    raw_text = remove_hedging(raw_text)
 
     # Quality check: brand name must appear.
     # Skip for restricted subreddits — the prompt intentionally avoids direct brand mentions.
@@ -1378,8 +818,8 @@ async def generate_opportunity_draft(
             + f"\n\n⚠ QUALITY REQUIREMENT: Your previous output did not mention '{brand.name}'."
             f" You MUST include '{brand.name}' naturally at least once in the content."
         )
-        _retry_raw = await _call_claude(_retry_prompt, max_tokens=max_tokens, model=_opp_model)
-        _retry_raw = _post_process(_retry_raw)
+        _retry_raw = await call_claude(_retry_prompt, max_tokens=max_tokens, model=_opp_model)
+        _retry_raw = remove_hedging(_retry_raw)
         if brand.name.lower() in _retry_raw.lower():
             raw_text = _retry_raw
         else:
@@ -1389,7 +829,7 @@ async def generate_opportunity_draft(
             )
             raw_text = f"[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
 
-    _, body = _split_title_body(raw_text, platform_key)
+    _, body = extract_title_and_body(raw_text, platform_key)
 
     estimated_impact = await _estimate_impact(
         db, opp.brand_id, opp.prompt_id or 0, opp.platform

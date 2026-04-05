@@ -155,10 +155,10 @@ function isPromoRestricted(subreddit: string): boolean {
   return RESTRICTED_NAME_SIGNALS.some((kw) => sub.includes(kw));
 }
 
-/** Extract subreddit name from opportunity draft content_brief. */
+/** Extract subreddit name from draft content_brief (opportunity or standalone format). */
 function extractSubreddit(contentBrief: string | null | undefined): string | null {
   if (!contentBrief) return null;
-  const m = contentBrief.match(/\bin r\/([A-Za-z0-9_]+)/i);
+  const m = contentBrief.match(/(?:^|\bin )r\/([A-Za-z0-9_]+)/i);
   return m ? m[1] : null;
 }
 

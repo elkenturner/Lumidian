@@ -1,51 +1,19 @@
 'use client';
 
 import { ModelScore } from '@/lib/api';
+import { getModelConfig as getModelConfigShared } from '@/lib/constants/models';
 
 interface ModelBreakdownProps {
   modelScores: ModelScore[];
 }
 
-const MODEL_CONFIG: Record<
-  string,
-  { label: string; color: string; bgColor: string; letter: string }
-> = {
-  chatgpt: {
-    label: 'ChatGPT',
-    color: 'var(--color-chatgpt)',
-    bgColor: 'var(--color-chatgpt-muted)',
-    letter: 'G',
-  },
-  claude: {
-    label: 'Claude',
-    color: 'var(--color-claude)',
-    bgColor: 'var(--color-claude-muted)',
-    letter: 'C',
-  },
-  perplexity: {
-    label: 'Perplexity',
-    color: 'var(--color-perplexity)',
-    bgColor: 'var(--color-perplexity-muted)',
-    letter: 'P',
-  },
-  gemini: {
-    label: 'Gemini',
-    color: 'var(--color-gemini)',
-    bgColor: 'var(--color-gemini-muted)',
-    letter: 'G',
-  },
-};
-
 function getModelConfig(model: string) {
-  const key = model.toLowerCase().replace(/[-_\s]/g, '');
-  for (const [k, v] of Object.entries(MODEL_CONFIG)) {
-    if (key.includes(k)) return v;
-  }
+  const cfg = getModelConfigShared(model);
   return {
-    label: model,
-    color: 'var(--text-muted)',
-    bgColor: 'rgba(99,102,241,0.10)',
-    letter: model.charAt(0).toUpperCase(),
+    label: cfg.label,
+    color: cfg.color,
+    bgColor: cfg.mutedBg,
+    letter: cfg.letter,
   };
 }
 

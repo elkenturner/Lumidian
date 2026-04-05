@@ -32,26 +32,19 @@ import {
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
 import { useBrand } from '@/contexts/BrandContext';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MODEL_ORDER, MODEL_CONFIG as MODEL_CONFIG_SHARED, getModelConfig } from '@/lib/constants/models';
+import { parseUTCISO } from '@/lib/utils/formatting';
 
-const parseUTCISO = (s: string) => parseISO(s.endsWith('Z') ? s : s + 'Z');
-
-const MODEL_ORDER = ['chatgpt', 'claude', 'perplexity', 'gemini'];
-const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  chatgpt:    { label: 'ChatGPT',    bg: 'var(--color-chatgpt-muted)', text: 'var(--color-chatgpt)' },
-  claude:     { label: 'Claude',     bg: 'var(--color-claude-muted)', text: 'var(--color-claude)' },
-  perplexity: { label: 'Perplexity', bg: 'var(--color-perplexity-muted)', text: 'var(--color-perplexity)' },
-  gemini:     { label: 'Gemini',     bg: 'var(--color-gemini-muted)', text: 'var(--color-gemini)' },
-};
+const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
+  Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.mutedBg, text: v.color }])
+);
 
 function getModelCfg(model: string) {
-  const key = model.toLowerCase().replace(/[-_\s]/g, '');
-  for (const [k, v] of Object.entries(MODEL_CONFIG)) {
-    if (key.includes(k)) return { ...v, key: k };
-  }
-  return { label: model, bg: 'var(--bg-card)', text: 'var(--text-secondary)', key: model };
+  const cfg = getModelConfig(model);
+  return { label: cfg.label, bg: cfg.mutedBg, text: cfg.color, key: cfg.key };
 }
 
 function stripMarkdown(text: string): string {
@@ -117,8 +110,6 @@ function extractGapMentions(group: PromptGroup, competitorNames: string[]): stri
   if (top.length === 2) return `${top[0]} and ${top[1]} are mentioned instead.`;
   return `${top[0]}, ${top[1]}, and ${top[2]} are mentioned instead.`;
 }
-
-const MODEL_ORDER_REPORT = ['chatgpt', 'claude', 'perplexity', 'gemini'];
 
 type SortBy = 'visibility' | 'alpha' | 'change';
 
@@ -682,7 +673,7 @@ export default function ReportsPage() {
                 </div>
                 {/* Model filter toggle */}
                 <div className="flex items-center gap-1">
-                  {['all', ...MODEL_ORDER_REPORT].map((mk) => {
+                  {['all', ...MODEL_ORDER].map((mk) => {
                     const cfg = mk === 'all' ? null : getModelCfg(mk);
                     return (
                       <button

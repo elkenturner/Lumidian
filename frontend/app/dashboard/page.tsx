@@ -18,6 +18,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import BrandAvatar from '@/components/BrandAvatar';
+import { logError } from '@/lib/utils/errors';
 import {
   getBrand,
   getOverview,
@@ -71,23 +72,17 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
+import { MODEL_ORDER, MODEL_CONFIG as MODEL_CONFIG_SHARED, getModelConfig } from '@/lib/constants/models';
+import { parseUTCISO } from '@/lib/utils/formatting';
 
-const parseUTCISO = (s: string) => parseISO(s.endsWith('Z') ? s : s + 'Z');
-const MODEL_ORDER = ['chatgpt', 'claude', 'perplexity', 'gemini'];
-const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  chatgpt:    { label: 'ChatGPT',    bg: 'var(--color-chatgpt-muted)',   text: 'var(--color-chatgpt)' },
-  claude:     { label: 'Claude',     bg: 'var(--color-claude-muted)',    text: 'var(--color-claude)' },
-  perplexity: { label: 'Perplexity', bg: 'var(--color-perplexity-muted)', text: 'var(--color-perplexity)' },
-  gemini:     { label: 'Gemini',     bg: 'var(--color-gemini-muted)',    text: 'var(--color-gemini)' },
-};
+const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
+  Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.mutedBg, text: v.color }])
+);
 
 function getModelCfg(model: string) {
-  const key = model.toLowerCase().replace(/[-_\s]/g, '');
-  for (const [k, v] of Object.entries(MODEL_CONFIG)) {
-    if (key.includes(k)) return { ...v, key: k };
-  }
-  return { label: model, bg: 'var(--bg-card)', text: 'var(--text-secondary)', key: model };
+  const cfg = getModelConfig(model);
+  return { label: cfg.label, bg: cfg.mutedBg, text: cfg.color, key: cfg.key };
 }
 
 function stripMarkdown(text: string): string {
@@ -422,8 +417,8 @@ export default function DashboardPage() {
   // Fetch billing status and usage on mount (non-admin only)
   useEffect(() => {
     if (!user || user.is_admin) return;
-    getBillingStatus().then(setBillingStatus).catch(() => {});
-    getBillingUsage().then(setUsage).catch(() => {});
+    getBillingStatus().then(setBillingStatus).catch((err) => logError(err, 'Dashboard: fetch billing status'));
+    getBillingUsage().then(setUsage).catch((err) => logError(err, 'Dashboard: fetch billing usage'));
   }, [user]);
 
   // If ?brandId=X is in the URL (new-brand onboarding), override the active brand
@@ -461,10 +456,10 @@ export default function DashboardPage() {
         getTrends(brandId),
         getDashboardAnalytics(brandId),
         runsPromise,
-        getBrand(brandId).catch(() => null),
-        getBrandProfile(brandId).catch(() => null),
-        getCompetitors(brandId).catch(() => []),
-        responsesPromise.catch(() => []),
+        getBrand(brandId).catch((err) => { logError(err, 'Dashboard: fetch brand detail'); return null; }),
+        getBrandProfile(brandId).catch((err) => { logError(err, 'Dashboard: fetch brand profile'); return null; }),
+        getCompetitors(brandId).catch((err) => { logError(err, 'Dashboard: fetch competitors'); return []; }),
+        responsesPromise.catch((err) => { logError(err, 'Dashboard: fetch responses'); return []; }),
       ]);
 
       // Bail out if the user has already switched to a different brand
@@ -478,7 +473,7 @@ export default function DashboardPage() {
       setCompetitors(Array.isArray(comps) ? comps : []);
       setLoadingAnalytics(false);
       setResponses(Array.isArray(resps) ? resps.filter((r) => r.response_text) : []);
-      getDrafts(brandId, undefined, 'posted').then((d) => setPublishedCount(d.length)).catch(() => {});
+      getDrafts(brandId, undefined, 'posted').then((d) => setPublishedCount(d.length)).catch((err) => logError(err, 'Dashboard: fetch posted drafts count'));
     } catch {
       if (signal?.aborted) return;
       setLoadingAnalytics(false);
@@ -605,7 +600,7 @@ export default function DashboardPage() {
                 await generateNow(selectedBrandId, 20);
               } catch { /* non-fatal */ }
               // Fire-and-forget Reddit scan
-              triggerScan(selectedBrandId).catch(() => {});
+              triggerScan(selectedBrandId).catch((err) => logError(err, 'Dashboard: trigger Reddit scan'));
               setNewBrandStep('done');
               setTimeout(() => setNewBrandMode(false), 10000);
             } else if (newBrandMode) {
@@ -646,7 +641,7 @@ export default function DashboardPage() {
       const result = await triggerRun(selectedBrandId);
       setActiveRunId(result.run_id);
       // Refresh usage after a successful run
-      getBillingUsage().then(setUsage).catch(() => {});
+      getBillingUsage().then(setUsage).catch((err) => logError(err, 'Dashboard: refresh billing usage after run'));
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } } };
       const httpStatus = e?.response?.status;

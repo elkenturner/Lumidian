@@ -13,36 +13,35 @@ POST /api/auth/google              — (legacy) exchange Google ID token for ses
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
+import secrets
 import time
 import urllib.parse
 from collections import defaultdict
-from datetime import datetime, timezone, timedelta
-from typing import Annotated, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 import bcrypt
 import httpx
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import secrets
-import logging
-
 from app.database import get_db
-from app.dependencies import JWT_SECRET, JWT_ALGORITHM, get_current_user, AllowUnverifiedUser
-from app.models import User, PasswordResetToken, utcnow
+from app.dependencies import JWT_ALGORITHM, JWT_SECRET, AllowUnverifiedUser, get_current_user
+from app.models import PasswordResetToken, User
 
 logger = logging.getLogger(__name__)
 
 _SAFE_PATH_RE = re.compile(r'^/[a-zA-Z0-9/_\-?=&%#.]*$')
 
 
-def _safe_redirect_path(state: Optional[str]) -> str:
+def _safe_redirect_path(state: str | None) -> str:
     """Validate an OAuth state parameter is a safe internal path.
     Rejects anything with double-slash, backslash, or non-path characters."""
     if not state:
@@ -110,13 +109,13 @@ def verify_password(password: str, hashed: str) -> bool:
 
 COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 
-from app.routers.billing import TIER_LIMITS, BRAND_LIMITS as BRAND_TYPE_LIMITS  # noqa: E402 — single source of truth
+from app.routers.billing import TIER_LIMITS  # noqa: E402 — single source of truth
 
 
 def create_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id),
-        "exp": datetime.now(timezone.utc) + timedelta(days=7),
+        "exp": datetime.now(UTC) + timedelta(days=7),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -169,7 +168,7 @@ def user_to_dict(user: User) -> dict:
 class RegisterRequest(BaseModel):
     email: str
     password: str
-    name: Optional[str] = None
+    name: str | None = None
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -185,7 +184,7 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
 
     verification_code = f"{secrets.randbelow(1_000_000):06d}"
     code_hash = hash_password(verification_code)
-    code_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=24)
+    code_expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=24)
 
     password_hash = hash_password(request.password)
     user = User(
@@ -207,7 +206,7 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     from app.services.analytics_service import log_event
     await log_event("user_registered", {"plan": user.subscription_tier}, user_id=user.id)
 
-    from app.services.email_service import send_email_verification, send_email_background
+    from app.services.email_service import send_email_background, send_email_verification
     send_email_background(send_email_verification, email=user.email, name=user.name, code=verification_code)
 
     return user_to_dict(user)
@@ -225,7 +224,7 @@ def create_challenge_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id),
         "scope": "2fa_challenge",
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=5),
+        "exp": datetime.now(UTC) + timedelta(minutes=5),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -267,8 +266,9 @@ async def logout(response: Response):
 
 @router.get("/me")
 async def get_me(user: AllowUnverifiedUser, db: DbDep):
-    from app.models import TeamMember
     from sqlalchemy import select as sa_select
+
+    from app.models import TeamMember
 
     data = user_to_dict(user)
 
@@ -311,8 +311,8 @@ async def google_auth(request: GoogleAuthRequest, response: Response, db: DbDep)
         )
 
     try:
-        from google.oauth2 import id_token as google_id_token
         from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token as google_id_token
         id_info = google_id_token.verify_oauth2_token(
             request.id_token,
             google_requests.Request(),
@@ -390,9 +390,9 @@ async def google_auth_url(redirect_to: str = "/dashboard"):
 async def google_auth_callback(
     request: Request,
     db: DbDep,
-    code: Optional[str] = None,
-    state: Optional[str] = None,
-    error: Optional[str] = None,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
 ):
     """
     Google redirects here after the user authenticates.
@@ -448,8 +448,8 @@ async def google_auth_callback(
 
     # Verify and decode the id_token
     try:
-        from google.oauth2 import id_token as google_id_token
         from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token as google_id_token
         id_info = google_id_token.verify_oauth2_token(
             id_token_str,
             google_requests.Request(),
@@ -545,7 +545,7 @@ async def forgot_password(request: ForgotPasswordRequest, db: DbDep):
 
         token_value = secrets.token_urlsafe(48)
         token_hash = hash_password(token_value)  # store bcrypt hash, not raw token
-        expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=1)
+        expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=1)
         reset_token = PasswordResetToken(
             user_id=user.id,
             token=token_hash,   # hashed
@@ -557,7 +557,7 @@ async def forgot_password(request: ForgotPasswordRequest, db: DbDep):
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         reset_link = f"{frontend_url}/reset-password?token={token_value}"  # raw token in URL
 
-        from app.services.email_service import send_password_reset_email, send_email_background
+        from app.services.email_service import send_email_background, send_password_reset_email
         send_email_background(send_password_reset_email, email=user.email, name=user.name, reset_link=reset_link)
 
     return {"message": "If that email is registered, a reset link has been sent."}
@@ -581,7 +581,7 @@ async def reset_password(request: ResetPasswordRequest, http_req: Request, db: D
         )
 
     # Tokens are stored as bcrypt hashes — find all unexpired, unused tokens and verify
-    now_lookup = datetime.now(timezone.utc).replace(tzinfo=None)
+    now_lookup = datetime.now(UTC).replace(tzinfo=None)
     candidates_result = await db.execute(
         select(PasswordResetToken).where(
             PasswordResetToken.used == False,
@@ -635,7 +635,7 @@ async def verify_email(
             detail="No pending verification. Please resend the code.",
         )
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     if current_user.email_verification_expires_at < now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -669,13 +669,13 @@ async def resend_verification(
 
     verification_code = f"{secrets.randbelow(1_000_000):06d}"
     code_hash = hash_password(verification_code)
-    code_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=24)
+    code_expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=24)
 
     current_user.email_verification_code = code_hash
     current_user.email_verification_expires_at = code_expires_at
     await db.commit()
 
-    from app.services.email_service import send_email_verification, send_email_background
+    from app.services.email_service import send_email_background, send_email_verification
     send_email_background(
         send_email_verification,
         email=current_user.email,
@@ -735,10 +735,11 @@ async def setup_2fa(
     2FA is NOT enabled yet — the user must confirm with /2fa/enable.
     """
     _rate_check(str(current_user.id), _totp_setup_attempts, _MAX_TOTP_SETUP)
+    import base64
+    import io
+
     import pyotp
     import qrcode
-    import io
-    import base64
 
     secret = pyotp.random_base32()
     totp = pyotp.TOTP(secret)

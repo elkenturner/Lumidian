@@ -8,10 +8,11 @@ Tests for authentication endpoints:
   Password length enforcement
 """
 import logging
-import pytest
-import httpx
-from tests.conftest import register_user, login_user, register_and_login
 
+import httpx
+import pytest
+
+from tests.conftest import register_and_login, register_user
 
 pytestmark = pytest.mark.asyncio
 
@@ -159,8 +160,9 @@ async def test_invalid_token_rejected(client: httpx.AsyncClient):
 
 async def test_tampered_token_rejected(client: httpx.AsyncClient):
     """A JWT signed with a different secret should be rejected."""
+    from datetime import datetime, timedelta, timezone
+
     import jwt as pyjwt
-    from datetime import datetime, timezone, timedelta
 
     fake_token = pyjwt.encode(
         {"sub": "999", "exp": datetime.now(timezone.utc) + timedelta(days=1)},
@@ -193,6 +195,8 @@ async def test_failed_login_is_logged(client, caplog):
 
 # ── Task 3: Google OAuth Open Redirect Fix ────────────────────────────────────
 
+from datetime import UTC
+
 from app.routers.auth import _safe_redirect_path
 
 
@@ -223,9 +227,10 @@ def test_safe_redirect_path_handles_none():
 
 async def test_totp_setup_rate_limited(client):
     """2FA setup must be rate-limited."""
+    from sqlalchemy import text
+
     from app.routers.auth import _totp_setup_attempts
     from tests.conftest import AsyncSessionLocal
-    from sqlalchemy import text
     _totp_setup_attempts.clear()
 
     email = "totp_rate@example.com"
@@ -275,8 +280,9 @@ async def test_csrf_allows_no_origin_header(client):
 @pytest.mark.asyncio
 async def test_password_reset_token_stored_as_hash(client, db_session):
     """Reset token stored in DB must be a bcrypt hash, not the raw token."""
-    from app.models import PasswordResetToken
     from sqlalchemy import select as sa_select
+
+    from app.models import PasswordResetToken
 
     # Register a user
     await client.post("/api/auth/register", json={
@@ -298,8 +304,10 @@ async def test_password_reset_token_stored_as_hash(client, db_session):
 async def test_password_reset_end_to_end(client, db_session):
     """Full reset flow: request reset, redeem hashed token, verify new password works."""
     from unittest.mock import patch
-    from app.models import PasswordResetToken
+
     from sqlalchemy import select as sa_select
+
+    from app.models import PasswordResetToken
 
     # Register user
     await client.post("/api/auth/register", json={
@@ -496,6 +504,7 @@ async def test_unverified_user_can_call_me(client: httpx.AsyncClient):
 async def test_verify_email_with_valid_code(client: httpx.AsyncClient, db_session):
     """Correct 6-digit code marks user as verified."""
     from sqlalchemy import text
+
     from app.routers.auth import hash_password
 
     email = "verify_ok@example.com"
@@ -504,8 +513,8 @@ async def test_verify_email_with_valid_code(client: httpx.AsyncClient, db_sessio
     # Reset the code to a known value directly via DB so we can submit it.
     known_code = "123456"
     code_hash = hash_password(known_code)
-    from datetime import datetime, timezone, timedelta
-    expires = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(hours=24)
+    from datetime import datetime, timedelta
+    expires = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=24)
     await db_session.execute(
         text("UPDATE users SET email_verification_code = :h, email_verification_expires_at = :e WHERE email = :email"),
         {"h": code_hash, "e": expires, "email": email},

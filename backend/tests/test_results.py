@@ -7,12 +7,14 @@ Tests for:
 """
 from __future__ import annotations
 
-import pytest
-import httpx
-from tests.conftest import register_and_login, create_brand
-from app.database import AsyncSessionLocal
-from app.models import TrackingRun, QueryResult, RunModelScore
+from datetime import UTC
 
+import httpx
+import pytest
+
+from app.database import AsyncSessionLocal
+from app.models import QueryResult, RunModelScore, TrackingRun
+from tests.conftest import create_brand, register_and_login
 
 pytestmark = pytest.mark.asyncio
 
@@ -28,7 +30,7 @@ async def _insert_completed_run(
 ) -> int:
     """Insert a completed TrackingRun with one QueryResult and one RunModelScore.
     Returns the run id."""
-    from datetime import datetime, timezone
+    from datetime import datetime
     async with AsyncSessionLocal() as db:
         run = TrackingRun(
             brand_id=brand_id,
@@ -38,8 +40,8 @@ async def _insert_completed_run(
             total_queries=1,
             total_mentions=1,
             has_content_influence=False,
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            completed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            completed_at=datetime.now(UTC).replace(tzinfo=None),
         )
         db.add(run)
         await db.flush()

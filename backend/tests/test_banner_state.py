@@ -1,11 +1,11 @@
 """Tests for banner state management during manual opportunity scans."""
 import asyncio
-import pytest
-import httpx
 from unittest.mock import patch
 
-from tests.conftest import register_and_login, create_brand
+import httpx
+import pytest
 
+from tests.conftest import create_brand, register_and_login
 
 pytestmark = pytest.mark.asyncio
 

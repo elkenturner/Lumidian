@@ -1,10 +1,11 @@
 """Tests for first-run detection and onboarding pipeline."""
-import pytest
+from datetime import UTC
+from unittest.mock import AsyncMock, patch
+
 import httpx
-from unittest.mock import patch, AsyncMock
+import pytest
 
-from tests.conftest import register_and_login, create_brand
-
+from tests.conftest import create_brand, register_and_login
 
 pytestmark = pytest.mark.asyncio
 
@@ -42,15 +43,16 @@ async def test_second_run_is_manual_not_onboarding(client: httpx.AsyncClient):
     brand_id = brand["id"]
 
     # Create a completed run in the DB to simulate first run already happened
+    from datetime import datetime
+
     from app.database import AsyncSessionLocal
     from app.models import TrackingRun
-    from datetime import datetime, timezone
     async with AsyncSessionLocal() as db:
         existing_run = TrackingRun(
             brand_id=brand_id,
             status="completed",
             run_type="onboarding",
-            completed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            completed_at=datetime.now(UTC).replace(tzinfo=None),
         )
         db.add(existing_run)
         await db.commit()
@@ -87,14 +89,15 @@ async def test_onboarding_pipeline_fires_after_first_run_completes(client: httpx
         run_id = run_resp.json()["run_id"]
 
     # Mark the run as completed with run_type=onboarding in DB
+    from datetime import datetime
+
     from app.database import AsyncSessionLocal
     from app.models import TrackingRun
-    from datetime import datetime, timezone
     async with AsyncSessionLocal() as db:
         run = await db.get(TrackingRun, run_id)
         assert run.run_type == "onboarding"
         run.status = "completed"
-        run.completed_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        run.completed_at = datetime.now(UTC).replace(tzinfo=None)
         await db.commit()
 
     # Now call _execute_run_with_id directly and assert _onboarding_post_process is triggered
@@ -120,8 +123,9 @@ async def test_onboarding_pipeline_fires_after_first_run_completes(client: httpx
             run.completed_at = None
             await db.commit()
 
-        from app.routers.tracking import _execute_run_with_id
         import asyncio
+
+        from app.routers.tracking import _execute_run_with_id
 
         # Run in a task context so create_task works
         async def _run():

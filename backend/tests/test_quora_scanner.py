@@ -9,12 +9,12 @@ because search_quora_questions is imported inside scan_brand_opportunities at ca
 """
 from __future__ import annotations
 
-import pytest
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
-from app.services.quora_scanner_service import _parse_serper_date, _score_question
+import pytest
 
+from app.services.quora_scanner_service import _parse_serper_date, _score_question
 
 # ── _parse_serper_date ────────────────────────────────────────────────────────
 
@@ -33,21 +33,21 @@ def test_parse_serper_date_unparseable():
 def test_parse_serper_date_relative_days():
     result = _parse_serper_date("3 days ago")
     assert result is not None
-    expected = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=3)
+    expected = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=3)
     assert abs((result - expected).total_seconds()) < 5
 
 
 def test_parse_serper_date_relative_weeks():
     result = _parse_serper_date("2 weeks ago")
     assert result is not None
-    expected = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(weeks=2)
+    expected = datetime.now(UTC).replace(tzinfo=None) - timedelta(weeks=2)
     assert abs((result - expected).total_seconds()) < 5
 
 
 def test_parse_serper_date_relative_months():
     result = _parse_serper_date("1 month ago")
     assert result is not None
-    expected = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+    expected = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
     assert abs((result - expected).total_seconds()) < 5
 
 
@@ -111,14 +111,14 @@ def test_score_snippet_contributes():
 
 # ── New threshold tests ───────────────────────────────────────────────────────
 
-def test_score_question_two_matches_returns_zero():
-    """Exactly 2 keyword matches now returns 0 (new minimum is 3)."""
+def test_score_question_two_matches_returns_score():
+    """2 keyword matches returns a score (minimum threshold is 2)."""
     score = _score_question(
         title="advisory platform review",
         snippet="short snippet here",
         prompt_text="what is the best reg a+ advisory platform for direct listings and capital raise",
     )
-    assert score == 0.0
+    assert score == 25.0
 
 def test_score_question_three_matches_nonzero():
     """3 keyword matches returns nonzero score."""
@@ -149,10 +149,11 @@ async def test_scan_nonexistent_brand_returns_zero():
 @pytest.mark.asyncio
 async def test_scan_no_prompts_returns_zero():
     """Brand with no prompts → returns 0 without error."""
-    from app.services import quora_scanner_service
+    import secrets
+
     from app.database import AsyncSessionLocal
     from app.models import Brand, User
-    import secrets
+    from app.services import quora_scanner_service
 
     async with AsyncSessionLocal() as db:
         user = User(
@@ -237,10 +238,11 @@ async def test_scan_deduplication(tmp_db):
 @pytest.mark.asyncio
 async def test_scan_clear_existing(tmp_db):
     """clear_existing=True deletes old rows before storing new ones; no duplicates."""
-    from app.services import quora_scanner_service
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models import ContentOpportunity
-    from sqlalchemy import select
+    from app.services import quora_scanner_service
 
     brand_id = await tmp_db.create_brand_with_prompt(
         name="ClearTest",

@@ -1,7 +1,7 @@
 """Tests for scheduler backup integrity check."""
-from pathlib import Path
 import shutil
 import sqlite3
+from pathlib import Path
 
 
 def test_backup_integrity_check_passes_on_valid_db(tmp_path: Path):

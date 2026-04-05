@@ -10,11 +10,7 @@ Covers:
 """
 from __future__ import annotations
 
-import json
-import pytest
-
-from tests.conftest import register_and_login, create_brand
-
+from tests.conftest import create_brand, register_and_login
 
 # ── GET /api/brands/{id}/profile ─────────────────────────────────────────────
 

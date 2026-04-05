@@ -15,7 +15,6 @@ import asyncio
 import logging
 import os
 import time
-from typing import Optional
 
 from dotenv import load_dotenv
 
@@ -74,10 +73,10 @@ def _mentioned(brand_name: str, text: str) -> bool:
 
 
 def _build_result(
-    response_text: Optional[str],
+    response_text: str | None,
     brand_name: str,
     latency_ms: int,
-    error: Optional[str] = None,
+    error: str | None = None,
 ) -> dict:
     mentioned = _mentioned(brand_name, response_text) if response_text else False
     return {

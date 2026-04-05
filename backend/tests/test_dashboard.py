@@ -4,13 +4,14 @@ Tests for:
 """
 from __future__ import annotations
 
-import pytest
-import httpx
-from datetime import datetime, timezone
-from tests.conftest import register_and_login, create_brand
-from app.database import AsyncSessionLocal
-from app.models import TrackingRun, QueryResult, RunModelScore
+from datetime import UTC, datetime
 
+import httpx
+import pytest
+
+from app.database import AsyncSessionLocal
+from app.models import QueryResult, RunModelScore, TrackingRun
+from tests.conftest import create_brand, register_and_login
 
 pytestmark = pytest.mark.asyncio
 
@@ -36,8 +37,8 @@ async def _insert_run_with_result(
             total_queries=1,
             total_mentions=1 if mentioned else 0,
             has_content_influence=False,
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            completed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            completed_at=datetime.now(UTC).replace(tzinfo=None),
         )
         db.add(run)
         await db.flush()

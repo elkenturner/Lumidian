@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ def _parse_serper_date(date_str: str | None) -> datetime | None:
     """
     if not date_str:
         return None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     m = _RELATIVE_RE.match(date_str.strip())
     if m:
@@ -115,10 +115,12 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
     Scan Quora for relevant questions for a single brand.
     Returns the number of new ContentOpportunity rows stored.
     """
+    from sqlalchemy import delete as sql_delete
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
-    from app.models import Brand, Prompt, ContentOpportunity
-    from app.services.quora_search_service import search_quora_questions, extract_keywords, invalidate_cache
-    from sqlalchemy import select, delete as sql_delete
+    from app.models import Brand, ContentOpportunity, Prompt
+    from app.services.quora_search_service import extract_keywords, invalidate_cache, search_quora_questions
 
     logger.info("Quora scanner: brand_id=%d clear_existing=%s", brand_id, clear_existing)
 
@@ -151,7 +153,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
         else:
             # Prune quora opportunities older than 14 days (status=new)
             # Tighter window ensures the rotating slots turn over regularly.
-            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=14)
+            cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=14)
             old_row = await db.execute(
                 select(ContentOpportunity).where(
                     ContentOpportunity.brand_id == brand_id,
@@ -255,9 +257,10 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
 async def scan_all_brands() -> None:
     """Run the Quora scanner for every brand in the database."""
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models import Brand
-    from sqlalchemy import select
 
     logger.info("Quora scanner: starting full sweep")
     async with AsyncSessionLocal() as db:

@@ -1,9 +1,11 @@
 import logging
 import os
-from sqlalchemy import event
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import DeclarativeBase
+from datetime import UTC
+
 from dotenv import load_dotenv
+from sqlalchemy import event
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.orm import DeclarativeBase
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +30,6 @@ engine = create_async_engine(
 # Enable FK constraints for every new SQLite connection (aiosqlite uses the sync
 # driver under the hood, so the sync `connect` event fires reliably).
 if "sqlite" in DATABASE_URL:
-    from sqlalchemy import text as _text
 
     @event.listens_for(engine.sync_engine, "connect")
     def _set_sqlite_pragma(dbapi_conn, _connection_record):
@@ -315,11 +316,13 @@ async def cleanup_stale_runs(max_age_minutes: int = 30):
 
     Called on startup to clear runs that never completed (e.g., server crash).
     """
-    from datetime import datetime, timedelta, timezone
-    from sqlalchemy import update, and_
+    from datetime import datetime, timedelta
+
+    from sqlalchemy import and_, update
+
     from app.models import TrackingRun
 
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=max_age_minutes)
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=max_age_minutes)
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(

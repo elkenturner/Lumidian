@@ -5,11 +5,12 @@ Tests for tracking run endpoints:
   GET  /api/tracking/run/{run_id}/status  — poll status
   Ownership isolation for runs
 """
-import pytest
-import httpx
-from unittest.mock import patch, AsyncMock
-from tests.conftest import register_and_login, create_brand
+from unittest.mock import AsyncMock, patch
 
+import httpx
+import pytest
+
+from tests.conftest import create_brand, register_and_login
 
 pytestmark = pytest.mark.asyncio
 
@@ -122,9 +123,9 @@ async def test_poll_other_users_run(client: httpx.AsyncClient):
 
 async def test_run_status_transitions(client: httpx.AsyncClient):
     """Verify a run can be written as 'completed' and read back correctly."""
+
     from app.database import AsyncSessionLocal
-    from app.models import TrackingRun, Brand, User, Prompt
-    from sqlalchemy import select
+    from app.models import TrackingRun
 
     await register_and_login(client, email="transition@example.com")
     brand = await create_brand(client, name="Transition Brand")

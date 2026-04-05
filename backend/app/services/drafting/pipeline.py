@@ -4,7 +4,6 @@ Post-processing pipeline helpers for the drafting service.
 from __future__ import annotations
 
 import re as _re
-from typing import Optional
 
 # ── Wikipedia output cleaning ─────────────────────────────────────────────────
 
@@ -137,7 +136,7 @@ def remove_hedging(text: str) -> str:
 
 # ── Title / body extraction ───────────────────────────────────────────────────
 
-def extract_title_and_body(raw_text: str, platform: str) -> tuple[Optional[str], str]:
+def extract_title_and_body(raw_text: str, platform: str) -> tuple[str | None, str]:
     """
     Extract title from the first line for Reddit and Medium.
     The prompt instructs Claude to separate title from body with a blank line.

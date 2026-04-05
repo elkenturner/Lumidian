@@ -5,10 +5,9 @@ Tests for _onboarding_post_process:
   - Manages state.generating_brands and state.scanning_brands correctly
   - Does NOT fire for non-onboarding run types
 """
-import asyncio
-import pytest
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, patch
 
+import pytest
 
 pytestmark = pytest.mark.asyncio
 
@@ -16,7 +15,6 @@ pytestmark = pytest.mark.asyncio
 async def test_onboarding_post_process_calls_drafting_then_scanning():
     """_onboarding_post_process: drafts first, then both scanners."""
     from app.services.tracking_service import _onboarding_post_process
-    from app import state
 
     call_order = []
 
@@ -67,8 +65,8 @@ async def test_onboarding_post_process_drafting_kwargs():
 
 async def test_onboarding_post_process_state_cleared_after_drafts():
     """State sets are correctly managed: set before, cleared after each phase."""
-    from app.services.tracking_service import _onboarding_post_process
     from app import state
+    from app.services.tracking_service import _onboarding_post_process
 
     drafting_state_snapshot = {}
     scanning_state_snapshot = {}

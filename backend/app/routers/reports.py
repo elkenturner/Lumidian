@@ -9,17 +9,17 @@ from __future__ import annotations
 
 import io
 import logging
-from datetime import datetime, timezone
-from typing import Annotated, Optional
+from datetime import UTC, datetime
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
-from app.models import Brand, TrackingRun, QueryResult, RunModelScore, Prompt
+from app.models import Prompt, QueryResult, RunModelScore, TrackingRun
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
-from app.utils import normalise_model, MODEL_ORDER, MODEL_LABELS  # noqa: E402
+from app.utils import MODEL_LABELS, MODEL_ORDER, normalise_model  # noqa: E402
 
 
 @router.get("/{brand_id}/export")
@@ -46,7 +46,7 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
     completed_runs: list[TrackingRun] = list(runs_result.scalars().all())
 
     latest_run = completed_runs[-1] if completed_runs else None
-    overall_score: Optional[float] = latest_run.overall_score if latest_run else None
+    overall_score: float | None = latest_run.overall_score if latest_run else None
 
     # Per-model scores for latest run
     model_scores: dict[str, float] = {}
@@ -113,7 +113,7 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
             completed_runs=completed_runs,
             sorted_groups=sorted_groups,
             model_scores=model_scores,
-            generated_at=datetime.now(timezone.utc),
+            generated_at=datetime.now(UTC),
         )
     except Exception as exc:
         logger.exception("PDF generation failed for brand %d: %s", brand_id, exc)
@@ -121,7 +121,7 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
 
     import re
     safe_name = re.sub(r'[^\w\-]', '_', brand.name)
-    date_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    date_str = datetime.now(UTC).strftime("%Y-%m-%d")
     filename = f"{safe_name}_visibility_{date_str}.pdf"
 
     return StreamingResponse(
@@ -135,20 +135,25 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
 
 def _build_pdf(
     brand_name: str,
-    overall_score: Optional[float],
+    overall_score: float | None,
     completed_runs: list,
     sorted_groups: list,
     model_scores: dict[str, float],
     generated_at: datetime,
 ) -> bytes:
     from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
     from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable,
+        HRFlowable,
+        Paragraph,
+        SimpleDocTemplate,
+        Spacer,
+        Table,
+        TableStyle,
     )
-    from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_RIGHT
 
     # Colour palette
     COL_BG        = colors.HexColor("#0a0a0f")
@@ -200,7 +205,7 @@ def _build_pdf(
     story = []
 
     # ── Header ────────────────────────────────────────────────────────────────
-    story.append(Paragraph(f"AI Visibility Report", S_TITLE))
+    story.append(Paragraph("AI Visibility Report", S_TITLE))
     story.append(Paragraph(f"<b>{brand_name}</b>  ·  Generated {generated_at.strftime('%B %d, %Y')}", S_SUB))
     story.append(Spacer(1, 4 * mm))
     story.append(HRFlowable(width="100%", thickness=1, color=COL_BORDER, spaceAfter=6 * mm))

@@ -8,7 +8,6 @@ POST /api/errors/client  — log a frontend error boundary catch
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from fastapi import APIRouter
 from fastapi.responses import Response
@@ -20,10 +19,10 @@ logger = logging.getLogger(__name__)
 
 class ClientErrorReport(BaseModel):
     message: str
-    stack: Optional[str] = None
-    component_stack: Optional[str] = None
-    url: Optional[str] = None
-    user_agent: Optional[str] = None
+    stack: str | None = None
+    component_stack: str | None = None
+    url: str | None = None
+    user_agent: str | None = None
 
 
 @router.post("/client", response_class=Response)

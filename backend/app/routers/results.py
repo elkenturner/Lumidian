@@ -9,8 +9,8 @@ GET /api/results/{brand_id}/responses   — paginated query results (filter by r
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone, timedelta
-from typing import Annotated, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
@@ -19,18 +19,18 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
-from app.models import Brand, TrackingRun, QueryResult, RunModelScore, Prompt, ContentAttribution
-from app.utils import normalise_model, MODEL_ORDER
+from app.models import Brand, ContentAttribution, QueryResult, RunModelScore, TrackingRun
 from app.schemas import (
+    ContentAttributionSummary,
+    ModelScoreResponse,
     OverviewResponse,
+    PaginatedQueryResults,
+    QueryResultResponse,
+    TrackingRunSummary,
     TrendPoint,
     TrendsResponse,
-    TrackingRunSummary,
-    ModelScoreResponse,
-    QueryResultResponse,
-    PaginatedQueryResults,
-    ContentAttributionSummary,
 )
+from app.utils import normalise_model
 
 router = APIRouter(prefix="/results", tags=["results"])
 
@@ -65,7 +65,7 @@ async def get_overview(brand_id: int, db: DbDep, user: CurrentUser):
         .order_by(TrackingRun.completed_at.desc())
         .limit(1)
     )
-    latest_run: Optional[TrackingRun] = run_result.scalar_one_or_none()
+    latest_run: TrackingRun | None = run_result.scalar_one_or_none()
 
     model_breakdown: list[ModelScoreResponse] = []
     if latest_run is not None:
@@ -75,7 +75,7 @@ async def get_overview(brand_id: int, db: DbDep, user: CurrentUser):
     has_content_influence = latest_run.has_content_influence if latest_run else False
 
     # Recent attributions for this brand (last 30 days)
-    thirty_days_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+    thirty_days_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
     attr_result = await db.execute(
         select(ContentAttribution)
         .where(
@@ -171,7 +171,7 @@ async def get_responses(
     brand_id: int,
     db: DbDep,
     user: CurrentUser,
-    run_id: Optional[int] = Query(None, description="Filter by specific tracking run ID"),
+    run_id: int | None = Query(None, description="Filter by specific tracking run ID"),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(20, ge=1, le=500, description="Results per page"),
 ):

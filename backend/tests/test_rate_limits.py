@@ -8,12 +8,13 @@ Rate limit state is in-memory (_rate_store), so we reset it between tests
 by patching check_rate_limit or by directly clearing the store.
 """
 import time
-import pytest
-import httpx
-from unittest.mock import patch, AsyncMock
-from tests.conftest import register_and_login, create_brand
-from app.dependencies import _rate_store, check_rate_limit
+from unittest.mock import AsyncMock, patch
 
+import httpx
+import pytest
+
+from app.dependencies import _rate_store, check_rate_limit
+from tests.conftest import create_brand, register_and_login
 
 pytestmark = pytest.mark.asyncio
 
@@ -64,8 +65,9 @@ async def test_rate_limit_resets_per_user(client: httpx.AsyncClient):
 
 async def test_check_rate_limit_function_directly():
     """Unit test the check_rate_limit helper directly."""
-    from app.dependencies import check_rate_limit, _rate_store
     from fastapi import HTTPException
+
+    from app.dependencies import check_rate_limit
     _reset_rate_store()
 
     user_id = 9999
@@ -83,8 +85,8 @@ async def test_check_rate_limit_function_directly():
 
 async def test_rate_limit_window_resets():
     """After the window expires, the counter resets."""
-    from app.dependencies import check_rate_limit, _rate_store
-    from time import monotonic
+
+    from app.dependencies import _rate_store, check_rate_limit
     _reset_rate_store()
 
     user_id = 8888
@@ -119,8 +121,9 @@ def test_rate_store_prunes_stale_entries():
 
 def test_rate_store_does_not_grow_unbounded():
     """After many distinct users, _rate_store should not retain stale entries."""
-    from app.dependencies import _rate_store, check_rate_limit, _RATE_WINDOW
     import time
+
+    from app.dependencies import _RATE_WINDOW, _rate_store, check_rate_limit
 
     _rate_store.clear()
 
@@ -142,8 +145,9 @@ def test_rate_store_does_not_grow_unbounded():
 
 def test_auth_rate_check_prunes_stale_ips():
     """_rate_check must remove stale entries for inactive IPs, not just empty lists."""
-    from app.routers.auth import _rate_check, _login_attempts, _RATE_WINDOW
     import time
+
+    from app.routers.auth import _RATE_WINDOW, _login_attempts, _rate_check
 
     _login_attempts.clear()
 

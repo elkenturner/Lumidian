@@ -13,20 +13,22 @@ from __future__ import annotations
 import json
 import logging
 import os
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import timedelta
 
-from sqlalchemy import select, func as sqlfunc
+from sqlalchemy import func as sqlfunc
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     Brand,
-    Prompt,
-    TrackingRun,
-    QueryResult,
+    ContentAttribution,
     ContentDraft,
     ContentPost,
-    ContentAttribution,
+    Prompt,
+    QueryResult,
+    TrackingRun,
+)
+from app.models import (
     utcnow as _utcnow,
 )
 
@@ -203,7 +205,7 @@ def _build_claude_prompt(
     target_query: str,
     visibility_score: float,
     guidelines: dict,
-    custom_brief: Optional[str],
+    custom_brief: str | None,
 ) -> str:
     """Build the system+user prompt string sent to Claude for draft generation."""
     rules_text = "\n".join(f"  - {r}" for r in guidelines["rules"])
@@ -269,10 +271,10 @@ async def generate_draft(
     db: AsyncSession,
     brand_id: int,
     platform: str,
-    prompt_id: Optional[int] = None,
-    custom_brief: Optional[str] = None,
-    quora_question_url: Optional[str] = None,
-    quora_question_title: Optional[str] = None,
+    prompt_id: int | None = None,
+    custom_brief: str | None = None,
+    quora_question_url: str | None = None,
+    quora_question_title: str | None = None,
 ) -> ContentDraft:
     """
     Generate a content draft using Claude (claude-haiku-4-5-20251001).
@@ -289,7 +291,7 @@ async def generate_draft(
 
     # Load brand
     brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-    brand: Optional[Brand] = brand_result.scalar_one_or_none()
+    brand: Brand | None = brand_result.scalar_one_or_none()
     if brand is None:
         raise ValueError(f"Brand {brand_id} not found")
 
@@ -298,7 +300,7 @@ async def generate_draft(
         prompt_result = await db.execute(
             select(Prompt).where(Prompt.id == prompt_id, Prompt.brand_id == brand_id)
         )
-        prompt: Optional[Prompt] = prompt_result.scalar_one_or_none()
+        prompt: Prompt | None = prompt_result.scalar_one_or_none()
         if prompt is None:
             raise ValueError(f"Prompt {prompt_id} not found for brand {brand_id}")
     else:
@@ -357,7 +359,7 @@ async def generate_draft(
     generated_text: str = response.content[0].text if response.content else ""
 
     # Extract title from first line if present
-    title: Optional[str] = None
+    title: str | None = None
     content_body = generated_text.strip()
     lines = content_body.split("\n", 1)
     if len(lines) >= 1:
@@ -421,8 +423,8 @@ async def generate_draft(
 async def post_draft(
     db: AsyncSession,
     draft_id: int,
-    post_url: Optional[str] = None,
-    platform_post_id: Optional[str] = None,
+    post_url: str | None = None,
+    platform_post_id: str | None = None,
 ) -> ContentPost:
     """
     Mark a draft as posted and create a ContentPost record.
@@ -434,7 +436,7 @@ async def post_draft(
     draft_result = await db.execute(
         select(ContentDraft).where(ContentDraft.id == draft_id)
     )
-    draft: Optional[ContentDraft] = draft_result.scalar_one_or_none()
+    draft: ContentDraft | None = draft_result.scalar_one_or_none()
     if draft is None:
         raise ValueError(f"ContentDraft {draft_id} not found")
 
@@ -502,7 +504,7 @@ async def calculate_attribution(
 
     # Load the tracking run
     run_result = await db.execute(select(TrackingRun).where(TrackingRun.id == tracking_run_id))
-    run: Optional[TrackingRun] = run_result.scalar_one_or_none()
+    run: TrackingRun | None = run_result.scalar_one_or_none()
     if run is None:
         raise ValueError(f"TrackingRun {tracking_run_id} not found")
 
@@ -534,7 +536,7 @@ async def calculate_attribution(
         draft_result = await db.execute(
             select(ContentDraft).where(ContentDraft.id == post.draft_id)
         )
-        draft: Optional[ContentDraft] = draft_result.scalar_one_or_none()
+        draft: ContentDraft | None = draft_result.scalar_one_or_none()
         if draft is None or draft.prompt_id is None:
             continue
 

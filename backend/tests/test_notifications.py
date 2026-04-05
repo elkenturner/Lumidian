@@ -9,11 +9,9 @@ Covers:
 """
 from __future__ import annotations
 
-import pytest
 from sqlalchemy import text
 
-from tests.conftest import register_and_login, AsyncSessionLocal
-
+from tests.conftest import AsyncSessionLocal, register_and_login
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 

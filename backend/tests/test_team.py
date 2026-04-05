@@ -1,7 +1,7 @@
 """Tests for the team invite flow."""
 import httpx
-import pytest
-from tests.conftest import register_and_login, login_user
+
+from tests.conftest import login_user, register_and_login
 
 
 async def test_invite_team_member_success(client: httpx.AsyncClient):

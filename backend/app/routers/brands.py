@@ -16,35 +16,36 @@ import json as _json
 import logging
 import os as _os
 import re
-from typing import Annotated, Optional
+from typing import Annotated
 
 logger = logging.getLogger(__name__)
 
+from datetime import UTC, datetime, timedelta
+
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import get_current_user, get_brand_for_user, get_data_owner_id, CurrentUser, check_rate_limit
-from app.models import Brand, Prompt, Competitor, TrackingRun, User
-from datetime import datetime, timezone, timedelta
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, get_data_owner_id
+from app.models import Brand, Competitor, Prompt, TrackingRun, User
 from app.schemas import (
     BrandCreate,
-    BrandUpdate,
-    BrandSummary,
     BrandDetail,
+    BrandSummary,
+    BrandUpdate,
     BrandWithStats,
-    PromptCreate,
-    PromptResponse,
-    CompetitorCreate,
-    CompetitorResponse,
     CompetitorAnalysisResponse,
-    OverallSOV,
-    CompetitorPromptResult,
     CompetitorByModel,
+    CompetitorCreate,
+    CompetitorPromptResult,
+    CompetitorResponse,
     FetchWebsiteContextRequest,
     FetchWebsiteContextResponse,
+    OverallSOV,
+    PromptCreate,
+    PromptResponse,
 )
 
 router = APIRouter(prefix="/brands", tags=["brands"])
@@ -60,7 +61,7 @@ def _slugify(name: str) -> str:
     return slug
 
 
-async def _get_brand_or_404(db: AsyncSession, brand_id: int, user: Optional[User] = None) -> Brand:
+async def _get_brand_or_404(db: AsyncSession, brand_id: int, user: User | None = None) -> Brand:
     result = await db.execute(
         select(Brand)
         .where(Brand.id == brand_id)
@@ -260,7 +261,7 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
 
     pitch_expires_at = None
     if payload.brand_type == "pitch":
-        pitch_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) + timedelta(days=30)
+        pitch_expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=30)
 
     from app.routers.billing import PROMPT_LIMITS
     # Set prompt limit based on brand type
@@ -617,6 +618,7 @@ async def fetch_website_context_endpoint(
 
 from pydantic import BaseModel as _BaseModel
 
+
 class _SuggestPreviewReq(_BaseModel):
     name: str
     description: str = ""
@@ -680,8 +682,9 @@ async def refresh_website_context(brand_id: int, db: DbDep, user: CurrentUser):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Brand has no website_url configured",
         )
-    from app.services.jina_service import refresh_brand_website_context
     import asyncio
+
+    from app.services.jina_service import refresh_brand_website_context
     asyncio.create_task(
         refresh_brand_website_context(brand_id),
         name=f"jina-refresh-{brand_id}",
@@ -696,10 +699,10 @@ async def get_competitor_analysis(
     brand_id: int,
     db: DbDep,
     user: CurrentUser,
-    run_id: Optional[int] = None,
+    run_id: int | None = None,
 ):
     """Per-prompt brand vs competitor mention rates with model breakdown."""
-    from app.models import QueryResult, CompetitorMention
+    from app.models import CompetitorMention, QueryResult
 
     brand = await get_brand_for_user(brand_id, db, user)
 
@@ -882,7 +885,8 @@ async def get_content_attribution(
     brand_id: int, db: DbDep, user: CurrentUser
 ):
     """Return draft attribution records showing visibility delta since posting."""
-    from app.models import DraftAttribution, ContentDraft, Prompt as PromptModel
+    from app.models import ContentDraft, DraftAttribution
+    from app.models import Prompt as PromptModel
     from app.schemas import DraftAttributionResponse
 
     await get_brand_for_user(brand_id, db, user)

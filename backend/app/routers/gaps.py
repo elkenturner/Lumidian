@@ -9,15 +9,15 @@ POST /api/gaps/{brand_id}/refresh    — trigger gap analysis on latest complete
 """
 
 import json
-from typing import Annotated, Optional, Dict, List
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
-from app.models import Brand, ContentGap, Prompt, TrackingRun
+from app.models import ContentGap, Prompt, TrackingRun
 from app.schemas import ContentGapResponse
 
 router = APIRouter(prefix="/gaps", tags=["gaps"])
@@ -25,8 +25,8 @@ router = APIRouter(prefix="/gaps", tags=["gaps"])
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 
-def _gap_to_response(gap: ContentGap, prompt_text: Optional[str] = None) -> ContentGapResponse:
-    def _parse(val: Optional[str], default):
+def _gap_to_response(gap: ContentGap, prompt_text: str | None = None) -> ContentGapResponse:
+    def _parse(val: str | None, default):
         if not val:
             return default
         try:
@@ -135,6 +135,7 @@ async def refresh_gaps(brand_id: int, db: DbDep, user: CurrentUser):
         )
 
     import asyncio
+
     from app.services.gap_analysis_service import run_gap_analysis
     asyncio.create_task(run_gap_analysis(brand_id, run.id))
 

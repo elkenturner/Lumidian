@@ -9,13 +9,11 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Optional
+from unittest.mock import AsyncMock, patch
 
+import httpx
 import pytest
 import pytest_asyncio
-import httpx
-from unittest.mock import patch, AsyncMock
-from sqlalchemy.ext.asyncio import AsyncSession
 
 # ── Must come before all app imports ─────────────────────────────────────────
 _db_fd, _db_path = tempfile.mkstemp(suffix=".test.db")
@@ -30,9 +28,8 @@ os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test_placeholder"
 # Prevent auto-seeding admin user during tests (no ADMIN_PASSWORD set)
 
 # App imports after env vars are configured
-from app.database import engine, Base, AsyncSessionLocal, get_db
+from app.database import AsyncSessionLocal, Base, engine
 from app.main import app
-
 
 # ── Database setup ────────────────────────────────────────────────────────────
 
@@ -57,7 +54,7 @@ async def clean_tables():
     # Reset in-memory rate limiters so tests don't affect each other
     from app.dependencies import _rate_store
     _rate_store.clear()
-    from app.routers.auth import _login_attempts, _register_attempts, _totp_setup_attempts, _resend_attempts
+    from app.routers.auth import _login_attempts, _register_attempts, _resend_attempts, _totp_setup_attempts
     _login_attempts.clear()
     _register_attempts.clear()
     _totp_setup_attempts.clear()
@@ -170,7 +167,7 @@ async def register_and_login(
 async def create_brand(
     client: httpx.AsyncClient,
     name: str = "Test Brand",
-    prompts: Optional[list] = None,
+    prompts: list | None = None,
 ) -> dict:
     resp = await client.post(
         "/api/brands",
@@ -189,8 +186,9 @@ class _TmpDb:
     """Minimal async helper for reddit scanner integration tests."""
 
     async def create_brand_with_prompt(self, name: str, prompt: str) -> int:
-        from app.models import Brand, Prompt, User
         import secrets
+
+        from app.models import Brand, Prompt, User
         async with AsyncSessionLocal() as session:
             user = User(
                 email=f"test_{secrets.token_hex(4)}@example.com",

@@ -20,7 +20,7 @@ Routers:
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -33,17 +33,28 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.database import create_tables, run_migrations, cleanup_stale_runs
-from app.scheduler import start_scheduler, stop_scheduler
-from app.routers import brands, tracking, results, content, accounts, dashboard
-from app.routers import brand_profile, gaps, opportunities, settings
-from app.routers import auth as auth_router, billing as billing_router
+from app.database import cleanup_stale_runs, create_tables, run_migrations
+from app.routers import (
+    accounts,
+    brand_profile,
+    brands,
+    content,
+    dashboard,
+    gaps,
+    opportunities,
+    results,
+    settings,
+    tracking,
+)
 from app.routers import analytics as analytics_router
-from app.routers import reports as reports_router
-from app.routers import team as team_router
+from app.routers import auth as auth_router
+from app.routers import billing as billing_router
 from app.routers import errors as errors_router
 from app.routers import notifications as notifications_router
+from app.routers import reports as reports_router
 from app.routers import support as support_router
+from app.routers import team as team_router
+from app.scheduler import start_scheduler, stop_scheduler
 from app.schemas import HealthResponse
 
 logging.basicConfig(
@@ -53,6 +64,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 from app.logging_config import configure_logging
+
 configure_logging()
 
 
@@ -185,5 +197,5 @@ async def health():
     return HealthResponse(
         status="ok",
         version="1.0.0",
-        timestamp=datetime.now(timezone.utc).replace(tzinfo=None),
+        timestamp=datetime.now(UTC).replace(tzinfo=None),
     )

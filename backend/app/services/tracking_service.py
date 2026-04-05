@@ -19,18 +19,16 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
-from datetime import datetime, timezone
-from typing import Optional
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
-from app.models import Brand, Prompt, TrackingRun, QueryResult, RunModelScore, utcnow as _utcnow
-from app.services.llm_service import query_model, SUPPORTED_MODELS, TIER_RUNS
+from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
+from app.models import utcnow as _utcnow
 from app.services.drafting_service import auto_draft_top_gaps
-from app.services.reddit_scanner_service import scan_brand_opportunities as reddit_scan
+from app.services.llm_service import SUPPORTED_MODELS, TIER_RUNS, query_model
 from app.services.quora_scanner_service import scan_brand_opportunities as quora_scan
+from app.services.reddit_scanner_service import scan_brand_opportunities as reddit_scan
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +42,8 @@ def _normalize(text: str) -> str:
 
 def _detect_mention(
     brand_name: str,
-    response_text: Optional[str],
-    error: Optional[str],
+    response_text: str | None,
+    error: str | None,
     model: str,
 ) -> bool:
     if not response_text or error == "api_key_not_configured":
@@ -78,7 +76,7 @@ def _detect_mention(
 async def run_tracking(
     brand_id: int,
     run_type: str = "manual",
-    schedule_slot: Optional[str] = None,
+    schedule_slot: str | None = None,
 ) -> int:
     """
     Execute a complete tracking run for the given brand.
@@ -97,7 +95,7 @@ async def run_tracking(
     async with AsyncSessionLocal() as db:
         # ── 1. Load brand ────────────────────────────────────────────────────
         brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-        brand: Optional[Brand] = brand_result.scalar_one_or_none()
+        brand: Brand | None = brand_result.scalar_one_or_none()
         if brand is None:
             raise ValueError(f"Brand {brand_id} not found")
 
@@ -276,7 +274,8 @@ async def run_tracking(
     # ── 6b. Detect competitor mentions ───────────────────────────────────────
     logger.info("Running competitor mention detection for run %d", run_id)
     try:
-        from app.models import Competitor as CompetitorModel, CompetitorMention
+        from app.models import Competitor as CompetitorModel
+        from app.models import CompetitorMention
 
         async with AsyncSessionLocal() as comp_db:
             comps_result = await comp_db.execute(
@@ -395,7 +394,8 @@ async def run_tracking(
 
     # ── 10. Create in-app notifications ──────────────────────────────────────
     try:
-        from app.models import Notification, Brand as BrandModel
+        from app.models import Brand as BrandModel
+        from app.models import Notification
 
         async with AsyncSessionLocal() as notif_db:
             brand_res = await notif_db.execute(select(BrandModel).where(BrandModel.id == brand_id))

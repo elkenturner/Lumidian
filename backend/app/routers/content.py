@@ -18,25 +18,31 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_active_subscription, require_brand_active
-from app.models import Brand, ContentDraft, ContentPost, ContentAttribution, BrandContentSettings, TrackingRun
+from app.dependencies import (
+    CurrentUser,
+    check_rate_limit,
+    get_brand_for_user,
+    require_active_subscription,
+    require_brand_active,
+)
+from app.models import Brand, BrandContentSettings, ContentAttribution, ContentDraft, TrackingRun, utcnow
 from app.schemas import (
+    BrandContentSettingsSchema,
+    ContentAttributionSchema,
     ContentDraftSchema,
     ContentPostSchema,
-    ContentAttributionSchema,
-    BrandContentSettingsSchema,
     CreateDraftRequest,
-    UpdateDraftRequest,
+    GenerateNowRequest,
     PostDraftRequest,
     UpdateContentSettingsRequest,
-    GenerateNowRequest,
+    UpdateDraftRequest,
 )
 from app.services.content_service import (
     PLATFORM_GUIDELINES,
@@ -44,16 +50,17 @@ from app.services.content_service import (
     post_draft,
 )
 from app.services.drafting_service import (
+    DRAFT_CAP,
     PLATFORM_SPECS,
     auto_draft_top_gaps,
     generate_gap_draft,
 )
-from app.models import utcnow
-from app.services.drafting_service import DRAFT_CAP
 
 SCHEDULED_CAP = 20  # max approved/scheduled drafts queued at once
 
 logger = logging.getLogger(__name__)
+
+from datetime import UTC
 
 from app import state as _state
 
@@ -88,15 +95,17 @@ _WEEKLY_MANUAL_LIMIT_PITCH = 1
 
 
 async def _check_weekly_manual_draft_limit(
-    db: AsyncSession, brand: Brand, subscription_tier: Optional[str] = None
+    db: AsyncSession, brand: Brand, subscription_tier: str | None = None
 ) -> int:
     """
     Enforce per-brand weekly manual draft limits.
     Returns the number of manual draft slots remaining this week.
     Raises HTTP 429 if the limit is already reached.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
+
     from sqlalchemy import func as sqlfunc
+
     from app.routers.billing import WEEKLY_DRAFT_LIMITS
 
     is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
@@ -105,7 +114,7 @@ async def _check_weekly_manual_draft_limit(
     else:
         weekly_limit = WEEKLY_DRAFT_LIMITS.get(subscription_tier or "", 10)
 
-    week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+    week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
     count_result = await db.execute(
         select(sqlfunc.count(ContentDraft.id)).where(
             ContentDraft.brand_id == brand.id,
@@ -176,8 +185,8 @@ async def list_drafts(
     brand_id: int,
     db: DbDep,
     user: CurrentUser,
-    platform: Optional[str] = Query(None, description="Filter by platform"),
-    draft_status: Optional[str] = Query(None, alias="status", description="Filter by status"),
+    platform: str | None = Query(None, description="Filter by platform"),
+    draft_status: str | None = Query(None, alias="status", description="Filter by status"),
     page: int = Query(1, ge=1, description="Page number (1-indexed)"),
     page_size: int = Query(20, ge=1, le=100, description="Results per page"),
 ):
@@ -280,7 +289,7 @@ async def get_draft(draft_id: int, db: DbDep, user: CurrentUser):
 
 async def _create_draft_attribution(db: AsyncSession, draft: ContentDraft) -> None:
     """Record current prompt visibility at time of posting for attribution tracking."""
-    from app.models import DraftAttribution, TrackingRun, QueryResult
+    from app.models import DraftAttribution, QueryResult, TrackingRun
 
     if draft.prompt_id is None:
         return  # No prompt linked — skip attribution
@@ -294,7 +303,7 @@ async def _create_draft_attribution(db: AsyncSession, draft: ContentDraft) -> No
     )
     latest_run = latest_run_result.scalar_one_or_none()
 
-    score_at_posting: Optional[float] = None
+    score_at_posting: float | None = None
     if latest_run:
         # Compute prompt visibility from that run's query results
         qr_result = await db.execute(
@@ -475,12 +484,14 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
     require_brand_active(brand, user)
 
     if not user.is_admin:
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
+
         from sqlalchemy import func as sqlfunc
+
         from app.routers.billing import WEEKLY_DRAFT_LIMITS
         is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
         weekly_limit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else WEEKLY_DRAFT_LIMITS.get(user.subscription_tier or "", 0)
-        week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
         # How many manual drafts were created this week
         used_result = await db.execute(
             select(sqlfunc.count(ContentDraft.id)).where(
@@ -535,6 +546,7 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
     brand_obj = await get_brand_for_user(brand_id, db, user)
 
     from sqlalchemy import func as sqlfunc
+
     from app.models import ContentOpportunity
 
     draft_count_result = await db.execute(
@@ -554,7 +566,6 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
     scheduled_count = scheduled_count_result.scalar_one_or_none() or 0
 
     # Last scan time: most recent ContentOpportunity created_at for this brand
-    from app.models import ContentOpportunity
     last_scan_result = await db.execute(
         select(sqlfunc.max(ContentOpportunity.created_at)).where(
             ContentOpportunity.brand_id == brand_id,
@@ -563,14 +574,15 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
     last_scan_at = last_scan_result.scalar_one_or_none()
 
     # Weekly draft quota for non-admin users
-    weekly_drafts_remaining: Optional[int] = None
-    weekly_drafts_limit: Optional[int] = None
+    weekly_drafts_remaining: int | None = None
+    weekly_drafts_limit: int | None = None
     if not user.is_admin:
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
+
         from app.routers.billing import WEEKLY_DRAFT_LIMITS
         is_pitch = getattr(brand_obj, "brand_type", "standard") == "pitch"
         wlimit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else WEEKLY_DRAFT_LIMITS.get(user.subscription_tier or "", 0)
-        week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
         used_result = await db.execute(
             select(sqlfunc.count(ContentDraft.id)).where(
                 ContentDraft.brand_id == brand_id,
@@ -706,7 +718,7 @@ async def update_brand_settings(
             BrandContentSettings.platform == platform,
         )
     )
-    setting: Optional[BrandContentSettings] = result.scalar_one_or_none()
+    setting: BrandContentSettings | None = result.scalar_one_or_none()
 
     if setting is None:
         setting = BrandContentSettings(brand_id=brand_id, platform=platform)

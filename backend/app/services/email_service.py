@@ -21,10 +21,9 @@ import logging
 import os
 import smtplib
 import ssl
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +73,7 @@ def _send(to: str, subject: str, body: str) -> None:
         logger.info("Email sent to %s — %s", to, subject)
     else:
         # Console fallback for development
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        timestamp = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
         from_display = _FROM or "hello@lumidian.ai"
         logger.info(
             "\n"
@@ -121,7 +120,7 @@ def send_email_background(fn, *args, **kwargs) -> None:
 
 # ── Public email functions ────────────────────────────────────────────────────
 
-def send_email_verification(email: str, name: Optional[str], code: str) -> None:
+def send_email_verification(email: str, name: str | None, code: str) -> None:
     """Sent immediately after a new user registers — 6-digit code to verify email."""
     display = name or email.split("@")[0]
 
@@ -148,7 +147,7 @@ If you didn't create a Lumidian account, you can safely ignore this email.
     )
 
 
-def send_welcome_email(email: str, name: Optional[str]) -> None:
+def send_welcome_email(email: str, name: str | None) -> None:
     """Sent immediately after a new user registers."""
     display = name or email.split("@")[0]
     brand_url = f"{_FRONTEND_URL}/tracker/new"
@@ -189,7 +188,7 @@ If you have questions, just reply to this email.
     )
 
 
-def send_password_reset_email(email: str, name: Optional[str], reset_link: str) -> None:
+def send_password_reset_email(email: str, name: str | None, reset_link: str) -> None:
     """Sent when a user requests a password reset."""
     display = name or email.split("@")[0]
 
@@ -217,7 +216,7 @@ Your password will not change.
 def send_team_invite_email(
     invited_email: str,
     invite_link: str,
-    inviter_name: Optional[str],
+    inviter_name: str | None,
 ) -> None:
     """Sent when a user is invited to join a team workspace."""
     inviter = inviter_name or "A Lumidian user"
@@ -250,7 +249,7 @@ you can register for free at:
 
 def send_pitch_expiry_warning_email(
     email: str,
-    name: Optional[str],
+    name: str | None,
     brand_name: str,
     expires_at: datetime,
 ) -> None:
@@ -289,7 +288,7 @@ If you have questions, just reply to this email.
 
 def send_report_ready_email(
     email: str,
-    name: Optional[str],
+    name: str | None,
     brand_name: str,
     overall_score: float,
     run_id: int,
@@ -326,7 +325,7 @@ Run ID: #{run_id}
 
 
 def send_support_request_email(
-    from_name: Optional[str],
+    from_name: str | None,
     from_email: str,
     subject: str,
     message: str,
@@ -358,7 +357,7 @@ Reply directly to {from_email} to respond.
 
 def send_visibility_alert_email(
     email: str,
-    name: Optional[str],
+    name: str | None,
     brand_name: str,
     current_score: float,
     previous_score: float,

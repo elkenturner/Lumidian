@@ -9,11 +9,9 @@ Covers:
 """
 from __future__ import annotations
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from tests.conftest import register_and_login
-
 
 # ── POST /api/support/contact — success ──────────────────────────────────────
 

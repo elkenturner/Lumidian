@@ -1,7 +1,7 @@
 """Tests for the content gaps router (access control + empty states)."""
 import httpx
-import pytest
-from tests.conftest import register_and_login, create_brand
+
+from tests.conftest import create_brand, register_and_login
 
 
 async def test_get_gaps_empty(client: httpx.AsyncClient):

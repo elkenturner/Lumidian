@@ -5,10 +5,10 @@ Tests for brand CRUD endpoints and multi-tenant ownership isolation:
   GET/POST/DELETE /api/brands/{id}/competitors
   Ownership: user A cannot access user B's brand
 """
-import pytest
 import httpx
-from tests.conftest import register_and_login, create_brand
+import pytest
 
+from tests.conftest import create_brand, register_and_login
 
 pytestmark = pytest.mark.asyncio
 

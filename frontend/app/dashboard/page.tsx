@@ -1022,12 +1022,7 @@ export default function DashboardPage() {
               {/* Brand profile completeness notification */}
               {brandProfile && brandProfile.completion_pct < 100 && (
                 <div
-                  className="mb-4 flex items-center justify-between px-4 py-2"
-                  style={{
-                    background: 'rgba(99,102,241,0.06)',
-                    borderBottom: '1px solid rgba(99,102,241,0.12)',
-                    borderRadius: '8px',
-                  }}
+                  className="mb-4 flex items-center justify-between px-4 py-2 bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-lg"
                 >
                   <p className="text-xs text-[var(--text-muted)]">
                     Complete your brand profile to improve draft quality

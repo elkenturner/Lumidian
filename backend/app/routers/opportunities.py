@@ -12,17 +12,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 logger = logging.getLogger(__name__)
+from datetime import UTC
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_brand_active
-from app.models import Brand, ContentOpportunity, Prompt, utcnow
+from app.models import Brand, ContentOpportunity, Prompt
 from app.schemas import ContentDraftSchema, ContentOpportunitySchema
 
 router = APIRouter(prefix="/opportunities", tags=["opportunities"])
@@ -58,7 +60,7 @@ async def list_opportunities(
     brand_id: int,
     db: DbDep,
     user: CurrentUser,
-    opp_status: Optional[str] = Query(None, alias="status", description="Filter by status: new, drafted, dismissed"),
+    opp_status: str | None = Query(None, alias="status", description="Filter by status: new, drafted, dismissed"),
     limit: int = Query(20, ge=1, le=200),
 ):
     """List content opportunities (Reddit/Quora threads) for a brand."""
@@ -150,9 +152,9 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
 
 async def _scan_and_log(brand_id: int) -> None:
     """Run Reddit AND Quora scanners in parallel, then log the scan_completed event."""
-    from app.services import reddit_scanner_service, quora_scanner_service
-    from app.services.analytics_service import log_event
     from app.database import AsyncSessionLocal
+    from app.services import quora_scanner_service, reddit_scanner_service
+    from app.services.analytics_service import log_event
 
     try:
         await asyncio.gather(
@@ -165,11 +167,12 @@ async def _scan_and_log(brand_id: int) -> None:
 
     # Count opportunities found in the last few minutes for analytics
     try:
-        from datetime import datetime, timezone, timedelta
-        cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=10)
+        from datetime import datetime, timedelta
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=10)
         async with AsyncSessionLocal() as db:
-            from app.models import ContentOpportunity
             from sqlalchemy import select as _select
+
+            from app.models import ContentOpportunity
             result = await db.execute(
                 _select(ContentOpportunity).where(
                     ContentOpportunity.brand_id == brand_id,
@@ -198,8 +201,10 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     Pro: 25 manual scans per 7-day rolling window.
     Admins: unlimited.
     """
-    from datetime import datetime, timezone, timedelta
+    from datetime import datetime, timedelta
+
     from sqlalchemy import func as sqlfunc
+
     from app.models import AnalyticsEvent
     from app.routers.billing import WEEKLY_SCAN_LIMITS
     from app.services.analytics_service import log_event
@@ -220,7 +225,7 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
                     "Your brand will be scanned automatically each week."
                 ),
             )
-        week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
         used_result = await db.execute(
             select(sqlfunc.count(AnalyticsEvent.id)).where(
                 AnalyticsEvent.brand_id == brand_id,
@@ -241,7 +246,7 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     # Pitch brands have stricter limits (1/week) regardless of subscription tier
     if brand.brand_type == "pitch":
         from app.routers.billing import WEEKLY_SCAN_LIMITS_PITCH
-        _week_ago = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=7)
+        _week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
         pitch_scan_result = await db.execute(
             select(sqlfunc.count(AnalyticsEvent.id)).where(
                 AnalyticsEvent.brand_id == brand_id,

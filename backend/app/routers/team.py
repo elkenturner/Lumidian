@@ -13,17 +13,17 @@ from __future__ import annotations
 import logging
 import os
 import secrets
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import CurrentUser, require_owner_only
-from app.models import TeamMember, User
-from app.schemas import TeamMemberResponse, InviteTeamMemberRequest
+from app.models import TeamMember
+from app.schemas import InviteTeamMemberRequest, TeamMemberResponse
 
 router = APIRouter(prefix="/team", tags=["team"])
 logger = logging.getLogger(__name__)
@@ -34,7 +34,7 @@ INVITE_EXPIRY_HOURS = 48
 
 
 def _utcnow_naive() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 # ── Invite ─────────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@ async def invite_team_member(request: InviteTeamMemberRequest, db: DbDep, user: 
     invite_link = f"/team/accept?token={token}"
     full_invite_link = f"{frontend_url}{invite_link}"
 
-    from app.services.email_service import send_team_invite_email, send_email_background
+    from app.services.email_service import send_email_background, send_team_invite_email
     send_email_background(send_team_invite_email, invited_email=email, invite_link=full_invite_link, inviter_name=user.name)
 
     return {"id": member.id, "invite_link": invite_link, "message": "Invitation created"}

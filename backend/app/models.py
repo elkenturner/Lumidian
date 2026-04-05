@@ -1,12 +1,12 @@
-from datetime import datetime, timezone
-from typing import Optional, List
-from sqlalchemy import (
-    Integer, String, Boolean, Float, ForeignKey, Text,
-    Enum as SAEnum, DateTime, UniqueConstraint
-)
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.database import Base
 import enum
+from datetime import UTC, datetime
+from typing import Optional
+
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.database import Base
 
 
 class TierEnum(str, enum.Enum):
@@ -42,7 +42,7 @@ class ModelEnum(str, enum.Enum):
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class User(Base):
@@ -50,23 +50,23 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    google_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, unique=True)
-    name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    subscription_tier: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 'starter' | 'pro' | None
-    subscription_status: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # 'active' | 'trialing' | 'canceled' | None
-    subscription_trial_end: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)  # trial end date (UTC, naive)
-    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    stripe_subscription_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    google_id: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    subscription_tier: Mapped[str | None] = mapped_column(String(50), nullable=True)  # 'starter' | 'pro' | None
+    subscription_status: Mapped[str | None] = mapped_column(String(50), nullable=True)  # 'active' | 'trialing' | 'canceled' | None
+    subscription_trial_end: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)  # trial end date (UTC, naive)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    stripe_subscription_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_paused: Mapped[bool] = mapped_column(Boolean, default=False)  # admin-controlled account pause
-    totp_secret: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default='1')
-    email_verification_code: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    email_verification_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    email_verification_code: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    email_verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 # ── System-wide key-value settings ───────────────────────────────────────────
@@ -98,33 +98,33 @@ class Brand(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     slug: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
-    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
+    user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     tier: Mapped[str] = mapped_column(
         SAEnum(TierEnum, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
         default=TierEnum.basic.value,
     )
-    website_url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    website_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     # "standard" | "pitch" — pitch brands expire after 30 days and cap at 10 prompts
     brand_type: Mapped[str] = mapped_column(String(20), nullable=False, default="standard")
-    pitch_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    pitch_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     prompt_limit: Mapped[int] = mapped_column(Integer, default=25)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
-    prompts: Mapped[List["Prompt"]] = relationship(
+    prompts: Mapped[list["Prompt"]] = relationship(
         "Prompt", back_populates="brand", cascade="all, delete-orphan"
     )
-    tracking_runs: Mapped[List["TrackingRun"]] = relationship(
+    tracking_runs: Mapped[list["TrackingRun"]] = relationship(
         "TrackingRun", back_populates="brand", cascade="all, delete-orphan"
     )
-    competitors: Mapped[List["Competitor"]] = relationship(
+    competitors: Mapped[list["Competitor"]] = relationship(
         "Competitor", back_populates="brand", cascade="all, delete-orphan"
     )
     profile: Mapped[Optional["BrandProfile"]] = relationship(
         "BrandProfile", back_populates="brand", uselist=False, cascade="all, delete-orphan"
     )
-    opportunities: Mapped[List["ContentOpportunity"]] = relationship(
+    opportunities: Mapped[list["ContentOpportunity"]] = relationship(
         "ContentOpportunity", back_populates="brand", cascade="all, delete-orphan"
     )
 
@@ -140,7 +140,7 @@ class Prompt(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     brand: Mapped["Brand"] = relationship("Brand", back_populates="prompts")
-    query_results: Mapped[List["QueryResult"]] = relationship(
+    query_results: Mapped[list["QueryResult"]] = relationship(
         "QueryResult", back_populates="prompt", cascade="all, delete-orphan"
     )
 
@@ -160,27 +160,27 @@ class TrackingRun(Base):
         nullable=False,
         default=RunTypeEnum.manual.value,
     )
-    schedule_slot: Mapped[Optional[str]] = mapped_column(
+    schedule_slot: Mapped[str | None] = mapped_column(
         SAEnum(ScheduleSlotEnum, values_callable=lambda obj: [e.value for e in obj]),
         nullable=True,
     )
-    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    overall_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    total_queries: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    total_mentions: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    total_queries: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    total_mentions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     has_content_influence: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     brand: Mapped["Brand"] = relationship("Brand", back_populates="tracking_runs")
-    query_results: Mapped[List["QueryResult"]] = relationship(
+    query_results: Mapped[list["QueryResult"]] = relationship(
         "QueryResult", back_populates="tracking_run", cascade="all, delete-orphan"
     )
-    model_scores: Mapped[List["RunModelScore"]] = relationship(
+    model_scores: Mapped[list["RunModelScore"]] = relationship(
         "RunModelScore", back_populates="tracking_run", cascade="all, delete-orphan"
     )
-    content_attributions: Mapped[List["ContentAttribution"]] = relationship(
+    content_attributions: Mapped[list["ContentAttribution"]] = relationship(
         "ContentAttribution", back_populates="tracking_run", cascade="all, delete-orphan"
     )
 
@@ -200,11 +200,11 @@ class QueryResult(Base):
         nullable=False,
     )
     run_number: Mapped[int] = mapped_column(Integer, nullable=False)
-    response_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     mentioned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    sentiment: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # positive | neutral | negative
-    latency_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
-    error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    sentiment: Mapped[str | None] = mapped_column(String(20), nullable=True)  # positive | neutral | negative
+    latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     tracking_run: Mapped["TrackingRun"] = relationship("TrackingRun", back_populates="query_results")
@@ -237,11 +237,11 @@ class Competitor(Base):
         Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    website_url: Mapped[Optional[str]] = mapped_column(String(2000), nullable=True)
+    website_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     brand: Mapped["Brand"] = relationship("Brand", back_populates="competitors")
-    mentions: Mapped[List["CompetitorMention"]] = relationship(
+    mentions: Mapped[list["CompetitorMention"]] = relationship(
         "CompetitorMention", back_populates="competitor", cascade="all, delete-orphan"
     )
 
@@ -278,11 +278,11 @@ class AccountConnection(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     platform: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="disconnected")
-    credentials: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    display_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    connected_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    last_verified_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    credentials: Mapped[str | None] = mapped_column(Text, nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    connected_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -315,35 +315,35 @@ class ContentDraft(Base):
     brand_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    prompt_id: Mapped[Optional[int]] = mapped_column(
+    prompt_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("prompts.id"), nullable=True, index=True
     )
-    opportunity_id: Mapped[Optional[int]] = mapped_column(
+    opportunity_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("content_opportunities.id", ondelete="SET NULL"), nullable=True, index=True
     )
     platform: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="draft")
-    title: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
-    content_brief: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    platform_guidelines_applied: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    visibility_score_at_draft: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    estimated_impact: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    content_brief: Mapped[str | None] = mapped_column(Text, nullable=True)
+    platform_guidelines_applied: Mapped[str | None] = mapped_column(Text, nullable=True)
+    visibility_score_at_draft: Mapped[float | None] = mapped_column(Float, nullable=True)
+    estimated_impact: Mapped[float | None] = mapped_column(Float, nullable=True)
     # ── Lifecycle tracking ────────────────────────────────────────────────────
-    approved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    dismissed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    visibility_at_post: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    visibility_at_post: Mapped[float | None] = mapped_column(Float, nullable=True)
     edited_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    time_to_approve_seconds: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    time_to_approve_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # 'scheduled' = auto-generated by weekly sweep; 'manual' = user-requested
-    source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    source: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
     brand: Mapped["Brand"] = relationship("Brand")
     prompt: Mapped[Optional["Prompt"]] = relationship("Prompt")
-    content_posts: Mapped[List["ContentPost"]] = relationship(
+    content_posts: Mapped[list["ContentPost"]] = relationship(
         "ContentPost", back_populates="draft", cascade="all, delete-orphan"
     )
 
@@ -356,14 +356,14 @@ class ContentPost(Base):
         Integer, ForeignKey("content_drafts.id", ondelete="CASCADE"), nullable=False, index=True
     )
     platform: Mapped[str] = mapped_column(String(50), nullable=False)
-    post_url: Mapped[Optional[str]] = mapped_column(String(1000), nullable=True)
-    platform_post_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
-    post_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    post_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    platform_post_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    post_metadata: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     draft: Mapped["ContentDraft"] = relationship("ContentDraft", back_populates="content_posts")
-    content_attributions: Mapped[List["ContentAttribution"]] = relationship(
+    content_attributions: Mapped[list["ContentAttribution"]] = relationship(
         "ContentAttribution", back_populates="content_post", cascade="all, delete-orphan"
     )
 
@@ -384,9 +384,9 @@ class ContentAttribution(Base):
     brand_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("brands.id"), nullable=False, index=True
     )
-    visibility_before: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    visibility_after: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    improvement_pct: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    visibility_before: Mapped[float | None] = mapped_column(Float, nullable=True)
+    visibility_after: Mapped[float | None] = mapped_column(Float, nullable=True)
+    improvement_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
     measured_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -409,15 +409,15 @@ class BrandProfile(Base):
     brand_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
     )
-    company_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    key_stats: Mapped[Optional[str]] = mapped_column(Text, nullable=True)        # JSON array of strings
-    tone_of_voice: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    what_not_to_say: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON array of strings
-    target_audience: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    approved_language: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # JSON array of strings
-    publications: Mapped[Optional[str]] = mapped_column(Text, nullable=True)     # JSON array of {url,title,publisher,date}
-    internal_brand_context: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # fetched from website via Jina
-    website_context_last_fetched: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    company_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    key_stats: Mapped[str | None] = mapped_column(Text, nullable=True)        # JSON array of strings
+    tone_of_voice: Mapped[str | None] = mapped_column(Text, nullable=True)
+    what_not_to_say: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON array of strings
+    target_audience: Mapped[str | None] = mapped_column(Text, nullable=True)
+    approved_language: Mapped[str | None] = mapped_column(Text, nullable=True) # JSON array of strings
+    publications: Mapped[str | None] = mapped_column(Text, nullable=True)     # JSON array of {url,title,publisher,date}
+    internal_brand_context: Mapped[str | None] = mapped_column(Text, nullable=True)  # fetched from website via Jina
+    website_context_last_fetched: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -435,12 +435,12 @@ class ContentOpportunity(Base):
     )
     platform: Mapped[str] = mapped_column(String(50), nullable=False, default="reddit")
     thread_url: Mapped[str] = mapped_column(String(1000), nullable=False)
-    thread_title: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
-    subreddit: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    body_preview: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    posted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    thread_title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    subreddit: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    body_preview: Mapped[str | None] = mapped_column(Text, nullable=True)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     relevance_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    prompt_id: Mapped[Optional[int]] = mapped_column(
+    prompt_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("prompts.id", ondelete="SET NULL"), nullable=True, index=True
     )
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="new")  # new | drafted | dismissed
@@ -448,7 +448,7 @@ class ContentOpportunity(Base):
 
     brand: Mapped["Brand"] = relationship("Brand", back_populates="opportunities")
     prompt: Mapped[Optional["Prompt"]] = relationship("Prompt")
-    drafts: Mapped[List["ContentDraft"]] = relationship(
+    drafts: Mapped[list["ContentDraft"]] = relationship(
         "ContentDraft",
         primaryjoin="ContentOpportunity.id == foreign(ContentDraft.opportunity_id)",
         viewonly=True,
@@ -470,16 +470,16 @@ class ContentGap(Base):
     tracking_run_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("tracking_runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    model: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)  # None = overall
+    model: Mapped[str | None] = mapped_column(String(50), nullable=True)  # None = overall
     severity_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     opportunity_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     recency_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     gap_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    competitor_mentions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON dict {name: count}
-    platforms_lacking: Mapped[Optional[str]] = mapped_column(Text, nullable=True)    # JSON array
-    quora_questions: Mapped[Optional[str]] = mapped_column(Text, nullable=True)      # JSON array [{title, url, snippet}]
-    prompt_visibility: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    last_content_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    competitor_mentions: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON dict {name: count}
+    platforms_lacking: Mapped[str | None] = mapped_column(Text, nullable=True)    # JSON array
+    quora_questions: Mapped[str | None] = mapped_column(Text, nullable=True)      # JSON array [{title, url, snippet}]
+    prompt_visibility: Mapped[float | None] = mapped_column(Float, nullable=True)
+    last_content_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     identified_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -501,13 +501,13 @@ class DraftAttribution(Base):
     brand_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    prompt_id: Mapped[Optional[int]] = mapped_column(
+    prompt_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("prompts.id", ondelete="SET NULL"), nullable=True, index=True
     )
     posted_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    score_at_posting: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    current_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    delta: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    score_at_posting: Mapped[float | None] = mapped_column(Float, nullable=True)
+    current_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    delta: Mapped[float | None] = mapped_column(Float, nullable=True)
     runs_since_posting: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
@@ -528,13 +528,13 @@ class TeamMember(Base):
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     invited_email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    user_id: Mapped[Optional[int]] = mapped_column(
+    user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
     role: Mapped[str] = mapped_column(String(50), nullable=False, default="viewer")
     invite_token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     invited_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
     account_owner: Mapped["User"] = relationship(
@@ -553,13 +553,13 @@ class AnalyticsEvent(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
-    brand_id: Mapped[Optional[int]] = mapped_column(
+    brand_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("brands.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    user_id: Mapped[Optional[int]] = mapped_column(
+    user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
-    data: Mapped[Optional[str]] = mapped_column(Text, nullable=True)  # JSON blob
+    data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
@@ -573,8 +573,8 @@ class Notification(Base):
     # notification type: "report_ready", "visibility_drop", "draft_ready", "info"
     type: Mapped[str] = mapped_column(String(50), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
-    body: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
     # optional link target (e.g. /reports, /content)
-    link: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+    link: Mapped[str | None] = mapped_column(String(500), nullable=True)
     read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)

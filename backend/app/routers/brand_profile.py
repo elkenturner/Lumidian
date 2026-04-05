@@ -9,7 +9,8 @@ PUT    /api/brands/{brand_id}/profile   — update brand profile fields
 
 import json
 import logging
-from typing import Annotated, Optional
+from datetime import UTC
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -76,7 +77,7 @@ def _compute_completion(profile: BrandProfile) -> float:
 
 
 def _profile_to_response(profile: BrandProfile) -> BrandProfileResponse:
-    def _parse_list(val: Optional[str]) -> list:
+    def _parse_list(val: str | None) -> list:
         if not val:
             return []
         try:
@@ -84,7 +85,7 @@ def _profile_to_response(profile: BrandProfile) -> BrandProfileResponse:
         except Exception:
             return []
 
-    def _parse_publications(val: Optional[str]) -> list:
+    def _parse_publications(val: str | None) -> list:
         if not val:
             return []
         try:
@@ -175,6 +176,7 @@ async def ai_fill_profile(brand_id: int, db: DbDep, user: CurrentUser):
     """
     import json
     import os
+
     from app.schemas import AiFillProfileResponse
 
     brand = await get_brand_for_user(brand_id, db, user)
@@ -189,9 +191,9 @@ async def ai_fill_profile(brand_id: int, db: DbDep, user: CurrentUser):
         from app.services.jina_service import fetch_website_context
         try:
             context = await fetch_website_context(brand.website_url)
-            from datetime import datetime, timezone
+            from datetime import datetime
             profile.internal_brand_context = context
-            profile.website_context_last_fetched = datetime.now(timezone.utc).replace(tzinfo=None)
+            profile.website_context_last_fetched = datetime.now(UTC).replace(tzinfo=None)
             await db.commit()
         except Exception as exc:
             logger.warning("AI fill: Jina fetch failed for brand %d: %s", brand_id, exc)

@@ -9,16 +9,16 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
 
 async def log_event(
     event_type: str,
-    data: Optional[dict[str, Any]] = None,
-    brand_id: Optional[int] = None,
-    user_id: Optional[int] = None,
+    data: dict[str, Any] | None = None,
+    brand_id: int | None = None,
+    user_id: int | None = None,
 ) -> None:
     """Append an analytics event row. Never raises."""
     try:

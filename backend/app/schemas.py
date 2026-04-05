@@ -1,7 +1,6 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # ── Prompt schemas ────────────────────────────────────────────────────────────
 
@@ -74,13 +73,13 @@ class BrandCreate(BaseModel):
 
 
 class BrandUpdate(BaseModel):
-    name: Optional[str] = None
-    tier: Optional[str] = None
-    website_url: Optional[str] = None
+    name: str | None = None
+    tier: str | None = None
+    website_url: str | None = None
 
     @field_validator("tier")
     @classmethod
-    def validate_tier(cls, v: Optional[str]) -> Optional[str]:
+    def validate_tier(cls, v: str | None) -> str | None:
         if v is not None:
             allowed = {"basic", "standard", "premium"}
             if v not in allowed:
@@ -94,9 +93,9 @@ class BrandSummary(BaseModel):
     slug: str
     tier: str
     brand_type: str = "standard"
-    pitch_expires_at: Optional[datetime] = None
+    pitch_expires_at: datetime | None = None
     prompt_count: int
-    website_url: Optional[str] = None
+    website_url: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -109,8 +108,8 @@ class BrandDetail(BaseModel):
     slug: str
     tier: str
     brand_type: str = "standard"
-    pitch_expires_at: Optional[datetime] = None
-    website_url: Optional[str] = None
+    pitch_expires_at: datetime | None = None
+    website_url: str | None = None
     created_at: datetime
     updated_at: datetime
     prompts: list[PromptResponse] = []
@@ -125,13 +124,13 @@ class TrackingRunSummary(BaseModel):
     brand_id: int
     status: str
     run_type: str
-    schedule_slot: Optional[str] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    overall_score: Optional[float] = None
-    total_queries: Optional[int] = None
-    total_mentions: Optional[int] = None
-    error_message: Optional[str] = None
+    schedule_slot: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    overall_score: float | None = None
+    total_queries: int | None = None
+    total_mentions: int | None = None
+    error_message: str | None = None
     has_content_influence: bool = False
     created_at: datetime
 
@@ -143,13 +142,13 @@ class TrackingRunStatus(BaseModel):
     brand_id: int
     status: str
     run_type: str
-    schedule_slot: Optional[str] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    overall_score: Optional[float] = None
-    total_queries: Optional[int] = None
-    total_mentions: Optional[int] = None
-    error_message: Optional[str] = None
+    schedule_slot: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    overall_score: float | None = None
+    total_queries: int | None = None
+    total_mentions: int | None = None
+    error_message: str | None = None
     has_content_influence: bool = False
     created_at: datetime
 
@@ -180,13 +179,13 @@ class QueryResultResponse(BaseModel):
     id: int
     tracking_run_id: int
     prompt_id: int
-    prompt_text: Optional[str] = None
+    prompt_text: str | None = None
     model: str
     run_number: int
-    response_text: Optional[str] = None
+    response_text: str | None = None
     mentioned: bool
-    latency_ms: Optional[int] = None
-    error: Optional[str] = None
+    latency_ms: int | None = None
+    error: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -207,10 +206,10 @@ class OverviewResponse(BaseModel):
     brand_id: int
     brand_name: str
     brand_tier: str = "basic"
-    latest_run: Optional[TrackingRunSummary] = None
-    overall_score: Optional[float] = None
-    total_queries: Optional[int] = None
-    total_mentions: Optional[int] = None
+    latest_run: TrackingRunSummary | None = None
+    overall_score: float | None = None
+    total_queries: int | None = None
+    total_mentions: int | None = None
     model_breakdown: list[ModelScoreResponse] = []
     has_content_influence: bool = False
     recent_attributions: list["ContentAttributionSummary"] = []
@@ -221,12 +220,12 @@ class TrendPoint(BaseModel):
 
     run_id: int
     created_at: datetime
-    completed_at: Optional[datetime] = None
-    overall_score: Optional[float] = None
-    total_queries: Optional[int] = None
-    total_mentions: Optional[int] = None
+    completed_at: datetime | None = None
+    overall_score: float | None = None
+    total_queries: int | None = None
+    total_mentions: int | None = None
     run_type: str
-    schedule_slot: Optional[str] = None
+    schedule_slot: str | None = None
     has_content_influence: bool = False
     model_scores: dict[str, float] = {}
 
@@ -243,10 +242,10 @@ class AccountConnectionSchema(BaseModel):
     id: int
     platform: str
     status: str
-    display_name: Optional[str] = None
-    connected_at: Optional[datetime] = None
-    last_verified_at: Optional[datetime] = None
-    error_message: Optional[str] = None
+    display_name: str | None = None
+    connected_at: datetime | None = None
+    last_verified_at: datetime | None = None
+    error_message: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -268,23 +267,23 @@ class BrandContentSettingsSchema(BaseModel):
 class ContentDraftSchema(BaseModel):
     id: int
     brand_id: int
-    prompt_id: Optional[int] = None
-    opportunity_id: Optional[int] = None
+    prompt_id: int | None = None
+    opportunity_id: int | None = None
     platform: str
     status: str
-    title: Optional[str] = None
+    title: str | None = None
     content_text: str
-    content_brief: Optional[str] = None
-    platform_guidelines_applied: Optional[str] = None
-    visibility_score_at_draft: Optional[float] = None
-    estimated_impact: Optional[float] = None
-    approved_at: Optional[datetime] = None
-    dismissed_at: Optional[datetime] = None
-    posted_at: Optional[datetime] = None
-    visibility_at_post: Optional[float] = None
-    source: Optional[str] = "manual"
+    content_brief: str | None = None
+    platform_guidelines_applied: str | None = None
+    visibility_score_at_draft: float | None = None
+    estimated_impact: float | None = None
+    approved_at: datetime | None = None
+    dismissed_at: datetime | None = None
+    posted_at: datetime | None = None
+    visibility_at_post: float | None = None
+    source: str | None = "manual"
     edited_count: int = 0
-    time_to_approve_seconds: Optional[int] = None
+    time_to_approve_seconds: int | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -296,13 +295,13 @@ class ContentOpportunitySchema(BaseModel):
     brand_id: int
     platform: str
     thread_url: str
-    thread_title: Optional[str] = None
-    subreddit: Optional[str] = None
-    body_preview: Optional[str] = None
-    posted_at: Optional[datetime] = None
+    thread_title: str | None = None
+    subreddit: str | None = None
+    body_preview: str | None = None
+    posted_at: datetime | None = None
     relevance_score: float
-    prompt_id: Optional[int] = None
-    prompt_text: Optional[str] = None
+    prompt_id: int | None = None
+    prompt_text: str | None = None
     status: str
     created_at: datetime
 
@@ -313,10 +312,10 @@ class ContentPostSchema(BaseModel):
     id: int
     draft_id: int
     platform: str
-    post_url: Optional[str] = None
-    platform_post_id: Optional[str] = None
-    posted_at: Optional[datetime] = None
-    post_metadata: Optional[str] = None
+    post_url: str | None = None
+    platform_post_id: str | None = None
+    posted_at: datetime | None = None
+    post_metadata: str | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -328,9 +327,9 @@ class ContentAttributionSchema(BaseModel):
     tracking_run_id: int
     prompt_id: int
     brand_id: int
-    visibility_before: Optional[float] = None
-    visibility_after: Optional[float] = None
-    improvement_pct: Optional[float] = None
+    visibility_before: float | None = None
+    visibility_after: float | None = None
+    improvement_pct: float | None = None
     measured_at: datetime
     created_at: datetime
 
@@ -342,11 +341,11 @@ class ContentAttributionSchema(BaseModel):
 class CreateDraftRequest(BaseModel):
     brand_id: int
     platform: str = Field(max_length=30)
-    prompt_id: Optional[int] = None
-    custom_brief: Optional[str] = Field(None, max_length=2000)
-    quora_question_url: Optional[str] = Field(None, max_length=500)
-    quora_question_title: Optional[str] = Field(None, max_length=300)
-    quora_question_snippet: Optional[str] = Field(None, max_length=1000)
+    prompt_id: int | None = None
+    custom_brief: str | None = Field(None, max_length=2000)
+    quora_question_url: str | None = Field(None, max_length=500)
+    quora_question_title: str | None = Field(None, max_length=300)
+    quora_question_snippet: str | None = Field(None, max_length=1000)
 
 
 class GenerateNowRequest(BaseModel):
@@ -354,15 +353,15 @@ class GenerateNowRequest(BaseModel):
 
 
 class UpdateDraftRequest(BaseModel):
-    title: Optional[str] = None
-    content_text: Optional[str] = None
-    status: Optional[str] = None
-    platform_guidelines_applied: Optional[str] = None
+    title: str | None = None
+    content_text: str | None = None
+    status: str | None = None
+    platform_guidelines_applied: str | None = None
 
 
 class PostDraftRequest(BaseModel):
-    post_url: Optional[str] = None
-    platform_post_id: Optional[str] = None
+    post_url: str | None = None
+    platform_post_id: str | None = None
 
 
 class ConnectAccountRequest(BaseModel):
@@ -371,8 +370,8 @@ class ConnectAccountRequest(BaseModel):
 
 
 class UpdateContentSettingsRequest(BaseModel):
-    auto_post: Optional[bool] = None
-    enabled: Optional[bool] = None
+    auto_post: bool | None = None
+    enabled: bool | None = None
 
 
 # ── Updated overview / trend schemas (include content influence) ──────────────
@@ -383,9 +382,9 @@ class ContentAttributionSummary(BaseModel):
     tracking_run_id: int
     prompt_id: int
     brand_id: int
-    visibility_before: Optional[float] = None
-    visibility_after: Optional[float] = None
-    improvement_pct: Optional[float] = None
+    visibility_before: float | None = None
+    visibility_after: float | None = None
+    improvement_pct: float | None = None
     measured_at: datetime
     created_at: datetime
 
@@ -441,7 +440,7 @@ class OverallSOV(BaseModel):
 class CompetitorAnalysisResponse(BaseModel):
     brand_id: int
     brand_name: str
-    run_id: Optional[int]
+    run_id: int | None
     has_data: bool
     overall: OverallSOV
     prompts: list[CompetitorPromptResult]
@@ -464,7 +463,7 @@ class SentimentBreakdown(BaseModel):
 
 
 class PositionData(BaseModel):
-    score: Optional[float] = None  # 1-10, 1 = mentioned earliest/most prominently
+    score: float | None = None  # 1-10, 1 = mentioned earliest/most prominently
     label: str    # "Early", "Middle", "Late", or "N/A"
     sample_count: int
 
@@ -482,7 +481,7 @@ class ConversationItem(BaseModel):
     model: str
     mentioned: bool
     response_preview: str
-    response_text: Optional[str] = None
+    response_text: str | None = None
     created_at: str
 
 
@@ -535,28 +534,28 @@ class Publication(BaseModel):
 
 
 class BrandProfileUpdate(BaseModel):
-    company_description: Optional[str] = None
-    key_stats: Optional[list[str]] = None
-    tone_of_voice: Optional[str] = None
-    what_not_to_say: Optional[list[str]] = None
-    target_audience: Optional[str] = None
-    approved_language: Optional[list[str]] = None
-    publications: Optional[list[Publication]] = None
+    company_description: str | None = None
+    key_stats: list[str] | None = None
+    tone_of_voice: str | None = None
+    what_not_to_say: list[str] | None = None
+    target_audience: str | None = None
+    approved_language: list[str] | None = None
+    publications: list[Publication] | None = None
 
 
 class BrandProfileResponse(BaseModel):
     id: int
     brand_id: int
-    company_description: Optional[str] = None
+    company_description: str | None = None
     key_stats: list[str] = []
-    tone_of_voice: Optional[str] = None
+    tone_of_voice: str | None = None
     what_not_to_say: list[str] = []
-    target_audience: Optional[str] = None
+    target_audience: str | None = None
     approved_language: list[str] = []
     publications: list[Publication] = []
     completion_pct: float = 0.0
-    internal_brand_context: Optional[str] = None
-    website_context_last_fetched: Optional[datetime] = None
+    internal_brand_context: str | None = None
+    website_context_last_fetched: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -564,9 +563,9 @@ class BrandProfileResponse(BaseModel):
 
 
 class AiFillProfileResponse(BaseModel):
-    company_description: Optional[str] = None
-    target_audience: Optional[str] = None
-    tone_of_voice: Optional[str] = None
+    company_description: str | None = None
+    target_audience: str | None = None
+    tone_of_voice: str | None = None
     key_stats: list[str] = []
 
 
@@ -578,10 +577,10 @@ class BrandWithStats(BaseModel):
     slug: str
     tier: str
     brand_type: str = "standard"
-    pitch_expires_at: Optional[datetime] = None
+    pitch_expires_at: datetime | None = None
     prompt_count: int
-    overall_score: Optional[float] = None
-    last_run_at: Optional[datetime] = None
+    overall_score: float | None = None
+    last_run_at: datetime | None = None
     trend: str = "flat"  # "up" | "down" | "flat"
     created_at: datetime
     updated_at: datetime
@@ -593,9 +592,9 @@ class ContentGapResponse(BaseModel):
     id: int
     brand_id: int
     prompt_id: int
-    prompt_text: Optional[str] = None
+    prompt_text: str | None = None
     tracking_run_id: int
-    model: Optional[str] = None
+    model: str | None = None
     severity_score: float
     opportunity_score: float
     recency_score: float
@@ -603,8 +602,8 @@ class ContentGapResponse(BaseModel):
     competitor_mentions: dict = {}
     platforms_lacking: list[str] = []
     quora_questions: list[dict] = []
-    prompt_visibility: Optional[float] = None
-    last_content_at: Optional[datetime] = None
+    prompt_visibility: float | None = None
+    last_content_at: datetime | None = None
     identified_at: datetime
     created_at: datetime
 
@@ -617,14 +616,14 @@ class DraftAttributionResponse(BaseModel):
     id: int
     draft_id: int
     brand_id: int
-    prompt_id: Optional[int] = None
-    prompt_text: Optional[str] = None
-    draft_title: Optional[str] = None
-    draft_platform: Optional[str] = None
+    prompt_id: int | None = None
+    prompt_text: str | None = None
+    draft_title: str | None = None
+    draft_platform: str | None = None
     posted_at: datetime
-    score_at_posting: Optional[float] = None
-    current_score: Optional[float] = None
-    delta: Optional[float] = None
+    score_at_posting: float | None = None
+    current_score: float | None = None
+    delta: float | None = None
     runs_since_posting: int = 0
     created_at: datetime
 
@@ -636,11 +635,11 @@ class DraftAttributionResponse(BaseModel):
 class TeamMemberResponse(BaseModel):
     id: int
     invited_email: str
-    user_id: Optional[int] = None
+    user_id: int | None = None
     role: str
     accepted: bool
     invited_at: datetime
-    accepted_at: Optional[datetime] = None
+    accepted_at: datetime | None = None
 
     model_config = {"from_attributes": True}
 

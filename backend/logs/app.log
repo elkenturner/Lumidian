@@ -20886,3 +20886,196 @@ task: <Task pending name='Task-390' coro=<send_email_background.<locals>._run() 
 task: <Task pending name='Task-323' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x1120314f0>()]>>
 2026-04-04 20:28:16  ERROR     asyncio — Task was destroyed but it is pending!
 task: <Task pending name='Task-424' coro=<send_email_background.<locals>._run() running at /Users/ken/Desktop/Lumidian/backend/app/services/email_service.py:108> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/asyncio/futures.py:384, <TaskWakeupMethWrapper object at 0x11207bf10>()]>>
+2026-04-04 21:35:35  WARNING   app.routers.auth — failed login attempt email=wrongpw@example.com ip=127.0.0.1
+2026-04-04 21:35:36  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-04 21:35:40  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-04 21:35:42  WARNING   app.main — CSRF rejected: origin=https://evil.com not in ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-04 21:35:42  WARNING   app.routers.auth — failed login attempt email=nonexistent@test.com ip=127.0.0.1
+2026-04-04 21:35:45  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-04 21:35:59  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 1
+2026-04-04 21:36:19  ERROR     asyncio — Task exception was never retrieved
+future: <Task finished name='reddit-scan-1' coro=<trigger_scan.<locals>._scan_with_state_cleanup() done, defined at /Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py:267> exception=RuntimeError('simulated scan failure')>
+Traceback (most recent call last):
+  File "/Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py", line 269, in _scan_with_state_cleanup
+    await _scan_and_log(bid)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py", line 2165, in _execute_mock_call
+    result = await effect(*args, **kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/tests/test_banner_state.py", line 75, in mock_scan_and_log_raises
+    raise RuntimeError("simulated scan failure")
+RuntimeError: simulated scan failure
+2026-04-04 21:37:03  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:37:05  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:37:37  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:37:42  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:37:45  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:37:52  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:38:02  WARNING   app.routers.auth — failed login attempt email=wrongpw@example.com ip=127.0.0.1
+2026-04-04 21:38:02  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-04 21:38:07  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-04 21:38:08  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:38:08  WARNING   app.main — CSRF rejected: origin=https://evil.com not in ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-04 21:38:08  WARNING   app.routers.auth — failed login attempt email=nonexistent@test.com ip=127.0.0.1
+2026-04-04 21:38:11  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-04 21:38:19  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:38:26  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 1
+2026-04-04 21:38:38  WARNING   app.services.tracking_service — Onboarding draft generation failed for brand_id=55 (non-fatal): LLM timeout
+2026-04-04 21:38:47  ERROR     asyncio — Task exception was never retrieved
+future: <Task finished name='reddit-scan-1' coro=<trigger_scan.<locals>._scan_with_state_cleanup() done, defined at /Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py:267> exception=RuntimeError('simulated scan failure')>
+Traceback (most recent call last):
+  File "/Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py", line 269, in _scan_with_state_cleanup
+    await _scan_and_log(bid)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py", line 2165, in _execute_mock_call
+    result = await effect(*args, **kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/tests/test_banner_state.py", line 75, in mock_scan_and_log_raises
+    raise RuntimeError("simulated scan failure")
+RuntimeError: simulated scan failure
+2026-04-04 21:38:57  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:39:02  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:39:09  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:39:14  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:39:33  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:39:34  ERROR     app.routers.support — Failed to send support email from user@example.com: SMTP down
+2026-04-04 21:39:35  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:39:49  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:39:55  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:40:01  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:40:08  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:40:08  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:40:13  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:40:16  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:40:23  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:40:40  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:40:53  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:41:11  WARNING   app.services.tracking_service — Onboarding draft generation failed for brand_id=55 (non-fatal): LLM timeout
+2026-04-04 21:41:30  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:41:36  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:41:42  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:41:47  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:42:07  ERROR     app.routers.support — Failed to send support email from user@example.com: SMTP down
+2026-04-04 21:42:22  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:42:27  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:42:33  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-04 21:42:42  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 01:06:10  WARNING   apscheduler.executors.default — Run time of job "Morning tracking sweep (08:00 UTC) (trigger: cron[hour='8', minute='0'], next run at: 2026-04-06 08:00:00 UTC)" was missed by 0:06:10.263856
+2026-04-05 11:01:29  WARNING   app.routers.auth — failed login attempt email=wrongpw@example.com ip=127.0.0.1
+2026-04-05 11:01:30  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:01:35  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:01:36  WARNING   app.main — CSRF rejected: origin=https://evil.com not in ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-05 11:01:36  WARNING   app.routers.auth — failed login attempt email=nonexistent@test.com ip=127.0.0.1
+2026-04-05 11:01:40  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:01:55  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 1
+2026-04-05 11:02:16  ERROR     asyncio — Task exception was never retrieved
+future: <Task finished name='reddit-scan-1' coro=<trigger_scan.<locals>._scan_with_state_cleanup() done, defined at /Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py:267> exception=RuntimeError('simulated scan failure')>
+Traceback (most recent call last):
+  File "/Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py", line 269, in _scan_with_state_cleanup
+    await _scan_and_log(bid)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py", line 2165, in _execute_mock_call
+    result = await effect(*args, **kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/tests/test_banner_state.py", line 75, in mock_scan_and_log_raises
+    raise RuntimeError("simulated scan failure")
+RuntimeError: simulated scan failure
+2026-04-05 11:02:42  WARNING   app.routers.auth — failed login attempt email=wrongpw@example.com ip=127.0.0.1
+2026-04-05 11:02:43  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:02:47  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:02:49  WARNING   app.main — CSRF rejected: origin=https://evil.com not in ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-05 11:02:49  WARNING   app.routers.auth — failed login attempt email=nonexistent@test.com ip=127.0.0.1
+2026-04-05 11:02:52  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:03:08  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 1
+2026-04-05 11:03:28  ERROR     asyncio — Task exception was never retrieved
+future: <Task finished name='reddit-scan-1' coro=<trigger_scan.<locals>._scan_with_state_cleanup() done, defined at /Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py:267> exception=RuntimeError('simulated scan failure')>
+Traceback (most recent call last):
+  File "/Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py", line 269, in _scan_with_state_cleanup
+    await _scan_and_log(bid)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py", line 2165, in _execute_mock_call
+    result = await effect(*args, **kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/tests/test_banner_state.py", line 75, in mock_scan_and_log_raises
+    raise RuntimeError("simulated scan failure")
+RuntimeError: simulated scan failure
+2026-04-05 11:04:13  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:04:15  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:04:46  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:04:50  WARNING   app.routers.auth — failed login attempt email=wrongpw@example.com ip=127.0.0.1
+2026-04-05 11:04:51  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:04:51  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:04:55  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:04:56  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:04:57  WARNING   app.main — CSRF rejected: origin=https://evil.com not in ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-05 11:04:57  WARNING   app.routers.auth — failed login attempt email=nonexistent@test.com ip=127.0.0.1
+2026-04-05 11:05:00  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:05:01  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:05:15  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 1
+2026-04-05 11:05:18  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:05:29  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:05:35  ERROR     asyncio — Task exception was never retrieved
+future: <Task finished name='reddit-scan-1' coro=<trigger_scan.<locals>._scan_with_state_cleanup() done, defined at /Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py:267> exception=RuntimeError('simulated scan failure')>
+Traceback (most recent call last):
+  File "/Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py", line 269, in _scan_with_state_cleanup
+    await _scan_and_log(bid)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py", line 2165, in _execute_mock_call
+    result = await effect(*args, **kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/tests/test_banner_state.py", line 75, in mock_scan_and_log_raises
+    raise RuntimeError("simulated scan failure")
+RuntimeError: simulated scan failure
+2026-04-05 11:05:47  WARNING   app.services.tracking_service — Onboarding draft generation failed for brand_id=55 (non-fatal): LLM timeout
+2026-04-05 11:06:06  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:06:11  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:06:18  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:06:21  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:06:23  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:06:23  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:06:43  ERROR     app.routers.support — Failed to send support email from user@example.com: SMTP down
+2026-04-05 11:06:55  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:06:58  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:07:00  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:07:03  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:07:03  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:07:08  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:07:10  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:07:15  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:07:28  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:07:39  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:07:55  WARNING   app.routers.auth — failed login attempt email=wrongpw@example.com ip=127.0.0.1
+2026-04-05 11:07:56  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:07:56  WARNING   app.services.tracking_service — Onboarding draft generation failed for brand_id=55 (non-fatal): LLM timeout
+2026-04-05 11:08:00  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:08:02  WARNING   app.main — CSRF rejected: origin=https://evil.com not in ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-05 11:08:02  WARNING   app.routers.auth — failed login attempt email=nonexistent@test.com ip=127.0.0.1
+2026-04-05 11:08:05  WARNING   app.routers.auth — failed login attempt email=nobody@example.com ip=127.0.0.1
+2026-04-05 11:08:15  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:08:19  WARNING   app.dependencies — get_current_user: BLOCKED - email not verified for user 1
+2026-04-05 11:08:20  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:08:27  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:08:32  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:08:40  ERROR     asyncio — Task exception was never retrieved
+future: <Task finished name='reddit-scan-1' coro=<trigger_scan.<locals>._scan_with_state_cleanup() done, defined at /Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py:267> exception=RuntimeError('simulated scan failure')>
+Traceback (most recent call last):
+  File "/Users/ken/Desktop/Lumidian/backend/app/routers/opportunities.py", line 269, in _scan_with_state_cleanup
+    await _scan_and_log(bid)
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/unittest/mock.py", line 2165, in _execute_mock_call
+    result = await effect(*args, **kwargs)
+  File "/Users/ken/Desktop/Lumidian/backend/tests/test_banner_state.py", line 75, in mock_scan_and_log_raises
+    raise RuntimeError("simulated scan failure")
+RuntimeError: simulated scan failure
+2026-04-05 11:08:52  ERROR     app.routers.support — Failed to send support email from user@example.com: SMTP down
+2026-04-05 11:09:07  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:09:13  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:09:18  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:09:24  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:09:25  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:09:27  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:09:59  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:10:04  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:10:08  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:10:14  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:10:31  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:10:43  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:11:01  WARNING   app.services.tracking_service — Onboarding draft generation failed for brand_id=55 (non-fatal): LLM timeout
+2026-04-05 11:11:20  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:11:25  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:11:32  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:11:37  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:11:56  ERROR     app.routers.support — Failed to send support email from user@example.com: SMTP down
+2026-04-05 11:12:12  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:12:17  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:12:22  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2
+2026-04-05 11:12:29  WARNING   app.dependencies — get_brand_for_user: ACCESS DENIED user=2 brand.user_id=1 effective_owner=2

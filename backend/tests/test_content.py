@@ -7,11 +7,12 @@ Tests for the drafting pipeline:
   Draft queue cap enforcement (DRAFT_CAP = 20)
   Brand profile injection into drafts
 """
-import pytest
-import httpx
-from unittest.mock import patch, AsyncMock
-from tests.conftest import register_and_login, create_brand
+from unittest.mock import AsyncMock, patch
 
+import httpx
+import pytest
+
+from tests.conftest import create_brand, register_and_login
 
 pytestmark = pytest.mark.asyncio
 
@@ -252,6 +253,7 @@ async def test_update_content_settings(client: httpx.AsyncClient):
 
 from app.services.drafting_service import _sanitize_user_input
 
+
 def test_sanitize_truncates_long_input():
     result = _sanitize_user_input("x" * 1000, max_length=500)
     assert len(result) == 500
@@ -289,7 +291,8 @@ def test_sanitize_prevents_prompt_injection_in_custom_brief():
 @pytest.mark.asyncio
 async def test_scan_log_calls_both_reddit_and_quora():
     """_scan_and_log must call both Reddit and Quora scan_brand_opportunities."""
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import patch
+
     from app.routers.opportunities import _scan_and_log
 
     with patch("app.services.reddit_scanner_service.scan_brand_opportunities", new_callable=AsyncMock) as mock_reddit, \

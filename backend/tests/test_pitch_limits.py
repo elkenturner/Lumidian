@@ -1,12 +1,11 @@
 """Tests for pitch brand manual action limits."""
-import pytest
-from datetime import datetime, timezone, timedelta
-
-import httpx
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
-from tests.conftest import register_and_login
+import httpx
+import pytest
 
+from tests.conftest import register_and_login
 
 pytestmark = pytest.mark.asyncio
 
@@ -43,8 +42,8 @@ async def test_pitch_brand_daily_run_limit(client: httpx.AsyncClient):
             brand_id=brand_id,
             status="completed",
             run_type="manual",
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            completed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            completed_at=datetime.now(UTC).replace(tzinfo=None),
         )
         db.add(today_run)
         await db.commit()
@@ -88,7 +87,7 @@ async def test_pitch_brand_yesterday_run_does_not_block(client: httpx.AsyncClien
     from app.database import AsyncSessionLocal
     from app.models import TrackingRun
     async with AsyncSessionLocal() as db:
-        yesterday = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
+        yesterday = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=1)
         old_run = TrackingRun(
             brand_id=brand_id,
             status="completed",
@@ -124,8 +123,8 @@ async def test_standard_brand_not_affected_by_pitch_limit(client: httpx.AsyncCli
             brand_id=brand_id,
             status="completed",
             run_type="manual",
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
-            completed_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+            completed_at=datetime.now(UTC).replace(tzinfo=None),
         )
         db.add(today_run)
         await db.commit()
@@ -149,6 +148,7 @@ async def test_pitch_brand_weekly_scan_limit(client: httpx.AsyncClient):
 
     # Seed a scan event from this week to simulate first scan already used
     import json
+
     from app.database import AsyncSessionLocal
     from app.models import AnalyticsEvent
     async with AsyncSessionLocal() as db:
@@ -156,7 +156,7 @@ async def test_pitch_brand_weekly_scan_limit(client: httpx.AsyncClient):
             event_type="manual_scan_triggered",
             brand_id=brand_id,
             data=json.dumps({"brand_id": brand_id}),
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None),
+            created_at=datetime.now(UTC).replace(tzinfo=None),
         )
         db.add(scan_event)
         await db.commit()
@@ -197,6 +197,7 @@ async def test_pitch_brand_old_scan_does_not_block(client: httpx.AsyncClient):
 
     # Seed a scan from 8 days ago (outside the rolling window)
     import json
+
     from app.database import AsyncSessionLocal
     from app.models import AnalyticsEvent
     async with AsyncSessionLocal() as db:
@@ -204,7 +205,7 @@ async def test_pitch_brand_old_scan_does_not_block(client: httpx.AsyncClient):
             event_type="manual_scan_triggered",
             brand_id=brand_id,
             data=json.dumps({"brand_id": brand_id}),
-            created_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=8),
+            created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=8),
         )
         db.add(old_event)
         await db.commit()

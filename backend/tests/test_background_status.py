@@ -10,10 +10,10 @@ Returns:
   state.generating_brands
 - scanning: true if any of the user's brand IDs is in state.scanning_brands
 """
-import pytest
 import httpx
-from tests.conftest import register_and_login, create_brand
+import pytest
 
+from tests.conftest import create_brand, register_and_login
 
 pytestmark = pytest.mark.asyncio
 

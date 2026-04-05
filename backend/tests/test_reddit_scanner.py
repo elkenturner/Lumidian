@@ -1,14 +1,14 @@
 # backend/tests/test_reddit_scanner.py
-import math
 import time
+
 import pytest
+
 from app.services.reddit_scanner_service import (
-    _is_blocked_subreddit,
-    _score_thread,
     _build_search_query,
     _haiku_relevance_check,
+    _is_blocked_subreddit,
+    _score_thread,
 )
-
 
 # ── _is_blocked_subreddit ─────────────────────────────────────────────────────
 
@@ -118,7 +118,6 @@ def test_low_relevance_scores_zero():
 
 # ── scan_brand_opportunities integration tests ────────────────────────────────
 
-import asyncio
 from unittest.mock import AsyncMock, patch
 
 
@@ -365,7 +364,7 @@ def test_build_search_query_extracts_specific_words():
 @pytest.mark.asyncio
 async def test_haiku_check_returns_list_same_length():
     """Returns a boolean list of same length as input."""
-    from unittest.mock import AsyncMock, patch, MagicMock
+    from unittest.mock import AsyncMock, MagicMock, patch
     candidates = [
         {"title": "How to raise capital via Reg A+", "subreddit": "startups", "body_preview": ""},
         {"title": "My cat is sick", "subreddit": "cats", "body_preview": ""},

@@ -11,6 +11,7 @@ In all cases refresh_brand_website_context() returns False on failure, True on s
 """
 
 import logging
+from datetime import UTC
 from urllib.parse import urlparse
 
 import httpx
@@ -72,10 +73,12 @@ async def refresh_brand_website_context(brand_id: int) -> bool:
     Returns True on success, False if the brand has no website_url or on error.
     Logs all failures — never raises.
     """
-    from datetime import datetime, timezone
+    from datetime import datetime
+
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models import Brand, BrandProfile
-    from sqlalchemy import select
 
     async with AsyncSessionLocal() as db:
         brand = await db.get(Brand, brand_id)
@@ -113,7 +116,7 @@ async def refresh_brand_website_context(brand_id: int) -> bool:
             db.add(profile)
 
         profile.internal_brand_context = context
-        profile.website_context_last_fetched = datetime.now(timezone.utc).replace(tzinfo=None)
+        profile.website_context_last_fetched = datetime.now(UTC).replace(tzinfo=None)
         await db.commit()
 
     logger.info("Website context refreshed for brand %d (%s): %d chars", brand_id, url, len(context))

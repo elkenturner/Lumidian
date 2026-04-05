@@ -13,26 +13,26 @@ from __future__ import annotations
 import logging
 import re
 from collections import defaultdict
-from datetime import datetime, timezone, timedelta
-from typing import Annotated, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, or_
+from fastapi import APIRouter, Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
-from app.models import Brand, Competitor, TrackingRun, QueryResult, Prompt
+from app.models import Competitor, Prompt, QueryResult, TrackingRun
 from app.schemas import (
-    DashboardAnalytics,
-    SOVData,
-    SentimentBreakdown,
-    PositionData,
-    DomainStat,
-    ConversationItem,
-    CompetitorStat,
-    ModelStat,
     CitationGap,
+    CompetitorStat,
+    ConversationItem,
+    DashboardAnalytics,
+    DomainStat,
+    ModelStat,
+    PositionData,
+    SentimentBreakdown,
+    SOVData,
 )
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -75,7 +75,7 @@ def _normalize(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
-def _position_score(response_text: str, brand_name: str) -> Optional[float]:
+def _position_score(response_text: str, brand_name: str) -> float | None:
     """
     Return a 1–10 score for where in the response the brand first appears.
     1 = very beginning, 10 = very end.
@@ -190,7 +190,7 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
     competitors = comp_result.scalars().all()
 
     # 3. Recent completed runs (last 30 days, max 50)
-    cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=_LOOKBACK_DAYS)
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=_LOOKBACK_DAYS)
     runs_result = await db.execute(
         select(TrackingRun)
         .where(

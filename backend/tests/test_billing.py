@@ -1,8 +1,9 @@
 """Tests for the billing endpoints."""
+from unittest.mock import MagicMock, patch
+
 import httpx
-import pytest
-from unittest.mock import patch, MagicMock
-from tests.conftest import register_and_login, create_brand
+
+from tests.conftest import create_brand, register_and_login
 
 
 async def test_billing_status_free_tier(client: httpx.AsyncClient):
@@ -163,14 +164,16 @@ async def test_create_checkout_session_carries_tier_metadata(client: httpx.Async
 async def test_webhook_checkout_completed_sets_active_tier(client: httpx.AsyncClient):
     """checkout.session.completed webhook must set subscription_tier and status='active'."""
     import json
+
     import stripe as _stripe
 
     await register_and_login(client, email="billing_webhook@example.com", subscription_tier=None)
 
     customer_id = "cus_webhook_test"
 
-    from app.database import AsyncSessionLocal
     from sqlalchemy import update
+
+    from app.database import AsyncSessionLocal
     from app.models import User
     async with AsyncSessionLocal() as db:
         await db.execute(

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Annotated, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -74,13 +74,13 @@ async def connect_account(request: ConnectAccountRequest, db: DbDep):
     result = await db.execute(
         select(AccountConnection).where(AccountConnection.platform == request.platform)
     )
-    account: Optional[AccountConnection] = result.scalar_one_or_none()
+    account: AccountConnection | None = result.scalar_one_or_none()
 
     now = utcnow()
     credentials_json = json.dumps(request.credentials)
 
     # Attempt to extract a display name from credentials (best-effort)
-    display_name: Optional[str] = (
+    display_name: str | None = (
         request.credentials.get("username")
         or request.credentials.get("display_name")
         or request.credentials.get("email")

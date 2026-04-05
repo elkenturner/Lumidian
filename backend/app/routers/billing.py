@@ -12,7 +12,8 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Annotated, Optional
+from datetime import UTC
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
@@ -113,15 +114,15 @@ def get_stripe():
 
 @router.get("/status")
 async def billing_status(user: Annotated[User, Depends(get_current_user)]):
-    from datetime import datetime, timezone
+    from datetime import datetime
     limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier or "", 10)
     brand_limits = BRAND_LIMITS.get(user.subscription_tier or "", BRAND_LIMITS[None])
     trial_end_dt = getattr(user, "subscription_trial_end", None)
     trial_end = trial_end_dt.isoformat() if trial_end_dt else None
     # Days remaining in trial (None when not in trial or no end date stored)
-    days_remaining: Optional[int] = None
+    days_remaining: int | None = None
     if user.subscription_status == "trialing" and trial_end_dt:
-        delta = trial_end_dt - datetime.now(timezone.utc).replace(tzinfo=None)
+        delta = trial_end_dt - datetime.now(UTC).replace(tzinfo=None)
         days_remaining = max(0, delta.days)
     return {
         "subscription_tier": user.subscription_tier,
@@ -141,15 +142,18 @@ async def billing_status(user: Annotated[User, Depends(get_current_user)]):
 @router.get("/usage")
 async def billing_usage(user: Annotated[User, Depends(get_current_user)], db: DbDep):
     """Returns today's manual run count and prompt/brand counts vs tier limits."""
-    from datetime import datetime, timezone
-    from sqlalchemy import select as sa_select, func
-    from app.models import TrackingRun, Brand, Prompt
+    from datetime import datetime
+
+    from sqlalchemy import func
+    from sqlalchemy import select as sa_select
+
+    from app.models import Brand, Prompt, TrackingRun
 
     tier = user.subscription_tier or ""
     is_admin = user.is_admin
 
     # Manual runs today (UTC midnight boundary)
-    today_start = datetime.now(timezone.utc).replace(
+    today_start = datetime.now(UTC).replace(
         hour=0, minute=0, second=0, microsecond=0, tzinfo=None
     )
     runs_today_result = await db.execute(
@@ -179,7 +183,6 @@ async def billing_usage(user: Annotated[User, Depends(get_current_user)], db: Db
     prompt_count = prompt_count_result.scalar_one()
 
     # Brand counts by type
-    from sqlalchemy import case
     brand_counts_result = await db.execute(
         sa_select(Brand.brand_type, func.count(Brand.id))
         .where(Brand.user_id == user.id)
@@ -420,6 +423,7 @@ async def stripe_webhook(request: Request, db: DbDep):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     from sqlalchemy import select as sa_select
+
     from app.models import User as UserModel
 
     event_type = event.get("type", "")
@@ -471,7 +475,7 @@ async def stripe_webhook(request: Request, db: DbDep):
         )
         user = result.scalar_one_or_none()
         if user:
-            from datetime import datetime, timezone
+            from datetime import datetime
             old_tier = user.subscription_tier
             user.subscription_status = sub_status
             user.stripe_subscription_id = sub_id
@@ -481,7 +485,7 @@ async def stripe_webhook(request: Request, db: DbDep):
             trial_end_ts = data_obj.get("trial_end")
             if trial_end_ts:
                 user.subscription_trial_end = datetime.fromtimestamp(
-                    trial_end_ts, tz=timezone.utc
+                    trial_end_ts, tz=UTC
                 ).replace(tzinfo=None)
             elif sub_status not in ("trialing",):
                 user.subscription_trial_end = None
@@ -497,6 +501,7 @@ async def stripe_webhook(request: Request, db: DbDep):
             # Auto-upgrade standard brands to pro if user upgraded to pro tier
             if tier == "pro" and tier != old_tier:
                 from sqlalchemy import update as sa_update
+
                 from app.models import Brand
                 upgrade_result = await db.execute(
                     sa_update(Brand)

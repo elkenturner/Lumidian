@@ -1,6 +1,7 @@
 """Tests for brand pause functionality."""
+from datetime import UTC, datetime, timedelta
+
 import pytest
-from datetime import datetime, timezone, timedelta
 from httpx import AsyncClient
 
 from tests.conftest import register_and_login
@@ -24,7 +25,7 @@ async def test_paused_pitch_brand_blocks_run(client: AsyncClient):
     from app.models import Brand
     async with AsyncSessionLocal() as db:
         brand = await db.get(Brand, brand_id)
-        brand.pitch_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
+        brand.pitch_expires_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=1)
         await db.commit()
 
     # Attempt to trigger a run — should be blocked
@@ -51,7 +52,7 @@ async def test_paused_brand_allows_read(client: AsyncClient):
     from app.models import Brand
     async with AsyncSessionLocal() as db:
         brand = await db.get(Brand, brand_id)
-        brand.pitch_expires_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=1)
+        brand.pitch_expires_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=1)
         await db.commit()
 
     # Reading brand should still work
@@ -73,9 +74,10 @@ async def test_lapsed_subscription_blocks_run(client: AsyncClient):
     brand_id = brand_resp.json()["id"]
 
     # Set subscription status to canceled
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models import User
-    from sqlalchemy import select
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).where(User.email == "lapsed@test.com"))
         user = result.scalar_one()

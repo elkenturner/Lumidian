@@ -22,6 +22,7 @@ Pitch brand lifecycle:
 import asyncio
 import logging
 import os
+from datetime import UTC
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -33,8 +34,8 @@ scheduler = AsyncIOScheduler(timezone="UTC")
 
 def _is_brand_paused(brand) -> bool:
     """Check if a brand should be skipped in scheduled sweeps."""
-    from datetime import datetime, timezone
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    from datetime import datetime
+    now = datetime.now(UTC).replace(tzinfo=None)
 
     # Skip expired pitch brands
     if brand.brand_type == "pitch" and brand.pitch_expires_at and brand.pitch_expires_at <= now:
@@ -45,9 +46,10 @@ def _is_brand_paused(brand) -> bool:
 
 async def _is_scheduler_paused() -> bool:
     """Return True if the scheduler has been paused via the settings API."""
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models import SystemSetting
-    from sqlalchemy import select
     async with AsyncSessionLocal() as db:
         result = await db.execute(
             select(SystemSetting).where(SystemSetting.key == "scheduler_paused")
@@ -62,10 +64,10 @@ async def _run_all_brands(schedule_slot: str) -> None:
         logger.info("Scheduler paused — skipping %s sweep", schedule_slot)
         return
 
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models import Brand
-    from app.services.tracking_service import run_tracking
-    from sqlalchemy import select
 
     logger.info("Scheduler: starting %s sweep", schedule_slot)
 
@@ -127,11 +129,12 @@ async def _reddit_scanner_sweep() -> None:
         logger.info("Scheduler paused — skipping Reddit scanner sweep")
         return
 
+    from sqlalchemy import select
+
     from app import state
     from app.database import AsyncSessionLocal
     from app.models import Brand
     from app.services.reddit_scanner_service import scan_brand_opportunities
-    from sqlalchemy import select
 
     logger.info("Scheduler: starting weekly Reddit scanner sweep")
 
@@ -160,11 +163,12 @@ async def _quora_scanner_sweep() -> None:
         logger.info("Scheduler paused — skipping Quora scanner sweep")
         return
 
+    from sqlalchemy import select
+
     from app import state
     from app.database import AsyncSessionLocal
     from app.models import Brand
     from app.services.quora_scanner_service import scan_brand_opportunities
-    from sqlalchemy import select
 
     logger.info("Scheduler: starting weekly Quora scanner sweep")
 
@@ -199,9 +203,10 @@ async def _auto_draft_sweep() -> None:
         logger.info("Scheduler paused — skipping auto-draft sweep")
         return
 
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models import Brand, BrandContentSettings
-    from sqlalchemy import select
 
     logger.info("Scheduler: starting weekly auto-draft sweep")
 
@@ -249,7 +254,7 @@ async def _sqlite_backup_sweep() -> None:
     Keeps the last 7 backups and deletes older ones automatically.
     """
     import shutil
-    from datetime import datetime, timezone
+    from datetime import datetime
     from pathlib import Path
 
     db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./clarity_ai.db")
@@ -268,7 +273,7 @@ async def _sqlite_backup_sweep() -> None:
     backup_dir = Path(__file__).resolve().parent.parent / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     backup_file = backup_dir / f"clarity_ai_{timestamp}.db"
 
     try:
@@ -310,10 +315,11 @@ async def _website_context_refresh_sweep() -> None:
         logger.info("Scheduler paused — skipping website context refresh sweep")
         return
 
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models import Brand
     from app.services.jina_service import refresh_brand_website_context
-    from sqlalchemy import select
 
     logger.info("Scheduler: starting monthly website context refresh sweep")
 
@@ -371,14 +377,16 @@ async def _visibility_alert_sweep() -> None:
         logger.info("Scheduler paused — skipping visibility alert sweep")
         return
 
-    from datetime import datetime, timedelta, timezone
-    from app.database import AsyncSessionLocal
-    from app.models import Brand, TrackingRun, User, SystemSetting
-    from app.services.email_service import send_visibility_alert_email
+    from datetime import datetime, timedelta
+
     from sqlalchemy import select
 
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, SystemSetting, TrackingRun, User
+    from app.services.email_service import send_visibility_alert_email
+
     logger.info("Scheduler: starting visibility alert sweep")
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     cooldown_cutoff = now - timedelta(days=ALERT_COOLDOWN_DAYS)
 
     async with AsyncSessionLocal() as db:
@@ -468,18 +476,20 @@ async def _pitch_expiry_sweep() -> None:
          with all child rows (prompts, tracking runs, drafts, content settings).
          SQLAlchemy cascade or ON DELETE CASCADE handles child cleanup.
     """
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
+
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models import Brand, User
     from app.services.email_service import send_pitch_expiry_warning_email
-    from sqlalchemy import select, delete
 
     if await _is_scheduler_paused():
         logger.info("Scheduler paused — skipping pitch expiry sweep")
         return
 
     logger.info("Scheduler: starting pitch expiry sweep")
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = datetime.now(UTC).replace(tzinfo=None)
     warn_start = now + timedelta(hours=23)
     warn_end = now + timedelta(hours=25)
 

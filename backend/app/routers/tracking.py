@@ -11,6 +11,7 @@ GET  /api/tracking/run/{run_id}/status                 — poll a specific run's
 
 import asyncio
 import logging
+from datetime import UTC
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -19,9 +20,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.routers.billing import DAILY_RUN_LIMITS
-from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_active_subscription, require_brand_active
+from app.dependencies import (
+    CurrentUser,
+    check_rate_limit,
+    get_brand_for_user,
+    require_active_subscription,
+    require_brand_active,
+)
 from app.models import Brand, TrackingRun
+from app.routers.billing import DAILY_RUN_LIMITS
 from app.schemas import ManualRunResponse, TrackingRunStatus, TrackingRunSummary
 
 logger = logging.getLogger(__name__)
@@ -47,9 +54,10 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
     require_brand_active(brand, user)
 
     # Calculate today's start once for all limit checks
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     from sqlalchemy import func
-    today_start = datetime.now(timezone.utc).replace(
+    today_start = datetime.now(UTC).replace(
         hour=0, minute=0, second=0, microsecond=0, tzinfo=None
     )
 
@@ -141,9 +149,9 @@ async def _background_run_with_id(run_id: int, brand_id: int) -> None:
     async with AsyncSessionLocal() as db:
         run = await db.get(TrackingRun, run_id)
         if run:
-            from datetime import datetime, timezone
+            from datetime import datetime
             run.status = "running"
-            run.started_at = datetime.now(timezone.utc).replace(tzinfo=None)
+            run.started_at = datetime.now(UTC).replace(tzinfo=None)
             await db.commit()
 
     try:
@@ -163,9 +171,10 @@ async def _log_run_events(
     query_results: list,
 ) -> None:
     """Log run_completed and per-prompt visibility_changed events."""
-    from app.services.analytics_service import log_event
     from app.database import AsyncSessionLocal
-    from app.models import QueryResult as QR, TrackingRun as TR
+    from app.models import QueryResult as QR
+    from app.models import TrackingRun as TR
+    from app.services.analytics_service import log_event
     from app.services.llm_service import SUPPORTED_MODELS
 
     # log run_completed
@@ -253,14 +262,16 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     instead of inserting a new TrackingRun row.
     """
     import asyncio
-    from app.database import AsyncSessionLocal
-    from app.models import Brand, Prompt, TrackingRun, QueryResult, RunModelScore
-    from app.services.llm_service import query_model, SUPPORTED_MODELS, TIER_RUNS
+    from datetime import datetime
+
     from sqlalchemy import select
-    from datetime import datetime, timezone
+
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
+    from app.services.llm_service import SUPPORTED_MODELS, TIER_RUNS, query_model
 
     def utcnow():
-        return datetime.now(timezone.utc).replace(tzinfo=None)
+        return datetime.now(UTC).replace(tzinfo=None)
 
     # Extract all values we need as plain Python types before the session closes,
     # so we never access SQLAlchemy-managed attributes on detached objects.
@@ -426,8 +437,9 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
     # Detect competitor mentions (non-fatal)
     try:
-        from app.models import Competitor as CompetitorModel, CompetitorMention
         from app.database import AsyncSessionLocal
+        from app.models import Competitor as CompetitorModel
+        from app.models import CompetitorMention
 
         async with AsyncSessionLocal() as comp_db:
             comps_result = await comp_db.execute(
@@ -457,12 +469,13 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
     # Update draft attributions (non-fatal)
     try:
-        from app.models import DraftAttribution
+        from datetime import datetime
+
         from app.database import AsyncSessionLocal
-        from datetime import datetime, timezone
+        from app.models import DraftAttribution
 
         def _utcnow_local():
-            return datetime.now(timezone.utc).replace(tzinfo=None)
+            return datetime.now(UTC).replace(tzinfo=None)
 
         async with AsyncSessionLocal() as attr_db:
             attr_result = await attr_db.execute(
@@ -582,13 +595,15 @@ async def _background_prompt_run(
 ) -> None:
     """Execute a single-prompt tracking run independently of full runs."""
     import asyncio as _asyncio
+    from datetime import datetime
+
     from app.database import AsyncSessionLocal
-    from app.models import TrackingRun as TR, QueryResult, RunModelScore
-    from app.services.llm_service import query_model, SUPPORTED_MODELS, TIER_RUNS
-    from datetime import datetime, timezone
+    from app.models import QueryResult, RunModelScore
+    from app.models import TrackingRun as TR
+    from app.services.llm_service import SUPPORTED_MODELS, TIER_RUNS, query_model
 
     def utcnow():
-        return datetime.now(timezone.utc).replace(tzinfo=None)
+        return datetime.now(UTC).replace(tzinfo=None)
 
     # Mark as running
     async with AsyncSessionLocal() as db:

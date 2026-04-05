@@ -8,11 +8,13 @@ Rules:
   - Admin users: always allowed regardless of tier
   - Weekly counter is per-brand (brand_id + event_type + created_at)
 """
-import pytest
-import httpx
-from unittest.mock import patch, AsyncMock
-from tests.conftest import register_and_login, create_brand
+from datetime import UTC
+from unittest.mock import AsyncMock, patch
 
+import httpx
+import pytest
+
+from tests.conftest import create_brand, register_and_login
 
 pytestmark = pytest.mark.asyncio
 
@@ -23,9 +25,10 @@ async def test_free_user_cannot_trigger_manual_scan(client: httpx.AsyncClient):
 
     # Free users can't create standard brands via the API (brand limit = 0).
     # Insert directly so we can test the scan quota check independently.
+    from sqlalchemy import select as _select
+
     from app.database import AsyncSessionLocal
     from app.models import Brand, User
-    from sqlalchemy import select as _select
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(_select(User).where(User.email == "scan_free@example.com"))
@@ -58,16 +61,17 @@ async def test_starter_user_blocked_at_weekly_limit(client: httpx.AsyncClient):
     brand = await create_brand(client, name="Limit Brand")
 
     # Seed 10 manual_scan_triggered analytics events for this brand
+    from datetime import datetime, timedelta
+
     from app.database import AsyncSessionLocal
     from app.models import AnalyticsEvent
-    from datetime import datetime, timezone, timedelta
 
     async with AsyncSessionLocal() as db:
         for _ in range(10):
             db.add(AnalyticsEvent(
                 event_type="manual_scan_triggered",
                 brand_id=brand["id"],
-                created_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=1),
+                created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1),
             ))
         await db.commit()
 
@@ -81,9 +85,10 @@ async def test_old_scan_events_do_not_count_toward_weekly_limit(client: httpx.As
     await register_and_login(client, email="scan_old@example.com", subscription_tier="starter")
     brand = await create_brand(client, name="Old Scan Brand")
 
+    from datetime import datetime, timedelta
+
     from app.database import AsyncSessionLocal
     from app.models import AnalyticsEvent
-    from datetime import datetime, timezone, timedelta
 
     # Seed 10 events from 8 days ago (outside window)
     async with AsyncSessionLocal() as db:
@@ -91,7 +96,7 @@ async def test_old_scan_events_do_not_count_toward_weekly_limit(client: httpx.As
             db.add(AnalyticsEvent(
                 event_type="manual_scan_triggered",
                 brand_id=brand["id"],
-                created_at=datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=8),
+                created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=8),
             ))
         await db.commit()
 
@@ -103,8 +108,9 @@ async def test_old_scan_events_do_not_count_toward_weekly_limit(client: httpx.As
 
 async def test_admin_can_always_trigger_scan(client: httpx.AsyncClient):
     """Admin users bypass all scan quota checks."""
-    from app.database import AsyncSessionLocal
     from sqlalchemy import text
+
+    from app.database import AsyncSessionLocal
 
     await register_and_login(client, email="scan_admin@example.com", subscription_tier=None)
     async with AsyncSessionLocal() as db:
@@ -113,9 +119,11 @@ async def test_admin_can_always_trigger_scan(client: httpx.AsyncClient):
 
     # Admin users can create brands via the API (they bypass limits).
     # However free plan has 0 standard brand limit, so insert directly.
-    from app.database import AsyncSessionLocal as _ASL
-    from app.models import Brand as _Brand, User as _User
     from sqlalchemy import select as _select
+
+    from app.database import AsyncSessionLocal as _ASL
+    from app.models import Brand as _Brand
+    from app.models import User as _User
 
     async with _ASL() as db:
         result = await db.execute(_select(_User).where(_User.email == "scan_admin@example.com"))

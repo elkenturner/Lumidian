@@ -12,7 +12,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Optional
 
 import httpx
 
@@ -68,7 +67,7 @@ def extract_keywords(prompt_text: str, max_words: int = 5) -> str:
 def search_quora_questions(
     query: str,
     num_results: int = 5,
-    cache_key: Optional[int] = None,
+    cache_key: int | None = None,
 ) -> list[dict]:
     """
     Search for real Quora question pages matching *query* via Serper.dev.

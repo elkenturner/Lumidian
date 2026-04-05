@@ -9,10 +9,10 @@ POST /api/notifications/{id}/read — mark one as read
 """
 from __future__ import annotations
 
-from typing import Annotated, List, Optional
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, update, func
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -26,16 +26,17 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 
 # ── Schemas (inline — small enough not to warrant schema file additions) ───────
 
-from pydantic import BaseModel
 from datetime import datetime
+
+from pydantic import BaseModel
 
 
 class NotificationOut(BaseModel):
     id: int
     type: str
     title: str
-    body: Optional[str] = None
-    link: Optional[str] = None
+    body: str | None = None
+    link: str | None = None
     read: bool
     created_at: datetime
 
@@ -43,7 +44,7 @@ class NotificationOut(BaseModel):
 
 
 class NotificationsResponse(BaseModel):
-    notifications: List[NotificationOut]
+    notifications: list[NotificationOut]
     unread_count: int
 
 

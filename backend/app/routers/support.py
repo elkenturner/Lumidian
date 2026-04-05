@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import Response
 from pydantic import BaseModel, field_validator
 
-from app.dependencies import get_current_user, CurrentUser
+from app.dependencies import CurrentUser
 
 logger = logging.getLogger(__name__)
 

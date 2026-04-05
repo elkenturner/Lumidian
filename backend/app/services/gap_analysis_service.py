@@ -14,17 +14,22 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime, timezone
-from typing import Optional
 from collections import defaultdict
+from datetime import UTC, datetime
 
-from sqlalchemy import select, func
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
 
 from app.database import AsyncSessionLocal
 from app.models import (
-    Brand, Prompt, TrackingRun, QueryResult, RunModelScore,
-    Competitor, ContentDraft, ContentPost, ContentGap,
+    Competitor,
+    ContentDraft,
+    ContentGap,
+    ContentPost,
+    Prompt,
+    QueryResult,
+    RunModelScore,
+)
+from app.models import (
     utcnow as _utcnow,
 )
 
@@ -118,7 +123,7 @@ async def run_gap_analysis(brand_id: int, run_id: int) -> list[int]:
 
         # Find platforms with recent activity per brand (last 30 days)
         from datetime import timedelta
-        thirty_days_ago_ts = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=30)
+        thirty_days_ago_ts = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
 
         recent_platforms_result = await db.execute(
             select(ContentPost.platform, func.max(ContentPost.posted_at))
@@ -220,7 +225,7 @@ async def run_gap_analysis(brand_id: int, run_id: int) -> list[int]:
             )
 
             # Fetch Quora questions relevant to this prompt (non-fatal, runs in thread)
-            quora_questions_json: Optional[str] = None
+            quora_questions_json: str | None = None
             try:
                 from app.services.quora_search_service import extract_keywords, search_quora_questions
                 keywords = extract_keywords(prompt.text)

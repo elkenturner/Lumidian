@@ -8,9 +8,6 @@ Covers:
 """
 from __future__ import annotations
 
-import pytest
-
-
 # ── GET /api/settings/scheduler ──────────────────────────────────────────────
 
 async def test_scheduler_default_active(client):

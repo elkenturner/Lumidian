@@ -3,8 +3,6 @@ Prompt construction for the drafting service.
 """
 from __future__ import annotations
 
-from typing import List, Optional
-
 # ── Wikipedia system prompt ───────────────────────────────────────────────────
 
 WIKIPEDIA_SYSTEM_PROMPT = (
@@ -20,7 +18,7 @@ WIKIPEDIA_SYSTEM_PROMPT = (
 def _build_citation_ref(
     publications: list[dict],
     brand_name: str,
-    website_url: Optional[str] = None,
+    website_url: str | None = None,
 ) -> str:
     """Build a <ref> citation from publications, website URL, or {{citation needed}}."""
     if publications:
@@ -49,8 +47,8 @@ def build_wikipedia_prompt(
     prompt_text: str,
     profile_context: str,
     response_analysis: str,
-    publications: Optional[List[dict]] = None,
-    website_url: Optional[str] = None,
+    publications: list[dict] | None = None,
+    website_url: str | None = None,
 ) -> str:
     citation_ref = _build_citation_ref(publications or [], brand_name, website_url)
     pub_note = ""
@@ -127,8 +125,8 @@ def build_prompt(
     profile_context: str,
     response_analysis: str,
     platform_spec: dict,
-    opportunity_context: Optional[str] = None,
-    existing_drafts_context: Optional[str] = None,
+    opportunity_context: str | None = None,
+    existing_drafts_context: str | None = None,
 ) -> str:
     spec = platform_spec
     word_min, word_max = spec["word_range"]

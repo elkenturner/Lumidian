@@ -20,32 +20,39 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
-from datetime import datetime, timezone
-from typing import List, Optional
 
-from sqlalchemy import select, func as sqlfunc
+from sqlalchemy import func as sqlfunc
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     Brand,
+    BrandContentSettings,
     BrandProfile,
-    ContentGap,
     ContentDraft,
+    ContentGap,
     ContentOpportunity,
     Prompt,
     QueryResult,
     TrackingRun,
-    BrandContentSettings,
+)
+from app.models import (
     utcnow as _utcnow,
 )
 from app.services.drafting import (
-    PLATFORM_SPECS, ALL_PLATFORMS, CONTENT_PLATFORMS, PLATFORM_MAX_TOKENS,
-    classify_subreddit, build_subreddit_strategy,
-    build_prompt, build_wikipedia_prompt, WIKIPEDIA_SYSTEM_PROMPT,
+    ALL_PLATFORMS,
+    CONTENT_PLATFORMS,
+    PLATFORM_MAX_TOKENS,
+    PLATFORM_SPECS,
+    build_prompt,
+    build_subreddit_strategy,
+    build_wikipedia_prompt,
     call_claude,
-    remove_hedging, clean_wiki_text, parse_wikipedia_draft,
-    extract_title_and_body, estimate_visibility_impact,
+    classify_subreddit,
+    estimate_visibility_impact,
+    extract_title_and_body,
+    parse_wikipedia_draft,
+    remove_hedging,
 )
 
 logger = logging.getLogger(__name__)
@@ -68,7 +75,7 @@ def _sanitize_user_input(text, max_length: int = 500) -> str:
 def _build_citation_ref(
     publications: list[dict],
     brand_name: str,
-    website_url: Optional[str] = None,
+    website_url: str | None = None,
 ) -> str:
     """Build a <ref> citation from publications, website URL, or {{citation needed}}."""
     from app.services.drafting.prompts import _build_citation_ref as _impl
@@ -77,7 +84,7 @@ def _build_citation_ref(
 
 # ── Brand profile loader ──────────────────────────────────────────────────────
 
-def _extract_publications(profile: "BrandProfile") -> list[dict]:
+def _extract_publications(profile: BrandProfile) -> list[dict]:
     """Return parsed publications list from the profile, or empty list."""
     if not profile or not profile.publications:
         return []
@@ -92,7 +99,7 @@ async def _load_profile_context(db: AsyncSession, brand_id: int) -> str:
     result = await db.execute(
         select(BrandProfile).where(BrandProfile.brand_id == brand_id)
     )
-    profile: Optional[BrandProfile] = result.scalar_one_or_none()
+    profile: BrandProfile | None = result.scalar_one_or_none()
 
     if profile is None:
         brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
@@ -141,7 +148,7 @@ async def _load_publications(db: AsyncSession, brand_id: int) -> list[dict]:
     result = await db.execute(
         select(BrandProfile).where(BrandProfile.brand_id == brand_id)
     )
-    profile: Optional[BrandProfile] = result.scalar_one_or_none()
+    profile: BrandProfile | None = result.scalar_one_or_none()
     return _extract_publications(profile) if profile else []
 
 
@@ -201,7 +208,6 @@ async def _analyze_responses_for_prompt(
     Read the most recent stored LLM responses for a prompt.
     Returns a summary of what is currently being said and what is missing.
     """
-    from sqlalchemy import Float, cast
 
     # Get the latest completed run for this brand
     run_result = await db.execute(
@@ -250,7 +256,7 @@ async def _analyze_responses_for_prompt(
 
     if not_mentioning:
         lines.append(
-            f"\nResponses that do NOT mention the brand — these show what narrative is missing:"
+            "\nResponses that do NOT mention the brand — these show what narrative is missing:"
         )
         for r in not_mentioning[:3]:
             preview = (r.response_text or "")[:300].replace("\n", " ")
@@ -304,6 +310,7 @@ async def _estimate_impact(
 
     # Platform activity — if no content posted on this platform recently, higher impact
     from datetime import timedelta
+
     from app.models import ContentPost
     thirty_days_ago = _utcnow() - timedelta(days=30)
     post_result = await db.execute(
@@ -325,16 +332,16 @@ async def _estimate_impact(
 async def _store_draft(
     db: AsyncSession,
     brand_id: int,
-    prompt_id: Optional[int],
+    prompt_id: int | None,
     platform: str,
-    title: Optional[str],
+    title: str | None,
     content_body: str,
     brief: str,
     visibility_pct: float,
     estimated_impact: float,
-    opportunity_id: Optional[int] = None,
-    guidelines_override: Optional[str] = None,
-    source: Optional[str] = None,
+    opportunity_id: int | None = None,
+    guidelines_override: str | None = None,
+    source: str | None = None,
 ) -> ContentDraft:
     spec = PLATFORM_SPECS.get(platform, {})
     guidelines_applied = guidelines_override if guidelines_override is not None else json.dumps(spec.get("rules", []))
@@ -412,11 +419,11 @@ async def generate_gap_draft(
     brand_id: int,
     prompt_id: int,
     platform: str,
-    custom_brief: Optional[str] = None,
-    quora_question_url: Optional[str] = None,
-    quora_question_title: Optional[str] = None,
-    quora_question_snippet: Optional[str] = None,
-    source: Optional[str] = None,
+    custom_brief: str | None = None,
+    quora_question_url: str | None = None,
+    quora_question_title: str | None = None,
+    quora_question_snippet: str | None = None,
+    source: str | None = None,
 ) -> ContentDraft:
     """
     Generate a draft targeting a specific prompt/platform gap.
@@ -464,7 +471,7 @@ async def generate_gap_draft(
     estimated_impact = await _estimate_impact(db, brand_id, prompt_id, platform)
 
     # Build context about existing drafts so Claude takes a different angle
-    existing_drafts_context: Optional[str] = None
+    existing_drafts_context: str | None = None
     if existing_drafts:
         ctx_lines = [
             "EXISTING DRAFTS FOR THIS PROMPT/PLATFORM — your draft MUST take a distinctly different angle:"
@@ -540,7 +547,7 @@ async def generate_gap_draft(
         return draft
 
     # Determine suggested subreddit for Reddit drafts
-    suggested_subreddit: Optional[str] = None
+    suggested_subreddit: str | None = None
     if platform == "reddit":
         from app.services.reddit_scanner_service import get_relevant_subreddits
         profile_result = await db.execute(
@@ -567,7 +574,7 @@ async def generate_gap_draft(
             suggested_subreddit = subs[0]
 
     # For restricted subreddits, brand name must NOT appear — skip mention retry
-    _reddit_strategy: Optional[str] = None
+    _reddit_strategy: str | None = None
     if platform == "reddit" and suggested_subreddit:
         _reddit_strategy = classify_subreddit(suggested_subreddit)
 
@@ -580,7 +587,7 @@ async def generate_gap_draft(
     # Jina is retained for any other URL that may be passed as quora_question_url.
     effective_opportunity_context = _sanitize_user_input(custom_brief) if custom_brief else None
     if platform == "quora" and quora_question_url and quora_question_title:
-        _quora_page_content: Optional[str] = None
+        _quora_page_content: str | None = None
         _is_quora_url = "quora.com" in quora_question_url.lower()
         if not _is_quora_url:
             # Non-Quora URL: attempt Jina fetch for richer context
@@ -669,7 +676,7 @@ async def generate_gap_draft(
                 brand.name, brand_id, platform, prompt_id,
             )
             raw_text = (
-                f"[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
+                "[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
             )
 
     title, body = extract_title_and_body(raw_text, platform)
@@ -827,7 +834,7 @@ async def generate_opportunity_draft(
                 "generate_opportunity_draft: brand '%s' not mentioned after retry — opp_id=%d",
                 brand.name, opportunity_id,
             )
-            raw_text = f"[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
+            raw_text = "[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
 
     _, body = extract_title_and_body(raw_text, platform_key)
 
@@ -870,7 +877,7 @@ async def auto_draft_top_gaps(
     brand_id: int,
     max_gaps: int = 20,
     clear_existing: bool = False,
-    source: Optional[str] = None,
+    source: str | None = None,
 ) -> list[ContentDraft]:
     """
     Generate up to max_gaps total drafts for a brand across all enabled platforms.
@@ -956,7 +963,7 @@ async def auto_draft_top_gaps(
     # max_gaps drafts are created or DRAFT_CAP is hit. This means 3 prompts ×
     # 4 platforms = 12 unique combos, but we keep cycling to reach 20.
     created: list[ContentDraft] = []
-    last_error: Optional[Exception] = None  # track first hard failure for diagnostics
+    last_error: Exception | None = None  # track first hard failure for diagnostics
     n_platforms = len(enabled_platforms)
     n_prompts = len(ordered_prompts)
     prompt_idx = 0
@@ -990,9 +997,9 @@ async def auto_draft_top_gaps(
         # Always query Serper for fresh results (24h in-process cache prevents
         # duplicate API calls within a day). Fall back to stored gap questions
         # only if Serper fails or returns nothing.
-        quora_url: Optional[str] = None
-        quora_title: Optional[str] = None
-        quora_snippet: Optional[str] = None
+        quora_url: str | None = None
+        quora_title: str | None = None
+        quora_snippet: str | None = None
         if platform == "quora":
             from app.services.quora_search_service import extract_keywords, search_quora_questions
             _questions: list[dict] = []

@@ -18,8 +18,7 @@ import logging
 import math
 import re
 import urllib.parse
-from datetime import datetime, timezone, timedelta
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -166,6 +165,7 @@ async def _haiku_relevance_check(
     Returns a list of booleans (True = keep). Fails open on any error.
     """
     import os
+
     import anthropic
 
     if not candidates:
@@ -361,7 +361,7 @@ def _score_thread(
         return 0.0
 
     # Recency — graduated, no hard cutoff (old evergreen threads still score)
-    now_ts = datetime.now(timezone.utc).timestamp()
+    now_ts = datetime.now(UTC).timestamp()
     age_days = (now_ts - created_utc) / 86400
     if age_days <= 7:
         recency = 1.0
@@ -386,7 +386,7 @@ def _score_thread(
 
 # ── HTTP fetching (httpx with urllib fallback) ─────────────────────────────────
 
-async def _fetch(url: str) -> Optional[dict]:
+async def _fetch(url: str) -> dict | None:
     try:
         import httpx
         async with httpx.AsyncClient(headers=_HEADERS, timeout=12.0) as client:
@@ -407,7 +407,7 @@ async def _fetch(url: str) -> Optional[dict]:
         req = urllib.request.Request(url, headers=_HEADERS)
         loop = asyncio.get_event_loop()
 
-        def _blocking_fetch() -> Optional[dict]:
+        def _blocking_fetch() -> dict | None:
             try:
                 with urllib.request.urlopen(req, timeout=12) as r:
                     return json.loads(r.read().decode())
@@ -420,7 +420,7 @@ async def _fetch(url: str) -> Optional[dict]:
         return None
 
 
-def _extract_posts(data: Optional[dict]) -> list[dict]:
+def _extract_posts(data: dict | None) -> list[dict]:
     if not data:
         return []
     try:
@@ -497,9 +497,11 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
     clear_existing=True: wipe ALL existing ContentOpportunity rows for this brand
     before inserting new ones.  Use for on-demand scans to flush stale results.
     """
+    from sqlalchemy import delete as sql_delete
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
-    from app.models import Brand, Prompt, ContentOpportunity
-    from sqlalchemy import select, delete as sql_delete
+    from app.models import Brand, ContentOpportunity, Prompt
 
     logger.info("Reddit scanner: brand_id=%d clear_existing=%s", brand_id, clear_existing)
 
@@ -534,7 +536,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             existing_urls: set[str] = set()
         else:
             # Prune only opportunities older than 14 days (status=new)
-            cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=14)
+            cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=14)
             old_row = await db.execute(
                 select(ContentOpportunity).where(
                     ContentOpportunity.brand_id == brand_id,
@@ -660,7 +662,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 continue
 
             posted_dt = (
-                datetime.fromtimestamp(cand["created_utc"], tz=timezone.utc).replace(tzinfo=None)
+                datetime.fromtimestamp(cand["created_utc"], tz=UTC).replace(tzinfo=None)
                 if cand["created_utc"] else None
             )
 
@@ -714,9 +716,10 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
 async def scan_all_brands() -> None:
     """Run the Reddit scanner for every brand in the database."""
+    from sqlalchemy import select
+
     from app.database import AsyncSessionLocal
     from app.models import Brand
-    from sqlalchemy import select
 
     logger.info("Reddit scanner: starting full sweep")
     async with AsyncSessionLocal() as db:

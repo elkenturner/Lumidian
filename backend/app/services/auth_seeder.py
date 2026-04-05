@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import logging
 import os
+
 import bcrypt
 from sqlalchemy import select
+
 from app.database import AsyncSessionLocal
 from app.models import User, utcnow
 

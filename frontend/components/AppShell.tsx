@@ -9,13 +9,11 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { BrandProvider } from '@/contexts/BrandContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getBackgroundStatus } from '@/lib/api';
+import { MODEL_CONFIG as MODEL_CONFIG_SHARED } from '@/lib/constants/models';
 
-const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  chatgpt: { label: 'ChatGPT', bg: 'rgba(16,163,127,0.15)', text: '#10a37f' },
-  claude: { label: 'Claude', bg: 'rgba(217,119,87,0.15)', text: '#d97757' },
-  perplexity: { label: 'Perplexity', bg: 'rgba(32,170,215,0.15)', text: '#20aad7' },
-  gemini: { label: 'Gemini', bg: 'rgba(66,133,244,0.15)', text: '#4285f4' },
-};
+const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
+  Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.bgColor, text: v.color }])
+);
 
 const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email'];
 

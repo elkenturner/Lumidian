@@ -1,27 +1,16 @@
 'use client';
 
 import { QueryResult } from '@/lib/api';
+import { MODEL_ORDER, getModelConfig as getModelConfigShared } from '@/lib/constants/models';
 
 interface ResponsesTableProps {
   responses: QueryResult[];
   loading: boolean;
 }
 
-const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  chatgpt:    { label: 'ChatGPT',    bg: 'var(--color-chatgpt-muted)', text: 'var(--color-chatgpt)' },
-  claude:     { label: 'Claude',     bg: 'var(--color-claude-muted)', text: 'var(--color-claude)' },
-  perplexity: { label: 'Perplexity', bg: 'var(--color-perplexity-muted)', text: 'var(--color-perplexity)' },
-  gemini:     { label: 'Gemini',     bg: 'var(--color-gemini-muted)', text: 'var(--color-gemini)' },
-};
-
-const MODEL_ORDER = ['chatgpt', 'claude', 'perplexity', 'gemini'];
-
 function getModelConfig(model: string) {
-  const key = model.toLowerCase().replace(/[-_\s]/g, '');
-  for (const [k, v] of Object.entries(MODEL_CONFIG)) {
-    if (key.includes(k)) return { ...v, key: k };
-  }
-  return { label: model, bg: 'rgba(99,102,241,0.10)', text: 'var(--text-muted)', key: model };
+  const cfg = getModelConfigShared(model);
+  return { label: cfg.label, bg: cfg.mutedBg, text: cfg.color, key: cfg.key };
 }
 
 interface ModelStat {

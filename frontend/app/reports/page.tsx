@@ -34,15 +34,16 @@ import TrendChart from '@/components/TrendChart';
 import { useBrand } from '@/contexts/BrandContext';
 import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const parseUTCISO = (s: string) => parseISO(s.endsWith('Z') ? s : s + 'Z');
 
 const MODEL_ORDER = ['chatgpt', 'claude', 'perplexity', 'gemini'];
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  chatgpt:    { label: 'ChatGPT',    bg: '#064e3b', text: '#10b981' },
-  claude:     { label: 'Claude',     bg: '#451a03', text: '#f59e0b' },
-  perplexity: { label: 'Perplexity', bg: '#2e1065', text: '#a78bfa' },
-  gemini:     { label: 'Gemini',     bg: '#1e3a5f', text: '#60a5fa' },
+  chatgpt:    { label: 'ChatGPT',    bg: 'var(--color-chatgpt-muted)', text: 'var(--color-chatgpt)' },
+  claude:     { label: 'Claude',     bg: 'var(--color-claude-muted)', text: 'var(--color-claude)' },
+  perplexity: { label: 'Perplexity', bg: 'var(--color-perplexity-muted)', text: 'var(--color-perplexity)' },
+  gemini:     { label: 'Gemini',     bg: 'var(--color-gemini-muted)', text: 'var(--color-gemini)' },
 };
 
 function getModelCfg(model: string) {
@@ -50,7 +51,7 @@ function getModelCfg(model: string) {
   for (const [k, v] of Object.entries(MODEL_CONFIG)) {
     if (key.includes(k)) return { ...v, key: k };
   }
-  return { label: model, bg: '#1e293b', text: '#94a3b8', key: model };
+  return { label: model, bg: 'var(--bg-card)', text: 'var(--text-secondary)', key: model };
 }
 
 function stripMarkdown(text: string): string {
@@ -136,6 +137,7 @@ export default function ReportsPage() {
   const [exportingCaseStudy, setExportingCaseStudy] = useState(false);
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysis | null>(null);
   const [competitorModelFilter, setCompetitorModelFilter] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'prompts' | 'competitors'>('prompts');
   const loadAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => { document.title = 'Reports — Lumidian'; }, []);
@@ -289,14 +291,14 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[#F0F4F8]">Reports</h1>
-          <p className="text-[13px] text-[#64748B] mt-1.5">Per-prompt visibility breakdown by AI model</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">Reports</h1>
+          <p className="text-[13px] text-[var(--text-muted)] mt-1.5">Per-prompt visibility breakdown by AI model</p>
         </div>
         <div className="flex items-center gap-3">
           {responses.length > 0 && (
             <button
               onClick={downloadCSV}
-              className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.09)] border border-[rgba(99,102,241,0.22)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-colors text-xs font-medium"
+              className="flex items-center gap-2 bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-colors text-xs font-medium"
               title="Export as CSV"
             >
               <Download size={14} />
@@ -308,7 +310,7 @@ export default function ReportsPage() {
               <button
                 onClick={downloadPDF}
                 disabled={exportingPDF}
-                className="flex items-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[#818cf8] hover:text-[#a5b4fc] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
+                className="flex items-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[var(--accent-light)] hover:text-[var(--accent-light)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
                 title="Export as PDF"
               >
                 {exportingPDF
@@ -326,7 +328,7 @@ export default function ReportsPage() {
                     finally { setExportingCaseStudy(false); }
                   }}
                   disabled={exportingCaseStudy}
-                  className="flex items-center gap-2 bg-[rgba(16,185,129,0.10)] hover:bg-[rgba(16,185,129,0.16)] border border-[rgba(16,185,129,0.25)] text-[#34d399] hover:text-[#6ee7b7] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
+                  className="flex items-center gap-2 bg-[rgba(16,185,129,0.10)] hover:bg-[rgba(16,185,129,0.16)] border border-[rgba(16,185,129,0.25)] text-[var(--success-text)] hover:text-[var(--success-text)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
                   title="Export 90-day case study PDF"
                 >
                   {exportingCaseStudy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
@@ -338,7 +340,7 @@ export default function ReportsPage() {
           <button
             onClick={() => selectedBrandId && loadData(selectedBrandId)}
             disabled={loading}
-            className="flex items-center gap-2 bg-[rgba(99,102,241,0.06)] hover:bg-[rgba(99,102,241,0.09)] border border-[rgba(99,102,241,0.22)] text-[#64748B] hover:text-[#94A3B8] rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
+            className="flex items-center gap-2 bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -347,17 +349,17 @@ export default function ReportsPage() {
 
       {loadingBrands ? (
         <div className="space-y-4 animate-pulse">
-          <div className="h-48 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
-          <div className="h-64 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl" />
+          <div className="h-48 bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl" />
+          <div className="h-64 bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl" />
         </div>
       ) : brands.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-14 h-14 bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.22)] rounded-2xl flex items-center justify-center mb-4">
-            <BarChart2 size={24} className="text-[#6366f1]" />
+          <div className="w-14 h-14 bg-[var(--accent-muted)] border border-[rgba(99,102,241,0.22)] rounded-2xl flex items-center justify-center mb-4">
+            <BarChart2 size={24} className="text-[var(--accent)]" />
           </div>
-          <h3 className="text-base font-semibold text-[#F0F4F8] mb-2">No brands tracked yet</h3>
-          <p className="text-sm text-[#64748B] max-w-sm mb-6">Add a brand and run a report to see prompt visibility data here.</p>
-          <Link href="/onboarding" className="flex items-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">
+          <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2">No brands tracked yet</h3>
+          <p className="text-sm text-[var(--text-muted)] max-w-sm mb-6">Add a brand and run a report to see prompt visibility data here.</p>
+          <Link href="/onboarding" className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white rounded-lg px-4 py-2 text-sm font-medium transition-colors">
             <Plus size={16} />
             Track Your First Brand
           </Link>
@@ -367,7 +369,7 @@ export default function ReportsPage() {
           {/* Trend chart */}
           <div className="mb-4">
             {loading ? (
-              <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30)] animate-pulse">
+              <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30)] animate-pulse">
                 <div className="h-5 bg-[rgba(255,255,255,0.06)] rounded w-32 mb-4" />
                 <div className="h-48 bg-[rgba(255,255,255,0.06)] rounded-lg" />
               </div>
@@ -377,32 +379,50 @@ export default function ReportsPage() {
           </div>
 
           {/* Schedule note */}
-          <p className="text-xs text-[#475569] mb-4 px-1">
+          <p className="text-xs text-[var(--text-faint)] mb-4 px-1">
             Reports update automatically once daily at 8:00 AM UTC.
           </p>
 
+          {/* Tabs for Prompt Breakdown and Competitor Analysis */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'prompts' | 'competitors')} className="mt-4">
+            <TabsList className="bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 h-auto gap-0 mb-4">
+              <TabsTrigger
+                value="prompts"
+                className="px-4 py-2 rounded-md text-sm font-medium h-auto data-[state=active]:bg-[rgba(99,102,241,0.25)] data-[state=active]:text-[var(--accent-light)] data-[state=inactive]:text-[var(--text-faint)]"
+              >
+                Prompt Breakdown
+              </TabsTrigger>
+              <TabsTrigger
+                value="competitors"
+                className="px-4 py-2 rounded-md text-sm font-medium h-auto data-[state=active]:bg-[rgba(99,102,241,0.25)] data-[state=active]:text-[var(--accent-light)] data-[state=inactive]:text-[var(--text-faint)]"
+              >
+                Competitor Analysis
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="prompts" className="mt-0">
           {/* Search + sort controls */}
           {!loading && responses.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 mb-3">
               {/* Search */}
               <div className="relative flex-1 min-w-[180px]">
-                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#475569] pointer-events-none" />
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search prompts…"
-                  className="w-full bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] text-[#94A3B8] placeholder:text-[#475569] rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1]/50 transition-colors"
+                  className="w-full bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-[var(--text-secondary)] placeholder:text-[var(--text-faint)] rounded-lg pl-8 pr-3 py-2 text-xs focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 transition-colors"
                 />
               </div>
               {/* Sort */}
-              <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5">
-                <ArrowUpDown size={11} className="text-[#475569] ml-1.5" />
+              <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[var(--border-subtle)] rounded-lg p-0.5">
+                <ArrowUpDown size={11} className="text-[var(--text-faint)] ml-1.5" />
                 {(['visibility', 'alpha', 'change'] as SortBy[]).map((s) => (
                   <button
                     key={s}
                     onClick={() => setSortBy(s)}
-                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all capitalize ${sortBy === s ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]' : 'text-[#475569] hover:text-[#94A3B8]'}`}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all capitalize ${sortBy === s ? 'bg-[rgba(99,102,241,0.25)] text-[var(--accent-light)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
                   >
                     {s === 'visibility' ? 'Visibility %' : s === 'alpha' ? 'A–Z' : 'Biggest Δ'}
                   </button>
@@ -419,32 +439,32 @@ export default function ReportsPage() {
             const indexS = indexR.length > 0 ? Math.round(indexR.filter(r => r.mentioned).length / indexR.length * 100) : null;
             if (liveS === null && indexS === null) return null;
             return (
-              <div className="mb-4 bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl px-5 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-                <p className="text-[11px] font-semibold text-[#64748B] uppercase tracking-wider mb-3">Score Breakdown</p>
+              <div className="mb-4 bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl px-5 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+                <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">Score Breakdown</p>
                 <div className="grid grid-cols-2 gap-4">
                   {([
-                    { label: 'Live Search', s: liveS,  models: 'Perplexity · Gemini',  color: '#10b981' },
-                    { label: 'AI Index',    s: indexS, models: 'GPT-4o-mini · Claude', color: '#818cf8' },
+                    { label: 'Live Search', s: liveS,  models: 'Perplexity · Gemini',  color: 'var(--success)' },
+                    { label: 'AI Index',    s: indexS, models: 'GPT-4o-mini · Claude', color: 'var(--accent-light)' },
                   ] as Array<{ label: string; s: number | null; models: string; color: string }>).map(({ label, s, models, color }) => (
                     <div key={label}>
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-1.5">
                           <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-                          <span className="text-xs font-medium text-[#94A3B8]">{label}</span>
+                          <span className="text-xs font-medium text-[var(--text-secondary)]">{label}</span>
                         </div>
-                        <span className="text-sm font-bold tabular-nums" style={{ color }}>
+                        <span className="text-sm font-bold tabular-nums font-mono" style={{ color }}>
                           {s !== null ? `${s}%` : '—'}
                         </span>
                       </div>
                       <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                         <div className="h-full rounded-full transition-all" style={{ width: `${s ?? 0}%`, background: color }} />
                       </div>
-                      <p className="text-[10px] text-[#475569] mt-1">{models}</p>
+                      <p className="text-[10px] text-[var(--text-faint)] mt-1">{models}</p>
                     </div>
                   ))}
                 </div>
                 {liveS !== null && indexS !== null && (
-                  <p className="text-[11px] text-[#64748B] italic mt-3 border-t border-[rgba(255,255,255,0.05)] pt-2.5">
+                  <p className="text-[11px] text-[var(--text-muted)] italic mt-3 border-t border-[rgba(255,255,255,0.05)] pt-2.5">
                     {liveS >= 50 && indexS >= 50
                       ? 'Strong across both live search and AI knowledge.'
                       : liveS >= 50 && indexS < 50
@@ -459,18 +479,18 @@ export default function ReportsPage() {
           })()}
 
           {/* Prompt visibility list */}
-          <div className="bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
-            <div className="px-5 py-3.5 border-b border-[rgba(99,102,241,0.12)] bg-[rgba(99,102,241,0.05)] flex items-center justify-between">
-              <h3 className="text-[15px] font-medium text-[#F0F4F8]">Prompt Visibility</h3>
+          <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <div className="px-5 py-3.5 border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)] flex items-center justify-between">
+              <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Prompt Visibility</h3>
               {!loading && (promptGroups.length + untrackedPrompts.length) > 0 && (
-                <span className="text-xs text-[#64748B]">
+                <span className="text-xs text-[var(--text-muted)]">
                   {searchQuery ? `${promptGroups.length} of ${allPromptGroups.length}` : `${promptGroups.length + untrackedPrompts.length}`} prompt{(promptGroups.length + untrackedPrompts.length) !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
 
             {loading ? (
-              <div className="divide-y divide-[rgba(99,102,241,0.10)]">
+              <div className="divide-y divide-[rgba(255,255,255,0.06)]">
                 {[1, 2, 3, 4].map(i => (
                   <div key={i} className="px-5 py-5 animate-pulse">
                     <div className="flex items-start justify-between gap-3 mb-3">
@@ -485,17 +505,17 @@ export default function ReportsPage() {
               </div>
             ) : promptGroups.length === 0 && untrackedPrompts.length === 0 ? (
               <div className="px-5 py-12 text-center">
-                <div className="w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.12)] flex items-center justify-center mx-auto mb-3">
-                  <BarChart2 size={18} className="text-[#475569]" />
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-muted)] border border-[rgba(99,102,241,0.22)] flex items-center justify-center mx-auto mb-3">
+                  <BarChart2 size={18} className="text-[var(--text-faint)]" />
                 </div>
-                <p className="text-sm font-medium text-[#94A3B8] mb-1">No report data yet</p>
-                <p className="text-sm text-[#475569]">Run a report from the Dashboard to see prompt visibility.</p>
+                <p className="text-sm font-medium text-[var(--text-secondary)] mb-1">No report data yet</p>
+                <p className="text-sm text-[var(--text-faint)]">Run a report from the Dashboard to see prompt visibility.</p>
               </div>
             ) : (
-              <div className="divide-y divide-[rgba(99,102,241,0.10)]">
+              <div className="divide-y divide-[rgba(255,255,255,0.06)]">
                 {promptGroups.map((g) => {
                   const overallPct = g.total > 0 ? Math.round((g.mentioned / g.total) * 100) : 0;
-                  const overallColor = overallPct >= 60 ? '#10b981' : overallPct >= 30 ? '#f59e0b' : '#ef4444';
+                  const overallColor = overallPct >= 60 ? 'var(--success)' : overallPct >= 30 ? 'var(--warning)' : 'var(--danger)';
                   const isExpanded = expandedPromptId === g.promptId;
                   const prevPct = prevScoreMap.get(g.promptId);
                   const delta = prevPct !== undefined ? overallPct - prevPct : null;
@@ -518,18 +538,18 @@ export default function ReportsPage() {
                   return (
                     <div key={g.promptId}>
                       <button
-                        className="w-full px-5 py-4 hover:bg-[rgba(99,102,241,0.05)] transition-colors text-left"
+                        className="w-full px-5 py-4 hover:bg-[rgba(255,255,255,0.02)] transition-colors text-left"
                         onClick={() => setExpandedPromptId(isExpanded ? null : g.promptId)}
                       >
                         <div className="flex items-start gap-3 mb-3">
-                          <p className="text-sm text-[#94A3B8] leading-snug font-medium flex-1">{g.promptText}</p>
+                          <p className="text-sm text-[var(--text-secondary)] leading-snug font-medium flex-1">{g.promptText}</p>
                           <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-sm font-bold tabular-nums" style={{ color: overallColor }}>
+                            <span className="text-sm font-bold tabular-nums font-mono" style={{ color: overallColor }}>
                               {overallPct}%
                             </span>
                             {delta !== null && delta !== 0 && (
                               <span
-                                className={`text-[10px] font-bold cursor-default ${delta > 0 ? 'text-[#10b981]' : 'text-[#f87171]'}`}
+                                className={`text-[10px] font-bold cursor-default ${delta > 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}
                                 title={modelDeltaTooltip || undefined}
                               >
                                 {delta > 0 ? `+${delta}%` : `${delta}%`}
@@ -537,7 +557,7 @@ export default function ReportsPage() {
                             )}
                             <ChevronDown
                               size={14}
-                              className={`text-[#475569] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                              className={`text-[var(--text-faint)] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
                             />
                           </div>
                         </div>
@@ -545,8 +565,8 @@ export default function ReportsPage() {
                         {/* Model breakdown badges — grouped by Live Search / AI Index */}
                         <div className="flex flex-col gap-1.5">
                           {([
-                            { category: 'Live', models: ['perplexity', 'gemini'], color: '#10b981' },
-                            { category: 'Index', models: ['chatgpt', 'claude'],   color: '#818cf8' },
+                            { category: 'Live', models: ['perplexity', 'gemini'], color: 'var(--success)' },
+                            { category: 'Index', models: ['chatgpt', 'claude'],   color: 'var(--accent-light)' },
                           ] as Array<{ category: string; models: string[]; color: string }>).map(({ category, models: catModels, color }) => (
                             <div key={category} className="flex items-center gap-2">
                               <span
@@ -560,15 +580,15 @@ export default function ReportsPage() {
                                   const ms = g.modelStats.get(modelKey);
                                   const cfg = getModelCfg(modelKey);
                                   const pct = ms && ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : null;
-                                  const mentionColor = pct === null ? '#475569' : pct >= 60 ? '#10b981' : pct >= 30 ? '#f59e0b' : '#ef4444';
+                                  const mentionColor = pct === null ? 'var(--text-faint)' : pct >= 60 ? 'var(--success)' : pct >= 30 ? 'var(--warning)' : 'var(--danger)';
                                   return (
                                     <div
                                       key={modelKey}
-                                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[rgba(99,102,241,0.22)] bg-[rgba(99,102,241,0.06)]"
+                                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)]"
                                     >
-                                      <span className="text-xs font-semibold" style={{ color: pct === null ? '#475569' : cfg.text }}>{cfg.label}</span>
+                                      <span className="text-xs font-semibold" style={{ color: pct === null ? 'var(--text-faint)' : cfg.text }}>{cfg.label}</span>
                                       <span className="text-[rgba(255,255,255,0.10)]">·</span>
-                                      <span className="text-xs font-bold tabular-nums" style={{ color: mentionColor }}>{pct !== null ? `${pct}%` : '—'}</span>
+                                      <span className="text-xs font-bold tabular-nums font-mono" style={{ color: mentionColor }}>{pct !== null ? `${pct}%` : '—'}</span>
                                     </div>
                                   );
                                 })}
@@ -582,14 +602,14 @@ export default function ReportsPage() {
                           const competitorNames = competitorAnalysis?.overall.competitors.map((c) => c.name) ?? [];
                           const explanation = extractGapMentions(g, competitorNames);
                           return explanation ? (
-                            <p className="text-xs text-[#475569] mt-2 italic">{explanation}</p>
+                            <p className="text-xs text-[var(--text-faint)] mt-2 italic">{explanation}</p>
                           ) : null;
                         })()}
                       </button>
 
                       {/* Expanded: individual query responses */}
                       {isExpanded && (
-                        <div className="border-t border-[rgba(99,102,241,0.12)] bg-[rgba(99,102,241,0.04)] divide-y divide-[rgba(99,102,241,0.10)]">
+                        <div className="border-t border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)] divide-y divide-[rgba(255,255,255,0.06)]">
                           {g.responses.map((r) => {
                             const cfg = getModelCfg(r.model);
                             return (
@@ -602,12 +622,12 @@ export default function ReportsPage() {
                                 </span>
                                 <div className="flex-1 min-w-0">
                                   {r.response_text ? (
-                                    <p className="text-xs text-[#64748B] leading-relaxed line-clamp-3">
+                                    <p className="text-xs text-[var(--text-muted)] leading-relaxed line-clamp-3">
                                       {stripMarkdown(r.response_text).slice(0, 200)}
                                       {r.response_text.length > 200 ? '…' : ''}
                                     </p>
                                   ) : (
-                                    <p className="text-xs text-[#475569] italic">No response text</p>
+                                    <p className="text-xs text-[var(--text-faint)] italic">No response text</p>
                                   )}
                                 </div>
                                 <Badge variant={r.mentioned ? "success" : "secondary"} className="flex-shrink-0">
@@ -626,34 +646,36 @@ export default function ReportsPage() {
                 {untrackedPrompts.map((p) => (
                   <div key={`untracked-${p.id}`} className="px-5 py-4">
                     <div className="flex items-start gap-3 mb-2">
-                      <p className="text-sm text-[#64748B] leading-snug font-medium flex-1">{p.text}</p>
+                      <p className="text-sm text-[var(--text-muted)] leading-snug font-medium flex-1">{p.text}</p>
                       <Badge variant="secondary" className="flex-shrink-0">
                         Not yet tracked
                       </Badge>
                     </div>
-                    <p className="text-xs text-[#475569]">Will be included in your next report run.</p>
+                    <p className="text-xs text-[var(--text-faint)]">Will be included in your next report run.</p>
                   </div>
                 ))}
               </div>
             )}
           </div>
+            </TabsContent>
 
+            <TabsContent value="competitors" className="mt-0">
           {/* Competitors section */}
           {!loading && competitorAnalysis && !competitorAnalysis.has_data && (
-            <div className="mt-4 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl p-8 text-center shadow-[0_4px_24px_rgba(0,0,0,0.30)]">
+            <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-8 text-center shadow-[0_4px_24px_rgba(0,0,0,0.30)]">
               <div className="w-10 h-10 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.20)] rounded-xl flex items-center justify-center mb-3 mx-auto">
-                <BarChart2 size={18} className="text-[#6366f1]" />
+                <BarChart2 size={18} className="text-[var(--accent)]" />
               </div>
-              <p className="text-sm font-semibold text-[#CBD5E1] mb-1">No competitor data yet</p>
-              <p className="text-xs text-[#64748B] max-w-xs mx-auto">Add competitors on the Dashboard to see a side-by-side share-of-voice comparison.</p>
+              <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">No competitor data yet</p>
+              <p className="text-xs text-[var(--text-muted)] max-w-xs mx-auto">Add competitors on the Dashboard to see a side-by-side share-of-voice comparison.</p>
             </div>
           )}
           {competitorAnalysis && competitorAnalysis.has_data && (
-            <div className="mt-4 bg-[rgba(99,102,241,0.06)] backdrop-blur-md border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
-              <div className="px-5 py-3.5 border-b border-[rgba(99,102,241,0.12)] bg-[rgba(99,102,241,0.05)] flex items-center justify-between">
+            <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+              <div className="px-5 py-3.5 border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)] flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-[#F0F4F8]">Competitor Share of Voice</h3>
-                  <p className="text-xs text-[#64748B] mt-0.5">
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">Competitor Share of Voice</h3>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
                     Overall: {selectedBrand?.name} {competitorAnalysis.overall.brand_pct}%
                     {competitorAnalysis.overall.competitors.map((c) => ` · ${c.name} ${c.pct}%`).join('')}
                   </p>
@@ -668,8 +690,8 @@ export default function ReportsPage() {
                         onClick={() => setCompetitorModelFilter(mk)}
                         className={`text-[10px] font-medium px-2 py-1 rounded transition-colors ${
                           competitorModelFilter === mk
-                            ? 'bg-[rgba(99,102,241,0.25)] text-[#818cf8]'
-                            : 'text-[#475569] hover:text-[#94A3B8]'
+                            ? 'bg-[rgba(99,102,241,0.25)] text-[var(--accent-light)]'
+                            : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'
                         }`}
                         style={cfg && competitorModelFilter === mk ? { color: cfg.text } : {}}
                       >
@@ -684,19 +706,19 @@ export default function ReportsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-[rgba(99,102,241,0.10)]">
-                      <th className="text-left px-5 py-2.5 text-[#64748B] font-medium w-1/2">Prompt</th>
-                      <th className="text-center px-3 py-2.5 text-[#6366f1] font-medium whitespace-nowrap">
+                    <tr className="border-b border-[rgba(255,255,255,0.06)]">
+                      <th className="text-left px-5 py-2.5 text-[var(--text-muted)] font-medium w-1/2">Prompt</th>
+                      <th className="text-center px-3 py-2.5 text-[var(--accent)] font-medium whitespace-nowrap">
                         {selectedBrand?.name ?? 'Your Brand'}
                       </th>
                       {competitorAnalysis.prompts[0]?.competitors.map((c) => (
-                        <th key={c.name} className="text-center px-3 py-2.5 text-[#64748B] font-medium whitespace-nowrap">
+                        <th key={c.name} className="text-center px-3 py-2.5 text-[var(--text-muted)] font-medium whitespace-nowrap">
                           {c.name}
                         </th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[rgba(99,102,241,0.08)]">
+                  <tbody className="divide-y divide-[rgba(255,255,255,0.06)]">
                     {competitorAnalysis.prompts.map((row) => {
                       const brandRate = competitorModelFilter === 'all'
                         ? row.brand_rate
@@ -712,15 +734,15 @@ export default function ReportsPage() {
                       const brandLoses = compRates.some((c) => c.rate > brandRate);
 
                       return (
-                        <tr key={row.prompt_id} className="hover:bg-[rgba(99,102,241,0.04)] transition-colors">
-                          <td className="px-5 py-3 text-[#94A3B8] leading-snug">
+                        <tr key={row.prompt_id} className="hover:bg-[rgba(255,255,255,0.03)] transition-colors">
+                          <td className="px-5 py-3 text-[var(--text-secondary)] leading-snug">
                             <p className="line-clamp-2">{row.prompt_text}</p>
                           </td>
                           <td className="px-3 py-3 text-center">
                             <span
-                              className="font-bold tabular-nums text-sm"
+                              className="font-bold tabular-nums font-mono text-sm"
                               style={{
-                                color: brandWins ? '#10b981' : brandLoses ? '#f87171' : '#94A3B8',
+                                color: brandWins ? 'var(--success)' : brandLoses ? 'var(--danger)' : 'var(--text-secondary)',
                               }}
                             >
                               {Math.round(brandRate)}%
@@ -731,8 +753,8 @@ export default function ReportsPage() {
                             return (
                               <td key={c.name} className="px-3 py-3 text-center">
                                 <span
-                                  className="font-medium tabular-nums"
-                                  style={{ color: compWins ? '#ef4444' : '#64748B' }}
+                                  className="font-medium tabular-nums font-mono"
+                                  style={{ color: compWins ? 'var(--danger)' : 'var(--text-muted)' }}
                                 >
                                   {Math.round(c.rate)}%
                                 </span>
@@ -747,6 +769,14 @@ export default function ReportsPage() {
               </div>
             </div>
           )}
+              {loading && (
+                <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-6 animate-pulse">
+                  <div className="h-5 bg-[rgba(255,255,255,0.06)] rounded w-48 mb-4" />
+                  <div className="h-32 bg-[rgba(255,255,255,0.06)] rounded-lg" />
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </>
       )}
     </div>

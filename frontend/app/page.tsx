@@ -339,7 +339,73 @@ function Header({ scrolled }: { scrolled: boolean }) {
 }
 
 function HeroSection() {
-  return <section className="min-h-screen flex items-center justify-center text-[#64748b]">Hero placeholder</section>;
+  return (
+    <section className="relative min-h-screen flex items-center justify-center pt-20 pb-16 overflow-hidden">
+      {/* Background gradient */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+        }}
+      />
+
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        {/* Badge */}
+        <FadeUp>
+          <div className="inline-flex items-center gap-2 bg-[#0f172a] border border-[rgba(99,102,241,0.3)] rounded-full px-4 py-1.5 mb-8">
+            <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
+            <span className="text-sm text-[#94a3b8]">Now tracking 4 AI models</span>
+          </div>
+        </FadeUp>
+
+        {/* Headline */}
+        <FadeUp delay={100}>
+          <h1
+            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight"
+            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif', letterSpacing: '-0.03em', lineHeight: 1.05 }}
+          >
+            Track Your Brand&apos;s
+            <br />
+            <span className="bg-gradient-to-r from-[#6366f1] to-[#a855f7] bg-clip-text text-transparent">
+              Visibility in AI
+            </span>
+          </h1>
+        </FadeUp>
+
+        {/* Subhead */}
+        <FadeUp delay={200}>
+          <p className="mt-6 text-lg sm:text-xl text-[#94a3b8] max-w-2xl mx-auto leading-relaxed">
+            Monitor how often ChatGPT, Claude, Perplexity, and Gemini mention your brand.
+            Identify gaps. Fix them with AI-drafted content.
+          </p>
+        </FadeUp>
+
+        {/* CTAs */}
+        <FadeUp delay={300}>
+          <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/register"
+              className="flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_32px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_rgba(99,102,241,0.6)]"
+            >
+              <Play size={18} fill="white" />
+              Start Free
+            </Link>
+            <Link
+              href="/login"
+              className="text-lg font-medium text-white px-6 py-4 rounded-full border border-[rgba(255,255,255,0.25)] hover:border-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
+            >
+              Log in
+            </Link>
+          </div>
+        </FadeUp>
+
+        {/* Dashboard mockup */}
+        <ScaleIn delay={400} className="mt-16">
+          <DashboardMockup />
+        </ScaleIn>
+      </div>
+    </section>
+  );
 }
 
 function ModelsBar() {

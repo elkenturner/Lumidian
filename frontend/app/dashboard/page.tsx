@@ -76,6 +76,7 @@ import { format } from 'date-fns';
 import { MODEL_ORDER, MODEL_CONFIG as MODEL_CONFIG_SHARED, getModelConfig } from '@/lib/constants/models';
 import { parseUTCISO } from '@/lib/utils/formatting';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.mutedBg, text: v.color }])
@@ -539,6 +540,15 @@ export default function DashboardPage() {
     return () => controller.abort();
   }, [selectedBrandId, loadData]);
 
+  const handlePullRefresh = useCallback(async () => {
+    if (selectedBrandId) await loadData(selectedBrandId);
+  }, [selectedBrandId, loadData]);
+
+  const { containerRef: pullRef, pullDistance, refreshing: pullRefreshing } = usePullToRefresh({
+    onRefresh: handlePullRefresh,
+    disabled: !isMobile || !selectedBrandId,
+  });
+
   // Load pending prompt mini-runs from localStorage on mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -816,7 +826,24 @@ export default function DashboardPage() {
   })();
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl">
+    <div ref={isMobile ? pullRef : undefined} className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl" style={isMobile ? { overflowY: 'auto', minHeight: '100vh' } : undefined}>
+      {/* Pull-to-refresh indicator */}
+      {isMobile && (pullDistance > 0 || pullRefreshing) && (
+        <div
+          className="pull-indicator -mx-4 mb-2"
+          style={{ height: pullDistance > 0 ? pullDistance : 40 }}
+        >
+          <Loader2
+            size={18}
+            className={pullRefreshing ? 'animate-spin' : ''}
+            style={{
+              color: 'var(--accent)',
+              transform: `rotate(${pullDistance * 3}deg)`,
+              opacity: Math.min(pullDistance / 60, 1),
+            }}
+          />
+        </div>
+      )}
       {/* Subscription status / trial banner */}
       {user?.subscription_status && ['past_due', 'canceled', 'unpaid', 'trialing'].includes(user.subscription_status) && (
         <div className="-mx-8 -mt-8 mb-6">

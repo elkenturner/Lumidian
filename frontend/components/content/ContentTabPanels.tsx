@@ -84,6 +84,8 @@ export interface ContentTabPanelsProps {
   setOppHelpOpen: (v: boolean) => void;
   // User
   user: { subscription_tier?: string | null; is_admin?: boolean } | null;
+  // Request Draft
+  onRequestDraft?: () => void;
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -1724,7 +1726,7 @@ function DraftsPanel(props: ContentTabPanelsProps) {
     brands, selectedBrandId, draftItems, _disabledPlatforms, platformFilter,
     setPlatformFilter, visibleDraftItems, pinnedDraftId, brandProfile, brandPrompts,
     postedItems, draftStatus, generating, handleGenerateNow, handleApprove,
-    handleDelete, handleSaved, setDraftItems, user,
+    handleDelete, handleSaved, setDraftItems, user, onRequestDraft,
   } = props;
 
   const selectedBrand = brands.find((b) => b.id === selectedBrandId);
@@ -1734,25 +1736,40 @@ function DraftsPanel(props: ContentTabPanelsProps) {
     draftItems.filter((d) => !_disabledPlatforms.has(d.platform)).map((d) => d.platform)
   )).sort();
 
-  const filterBar = draftPlatforms.length >= 2 ? (
-    <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 mb-4 self-start">
-      <button
-        onClick={() => setPlatformFilter('all')}
-        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
-      >
-        All
-      </button>
-      {draftPlatforms.map((p) => (
+  const canRequestDraft = onRequestDraft && (user?.subscription_tier || user?.is_admin);
+
+  const filterBar = (
+    <div className="flex items-center justify-between mb-4">
+      {draftPlatforms.length >= 2 ? (
+        <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 self-start">
+          <button
+            onClick={() => setPlatformFilter('all')}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+          >
+            All
+          </button>
+          {draftPlatforms.map((p) => (
+            <button
+              key={p}
+              onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      ) : <div />}
+      {canRequestDraft && (
         <button
-          key={p}
-          onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
-          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+          onClick={onRequestDraft}
+          className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--accent-foreground)] transition-colors"
         >
-          {p}
+          <span className="w-5 h-5 rounded-md bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] flex items-center justify-center text-[var(--accent-foreground)]">+</span>
+          New draft
         </button>
-      ))}
+      )}
     </div>
-  ) : null;
+  );
 
   if (visibleDraftItems.length === 0) {
     return (

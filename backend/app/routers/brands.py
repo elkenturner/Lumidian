@@ -600,7 +600,6 @@ async def fetch_website_context_endpoint(
 
     try:
         context = await fetch_website_context(payload.url)
-        return FetchWebsiteContextResponse(context=context)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -612,6 +611,37 @@ async def fetch_website_context_endpoint(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="Failed to fetch website content. Please check the URL and try again.",
         )
+
+    # Best-effort: generate a clean company description from the scraped content
+    description = None
+    if context and context.strip():
+        try:
+            import os
+
+            import anthropic
+
+            api_key = os.getenv("ANTHROPIC_API_KEY", "")
+            if api_key:
+                brand_label = f' for "{payload.brand_name}"' if payload.brand_name else ""
+                client = anthropic.AsyncAnthropic(api_key=api_key)
+                resp = await client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=256,
+                    messages=[{
+                        "role": "user",
+                        "content": (
+                            f"Based on this website content, write a concise 1-2 sentence company description{brand_label}. "
+                            "Describe what the company does and what makes it notable. "
+                            "Be professional and factual. Return ONLY the description, nothing else.\n\n"
+                            f"Website content:\n---\n{context[:6000]}\n---"
+                        ),
+                    }],
+                )
+                description = resp.content[0].text.strip()
+        except Exception as exc:
+            logger.warning("Description generation failed for %s (non-fatal): %s", payload.url, exc)
+
+    return FetchWebsiteContextResponse(context=context, description=description)
 
 
 # ── Suggest prompts without an existing brand (onboarding) ───────────────────

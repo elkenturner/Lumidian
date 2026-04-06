@@ -339,7 +339,7 @@ class ContentAttributionSchema(BaseModel):
 # ── Request schemas ───────────────────────────────────────────────────────────
 
 class CreateDraftRequest(BaseModel):
-    brand_id: int
+    brand_id: int | None = None  # provided via URL path, not required in body
     platform: str = Field(max_length=30)
     prompt_id: int | None = None
     custom_brief: str | None = Field(None, max_length=2000)
@@ -660,7 +660,9 @@ class HealthResponse(BaseModel):
 
 class FetchWebsiteContextRequest(BaseModel):
     url: str
+    brand_name: str = ""
 
 
 class FetchWebsiteContextResponse(BaseModel):
     context: str
+    description: str | None = None

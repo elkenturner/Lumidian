@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, LineChart, PenLine, Settings } from 'lucide-react';
+import { LayoutDashboard, LineChart, PenLine, Settings, Building2, ChevronUp } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { BrandProvider } from '@/contexts/BrandContext';
@@ -19,9 +19,10 @@ const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-pa
 
 const MOBILE_NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Brands',    href: '/settings',  icon: Building2 },
   { label: 'Reports',   href: '/reports',   icon: LineChart },
   { label: 'Content',   href: '/content',   icon: PenLine },
-  { label: 'Settings',  href: '/settings',  icon: Settings },
+  { label: 'Settings',  href: '/account',   icon: Settings },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
@@ -136,7 +137,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         className="min-h-screen relative"
         style={{
           marginLeft: isMobile ? 0 : (sidebarExpanded ? 220 : 56),
-          marginBottom: isMobile ? 56 : 0,
+          marginBottom: isMobile ? 72 : 0,
           transition: 'margin-left 0.2s ease',
           zIndex: 0,
         }}
@@ -146,7 +147,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div style={{
             background: 'rgba(99,102,241,0.06)',
             borderBottom: '1px solid rgba(99,102,241,0.18)',
-            padding: '8px 28px',
+            padding: isMobile ? '6px 12px' : '8px 28px',
             display: 'flex',
             alignItems: 'center',
             gap: 10,
@@ -155,7 +156,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
             <span style={{ fontSize: 12, color: 'var(--accent-light)', fontWeight: 600 }}>Report in progress</span>
             <span style={{ fontSize: 12, color: 'var(--accent)' }}>— querying AI models with your prompts.</span>
-            {modelScores.length > 0 && (
+            {!isMobile && modelScores.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
                 {modelScores.map((ms) => {
                   const cfg = MODEL_CONFIG[ms.model] || { label: ms.model, bg: 'rgba(100,116,139,0.15)', text: 'var(--text-muted)' };
@@ -189,7 +190,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div style={{
             background: 'rgba(16,185,129,0.06)',
             borderBottom: '1px solid rgba(16,185,129,0.18)',
-            padding: '8px 28px',
+            padding: isMobile ? '6px 12px' : '8px 28px',
             display: 'flex',
             alignItems: 'center',
             gap: 10,
@@ -203,7 +204,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           <div style={{
             background: 'rgba(6,182,212,0.06)',
             borderBottom: '1px solid rgba(6,182,212,0.18)',
-            padding: '8px 28px',
+            padding: isMobile ? '6px 12px' : '8px 28px',
             display: 'flex',
             alignItems: 'center',
             gap: 10,
@@ -221,16 +222,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       {isMobile && (
         <nav
           aria-label="Main navigation"
+          className="safe-bottom"
           style={{
             position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
-            height: 56,
-            background: 'rgba(8,12,20,0.95)',
-            backdropFilter: 'blur(20px)',
+            background: 'rgba(8,12,20,0.97)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
             borderTop: '1px solid rgba(255,255,255,0.08)',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'stretch',
             justifyContent: 'space-around',
-            padding: '0 8px',
+            paddingTop: 6,
+            paddingBottom: 6,
+            paddingLeft: 4,
+            paddingRight: 4,
           }}
         >
           {MOBILE_NAV.map(({ label, href, icon: Icon }) => {
@@ -244,16 +249,31 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  gap: 3,
+                  justifyContent: 'center',
+                  gap: 2,
                   flex: 1,
-                  padding: '6px 0',
+                  padding: '8px 0',
                   color: isActive ? 'var(--accent-light)' : 'var(--text-faint)',
                   textDecoration: 'none',
                   fontSize: 10,
-                  fontWeight: 500,
+                  fontWeight: isActive ? 600 : 500,
+                  position: 'relative',
+                  minHeight: 48,
                 }}
               >
-                <Icon size={20} />
+                {isActive && (
+                  <span style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 20,
+                    height: 2,
+                    borderRadius: 1,
+                    background: 'var(--accent-light)',
+                  }} />
+                )}
+                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.75} />
                 <span>{label}</span>
               </Link>
             );

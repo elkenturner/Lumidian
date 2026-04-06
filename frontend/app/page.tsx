@@ -945,7 +945,56 @@ function CTASection() {
 }
 
 function Footer() {
-  return <footer className="py-16 flex items-center justify-center text-[#64748b]">Footer placeholder</footer>;
+  return (
+    <footer className="py-16 border-t border-[rgba(51,65,85,0.5)]">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
+          {/* Logo & tagline */}
+          <div className="col-span-2 md:col-span-1">
+            <LumidianLogo size={28} withWordmark variant="dark" />
+            <p className="text-sm text-[#64748b] mt-3">
+              AI visibility tracking for modern brands.
+            </p>
+          </div>
+
+          {/* Product */}
+          <div>
+            <h4 className="text-sm font-semibold text-[#f8fafc] mb-4">Product</h4>
+            <nav className="space-y-3">
+              <a href="#features" className="block text-sm text-[#94a3b8] hover:text-white transition-colors">Features</a>
+              <a href="#pricing" className="block text-sm text-[#94a3b8] hover:text-white transition-colors">Pricing</a>
+              <a href="#faq" className="block text-sm text-[#94a3b8] hover:text-white transition-colors">FAQ</a>
+            </nav>
+          </div>
+
+          {/* Company */}
+          <div>
+            <h4 className="text-sm font-semibold text-[#f8fafc] mb-4">Company</h4>
+            <nav className="space-y-3">
+              <Link href="/terms" className="block text-sm text-[#94a3b8] hover:text-white transition-colors">Terms</Link>
+              <Link href="/privacy" className="block text-sm text-[#94a3b8] hover:text-white transition-colors">Privacy</Link>
+            </nav>
+          </div>
+
+          {/* Get Started */}
+          <div>
+            <h4 className="text-sm font-semibold text-[#f8fafc] mb-4">Get Started</h4>
+            <nav className="space-y-3">
+              <Link href="/register" className="block text-sm text-[#94a3b8] hover:text-white transition-colors">Sign up</Link>
+              <Link href="/login" className="block text-sm text-[#94a3b8] hover:text-white transition-colors">Log in</Link>
+            </nav>
+          </div>
+        </div>
+
+        {/* Bottom bar */}
+        <div className="pt-8 border-t border-[rgba(51,65,85,0.5)]">
+          <p className="text-sm text-[#64748b] text-center">
+            &copy; {new Date().getFullYear()} Lumidian. All rights reserved.
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

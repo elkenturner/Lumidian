@@ -909,7 +909,39 @@ function FAQSection() {
 }
 
 function CTASection() {
-  return <section className="py-32 flex items-center justify-center text-[#64748b]">CTA placeholder</section>;
+  return (
+    <section
+      className="py-32 text-center relative"
+      style={{
+        background: 'radial-gradient(ellipse at 50% 100%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+      }}
+    >
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FadeUp>
+          <h2
+            className="text-3xl sm:text-4xl font-bold text-[#f8fafc] mb-4"
+            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+          >
+            Start tracking your AI visibility
+          </h2>
+        </FadeUp>
+        <FadeUp delay={100}>
+          <p className="text-[#94a3b8] mb-8">
+            Free to start. No credit card required.
+          </p>
+        </FadeUp>
+        <FadeUp delay={200}>
+          <Link
+            href="/register"
+            className="inline-flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_32px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_rgba(99,102,241,0.6)]"
+          >
+            Get Started Free
+            <ArrowRight size={18} />
+          </Link>
+        </FadeUp>
+      </div>
+    </section>
+  );
 }
 
 function Footer() {

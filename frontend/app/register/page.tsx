@@ -8,8 +8,6 @@ import LumidianLogo from '@/components/LumidianLogo';
 import { useAuth } from '@/contexts/AuthContext';
 import { getGoogleAuthUrl } from '@/lib/api';
 
-const NOISE_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`;
-
 export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
@@ -55,115 +53,73 @@ export default function RegisterPage() {
     }
   }
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    background: '#fff',
-    border: '1px solid rgba(0,0,0,0.12)',
-    borderRadius: 10,
-    padding: '10px 12px',
-    fontSize: 14,
-    color: '#0F0F12',
-    outline: 'none',
-    boxSizing: 'border-box',
-    transition: 'border-color 0.15s',
-    fontFamily: 'inherit',
-  };
-
   return (
-    <div style={{
-      position: 'relative',
-      minHeight: '100vh',
-      backgroundColor: '#F8F7F4',
-      color: '#0F0F12',
-      fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px 16px',
-      overflow: 'hidden',
-    }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');`}</style>
+    <div className="relative min-h-screen bg-[#020617] text-[#f8fafc] flex items-center justify-center p-6 overflow-hidden">
+      {/* Background gradient */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+        }}
+      />
 
-      {/* Background gradient orbs */}
-      <div aria-hidden style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: '-20vh', left: '-15vw', width: '70vw', height: '70vw', maxWidth: 900, maxHeight: 900, borderRadius: '50%', background: 'radial-gradient(circle at 40% 40%, rgba(147,197,253,0.38) 0%, rgba(147,197,253,0.08) 50%, transparent 72%)', filter: 'blur(60px)' }} />
-        <div style={{ position: 'absolute', top: '-10vh', right: '-10vw', width: '60vw', height: '60vw', maxWidth: 800, maxHeight: 800, borderRadius: '50%', background: 'radial-gradient(circle at 60% 40%, rgba(196,181,253,0.32) 0%, rgba(196,181,253,0.06) 50%, transparent 72%)', filter: 'blur(60px)' }} />
-        <div style={{ position: 'absolute', top: '35vh', left: '25vw', width: '55vw', height: '55vw', maxWidth: 750, maxHeight: 750, borderRadius: '50%', background: 'radial-gradient(circle at 50% 50%, rgba(167,243,208,0.22) 0%, rgba(167,243,208,0.04) 55%, transparent 72%)', filter: 'blur(70px)' }} />
-        {/* Noise grain */}
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: NOISE_SVG, backgroundRepeat: 'repeat', backgroundSize: '200px 200px', opacity: 0.04, mixBlendMode: 'multiply' }} />
-      </div>
-
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}>
+      <div className="relative z-10 w-full max-w-[420px]">
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 36 }}>
-          <LumidianLogo size={40} withWordmark variant="light" />
+        <div className="flex items-center justify-center mb-9">
+          <LumidianLogo size={40} withWordmark variant="dark" />
         </div>
 
         {/* Card */}
-        <div style={{
-          background: 'rgba(255,255,255,0.82)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0,0,0,0.07)',
-          borderRadius: 20,
-          padding: '36px 32px',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-        }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F0F12', margin: '0 0 4px', letterSpacing: '-0.03em' }}>Create your account</h1>
-          <p style={{ fontSize: 14, color: '#6B7280', margin: '0 0 24px', fontWeight: 400 }}>Start tracking your brand&apos;s AI visibility</p>
+        <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-8">
+          <h1 className="text-2xl font-bold text-[#f8fafc] mb-1">Create your account</h1>
+          <p className="text-sm text-[#94a3b8] mb-6">Start tracking your brand&apos;s AI visibility</p>
 
           {error && (
-            <div role="alert" style={{ background: 'rgba(254,226,226,0.8)', border: '1px solid rgba(252,165,165,0.5)', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
-              <p style={{ fontSize: 13, color: '#b91c1c', margin: 0 }}>{error}</p>
+            <div className="bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.3)] rounded-lg px-3.5 py-2.5 mb-5">
+              <p className="text-sm text-[#f87171]">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Name</label>
+              <label className="block text-sm font-medium text-[#94a3b8] mb-1.5">Name</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your name"
-                style={inputStyle}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(79,70,229,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.2)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
+                className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Email</label>
+              <label className="block text-sm font-medium text-[#94a3b8] mb-1.5">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="you@example.com"
-                style={inputStyle}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(79,70,229,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.2)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
+                className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
               />
             </div>
             <div>
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 6 }}>Password</label>
-              <div style={{ position: 'relative' }}>
+              <label className="block text-sm font-medium text-[#94a3b8] mb-1.5">Password</label>
+              <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="Min. 6 characters"
-                  style={{ ...inputStyle, padding: '10px 40px 10px 12px' }}
-                  onFocus={(e) => (e.currentTarget.style.borderColor = 'rgba(79,70,229,0.5)')}
-                  onBlur={(e) => (e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)')}
+                  className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 pr-10 text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 0, display: 'flex' }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-[#94a3b8] transition-colors"
                 >
-                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
@@ -171,28 +127,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                background: '#0F0F12',
-                border: 'none',
-                borderRadius: 100,
-                padding: '11px 20px',
-                fontSize: 14,
-                fontWeight: 600,
-                color: '#fff',
-                cursor: loading ? 'not-allowed' : 'pointer',
-                opacity: loading ? 0.7 : 1,
-                transition: 'background 0.15s, box-shadow 0.15s',
-                boxShadow: '0 2px 8px rgba(15,15,18,0.15)',
-                fontFamily: 'inherit',
-                marginTop: 4,
-              }}
-              onMouseEnter={(e) => { if (!loading) { (e.currentTarget as HTMLButtonElement).style.background = '#2a2a3a'; } }}
-              onMouseLeave={(e) => { if (!loading) { (e.currentTarget as HTMLButtonElement).style.background = '#0F0F12'; } }}
+              className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-2.5 px-5 mt-1 transition-colors"
             >
               {loading && <Loader2 size={15} className="animate-spin" />}
               {loading ? 'Creating account…' : 'Create account'}
@@ -201,40 +136,24 @@ export default function RegisterPage() {
           </form>
 
           {/* Divider */}
-          <div style={{ position: 'relative', margin: '20px 0' }}>
-            <div style={{ borderTop: '1px solid rgba(0,0,0,0.08)', position: 'absolute', inset: '50% 0 auto' }} />
-            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center' }}>
-              <span style={{ background: 'rgba(255,255,255,0.82)', padding: '0 12px', fontSize: 12, color: '#9CA3AF', fontWeight: 500 }}>or</span>
+          <div className="relative my-5">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[rgba(51,65,85,0.5)]" />
+            </div>
+            <div className="relative flex justify-center">
+              <span className="bg-[#0f172a] px-3 text-xs text-[#64748b]">or</span>
             </div>
           </div>
 
+          {/* Google OAuth */}
           <button
             type="button"
             onClick={handleGoogleClick}
             disabled={googleLoading}
-            style={{
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-              background: 'rgba(255,255,255,0.9)',
-              border: '1px solid rgba(0,0,0,0.10)',
-              borderRadius: 100,
-              padding: '10px 20px',
-              fontSize: 14,
-              fontWeight: 500,
-              color: '#374151',
-              cursor: googleLoading ? 'not-allowed' : 'pointer',
-              opacity: googleLoading ? 0.5 : 1,
-              transition: 'border-color 0.15s, box-shadow 0.15s',
-              fontFamily: 'inherit',
-            }}
-            onMouseEnter={(e) => { const el = e.currentTarget as HTMLButtonElement; if (!el.disabled) { el.style.borderColor = 'rgba(0,0,0,0.2)'; el.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)'; } }}
-            onMouseLeave={(e) => { const el = e.currentTarget as HTMLButtonElement; el.style.borderColor = 'rgba(0,0,0,0.10)'; el.style.boxShadow = 'none'; }}
+            className="w-full flex items-center justify-center gap-2.5 bg-[#1e293b] border border-[rgba(51,65,85,0.5)] hover:border-[rgba(71,85,105,0.5)] disabled:opacity-50 disabled:cursor-not-allowed text-[#f8fafc] font-medium rounded-full py-2.5 px-5 transition-colors"
           >
             {googleLoading ? (
-              <Loader2 size={15} className="animate-spin" />
+              <Loader2 size={16} className="animate-spin" />
             ) : (
               <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -246,20 +165,17 @@ export default function RegisterPage() {
             {googleLoading ? 'Signing in…' : 'Continue with Google'}
           </button>
 
-          <p style={{ textAlign: 'center', fontSize: 12, color: '#9CA3AF', margin: '20px 0 0', fontWeight: 400 }}>
+          <p className="text-center text-xs text-[#64748b] mt-5">
             By creating an account you agree to our{' '}
-            <Link href="/terms" style={{ color: '#6B7280', textDecoration: 'underline' }}>terms of service</Link>
+            <Link href="/terms" className="text-[#94a3b8] underline hover:text-[#f8fafc] transition-colors">terms of service</Link>
             {' '}and{' '}
-            <Link href="/privacy" style={{ color: '#6B7280', textDecoration: 'underline' }}>privacy policy</Link>
+            <Link href="/privacy" className="text-[#94a3b8] underline hover:text-[#f8fafc] transition-colors">privacy policy</Link>
           </p>
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: 14, color: '#6B7280', marginTop: 24, fontWeight: 400 }}>
+        <p className="text-center text-sm text-[#94a3b8] mt-6">
           Already have an account?{' '}
-          <Link href="/login" style={{ color: 'var(--accent-hover)', fontWeight: 600, textDecoration: 'none' }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--accent)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--accent-hover)')}
-          >
+          <Link href="/login" className="text-[#6366f1] hover:text-[#818cf8] font-semibold transition-colors">
             Sign in
           </Link>
         </p>

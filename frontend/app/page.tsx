@@ -190,13 +190,6 @@ const HOW_STEPS = [
   },
 ];
 
-const STATS = [
-  { value: 4, label: 'AI Models Tracked', suffix: '' },
-  { value: 1, label: 'Daily Report', suffix: 'x' },
-  { value: 100, label: 'Prompts Supported', suffix: '+' },
-  { value: 30, label: 'Day Trend History', suffix: '' },
-];
-
 const COMPARISON_FEATURES = [
   { label: 'Standard brands', free: '0', starter: '2', pro: '2' },
   { label: 'Pitch decks', free: '1', starter: '1', pro: '3' },
@@ -437,63 +430,6 @@ function ModelsBar() {
                 <span className="text-sm font-medium text-white">{model.name}</span>
               </div>
             </FadeUp>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function StatCard({
-  value,
-  label,
-  suffix,
-  color,
-  delay,
-}: {
-  value: number;
-  label: string;
-  suffix: string;
-  color: string;
-  delay: number;
-}) {
-  const { ref, value: animatedValue } = useCountUp(value, 1800);
-
-  return (
-    <FadeUp delay={delay}>
-      <div
-        ref={ref}
-        className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-xl p-6 text-center"
-        style={{ borderTopColor: color, borderTopWidth: 2 }}
-      >
-        <p
-          className="text-4xl font-bold text-[#f8fafc]"
-          style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
-        >
-          {animatedValue.toLocaleString()}{suffix}
-        </p>
-        <p className="text-sm text-[#64748b] mt-2">{label}</p>
-      </div>
-    </FadeUp>
-  );
-}
-
-function StatsSection() {
-  const colors = ['#22c55e', '#f97316', '#8b5cf6', '#3b82f6'];
-
-  return (
-    <section className="py-20">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {STATS.map((stat, i) => (
-            <StatCard
-              key={stat.label}
-              value={stat.value}
-              label={stat.label}
-              suffix={stat.suffix}
-              color={colors[i % colors.length]}
-              delay={i * 100}
-            />
           ))}
         </div>
       </div>
@@ -1015,7 +951,6 @@ export default function LandingPage() {
       <main>
         <HeroSection />
         <ModelsBar />
-        <StatsSection />
         <FeaturesSection />
         <HowItWorksSection />
         <PricingSection />

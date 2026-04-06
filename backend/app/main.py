@@ -29,6 +29,17 @@ from dotenv import load_dotenv
 # Resolve relative to this file so it works regardless of cwd.
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
+import sentry_sdk
+
+sentry_sdk.init(
+    dsn="https://5bade42aa6c2a0b2dae2f67ebcef2c38@o4511165656465408.ingest.us.sentry.io/4511170147975168",
+    # Tracing sample rate
+    traces_sample_rate=0.1 if os.getenv("ENVIRONMENT") == "production" else 1.0,
+    # Only send errors in production
+    send_default_pii=False,
+    environment=os.getenv("ENVIRONMENT", "development"),
+)
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse

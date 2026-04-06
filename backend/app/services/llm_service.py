@@ -245,8 +245,11 @@ async def _query_gemini(prompt: str, brand_name: str) -> dict:
                 getattr(genai, "__version__", "unknown"),
             )
         loop = asyncio.get_running_loop()
-        response = await loop.run_in_executor(
-            None, lambda: model.generate_content(prompt, **gen_kwargs)
+        response = await asyncio.wait_for(
+            loop.run_in_executor(
+                None, lambda: model.generate_content(prompt, **gen_kwargs)
+            ),
+            timeout=30.0,  # 30s timeout to avoid hanging
         )
         # response.text raises ValueError when the response was blocked by a
         # safety filter or finished with a non-STOP reason (e.g. RECITATION,
@@ -278,6 +281,10 @@ async def _query_gemini(prompt: str, brand_name: str) -> dict:
             )
         logger.debug("[gemini] response preview: %r", text[:200])
         return _build_result(text, brand_name, latency_ms)
+    except asyncio.TimeoutError:
+        latency_ms = int((time.monotonic() - start) * 1000)
+        logger.error("[gemini] Request timed out after 30s for prompt %r", prompt[:100])
+        return _build_result(None, brand_name, latency_ms, error="Request timed out (30s)")
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.error("[gemini] API error for prompt %r: %s", prompt[:100], exc)
@@ -302,55 +309,53 @@ _DISPATCHERS = {
 SUPPORTED_MODELS = list(_DISPATCHERS.keys())
 
 
-async def _with_retry(handler, prompt: str, brand_name: str, model_key: str) -> dict:
+async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 3) -> dict:
     """
-    Call handler(prompt, brand_name) and retry once after 3 seconds if the
+    Call handler(prompt, brand_name) and retry up to max_attempts times if the
     response is empty or errored (but not due to a missing API key, which is
     a permanent configuration issue).
     """
-    result = await handler(prompt, brand_name)
-
-    # Successful response — return immediately
-    if result.get("response_text") and not result.get("error"):
-        return result
-
-    # api_key_not_configured is permanent — retrying won't help
-    if result.get("error") == "api_key_not_configured":
-        return result
-
     display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
-    first_error = result.get("error") or "empty response"
+    errors: list[str] = []
 
-    # Rate-limit errors (429) need a much longer backoff — the standard window
-    # is 60 seconds. A 3s retry will almost certainly hit the same limit again.
-    is_rate_limit = "429" in first_error or "rate_limit" in first_error.lower() or "rate limit" in first_error.lower()
-    retry_delay = 65 if is_rate_limit else 3
+    for attempt in range(1, max_attempts + 1):
+        result = await handler(prompt, brand_name)
 
-    logger.warning(
-        "[%s] First attempt failed (error=%r) for prompt %r — retrying in %ds",
-        model_key, first_error, prompt[:100], retry_delay,
-    )
-    await asyncio.sleep(retry_delay)
+        # Successful response — return immediately
+        if result.get("response_text") and not result.get("error"):
+            if attempt > 1:
+                logger.info("[%s] Attempt %d succeeded for prompt %r", model_key, attempt, prompt[:100])
+            return result
 
-    retry = await handler(prompt, brand_name)
-    if retry.get("response_text") and not retry.get("error"):
-        logger.info("[%s] Retry succeeded for prompt %r", model_key, prompt[:100])
-        return retry
+        # api_key_not_configured is permanent — retrying won't help
+        if result.get("error") == "api_key_not_configured":
+            return result
 
-    # Both attempts failed — return a single descriptive error
-    retry_error = retry.get("error") or "empty response"
-    final_error = (
-        f"Empty response from {display} API after retry "
-        f"(attempt 1: {first_error}; attempt 2: {retry_error})"
-    )
+        error = result.get("error") or "empty response"
+        errors.append(f"attempt {attempt}: {error}")
+
+        # Don't sleep after the last attempt
+        if attempt < max_attempts:
+            # Rate-limit errors (429) need a much longer backoff
+            is_rate_limit = "429" in error or "rate_limit" in error.lower() or "rate limit" in error.lower()
+            retry_delay = 65 if is_rate_limit else 3
+
+            logger.warning(
+                "[%s] Attempt %d/%d failed (error=%r) for prompt %r — retrying in %ds",
+                model_key, attempt, max_attempts, error, prompt[:100], retry_delay,
+            )
+            await asyncio.sleep(retry_delay)
+
+    # All attempts failed — return a single descriptive error
+    final_error = f"Empty response from {display} API after {max_attempts} attempts ({'; '.join(errors)})"
     logger.error(
-        "[%s] Both attempts failed for prompt %r. Final error: %s",
-        model_key, prompt[:100], final_error,
+        "[%s] All %d attempts failed for prompt %r. Final error: %s",
+        model_key, max_attempts, prompt[:100], final_error,
     )
     return {
         "response_text": None,
         "mentioned": False,
-        "latency_ms": retry.get("latency_ms"),
+        "latency_ms": result.get("latency_ms"),
         "error": final_error,
     }
 

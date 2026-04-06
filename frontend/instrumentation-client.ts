@@ -18,3 +18,5 @@ Sentry.init({
   // Only send errors in production
   enabled: process.env.NODE_ENV === "production",
 });
+
+export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

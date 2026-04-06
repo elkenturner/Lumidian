@@ -600,7 +600,173 @@ function HowItWorksSection() {
 }
 
 function DashboardMockup() {
-  return <div className="p-8 flex items-center justify-center text-[#64748b]">Dashboard mockup placeholder</div>;
+  const { ref: scoreRef, value: scoreVal } = useCountUp(67, 1600);
+  const { ref: liveRef, value: liveVal } = useCountUp(66, 1400);
+  const { ref: indexRef, value: indexVal } = useCountUp(67, 1400);
+  const [barWidths, setBarWidths] = useState([0, 0, 0, 0]);
+  const barTriggered = useRef(false);
+  const { ref: barRef, inView: barInView } = useInView(0.2);
+
+  useEffect(() => {
+    if (!barInView || barTriggered.current) return;
+    barTriggered.current = true;
+    setTimeout(() => {
+      setBarWidths(DEMO_MODELS.map((m) => m.score));
+    }, 200);
+  }, [barInView]);
+
+  // Sparkline data
+  const sparkPoints = [28, 35, 31, 42, 38, 50, 47, 55, 52, 61, 67];
+  const w = 200;
+  const h = 48;
+  const min = Math.min(...sparkPoints);
+  const max = Math.max(...sparkPoints);
+  const toX = (i: number) => (i / (sparkPoints.length - 1)) * w;
+  const toY = (v: number) => h - ((v - min) / (max - min || 1)) * (h - 8) - 4;
+  const pathD = sparkPoints.map((v, i) => `${i === 0 ? 'M' : 'L'} ${toX(i)} ${toY(v)}`).join(' ');
+  const areaD = `${pathD} L ${w} ${h} L 0 ${h} Z`;
+
+  return (
+    <div
+      ref={barRef}
+      className="relative max-w-[720px] mx-auto"
+      style={{
+        perspective: '1000px',
+      }}
+    >
+      <div
+        className="bg-[#0f172a] border border-[rgba(99,102,241,0.2)] rounded-2xl overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.5),0_0_0_1px_rgba(99,102,241,0.1)]"
+        style={{
+          transform: 'rotateX(2deg)',
+        }}
+      >
+        {/* Browser chrome */}
+        <div className="bg-[#1e293b] border-b border-[rgba(51,65,85,0.5)] px-4 py-3 flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-[#ef4444]" />
+          <span className="w-3 h-3 rounded-full bg-[#fbbf24]" />
+          <span className="w-3 h-3 rounded-full bg-[#22c55e]" />
+          <div className="flex-1 ml-3 bg-[#0f172a] rounded-md px-3 py-1.5">
+            <span className="text-xs text-[#64748b]">app.lumidian.ai/dashboard</span>
+          </div>
+        </div>
+
+        {/* Dashboard content */}
+        <div className="p-5 grid grid-cols-2 gap-4">
+          {/* Visibility score card */}
+          <div
+            ref={scoreRef}
+            className="rounded-2xl p-5 text-white"
+            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wider opacity-70">AI Visibility Score</p>
+            <p
+              className="text-5xl font-extrabold mt-1"
+              style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+            >
+              {scoreVal}<span className="text-2xl opacity-70">%</span>
+            </p>
+            <div className="flex items-center gap-1 mt-2 text-xs opacity-80">
+              <TrendingUp size={12} />
+              <span>+14% vs last run</span>
+            </div>
+          </div>
+
+          {/* Sparkline card */}
+          <div className="bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-2xl p-4">
+            <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-3">30-Day Trend</p>
+            <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-12">
+              <defs>
+                <linearGradient id="mockupSparkGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <path d={areaD} fill="url(#mockupSparkGrad)" />
+              <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          {/* Live vs Index */}
+          <div className="col-span-2 bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-2xl p-4">
+            <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-3">Live vs Index</p>
+            <div className="space-y-3">
+              <div ref={liveRef}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
+                    <span className="text-xs text-[#94a3b8]">Live Search</span>
+                  </div>
+                  <span className="text-xs font-bold text-[#22c55e]">{liveVal}%</span>
+                </div>
+                <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#22c55e] rounded-full transition-all duration-700"
+                    style={{ width: `${liveVal}%` }}
+                  />
+                </div>
+              </div>
+              <div ref={indexRef}>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#818cf8]" />
+                    <span className="text-xs text-[#94a3b8]">AI Index</span>
+                  </div>
+                  <span className="text-xs font-bold text-[#818cf8]">{indexVal}%</span>
+                </div>
+                <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[#818cf8] rounded-full transition-all duration-700"
+                    style={{ width: `${indexVal}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Model breakdown */}
+          <div className="col-span-2 bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-2xl p-4">
+            <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-3">Performance by Model</p>
+            <div className="space-y-2.5">
+              {DEMO_MODELS.map((m, i) => (
+                <div key={m.name} className="flex items-center gap-3">
+                  <span className="text-xs font-medium text-[#94a3b8] w-20 flex-shrink-0">{m.name}</span>
+                  <div className="flex-1 h-2 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-700"
+                      style={{
+                        width: `${barWidths[i]}%`,
+                        backgroundColor: m.color,
+                        transitionDelay: `${i * 100}ms`,
+                      }}
+                    />
+                  </div>
+                  <span className="text-xs font-bold text-[#f8fafc] w-10 text-right">{m.score}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Citation gaps */}
+          <div className="col-span-2 bg-[rgba(251,146,60,0.1)] border border-[rgba(251,146,60,0.2)] rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingDown size={14} className="text-[#fbbf24]" />
+              <p className="text-xs font-semibold text-[#fbbf24] uppercase tracking-wider">Top Citation Gaps</p>
+            </div>
+            <div className="space-y-2">
+              {DEMO_GAPS.map((g) => (
+                <div key={g.prompt} className="flex items-center justify-between">
+                  <span className="text-sm text-[#94a3b8]">&ldquo;{g.prompt}&rdquo;</span>
+                  <span className="text-xs font-bold text-[#f87171] bg-[rgba(239,68,68,0.1)] px-2 py-0.5 rounded-full">
+                    {g.score}%
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function PricingSection() {

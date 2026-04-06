@@ -841,8 +841,71 @@ function PricingSection() {
   );
 }
 
+function FAQItem({
+  item,
+  isOpen,
+  onToggle,
+  delay,
+}: {
+  item: { q: string; a: string };
+  isOpen: boolean;
+  onToggle: () => void;
+  delay: number;
+}) {
+  return (
+    <FadeUp delay={delay}>
+      <div
+        className={`border-b border-[rgba(51,65,85,0.5)] transition-all ${isOpen ? 'border-l-2 border-l-[#6366f1] pl-4' : ''}`}
+      >
+        <button
+          onClick={onToggle}
+          className="w-full py-5 flex items-center justify-between text-left hover:bg-[rgba(255,255,255,0.02)] transition-colors rounded"
+        >
+          <span className="text-base font-medium text-[#f8fafc] pr-4">{item.q}</span>
+          <ChevronDown
+            size={20}
+            className={`text-[#64748b] flex-shrink-0 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+        <div
+          className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-96 pb-5' : 'max-h-0'}`}
+        >
+          <p className="text-sm text-[#94a3b8] leading-relaxed">{item.a}</p>
+        </div>
+      </div>
+    </FadeUp>
+  );
+}
+
 function FAQSection() {
-  return <section className="py-24 flex items-center justify-center text-[#64748b]">FAQ placeholder</section>;
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
+
+  return (
+    <section id="faq" className="py-24 border-t border-[rgba(51,65,85,0.5)] scroll-mt-20">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FadeUp>
+          <h2
+            className="text-3xl sm:text-4xl font-bold text-center text-[#f8fafc] mb-12"
+            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+          >
+            Frequently asked questions
+          </h2>
+        </FadeUp>
+
+        <div>
+          {FAQ_ITEMS.map((item, i) => (
+            <FAQItem
+              key={i}
+              item={item}
+              isOpen={openIndex === i}
+              onToggle={() => setOpenIndex(openIndex === i ? null : i)}
+              delay={i * 60}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function CTASection() {

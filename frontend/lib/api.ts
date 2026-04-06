@@ -257,8 +257,8 @@ export async function updateBrand(
   return res.data;
 }
 
-export async function fetchWebsiteContext(url: string): Promise<{ context: string }> {
-  const res = await api.post<{ context: string }>('/brands/fetch-website-context', { url });
+export async function fetchWebsiteContext(url: string, brandName?: string): Promise<{ context: string; description: string | null }> {
+  const res = await api.post<{ context: string; description: string | null }>('/brands/fetch-website-context', { url, brand_name: brandName || '' });
   return res.data;
 }
 

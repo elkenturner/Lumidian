@@ -25,8 +25,10 @@ import {
   BookOpen,
   ArrowRight,
   BarChart2,
-  ToggleLeft,
-  ToggleRight,
+  MessageSquare,
+  Globe2,
+  Lightbulb,
+  Shield,
 } from 'lucide-react';
 import {
   getBrand,
@@ -1985,9 +1987,11 @@ export default function ContentHubPage() {
           reddit: {
             label: 'Reddit',
             subtitle: 'Discussion posts & replies',
+            icon: MessageSquare,
             color: '#ff4500',
-            colorMuted: 'rgba(255,69,0,0.12)',
-            colorBorder: 'rgba(255,69,0,0.22)',
+            colorMuted: 'rgba(255,69,0,0.10)',
+            colorBorder: 'rgba(255,69,0,0.20)',
+            gradient: 'linear-gradient(135deg, rgba(255,69,0,0.08) 0%, rgba(255,69,0,0.02) 100%)',
             steps: [
               { title: 'Pick a subreddit', detail: 'Search your niche — r/entrepreneur, r/investing, etc. Target 10k+ member subs with active daily threads. Read the rules before posting; many ban all promotion.' },
               { title: 'Write a real title', detail: 'Frame a genuine question or insight, not a product pitch. Curiosity and controversy outperform announcements.' },
@@ -1995,14 +1999,16 @@ export default function ContentHubPage() {
               { title: 'Engage in the first hour', detail: 'Reply to every comment — early engagement determines ranking. Set a reminder to check back 30 minutes after posting.' },
             ],
             disclosure: 'Add "Disclosure: I work at [Brand]" at the end of your post.',
-            tip: null,
+            tip: 'Redditors check your post history. An account with only brand content will get flagged. Mix in genuine community participation.',
           },
           quora: {
             label: 'Quora',
             subtitle: 'Q&A answers',
+            icon: HelpCircle,
             color: '#b92b27',
-            colorMuted: 'rgba(185,43,39,0.12)',
-            colorBorder: 'rgba(185,43,39,0.22)',
+            colorMuted: 'rgba(185,43,39,0.10)',
+            colorBorder: 'rgba(185,43,39,0.20)',
+            gradient: 'linear-gradient(135deg, rgba(185,43,39,0.08) 0%, rgba(185,43,39,0.02) 100%)',
             steps: [
               { title: 'Find the right question', detail: 'Search with the exact phrasing of your tracked prompts. Favor questions with 1k+ views and fewer than 5 existing answers.' },
               { title: 'Lead with the answer', detail: "State your main point in the first sentence — don't bury the takeaway. Quora buries answers that take too long to get to the point." },
@@ -2010,14 +2016,16 @@ export default function ContentHubPage() {
               { title: 'Mention your brand in context', detail: 'Never as the opening line. Weave it in naturally where it genuinely adds value to the reader.' },
             ],
             disclosure: 'Add "I\'m on the team at [Brand]" in your Quora bio and in the answer itself.',
-            tip: null,
+            tip: 'Answers posted within the first 24 hours of a question get 5-10x more views. Set alerts for new questions in your space.',
           },
           medium: {
             label: 'Medium',
             subtitle: 'Long-form articles',
-            color: 'var(--text-secondary)',
+            icon: FileText,
+            color: '#94a3b8',
             colorMuted: 'rgba(148,163,184,0.10)',
             colorBorder: 'rgba(148,163,184,0.18)',
+            gradient: 'linear-gradient(135deg, rgba(148,163,184,0.06) 0%, rgba(148,163,184,0.01) 100%)',
             steps: [
               { title: 'Open a new story', detail: 'Go to medium.com/new-story and paste your draft. Clean up any formatting artifacts from the copy-paste.' },
               { title: 'Title & subtitle', detail: 'Both appear in search results — make them specific and search-friendly. Avoid vague headlines like "Lessons I Learned."' },
@@ -2025,15 +2033,17 @@ export default function ContentHubPage() {
               { title: 'Tags', detail: 'Add up to 5 specific tags, e.g. "Startup", "AI", "SaaS". Tags determine which readers see your story.' },
               { title: 'Pitch a publication', detail: 'Submitting to a publication multiplies your reach significantly. Look for publications with 10k+ followers in your niche.' },
             ],
-            disclosure: 'End the article with "Disclosure: The author is affiliated with [Brand]."',
-            tip: null,
+            disclosure: null,
+            tip: 'Publish on Tuesday–Thursday mornings for the highest engagement. Articles over 1,500 words perform best on Medium.',
           },
           wikipedia: {
             label: 'Wikipedia',
             subtitle: 'Article edits — handle with care',
-            color: 'var(--text-muted)',
+            icon: Globe2,
+            color: '#64748b',
             colorMuted: 'rgba(100,116,139,0.10)',
             colorBorder: 'rgba(100,116,139,0.20)',
+            gradient: 'linear-gradient(135deg, rgba(100,116,139,0.06) 0%, rgba(100,116,139,0.01) 100%)',
             steps: [
               { title: 'Declare your COI first', detail: 'On your user talk page, add the {{connected contributor}} template before doing anything else. Skipping this can get you permanently banned.' },
               { title: 'Propose on the Talk page', detail: "Open the article's Talk tab and post your suggested addition with sources. Do not self-publish COI edits directly — this violates policy." },
@@ -2041,11 +2051,12 @@ export default function ContentHubPage() {
               { title: 'Iterate if declined', detail: 'Ask for specific feedback, revise with better sources, and re-submit. Patience is essential; editors respond poorly to pressure.' },
             ],
             disclosure: null,
-            tip: null,
+            tip: 'Only cite secondary sources (news articles, reviews). Primary sources (your own website) are flagged as promotional by editors.',
           },
         } as const;
 
         const p = PLATFORMS[postingPlatform];
+        const PlatformIcon = p.icon;
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -2055,60 +2066,68 @@ export default function ContentHubPage() {
             />
             <div className="relative w-full max-w-xl max-h-[88vh] flex flex-col bg-[rgba(8,12,20,0.98)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.70),0_0_0_1px_rgba(99,102,241,0.08)] overflow-hidden">
 
-              {/* Header */}
-              <div className="flex items-center justify-between px-6 pt-5 pb-4 shrink-0">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-[rgba(99,102,241,0.12)] border border-[var(--border-subtle)] flex items-center justify-center">
-                    <BookOpen size={14} className="text-[var(--accent-foreground)]" />
+              {/* Header with platform-colored accent line */}
+              <div className="shrink-0" style={{ borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+                <div className="h-[2px] w-full opacity-60" style={{ background: `linear-gradient(90deg, transparent 0%, ${p.color} 50%, transparent 100%)` }} />
+                <div className="flex items-center justify-between px-6 pt-4 pb-3">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: p.colorMuted, border: `1px solid ${p.colorBorder}` }}>
+                      <BookOpen size={15} style={{ color: p.color }} />
+                    </div>
+                    <div>
+                      <h2 className="text-[15px] font-semibold text-[var(--text-primary)] leading-none">Posting Guide</h2>
+                      <p className="text-[11px] text-[var(--text-faint)] mt-0.5">Step-by-step for each platform</p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-sm font-semibold text-[var(--text-primary)] leading-none">Posting Guide</h2>
-                    <p className="text-[11px] text-[var(--text-faint)] mt-0.5">How to publish your draft on each platform</p>
-                  </div>
+                  <button
+                    onClick={() => setPostingGuideOpen(false)}
+                    aria-label="Close"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] transition-all"
+                  >
+                    <X size={14} />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setPostingGuideOpen(false)}
-                  aria-label="Close"
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] transition-all"
-                >
-                  <X size={14} />
-                </button>
-              </div>
 
-              {/* Platform tabs */}
-              <div className="px-6 pb-0 shrink-0">
-                <div className="flex gap-1 p-1 bg-[rgba(255,255,255,0.03)] border border-[rgba(99,102,241,0.12)] rounded-xl">
-                  {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((key) => {
-                    const active = postingPlatform === key;
-                    const pl = PLATFORMS[key];
-                    return (
-                      <button
-                        key={key}
-                        onClick={() => setPostingPlatform(key)}
-                        className="flex-1 py-1.5 px-2 rounded-lg text-xs font-medium transition-all"
-                        style={{
-                          background: active ? pl.colorMuted : 'transparent',
-                          color: active ? pl.color : 'var(--text-faint)',
-                          border: active ? `1px solid ${pl.colorBorder}` : '1px solid transparent',
-                        }}
-                      >
-                        {pl.label}
-                      </button>
-                    );
-                  })}
+                {/* Platform tabs */}
+                <div className="px-6 pb-3">
+                  <div className="flex gap-1 p-1 bg-[rgba(255,255,255,0.025)] border border-[rgba(255,255,255,0.06)] rounded-xl">
+                    {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((key) => {
+                      const active = postingPlatform === key;
+                      const pl = PLATFORMS[key];
+                      const TabIcon = pl.icon;
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setPostingPlatform(key)}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all duration-200"
+                          style={{
+                            background: active ? pl.colorMuted : 'transparent',
+                            color: active ? pl.color : 'var(--text-faint)',
+                            border: active ? `1px solid ${pl.colorBorder}` : '1px solid transparent',
+                            boxShadow: active ? `0 0 12px ${pl.colorMuted}` : 'none',
+                          }}
+                        >
+                          <TabIcon size={12} />
+                          {pl.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
               {/* Scrollable body */}
               <div className="flex-1 overflow-y-auto px-6 py-5 space-y-3">
 
-                {/* Platform header */}
-                <div className="flex items-center justify-between gap-3 mb-1">
+                {/* Platform hero */}
+                <div className="flex items-center justify-between gap-3 mb-2 p-4 rounded-xl" style={{ background: p.gradient }}>
                   <div className="flex items-center gap-3">
-                    <div className="w-1 h-9 rounded-full shrink-0" style={{ background: p.color }} />
+                    <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: p.colorMuted, border: `1px solid ${p.colorBorder}` }}>
+                      <PlatformIcon size={18} style={{ color: p.color }} />
+                    </div>
                     <div>
-                      <p className="text-base font-semibold text-[var(--text-primary)]">{p.label}</p>
-                      <p className="text-xs text-[var(--text-faint)]">{p.subtitle}</p>
+                      <p className="text-[15px] font-semibold text-[var(--text-primary)]">{p.label}</p>
+                      <p className="text-xs text-[var(--text-muted)]">{p.subtitle}</p>
                     </div>
                   </div>
                   {postingPlatform === 'medium' && (
@@ -2116,7 +2135,7 @@ export default function ContentHubPage() {
                       href="https://medium.com/new-story"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 bg-[rgba(148,163,184,0.08)] hover:bg-[rgba(148,163,184,0.14)] border border-[rgba(148,163,184,0.18)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 text-xs font-medium transition-all shrink-0"
+                      className="flex items-center gap-1.5 hover:bg-[rgba(148,163,184,0.14)] border border-[rgba(148,163,184,0.18)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 text-xs font-medium transition-all shrink-0"
                     >
                       Open Medium
                       <ExternalLink size={11} />
@@ -2124,35 +2143,50 @@ export default function ContentHubPage() {
                   )}
                 </div>
 
-                {/* Steps */}
-                {p.steps.map((step, i) => (
+                {/* Steps — with connected timeline */}
+                <div className="relative">
+                  {/* Vertical connector line */}
                   <div
-                    key={step.title}
-                    className="group flex gap-4 p-4 rounded-xl border border-[rgba(255,255,255,0.05)] bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.04)] hover:border-[rgba(99,102,241,0.18)] transition-all cursor-default"
-                  >
+                    className="absolute left-[19px] top-[28px] w-px"
+                    style={{
+                      height: `calc(100% - 56px)`,
+                      background: `linear-gradient(180deg, ${p.colorBorder} 0%, transparent 100%)`,
+                    }}
+                  />
+
+                  {p.steps.map((step, i) => (
                     <div
-                      className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold transition-all"
-                      style={{
-                        background: p.colorMuted,
-                        border: `1px solid ${p.colorBorder}`,
-                        color: p.color,
-                      }}
+                      key={step.title}
+                      className="group relative flex gap-4 p-3.5 pl-0 rounded-xl transition-all cursor-default"
                     >
-                      {i + 1}
+                      {/* Step number */}
+                      <div className="relative z-10 shrink-0 ml-1">
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ring-[3px] ring-[rgba(8,12,20,0.98)] transition-all group-hover:scale-110"
+                          style={{
+                            background: p.colorMuted,
+                            border: `1.5px solid ${p.colorBorder}`,
+                            color: p.color,
+                          }}
+                        >
+                          {i + 1}
+                        </div>
+                      </div>
+                      {/* Content */}
+                      <div className="min-w-0 flex-1 pb-2">
+                        <p className="text-sm font-medium text-[var(--text-primary)] mb-1 group-hover:text-white transition-colors">{step.title}</p>
+                        <p className="text-[12.5px] text-[var(--text-muted)] leading-[1.6]">{step.detail}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-[var(--text-primary)] mb-1">{step.title}</p>
-                      <p className="text-xs text-[var(--text-muted)] leading-relaxed">{step.detail}</p>
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
 
                 {/* Wikipedia accept/reject grid */}
                 {postingPlatform === 'wikipedia' && (
                   <div className="grid grid-cols-2 gap-3 mt-1">
                     <div className="bg-[rgba(16,185,129,0.04)] border border-[rgba(16,185,129,0.14)] rounded-xl px-4 py-3">
                       <p className="text-xs text-[var(--success)] font-semibold mb-2.5 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-[rgba(16,185,129,0.15)] flex items-center justify-center text-[9px]" aria-hidden="true">✓</span>
+                        <CheckCircle2 size={13} className="text-[var(--success)]" />
                         Editors accept
                       </p>
                       <div className="space-y-2">
@@ -2166,7 +2200,7 @@ export default function ContentHubPage() {
                     </div>
                     <div className="bg-[rgba(239,68,68,0.04)] border border-[rgba(239,68,68,0.14)] rounded-xl px-4 py-3">
                       <p className="text-xs text-[var(--danger)] font-semibold mb-2.5 flex items-center gap-1.5">
-                        <span className="w-4 h-4 rounded-full bg-[rgba(239,68,68,0.15)] flex items-center justify-center text-[9px]" aria-hidden="true">✗</span>
+                        <X size={13} className="text-[var(--danger)]" />
                         Editors reject
                       </p>
                       <div className="space-y-2">
@@ -2181,15 +2215,28 @@ export default function ContentHubPage() {
                   </div>
                 )}
 
-                {/* Disclosure */}
+                {/* Disclosure — only for platforms that require it */}
                 {p.disclosure && (
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.16)]">
-                    <div className="shrink-0 w-5 h-5 rounded-full bg-[rgba(99,102,241,0.15)] border border-[rgba(99,102,241,0.25)] flex items-center justify-center mt-0.5">
-                      <span className="text-[9px] text-[var(--accent-foreground)] font-bold">!</span>
+                  <div className="flex items-start gap-3 p-4 rounded-xl border" style={{ background: 'rgba(251,191,36,0.04)', borderColor: 'rgba(251,191,36,0.16)' }}>
+                    <div className="shrink-0 w-6 h-6 rounded-full flex items-center justify-center mt-0.5" style={{ background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.25)' }}>
+                      <Shield size={12} className="text-yellow-400" />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-[var(--accent-foreground)] mb-1">Required disclosure</p>
-                      <p className="text-xs text-[var(--text-muted)] leading-relaxed">{p.disclosure}</p>
+                      <p className="text-xs font-semibold text-yellow-300 mb-1">Required disclosure</p>
+                      <p className="text-[12.5px] text-[var(--text-muted)] leading-relaxed">{p.disclosure}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pro tip */}
+                {p.tip && (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-[rgba(99,102,241,0.04)] border border-[rgba(99,102,241,0.12)]">
+                    <div className="shrink-0 w-6 h-6 rounded-full bg-[rgba(99,102,241,0.12)] border border-[rgba(99,102,241,0.22)] flex items-center justify-center mt-0.5">
+                      <Lightbulb size={12} className="text-[var(--accent-foreground)]" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--accent-foreground)] mb-1">Pro tip</p>
+                      <p className="text-[12.5px] text-[var(--text-muted)] leading-relaxed">{p.tip}</p>
                     </div>
                   </div>
                 )}
@@ -2226,15 +2273,6 @@ export default function ContentHubPage() {
           >
             <BookOpen size={14} />
             Posting Guide
-          </button>
-
-          {/* Request Draft button */}
-          <button
-            onClick={() => setRequestDraftOpen(true)}
-            className="flex items-center gap-1.5 text-sm bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-2 transition-all duration-150"
-          >
-            <PenLine size={14} />
-            Request Draft
           </button>
 
         </div>
@@ -2323,6 +2361,7 @@ export default function ContentHubPage() {
               handleDismissOpportunity={handleDismissOpportunity}
               setOppHelpOpen={setOppHelpOpen}
               user={user}
+              onRequestDraft={() => setRequestDraftOpen(true)}
             />
           </div>
 
@@ -2479,29 +2518,54 @@ export default function ContentHubPage() {
             {/* Platform toggles */}
             <div className="card p-5">
               <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">Platforms</p>
-              <div className="space-y-0.5">
-                {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((platform) => {
-                  const setting = contentSettings.find((s) => s.platform === platform);
+              <div className="space-y-1">
+                {([
+                  { key: 'reddit', icon: MessageSquare, color: '#ff4500' },
+                  { key: 'quora', icon: HelpCircle, color: '#b92b27' },
+                  { key: 'medium', icon: FileText, color: '#94a3b8' },
+                  { key: 'wikipedia', icon: Globe2, color: '#64748b' },
+                ] as const).map(({ key, icon: Icon, color }) => {
+                  const setting = contentSettings.find((s) => s.platform === key);
                   const enabled = setting?.enabled ?? true;
                   return (
-                    <div key={platform} className="flex items-center justify-between py-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-xs capitalize ${enabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-faint)]'}`}>{platform}</span>
-                        {savedPlatform === platform && (
-                          <span className="text-[10px] text-[var(--success)]">Saved</span>
+                    <button
+                      key={key}
+                      onClick={() => handleTogglePlatform(key, !enabled)}
+                      className="w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg hover:bg-[rgba(255,255,255,0.03)] transition-all duration-200 group"
+                      title={enabled ? `Disable ${key}` : `Enable ${key}`}
+                      aria-label={enabled ? `Disable ${key}` : `Enable ${key}`}
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div
+                          className="w-6 h-6 rounded-md flex items-center justify-center transition-all duration-200"
+                          style={{
+                            background: enabled ? `${color}15` : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${enabled ? `${color}30` : 'rgba(255,255,255,0.06)'}`,
+                          }}
+                        >
+                          <Icon size={12} style={{ color: enabled ? color : 'var(--text-faint)' }} className="transition-colors duration-200" />
+                        </div>
+                        <span className={`text-[13px] font-medium capitalize transition-colors duration-200 ${enabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-faint)]'}`}>
+                          {key}
+                        </span>
+                        {savedPlatform === key && (
+                          <Check size={12} className="text-[var(--success)]" />
                         )}
                       </div>
-                      <button
-                        onClick={() => handleTogglePlatform(platform, !enabled)}
-                        className="transition-colors shrink-0"
-                        title={enabled ? 'Disable' : 'Enable'}
-                        aria-label={enabled ? `Disable ${platform}` : `Enable ${platform}`}
+                      {/* Custom toggle switch */}
+                      <div
+                        className="relative w-8 h-[18px] rounded-full transition-all duration-200 shrink-0"
+                        style={{
+                          background: enabled ? 'var(--accent)' : 'rgba(255,255,255,0.10)',
+                          boxShadow: enabled ? '0 0 8px rgba(99,102,241,0.3)' : 'none',
+                        }}
                       >
-                        {enabled
-                          ? <ToggleRight size={18} className="text-[var(--accent)]" />
-                          : <ToggleLeft size={18} className="text-[var(--text-faint)]" />}
-                      </button>
-                    </div>
+                        <div
+                          className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-all duration-200"
+                          style={{ left: enabled ? '14px' : '2px' }}
+                        />
+                      </div>
+                    </button>
                   );
                 })}
               </div>

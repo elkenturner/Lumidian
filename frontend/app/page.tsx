@@ -409,7 +409,41 @@ function HeroSection() {
 }
 
 function ModelsBar() {
-  return <section className="py-12 flex items-center justify-center text-[#64748b]">Models bar placeholder</section>;
+  return (
+    <section className="py-12 border-y border-[rgba(51,65,85,0.5)]">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FadeUp>
+          <p className="text-center text-sm text-[#64748b] mb-6">Tracking visibility across</p>
+        </FadeUp>
+        <div className="flex flex-wrap justify-center gap-3">
+          {AI_MODELS.map((model, i) => (
+            <FadeUp key={model.name} delay={i * 60}>
+              <div
+                className="flex items-center gap-2 bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-full px-4 py-2 transition-all hover:border-opacity-100"
+                style={{
+                  ['--model-color' as string]: model.color,
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = model.color;
+                  e.currentTarget.style.boxShadow = `0 0 16px ${model.color}40`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'rgba(51,65,85,0.5)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: model.color }}
+                />
+                <span className="text-sm font-medium text-white">{model.name}</span>
+              </div>
+            </FadeUp>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function StatsSection() {

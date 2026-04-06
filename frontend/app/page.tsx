@@ -260,7 +260,82 @@ const DEMO_GAPS = [
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function Header({ scrolled }: { scrolled: boolean }) {
-  return <header className="fixed top-0 left-0 right-0 z-50 h-16 flex items-center justify-center text-[#64748b]">Header placeholder</header>;
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  return (
+    <header
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? 'bg-[rgba(2,6,23,0.85)] backdrop-blur-lg border-b border-[rgba(51,65,85,0.5)]'
+          : 'bg-transparent'
+      }`}
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo */}
+          <Link href="/" className="flex items-center">
+            <LumidianLogo size={32} withWordmark variant="dark" />
+          </Link>
+
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-8">
+            <a href="#features" className="text-sm font-medium text-[#94a3b8] hover:text-white transition-colors">
+              Features
+            </a>
+            <a href="#pricing" className="text-sm font-medium text-[#94a3b8] hover:text-white transition-colors">
+              Pricing
+            </a>
+            <a href="#faq" className="text-sm font-medium text-[#94a3b8] hover:text-white transition-colors">
+              FAQ
+            </a>
+          </nav>
+
+          {/* Desktop CTAs */}
+          <div className="hidden md:flex items-center gap-3">
+            <Link
+              href="/login"
+              className="text-sm font-medium text-white px-4 py-2 rounded-full border border-[rgba(255,255,255,0.2)] hover:border-white transition-colors"
+            >
+              Log in
+            </Link>
+            <Link
+              href="/register"
+              className="text-sm font-semibold text-white px-5 py-2.5 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:shadow-[0_0_32px_rgba(99,102,241,0.6)]"
+            >
+              Get Started
+            </Link>
+          </div>
+
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 text-[#94a3b8] hover:text-white"
+          >
+            {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          </button>
+        </div>
+
+        {/* Mobile menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden py-4 border-t border-[rgba(51,65,85,0.5)]">
+            <nav className="flex flex-col gap-4">
+              <a href="#features" className="text-sm font-medium text-[#94a3b8] hover:text-white">Features</a>
+              <a href="#pricing" className="text-sm font-medium text-[#94a3b8] hover:text-white">Pricing</a>
+              <a href="#faq" className="text-sm font-medium text-[#94a3b8] hover:text-white">FAQ</a>
+              <div className="flex flex-col gap-2 pt-4 border-t border-[rgba(51,65,85,0.5)]">
+                <Link href="/login" className="text-sm font-medium text-white text-center py-2 rounded-full border border-[rgba(255,255,255,0.2)]">
+                  Log in
+                </Link>
+                <Link href="/register" className="text-sm font-semibold text-white text-center py-2.5 rounded-full bg-[#6366f1]">
+                  Get Started
+                </Link>
+              </div>
+            </nav>
+          </div>
+        )}
+      </div>
+    </header>
+  );
 }
 
 function HeroSection() {

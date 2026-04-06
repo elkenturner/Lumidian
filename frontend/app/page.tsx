@@ -363,6 +363,7 @@ function HeroSection() {
             <span className="bg-gradient-to-r from-[#6366f1] to-[#a855f7] bg-clip-text text-transparent">
               Visibility in AI
             </span>
+            {' — Then Fix It'}
           </h1>
         </FadeUp>
 

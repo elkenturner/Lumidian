@@ -6,8 +6,6 @@ import LumidianLogo from '@/components/LumidianLogo';
 import { useAuth } from '@/contexts/AuthContext';
 import { authVerifyEmail, authResendVerification } from '@/lib/api';
 
-const NOISE_SVG = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='300' height='300' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")`;
-
 export default function VerifyEmailPage() {
   const { user, refresh } = useAuth();
   const [code, setCode] = useState('');
@@ -58,89 +56,46 @@ export default function VerifyEmailPage() {
   // Render nothing while user state is resolving (AuthContext redirects if needed)
   if (!user) return null;
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    background: '#fff',
-    border: '1px solid rgba(0,0,0,0.12)',
-    borderRadius: 10,
-    padding: '12px 16px',
-    fontSize: 28,
-    fontWeight: 700,
-    letterSpacing: '0.3em',
-    color: '#0F0F12',
-    outline: 'none',
-    boxSizing: 'border-box',
-    textAlign: 'center',
-    fontFamily: 'var(--font-fira-code), monospace',
-    transition: 'border-color 0.15s',
-  };
-
   return (
-    <div style={{
-      position: 'relative',
-      minHeight: '100vh',
-      backgroundColor: '#F8F7F4',
-      color: '#0F0F12',
-      fontFamily: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '24px 16px',
-      overflow: 'hidden',
-    }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
+    <div className="relative min-h-screen bg-[#020617] text-[#f8fafc] flex items-center justify-center p-6 overflow-hidden">
+      {/* Background gradient */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+        }}
+      />
 
-      {/* Background gradient orbs — same as login/register */}
-      <div aria-hidden style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0, overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: '-20vh', left: '-15vw', width: '70vw', height: '70vw', maxWidth: 900, maxHeight: 900, borderRadius: '50%', background: 'radial-gradient(circle at 40% 40%, rgba(147,197,253,0.38) 0%, rgba(147,197,253,0.08) 50%, transparent 72%)', filter: 'blur(60px)' }} />
-        <div style={{ position: 'absolute', top: '-10vh', right: '-10vw', width: '60vw', height: '60vw', maxWidth: 800, maxHeight: 800, borderRadius: '50%', background: 'radial-gradient(circle at 60% 40%, rgba(196,181,253,0.32) 0%, rgba(196,181,253,0.06) 50%, transparent 72%)', filter: 'blur(60px)' }} />
-        <div style={{ position: 'absolute', top: '35vh', left: '25vw', width: '55vw', height: '55vw', maxWidth: 750, maxHeight: 750, borderRadius: '50%', background: 'radial-gradient(circle at 50% 50%, rgba(167,243,208,0.22) 0%, rgba(167,243,208,0.04) 55%, transparent 72%)', filter: 'blur(70px)' }} />
-        <div style={{ position: 'absolute', inset: 0, backgroundImage: NOISE_SVG, backgroundRepeat: 'repeat', backgroundSize: '200px 200px', opacity: 0.04, mixBlendMode: 'multiply' }} />
-      </div>
-
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}>
+      <div className="relative z-10 w-full max-w-[420px]">
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, marginBottom: 36 }}>
-          <LumidianLogo size={40} withWordmark variant="light" />
+        <div className="flex items-center justify-center mb-9">
+          <LumidianLogo size={40} withWordmark variant="dark" />
         </div>
 
         {/* Card */}
-        <div style={{
-          background: 'rgba(255,255,255,0.82)',
-          backdropFilter: 'blur(20px)',
-          WebkitBackdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0,0,0,0.07)',
-          borderRadius: 20,
-          padding: '36px 32px',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-        }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#0F0F12', margin: '0 0 4px', letterSpacing: '-0.03em' }}>
-            Check your email
-          </h1>
-          <p style={{ fontSize: 14, color: '#6B7280', margin: '0 0 24px', fontWeight: 400 }}>
+        <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-8">
+          <h1 className="text-2xl font-bold text-[#f8fafc] mb-1">Check your email</h1>
+          <p className="text-sm text-[#94a3b8] mb-6">
             We sent a 6-digit code to{' '}
-            <strong style={{ color: '#374151' }}>{user.email}</strong>.
+            <strong className="text-[#f8fafc]">{user.email}</strong>.
             Enter it below to verify your account.
           </p>
 
           {error && (
-            <div role="alert" style={{ background: 'rgba(254,226,226,0.8)', border: '1px solid rgba(252,165,165,0.5)', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
-              <p style={{ fontSize: 13, color: '#b91c1c', margin: 0 }}>{error}</p>
+            <div className="bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.3)] rounded-lg px-3.5 py-2.5 mb-5">
+              <p className="text-sm text-[#f87171]">{error}</p>
             </div>
           )}
 
           {resent && (
-            <div role="alert" style={{ background: 'rgba(209,250,229,0.8)', border: '1px solid rgba(110,231,183,0.5)', borderRadius: 10, padding: '10px 14px', marginBottom: 20 }}>
-              <p style={{ fontSize: 13, color: '#065f46', margin: 0 }}>A new code has been sent to your email.</p>
+            <div className="bg-[rgba(34,197,94,0.1)] border border-[rgba(34,197,94,0.3)] rounded-lg px-3.5 py-2.5 mb-5">
+              <p className="text-sm text-[#4ade80]">A new code has been sent to your email.</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div>
-              <label htmlFor="verification-code" style={{ display: 'block', fontSize: 13, fontWeight: 500, color: '#374151', marginBottom: 8 }}>
+              <label htmlFor="verification-code" className="block text-sm font-medium text-[#94a3b8] mb-2">
                 Verification code
               </label>
               <input
@@ -152,56 +107,26 @@ export default function VerifyEmailPage() {
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                 placeholder="000000"
                 autoFocus
-                style={inputStyle}
-                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(79,70,229,0.5)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.2)'; }}
-                onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(0,0,0,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
+                className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 text-2xl text-center font-mono text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading || code.length !== 6}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-                background: '#0F0F12',
-                border: 'none',
-                borderRadius: 100,
-                padding: '11px 20px',
-                fontSize: 14,
-                fontWeight: 600,
-                color: '#fff',
-                cursor: (loading || code.length !== 6) ? 'not-allowed' : 'pointer',
-                opacity: (loading || code.length !== 6) ? 0.6 : 1,
-                transition: 'background 0.15s, box-shadow 0.15s',
-                boxShadow: '0 2px 8px rgba(15,15,18,0.15)',
-                fontFamily: 'inherit',
-              }}
+              className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-2.5 px-5 transition-colors"
             >
-              {loading && <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />}
+              {loading && <Loader2 size={15} className="animate-spin" />}
               {loading ? 'Verifying…' : 'Verify email'}
             </button>
           </form>
 
-          <p style={{ fontSize: 13, color: '#9CA3AF', textAlign: 'center', marginTop: 20, marginBottom: 0 }}>
+          <p className="text-sm text-[#64748b] text-center mt-5">
             Didn&apos;t receive a code?{' '}
             <button
               onClick={handleResend}
               disabled={resending}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--accent)',
-                fontWeight: 500,
-                cursor: resending ? 'not-allowed' : 'pointer',
-                fontSize: 13,
-                padding: 0,
-                fontFamily: 'inherit',
-                opacity: resending ? 0.6 : 1,
-              }}
+              className="text-[#6366f1] hover:text-[#818cf8] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {resending ? 'Sending…' : 'Resend code'}
             </button>

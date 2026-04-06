@@ -504,7 +504,49 @@ function StatsSection() {
 }
 
 function FeaturesSection() {
-  return <section className="py-24 flex items-center justify-center text-[#64748b]">Features placeholder</section>;
+  return (
+    <section id="features" className="py-24 scroll-mt-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FadeUp>
+          <h2
+            className="text-3xl sm:text-4xl font-bold text-center text-[#f8fafc] mb-4"
+            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+          >
+            Everything you need to dominate AI visibility
+          </h2>
+        </FadeUp>
+        <FadeUp delay={100}>
+          <p className="text-center text-[#94a3b8] mb-16 max-w-2xl mx-auto">
+            Track, analyze, and improve how AI models talk about your brand.
+          </p>
+        </FadeUp>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {FEATURES.map((feature, i) => {
+            const Icon = feature.icon;
+            return (
+              <FadeUp key={feature.title} delay={i * 80}>
+                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-7 h-full transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(71,85,105,0.5)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+                  <div className="w-11 h-11 rounded-xl bg-[rgba(99,102,241,0.15)] flex items-center justify-center mb-4">
+                    <Icon size={20} className="text-[#6366f1]" />
+                  </div>
+                  <h3
+                    className="text-lg font-semibold text-[#f8fafc] mb-2"
+                    style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+                  >
+                    {feature.title}
+                  </h3>
+                  <p className="text-sm text-[#94a3b8] leading-relaxed">
+                    {feature.desc}
+                  </p>
+                </div>
+              </FadeUp>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function HowItWorksSection() {

@@ -57,8 +57,9 @@ export default function OnboardingPage() {
         setError('Please enter a valid website URL.');
         return;
       }
-      const result = await fetchWebsiteContext(normalisedUrl);
+      const result = await fetchWebsiteContext(normalisedUrl, brandName.trim());
       setWebsiteContext(result.context);
+      if (result.description) setCompanyDescription(result.description);
       setStep(2);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
@@ -72,14 +73,6 @@ export default function OnboardingPage() {
     setSaving(true);
     setError('');
     try {
-      // Pre-fill description from website context if available and not already set
-      if (websiteContext && !companyDescription) {
-        const firstLine = websiteContext
-          .split(/\n+/)
-          .map((l) => l.trim())
-          .find((l) => l.length > 20 && !l.startsWith('#') && !l.startsWith('http') && !l.startsWith('['));
-        if (firstLine) setCompanyDescription(firstLine.slice(0, 300));
-      }
       setStep(3);
     } finally {
       setSaving(false);

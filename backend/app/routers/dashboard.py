@@ -135,9 +135,12 @@ _URL_RE = re.compile(
 )
 # Bare domains: "wikipedia.org", "www.techcrunch.com", "(reddit.com)"
 # Require letter-start + known TLD; excludes "1.0", "[1]", etc.
+# Supports compound TLDs (co.uk, gov.au) and single TLDs.
 _BARE_DOMAIN_RE = re.compile(
     r'(?:^|[\s\(\[\"\',;:])(?:www\.)?([a-zA-Z][a-zA-Z0-9\-]*\.'
-    r'(?:com|org|net|io|ai|co|edu|gov|info|tech|app|dev|news|media|blog|tv|uk|de|fr|jp|au))'
+    r'(?:(?:co|gov|org|ac|net)\.(?:uk|au|nz|in|za|kr|jp|id|br)'  # compound TLDs
+    r'|com|org|net|io|ai|co|edu|gov|info|tech|app|dev|news|media|blog|tv|health|int|me|us'
+    r'|uk|de|fr|jp|au|ca|eu|nz|in|br|mx|kr|cn|se|nl|ch|be|at|pt|es|it|pl|ie|fi|dk|no|sg|hk))'
     r'(?:[/\s\)\]\"\'<>,;.]|$)',
     re.IGNORECASE,
 )

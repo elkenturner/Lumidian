@@ -198,10 +198,10 @@ const STATS = [
 ];
 
 const COMPARISON_FEATURES = [
-  { label: 'Standard brands', free: '0', starter: '2', pro: '4' },
-  { label: 'Pitch decks', free: '1', starter: '3', pro: 'Unlimited' },
+  { label: 'Standard brands', free: '0', starter: '2', pro: '2' },
+  { label: 'Pitch decks', free: '1', starter: '1', pro: '3' },
   { label: 'Prompts per brand', free: '10', starter: '25', pro: '100' },
-  { label: 'Manual runs per day', free: '1', starter: '1', pro: 'Unlimited' },
+  { label: 'Manual runs per day', free: '1', starter: 'Unlimited', pro: 'Unlimited' },
   { label: 'AI models monitored', free: '4', starter: '4', pro: '4' },
   { label: 'Daily tracking', free: true, starter: true, pro: true },
   { label: 'Visibility score & report', free: true, starter: true, pro: true },

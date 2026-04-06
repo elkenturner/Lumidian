@@ -75,6 +75,7 @@ import {
 import { format } from 'date-fns';
 import { MODEL_ORDER, MODEL_CONFIG as MODEL_CONFIG_SHARED, getModelConfig } from '@/lib/constants/models';
 import { parseUTCISO } from '@/lib/utils/formatting';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.mutedBg, text: v.color }])
@@ -404,6 +405,7 @@ function BestPromptCard({ responses, loading }: { responses: QueryResult[]; load
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const { brands, activeBrandId: selectedBrandId, loading: loadingBrands, setActiveBrandId, refetch: refetchBrands } = useBrand();
   const [newBrandMode, setNewBrandMode] = useState(false);
   const [newBrandStep, setNewBrandStep] = useState<'running' | 'drafting' | 'done'>('running');
@@ -922,11 +924,12 @@ export default function DashboardPage() {
             <p className="text-[13px] text-[var(--text-muted)] mt-1.5">AI visibility analytics</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className={`flex ${isMobile ? 'flex-col w-full' : 'items-center'} gap-2 sm:gap-3`}>
+          <div className={`flex ${isMobile ? 'w-full' : ''} items-center gap-2`}>
           <button
             onClick={() => setPromptModalOpen(true)}
             disabled={!selectedBrandId}
-            className="flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 text-xs transition-all duration-150"
+            className={`flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 text-xs transition-all duration-150 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
           >
             <MessageSquare size={14} />
             Prompts
@@ -934,16 +937,17 @@ export default function DashboardPage() {
           <button
             onClick={() => selectedBrandId && loadData(selectedBrandId)}
             aria-label="Refresh dashboard"
-            className="flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-all duration-150"
+            className={`flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-all duration-150 ${isMobile ? 'min-h-[44px]' : ''}`}
           >
             <RefreshCw size={14} />
           </button>
-          <div className="flex flex-col items-end gap-1">
+          </div>
+          <div className={`flex flex-col ${isMobile ? 'w-full' : 'items-end'} gap-1`}>
             <button
               onClick={isAtRunLimit ? () => { setUpgradeModalReason("You've used your 1 daily report run. Upgrade to run reports any time."); setUpgradeModalOpen(true); } : handleRunReport}
               disabled={triggering || isRunning || !selectedBrandId}
               title={isAtRunLimit ? 'Daily run limit reached — resets at midnight UTC' : undefined}
-              className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${
+              className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${isMobile ? 'w-full justify-center' : ''} ${
                 isAtRunLimit
                   ? 'bg-[var(--accent-muted)] border border-[var(--accent-border)] text-[var(--text-faint)] cursor-default'
                   : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40 hover:shadow-xl'
@@ -1078,7 +1082,7 @@ export default function DashboardPage() {
 
               {/* Quick stats row */}
               {!loadingAnalytics && totalRuns > 0 && (
-                <div className="grid grid-cols-3 gap-3 mb-4">
+                <div className={isMobile ? 'snap-scroll-x gap-3 mb-4 -mx-4 px-4' : 'grid grid-cols-3 gap-3 mb-4'}>
                   {([
                     { label: 'Prompts Tracked',   value: totalPrompts || '—',   icon: MessageSquare, accent: 'var(--color-gemini)', iconBg: 'var(--color-gemini-muted)',  borderTop: 'var(--color-gemini)', sub: null, subColor: '' },
                     { label: 'Days Tracking',     value: daysSinceFirst != null ? daysSinceFirst : '—', icon: TrendingUp, accent: 'var(--warning-text)', iconBg: 'var(--warning-muted)', borderTop: 'var(--warning)', sub: null, subColor: '' },
@@ -1086,7 +1090,7 @@ export default function DashboardPage() {
                   ] as Array<{ label: string; value: string | number; icon: React.ElementType; accent: string; iconBg: string; borderTop: string; sub: string | null; subColor: string }>).map(({ label, value, icon: Icon, accent, iconBg, borderTop, sub, subColor }) => (
                     <div
                       key={label}
-                      className="bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-xl px-4 py-4 flex items-center gap-3"
+                      className={`bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-xl px-4 py-4 flex items-center gap-3 ${isMobile ? 'min-w-[160px]' : ''}`}
                       style={{ borderTopColor: borderTop, borderTopWidth: 2 }}
                     >
                       <div
@@ -1121,7 +1125,7 @@ export default function DashboardPage() {
                         <div className="h-14 w-28 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-2" />
                       ) : (
                         <>
-                          <p className="text-6xl font-bold text-[var(--text-primary)] mt-1 leading-none">
+                          <p className="text-5xl md:text-6xl font-bold text-[var(--text-primary)] mt-1 leading-none">
                             {score != null ? `${Math.round(score)}%` : 'N/A'}
                           </p>
                           {scoreDelta !== null && (
@@ -1169,7 +1173,7 @@ export default function DashboardPage() {
                       ] as Array<{ label: string; s: number | null; models: string; color: string }>).map(({ label, s, models, color }) => (
                         <div key={label}>
                           <div className="flex items-center gap-3 mb-0.5">
-                            <div className="flex items-center gap-1.5 w-24 flex-shrink-0">
+                            <div className="flex items-center gap-1.5 w-20 md:w-24 flex-shrink-0">
                               <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
                               <span className="text-[11px] font-medium text-[var(--text-muted)] truncate">{label}</span>
                             </div>
@@ -1180,7 +1184,7 @@ export default function DashboardPage() {
                               {s !== null ? `${s}%` : '—'}
                             </span>
                           </div>
-                          <p className="text-[9px] text-[var(--text-faint)] pl-[108px] truncate">{models}</p>
+                          <p className="text-[9px] text-[var(--text-faint)] pl-[88px] md:pl-[108px] truncate">{models}</p>
                         </div>
                       ))}
                       {liveScore !== null && indexScore !== null && (
@@ -1201,7 +1205,7 @@ export default function DashboardPage() {
                 {/* Right column: Best Prompt + Sentiment on top, SOV below */}
                 <div className="flex flex-col gap-3">
                   {/* Top row */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <BestPromptCard responses={responses} loading={loadingAnalytics} />
 
                     {/* Sentiment */}
@@ -1271,7 +1275,7 @@ export default function DashboardPage() {
                       const count = sorted.length;
 
                       return (
-                        <div className={`grid gap-3 ${count <= 2 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                        <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : count <= 2 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
                           {sorted.map((s) => {
                             const pct = Math.round(s.mention_rate * 100);
                             const barColor = s.is_primary ? 'var(--accent)' : 'var(--text-faint)';
@@ -1465,9 +1469,11 @@ export default function DashboardPage() {
                                 <Badge style={{ backgroundColor: mc.bg, color: mc.text, borderColor: 'transparent' }}>
                                   {label}
                                 </Badge>
-                                <Badge variant={conv.mentioned ? "success" : "secondary"}>
-                                  {conv.mentioned ? 'Mentioned' : 'Not mentioned'}
-                                </Badge>
+                                {!isMobile && (
+                                  <Badge variant={conv.mentioned ? "success" : "secondary"}>
+                                    {conv.mentioned ? 'Mentioned' : 'Not mentioned'}
+                                  </Badge>
+                                )}
                                 <ChevronDown
                                   size={12}
                                   className={`text-[var(--text-faint)] transition-transform ${expandedConvId === conv.id ? 'rotate-180' : ''}`}

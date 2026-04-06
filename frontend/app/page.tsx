@@ -176,7 +176,7 @@ const HOW_STEPS = [
   {
     n: '1',
     title: 'Track Your Visibility',
-    desc: 'Connect your brand and set prompts. We query all four AI models twice daily and score how often you appear.',
+    desc: 'Connect your brand and set prompts. We query all four AI models daily and score how often you appear.',
   },
   {
     n: '2',
@@ -191,10 +191,10 @@ const HOW_STEPS = [
 ];
 
 const STATS = [
-  { value: 50000, label: 'Queries Tracked', suffix: '+' },
-  { value: 4, label: 'AI Models', suffix: '' },
-  { value: 98, label: 'Accuracy Rate', suffix: '%' },
-  { value: 2, label: 'Daily Reports', suffix: 'x' },
+  { value: 4, label: 'AI Models Tracked', suffix: '' },
+  { value: 1, label: 'Daily Report', suffix: 'x' },
+  { value: 100, label: 'Prompts Supported', suffix: '+' },
+  { value: 30, label: 'Day Trend History', suffix: '' },
 ];
 
 const COMPARISON_FEATURES = [
@@ -203,7 +203,7 @@ const COMPARISON_FEATURES = [
   { label: 'Prompts per brand', free: '10', starter: '25', pro: '100' },
   { label: 'Manual runs per day', free: '1', starter: '1', pro: 'Unlimited' },
   { label: 'AI models monitored', free: '4', starter: '4', pro: '4' },
-  { label: 'Twice-daily tracking', free: true, starter: true, pro: true },
+  { label: 'Daily tracking', free: true, starter: true, pro: true },
   { label: 'Visibility score & report', free: true, starter: true, pro: true },
   { label: 'Content Hub & drafting', free: false, starter: true, pro: true },
   { label: 'Gap analysis', free: false, starter: true, pro: true },
@@ -218,7 +218,7 @@ const COMPARISON_FEATURES = [
 const FAQ_ITEMS = [
   {
     q: 'How does Lumidian track AI visibility?',
-    a: 'Lumidian runs your tracked prompts across ChatGPT, Claude, Perplexity, and Gemini twice daily, analyzing each response to detect whether your brand is mentioned. Results are scored and stored so you can track changes over time.',
+    a: 'Lumidian runs your tracked prompts across ChatGPT, Claude, Perplexity, and Gemini daily, analyzing each response to detect whether your brand is mentioned. Results are scored and stored so you can track changes over time.',
   },
   {
     q: 'What kind of content does Lumidian draft?',
@@ -250,9 +250,9 @@ const DEMO_MODELS = [
 ];
 
 const DEMO_GAPS = [
-  { prompt: 'best CRM for startups', score: 12 },
-  { prompt: 'sales automation tools', score: 18 },
-  { prompt: 'email marketing software', score: 21 },
+  { prompt: 'best tools for [your industry]', score: 12 },
+  { prompt: 'top solutions in [your category]', score: 18 },
+  { prompt: 'recommended [your product type]', score: 21 },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -300,7 +300,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
             </Link>
             <Link
               href="/register"
-              className="text-sm font-semibold text-white px-5 py-2.5 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)] hover:shadow-[0_0_32px_rgba(99,102,241,0.6)]"
+              className="text-sm font-semibold text-white px-5 py-2.5 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-lg"
             >
               Get Started
             </Link>
@@ -385,7 +385,7 @@ function HeroSection() {
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/register"
-              className="flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_32px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_rgba(99,102,241,0.6)]"
+              className="flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-lg hover:shadow-xl"
             >
               <Play size={18} fill="white" />
               Start Free
@@ -425,11 +425,9 @@ function ModelsBar() {
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = model.color;
-                  e.currentTarget.style.boxShadow = `0 0 16px ${model.color}40`;
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.borderColor = 'rgba(51,65,85,0.5)';
-                  e.currentTarget.style.boxShadow = 'none';
                 }}
               >
                 <span
@@ -647,6 +645,7 @@ function DashboardMockup() {
           <span className="w-3 h-3 rounded-full bg-[#22c55e]" />
           <div className="flex-1 ml-3 bg-[#0f172a] rounded-md px-3 py-1.5">
             <span className="text-xs text-[#64748b]">app.lumidian.ai/dashboard</span>
+            <span className="text-[10px] text-[#94a3b8] ml-2 opacity-60">Example</span>
           </div>
         </div>
 
@@ -933,7 +932,7 @@ function CTASection() {
         <FadeUp delay={200}>
           <Link
             href="/register"
-            className="inline-flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_32px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_rgba(99,102,241,0.6)]"
+            className="inline-flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-lg hover:shadow-xl"
           >
             Get Started Free
             <ArrowRight size={18} />

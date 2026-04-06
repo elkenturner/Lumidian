@@ -434,3 +434,87 @@ body {
     transform: translateX(0);
   }
 }
+
+/* ── Mobile responsive utilities ──────────────────────────────────────────── */
+
+/* Reduce card padding on mobile */
+@media (max-width: 767px) {
+  .card {
+    padding: 16px;
+  }
+  .card-elevated {
+    padding: 16px;
+  }
+}
+
+/* Touch-friendly tap targets */
+@media (max-width: 767px) {
+  .touch-target {
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+  .touch-target-lg {
+    min-height: 48px;
+    display: flex;
+    align-items: center;
+  }
+}
+
+/* Horizontal scroll hints — fade on right edge */
+.scroll-hint-right {
+  position: relative;
+}
+.scroll-hint-right::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 40px;
+  background: linear-gradient(to right, transparent, var(--bg-base));
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Snap scroll container */
+.snap-scroll-x {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.snap-scroll-x::-webkit-scrollbar {
+  display: none;
+}
+.snap-scroll-x > * {
+  scroll-snap-align: start;
+  flex-shrink: 0;
+}
+
+/* Pull-to-refresh indicator */
+.pull-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  transition: height 0.2s ease;
+}
+.pull-indicator svg {
+  transition: transform 0.2s ease;
+}
+
+/* Safe area support */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Mobile input zoom prevention */
+@media (max-width: 767px) {
+  .mobile-input {
+    font-size: 16px !important;
+  }
+}

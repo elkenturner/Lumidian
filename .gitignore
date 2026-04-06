@@ -31,3 +31,7 @@ Thumbs.db
 .idea/
 .vscode/
 *.swp
+.playwright-mcp/
+backend/logs/
+*.png
+frontend/tsconfig.tsbuildinfo

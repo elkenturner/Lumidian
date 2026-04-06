@@ -185,8 +185,8 @@ export default function ReportsPage() {
       setResponses(Array.isArray(resps) ? resps.filter((r: QueryResult) => r.response_text) : []);
       setPrevResponses(Array.isArray(prevResps) ? prevResps.filter((r: QueryResult) => r.response_text) : []);
       if (compAnalysis?.has_data) setCompetitorAnalysis(compAnalysis);
-      // Check case study eligibility
-      getCaseStudyEligibility(brandId).then(setCaseStudyEligibility).catch((err) => logError(err, 'Reports: fetch case study eligibility'));
+      // Check case study eligibility (endpoint not yet implemented — silently ignore)
+      getCaseStudyEligibility(brandId).then(setCaseStudyEligibility).catch(() => {});
     } catch { /* ignore */ } finally {
       if (!signal?.aborted) setLoading(false);
     }

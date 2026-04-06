@@ -130,31 +130,61 @@ function SparklineTooltip({ active, payload }: { active?: boolean; payload?: Arr
   );
 }
 
-// ── Top domains donut chart ─────────────────────────────────────────────────────
+// ── Top domains chart ────────────────────────────────────────────────────────────
 
-const DOMAIN_COLORS = ['var(--accent)', 'var(--success)', 'var(--warning)', 'var(--color-perplexity)', '#f43f5e', '#06b6d4'];
+const DOMAIN_COLORS = [
+  { color: '#818cf8', glow: 'rgba(129,140,248,0.4)' },
+  { color: '#34d399', glow: 'rgba(52,211,153,0.4)' },
+  { color: '#fbbf24', glow: 'rgba(251,191,36,0.4)' },
+  { color: '#a78bfa', glow: 'rgba(167,139,250,0.4)' },
+  { color: '#f472b6', glow: 'rgba(244,114,182,0.4)' },
+  { color: '#22d3ee', glow: 'rgba(34,211,238,0.4)' },
+];
+
+// Format percentage without redundant decimals (87% not 87.0%)
+const formatPct = (pct: number) => pct % 1 === 0 ? `${Math.round(pct)}%` : `${pct.toFixed(1)}%`;
 
 function DonutDomains({ domains }: { domains: Array<{ domain: string; pct: number; count: number; domain_type: string }> }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const total = domains.reduce((s, d) => s + d.count, 0);
   const data = domains.map((d) => ({ ...d, value: d.count }));
-  const active = activeIndex !== null ? data[activeIndex] : null;
-  const activePct = active && total > 0 ? ((active.count / total) * 100).toFixed(1) : null;
+
+  const getDomainUrl = (domain: string) => {
+    const clean = domain.replace(/^www\./, '');
+    return `https://${clean}`;
+  };
 
   return (
     <div className="flex items-center gap-5 flex-1 min-h-0">
-      {/* Donut */}
-      <div className="relative flex-shrink-0" style={{ width: 130, height: 130 }}>
-        <PieChart width={130} height={130}>
+      {/* Modern Donut */}
+      <div className="relative flex-shrink-0" style={{ width: 110, height: 110 }}>
+        <PieChart width={110} height={110}>
+          <defs>
+            {DOMAIN_COLORS.map((c, i) => (
+              <linearGradient key={i} id={`domainGrad${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor={c.color} stopOpacity={1} />
+                <stop offset="100%" stopColor={c.color} stopOpacity={0.7} />
+              </linearGradient>
+            ))}
+            <filter id="domainGlow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
           <Pie
             data={data}
-            cx={65}
-            cy={65}
-            innerRadius={42}
-            outerRadius={60}
-            paddingAngle={2}
+            cx={55}
+            cy={55}
+            innerRadius={32}
+            outerRadius={50}
+            cornerRadius={4}
+            paddingAngle={4}
             dataKey="value"
-            strokeWidth={0}
+            stroke="rgba(0,0,0,0.3)"
+            strokeWidth={1}
             startAngle={90}
             endAngle={-270}
             onMouseEnter={(_, i) => setActiveIndex(i)}
@@ -163,47 +193,62 @@ function DonutDomains({ domains }: { domains: Array<{ domain: string; pct: numbe
             {data.map((_, i) => (
               <Cell
                 key={i}
-                fill={DOMAIN_COLORS[i % DOMAIN_COLORS.length]}
+                fill={`url(#domainGrad${i % DOMAIN_COLORS.length})`}
                 opacity={activeIndex === null || activeIndex === i ? 1 : 0.25}
-                style={{ cursor: 'default', outline: 'none' }}
+                style={{ cursor: 'pointer', outline: 'none', transition: 'opacity 0.25s ease-out', filter: activeIndex === i ? 'url(#domainGlow)' : 'none' }}
               />
             ))}
           </Pie>
         </PieChart>
-        {/* Centre label */}
+        {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          {active && activePct ? (
-            <>
-              <span className="text-base font-bold text-[var(--text-primary)] leading-none">{activePct}%</span>
-              <span className="text-[10px] text-[var(--text-muted)] mt-0.5 max-w-[60px] text-center leading-tight truncate">{active.domain.replace(/^www\./, '')}</span>
-            </>
-          ) : (
-            <>
-              <span className="text-base font-bold text-[var(--text-primary)] leading-none">{data.length}</span>
-              <span className="text-[10px] text-[var(--text-muted)] mt-0.5">sources</span>
-            </>
-          )}
+          <span className="text-lg font-bold text-[var(--text-primary)] leading-none">{data.length}</span>
+          <span className="text-[9px] text-[var(--text-faint)] mt-0.5 uppercase tracking-wider">sources</span>
         </div>
       </div>
 
       {/* Legend */}
-      <div className="flex-1 min-w-0 space-y-2">
+      <div className="flex-1 min-w-0 space-y-0.5">
         {data.map((d, i) => {
           const pct = total > 0 ? (d.count / total) * 100 : 0;
-          const color = DOMAIN_COLORS[i % DOMAIN_COLORS.length];
+          const { color, glow } = DOMAIN_COLORS[i % DOMAIN_COLORS.length];
           const isActive = activeIndex === i;
+          const displayDomain = d.domain.replace(/^www\./, '');
           return (
-            <div
+            <a
               key={d.domain}
-              className="flex items-center gap-2 min-w-0 cursor-default"
+              href={getDomainUrl(d.domain)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2.5 min-w-0 group rounded-lg px-2 py-1.5 -mx-2 transition-all duration-200"
               onMouseEnter={() => setActiveIndex(i)}
               onMouseLeave={() => setActiveIndex(null)}
-              style={{ opacity: activeIndex === null || isActive ? 1 : 0.4, transition: 'opacity 0.15s' }}
+              style={{
+                opacity: activeIndex === null || isActive ? 1 : 0.4,
+                background: isActive ? 'rgba(255,255,255,0.05)' : 'transparent',
+              }}
             >
-              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
-              <span className="text-xs truncate flex-1 min-w-0" style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)' }}>{d.domain}</span>
-              <span className="text-xs tabular-nums font-semibold flex-shrink-0" style={{ color: isActive ? color : 'var(--text-muted)' }}>{pct.toFixed(1)}%</span>
-            </div>
+              <span
+                className="w-2 h-2 rounded-full flex-shrink-0 transition-all duration-200"
+                style={{
+                  background: color,
+                  boxShadow: isActive ? `0 0 10px ${glow}, 0 0 4px ${color}` : 'none',
+                  transform: isActive ? 'scale(1.3)' : 'scale(1)',
+                }}
+              />
+              <span
+                className="text-xs truncate flex-1 min-w-0 transition-colors duration-200"
+                style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)' }}
+              >
+                {displayDomain}
+              </span>
+              <span
+                className="text-[11px] tabular-nums font-semibold flex-shrink-0 transition-colors duration-200"
+                style={{ color: isActive ? color : 'var(--text-faint)' }}
+              >
+                {formatPct(pct)}
+              </span>
+            </a>
           );
         })}
       </div>
@@ -1221,22 +1266,27 @@ export default function DashboardPage() {
                       </p>
                     ) : (() => {
                       const allStats = analytics.competitor_comparison;
-                      const maxRate = Math.max(...allStats.map((s) => s.mention_rate));
+                      // Sort: primary brand first, then competitors
+                      const sorted = [...allStats].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+                      const count = sorted.length;
+
                       return (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                          {allStats.map((s) => {
+                        <div className={`grid gap-3 ${count <= 2 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                          {sorted.map((s) => {
                             const pct = Math.round(s.mention_rate * 100);
-                            const isLeading = s.mention_rate === maxRate && maxRate > 0;
-                            const barColor = s.is_primary ? (isLeading ? 'var(--success)' : 'var(--accent)') : (isLeading ? 'var(--danger)' : 'var(--text-faint)');
-                            const textColor = s.is_primary ? (isLeading ? 'var(--success)' : 'var(--accent-light)') : (isLeading ? 'var(--danger-text)' : 'var(--text-muted)');
+                            const barColor = s.is_primary ? 'var(--accent)' : 'var(--text-faint)';
+                            const textColor = s.is_primary ? 'var(--accent-light)' : 'var(--text-muted)';
                             return (
                               <div key={s.name} className="flex flex-col gap-1.5">
                                 <div className="flex items-center justify-between">
                                   <span className={`text-xs font-medium truncate ${s.is_primary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{s.name}</span>
-                                  <span className="text-xs font-bold tabular-nums ml-2 flex-shrink-0" style={{ color: textColor }}>{pct}%</span>
+                                  <span className="text-xs font-semibold tabular-nums ml-2 flex-shrink-0" style={{ color: textColor }}>{pct}%</span>
                                 </div>
-                                <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.08)] overflow-hidden">
-                                  <div className="h-full rounded-full transition-all" style={{ width: `${maxRate > 0 ? (s.mention_rate / maxRate) * 100 : 0}%`, background: barColor }} />
+                                <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full transition-all duration-500"
+                                    style={{ width: `${pct}%`, background: barColor }}
+                                  />
                                 </div>
                               </div>
                             );

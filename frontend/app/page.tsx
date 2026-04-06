@@ -550,7 +550,53 @@ function FeaturesSection() {
 }
 
 function HowItWorksSection() {
-  return <section className="py-24 flex items-center justify-center text-[#64748b]">How it works placeholder</section>;
+  return (
+    <section className="py-24 border-y border-[rgba(51,65,85,0.5)]">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FadeUp>
+          <h2
+            className="text-3xl sm:text-4xl font-bold text-center text-[#f8fafc] mb-16"
+            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+          >
+            How it works
+          </h2>
+        </FadeUp>
+
+        <div className="space-y-12">
+          {HOW_STEPS.map((step, i) => (
+            <FadeUp key={step.n} delay={i * 150}>
+              <div className="flex gap-6 sm:gap-8">
+                {/* Number */}
+                <div className="flex-shrink-0">
+                  <span
+                    className="text-6xl sm:text-7xl font-extrabold bg-gradient-to-br from-[#6366f1] to-[#a855f7] bg-clip-text text-transparent"
+                    style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif', lineHeight: 1 }}
+                  >
+                    {step.n}
+                  </span>
+                </div>
+
+                {/* Content */}
+                <div className="pt-2">
+                  <div className="inline-flex items-center gap-2 bg-[rgba(99,102,241,0.1)] border border-[rgba(99,102,241,0.2)] rounded-full px-3 py-1 mb-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1]" />
+                    <span className="text-xs font-semibold text-[#6366f1]">Step {step.n}</span>
+                  </div>
+                  <h3
+                    className="text-xl font-semibold text-[#f8fafc] mb-2"
+                    style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+                  >
+                    {step.title}
+                  </h3>
+                  <p className="text-[#94a3b8] leading-relaxed">{step.desc}</p>
+                </div>
+              </div>
+            </FadeUp>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function DashboardMockup() {

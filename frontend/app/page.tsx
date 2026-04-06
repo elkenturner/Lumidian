@@ -141,12 +141,12 @@ const FEATURES = [
   {
     icon: Target,
     title: 'Identify Gaps',
-    desc: 'See which prompts miss your brand and what competitors get recommended instead.',
+    desc: 'See exactly which prompts miss your brand, which competitors appear instead, and where to focus.',
   },
   {
     icon: Sparkles,
     title: 'Auto-Draft Content',
-    desc: 'AI-generated articles and posts targeted at closing your specific visibility gaps.',
+    desc: 'Platform-specific drafts generated for every gap — Reddit posts, Quora answers, Medium articles, and Wikipedia edits.',
   },
   {
     icon: TrendingUp,
@@ -155,8 +155,8 @@ const FEATURES = [
   },
   {
     icon: MessageSquare,
-    title: 'Reddit Opportunities',
-    desc: 'Surface live threads where your brand can contribute — scored by relevance.',
+    title: 'Reddit & Quora Opportunities',
+    desc: 'Surface live threads and questions where your brand can contribute — scored by relevance.',
   },
   {
     icon: Settings2,
@@ -185,8 +185,8 @@ const HOW_STEPS = [
   },
   {
     n: '3',
-    title: 'Fix It with Content',
-    desc: 'We draft platform-specific content targeting your weakest prompts — ready for your review.',
+    title: 'Close the Gaps',
+    desc: 'We generate targeted drafts for Reddit, Quora, Medium, and Wikipedia — each one aimed at prompts where your brand is missing. Review, edit, and post.',
   },
 ];
 
@@ -199,6 +199,7 @@ const COMPARISON_FEATURES = [
   { label: 'Daily tracking', free: true, starter: true, pro: true },
   { label: 'Visibility score & report', free: true, starter: true, pro: true },
   { label: 'Content Hub & drafting', free: false, starter: true, pro: true },
+  { label: 'Custom draft requests', free: '—', starter: '10/week', pro: '25/week' },
   { label: 'Gap analysis', free: false, starter: true, pro: true },
   { label: 'Brand profile & voice', free: false, starter: true, pro: true },
   { label: 'Reddit scanner', free: false, starter: true, pro: true },
@@ -311,15 +312,15 @@ function Header({ scrolled }: { scrolled: boolean }) {
         {/* Mobile menu */}
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-[rgba(51,65,85,0.5)]">
-            <nav className="flex flex-col gap-4">
-              <a href="#features" className="text-sm font-medium text-[#94a3b8] hover:text-white">Features</a>
-              <a href="#pricing" className="text-sm font-medium text-[#94a3b8] hover:text-white">Pricing</a>
-              <a href="#faq" className="text-sm font-medium text-[#94a3b8] hover:text-white">FAQ</a>
-              <div className="flex flex-col gap-2 pt-4 border-t border-[rgba(51,65,85,0.5)]">
-                <Link href="/login" className="text-sm font-medium text-white text-center py-2 rounded-full border border-[rgba(255,255,255,0.2)]">
+            <nav className="flex flex-col gap-1">
+              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[#94a3b8] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">Features</a>
+              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[#94a3b8] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">Pricing</a>
+              <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[#94a3b8] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">FAQ</a>
+              <div className="flex flex-col gap-3 pt-4 mt-2 border-t border-[rgba(51,65,85,0.5)]">
+                <Link href="/login" className="text-base font-medium text-white text-center py-3 rounded-full border border-[rgba(255,255,255,0.2)]">
                   Log in
                 </Link>
-                <Link href="/register" className="text-sm font-semibold text-white text-center py-2.5 rounded-full bg-[#6366f1]">
+                <Link href="/register" className="text-base font-semibold text-white text-center py-3.5 rounded-full bg-[#6366f1]">
                   Get Started
                 </Link>
               </div>
@@ -368,8 +369,8 @@ function HeroSection() {
         {/* Subhead */}
         <FadeUp delay={200}>
           <p className="mt-6 text-lg sm:text-xl text-[#94a3b8] max-w-2xl mx-auto leading-relaxed">
-            Monitor how often ChatGPT, Claude, Perplexity, and Gemini mention your brand.
-            Identify gaps. Fix them with AI-drafted content.
+            Monitor how ChatGPT, Claude, Perplexity, and Gemini talk about your brand.
+            Find where you&apos;re missing — then fix it with targeted, AI-drafted content.
           </p>
         </FadeUp>
 
@@ -393,7 +394,7 @@ function HeroSection() {
         </FadeUp>
 
         {/* Dashboard mockup */}
-        <ScaleIn delay={400} className="mt-16">
+        <ScaleIn delay={400} className="mt-16 hidden sm:block">
           <DashboardMockup />
         </ScaleIn>
       </div>
@@ -460,7 +461,7 @@ function FeaturesSection() {
             const Icon = feature.icon;
             return (
               <FadeUp key={feature.title} delay={i * 80}>
-                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-7 h-full transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(71,85,105,0.5)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-5 md:p-7 h-full transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(71,85,105,0.5)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
                   <div className="w-11 h-11 rounded-xl bg-[rgba(99,102,241,0.15)] flex items-center justify-center mb-4">
                     <Icon size={20} className="text-[#6366f1]" />
                   </div>
@@ -730,10 +731,10 @@ function PricingSection() {
 
         <FadeUp delay={200}>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="w-full border-collapse" style={{ minWidth: 500 }}>
               <thead>
                 <tr className="bg-[#1e293b]">
-                  <th className="text-left text-sm font-semibold text-[#f8fafc] p-4 rounded-tl-xl">Feature</th>
+                  <th className="text-left text-sm font-semibold text-[#f8fafc] p-3 md:p-4 rounded-tl-xl sticky left-0 bg-[#1e293b] z-10">Feature</th>
                   <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Free</th>
                   <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Starter</th>
                   <th className="text-center text-sm font-semibold text-[#f8fafc] p-4 rounded-tr-xl bg-[rgba(99,102,241,0.2)] border-b-2 border-[#6366f1]">
@@ -747,7 +748,7 @@ function PricingSection() {
                     key={row.label}
                     className={`${i % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#020617]'} hover:bg-[rgba(99,102,241,0.05)] transition-colors`}
                   >
-                    <td className="text-sm text-[#f8fafc] p-4">{row.label}</td>
+                    <td className="text-sm text-[#f8fafc] p-3 md:p-4 sticky left-0 z-10" style={{ background: i % 2 === 0 ? '#0f172a' : '#020617' }}>{row.label}</td>
                     <td className="text-center p-4"><PricingCell value={row.free} /></td>
                     <td className="text-center p-4"><PricingCell value={row.starter} /></td>
                     <td className="text-center p-4 bg-[rgba(99,102,241,0.05)] border-l border-r border-[rgba(99,102,241,0.2)]">
@@ -794,7 +795,7 @@ function FAQItem({
       >
         <button
           onClick={onToggle}
-          className="w-full py-5 flex items-center justify-between text-left hover:bg-[rgba(255,255,255,0.02)] transition-colors rounded"
+          className="w-full py-5 flex items-center justify-between text-left hover:bg-[rgba(255,255,255,0.02)] transition-colors rounded min-h-[48px]"
         >
           <span className="text-base font-medium text-[#f8fafc] pr-4">{item.q}</span>
           <ChevronDown

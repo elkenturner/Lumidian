@@ -446,8 +446,61 @@ function ModelsBar() {
   );
 }
 
+function StatCard({
+  value,
+  label,
+  suffix,
+  color,
+  delay,
+}: {
+  value: number;
+  label: string;
+  suffix: string;
+  color: string;
+  delay: number;
+}) {
+  const { ref, value: animatedValue } = useCountUp(value, 1800);
+
+  return (
+    <FadeUp delay={delay}>
+      <div
+        ref={ref}
+        className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-xl p-6 text-center"
+        style={{ borderTopColor: color, borderTopWidth: 2 }}
+      >
+        <p
+          className="text-4xl font-bold text-[#f8fafc]"
+          style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+        >
+          {animatedValue.toLocaleString()}{suffix}
+        </p>
+        <p className="text-sm text-[#64748b] mt-2">{label}</p>
+      </div>
+    </FadeUp>
+  );
+}
+
 function StatsSection() {
-  return <section className="py-20 flex items-center justify-center text-[#64748b]">Stats placeholder</section>;
+  const colors = ['#22c55e', '#f97316', '#8b5cf6', '#3b82f6'];
+
+  return (
+    <section className="py-20">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {STATS.map((stat, i) => (
+            <StatCard
+              key={stat.label}
+              value={stat.value}
+              label={stat.label}
+              suffix={stat.suffix}
+              color={colors[i % colors.length]}
+              delay={i * 100}
+            />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function FeaturesSection() {

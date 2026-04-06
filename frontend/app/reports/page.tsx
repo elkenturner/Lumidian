@@ -38,6 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MODEL_ORDER, MODEL_CONFIG as MODEL_CONFIG_SHARED, getModelConfig } from '@/lib/constants/models';
 import { parseUTCISO } from '@/lib/utils/formatting';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.mutedBg, text: v.color }])
@@ -116,6 +117,7 @@ type SortBy = 'visibility' | 'alpha' | 'change';
 
 export default function ReportsPage() {
   const { brands, activeBrandId: selectedBrandId, loading: loadingBrands } = useBrand();
+  const isMobile = useIsMobile();
   const [brandDetail, setBrandDetail] = useState<BrandDetail | null>(null);
   const [trends, setTrends] = useState<(TrendPoint & { formattedDate: string; score: number })[]>([]);
   const [responses, setResponses] = useState<QueryResult[]>([]);
@@ -286,11 +288,11 @@ export default function ReportsPage() {
           <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">Reports</h1>
           <p className="text-[13px] text-[var(--text-muted)] mt-1.5">Per-prompt visibility breakdown by AI model</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className={`flex ${isMobile ? 'flex-col w-full' : 'items-center'} gap-2 md:gap-3`}>
           {responses.length > 0 && (
             <button
               onClick={downloadCSV}
-              className="flex items-center gap-2 bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-colors text-xs font-medium"
+              className={`flex items-center gap-2 bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-colors text-xs font-medium ${isMobile ? 'w-full justify-center min-h-[44px]' : ''}`}
               title="Export as CSV"
             >
               <Download size={14} />
@@ -298,11 +300,11 @@ export default function ReportsPage() {
             </button>
           )}
           {selectedBrandId && (
-            <div className="flex items-center gap-1">
+            <div className={`flex items-center gap-1 ${isMobile ? 'w-full' : ''}`}>
               <button
                 onClick={downloadPDF}
                 disabled={exportingPDF}
-                className="flex items-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[var(--accent-light)] hover:text-[var(--accent-light)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
+                className={`flex items-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[var(--accent-light)] hover:text-[var(--accent-light)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
                 title="Export as PDF"
               >
                 {exportingPDF
@@ -320,7 +322,7 @@ export default function ReportsPage() {
                     finally { setExportingCaseStudy(false); }
                   }}
                   disabled={exportingCaseStudy}
-                  className="flex items-center gap-2 bg-[rgba(16,185,129,0.10)] hover:bg-[rgba(16,185,129,0.16)] border border-[rgba(16,185,129,0.25)] text-[var(--success-text)] hover:text-[var(--success-text)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60"
+                  className={`flex items-center gap-2 bg-[rgba(16,185,129,0.10)] hover:bg-[rgba(16,185,129,0.16)] border border-[rgba(16,185,129,0.25)] text-[var(--success-text)] hover:text-[var(--success-text)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
                   title="Export 90-day case study PDF"
                 >
                   {exportingCaseStudy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
@@ -332,7 +334,7 @@ export default function ReportsPage() {
           <button
             onClick={() => selectedBrandId && loadData(selectedBrandId)}
             disabled={loading}
-            className="flex items-center gap-2 bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
+            className={`flex items-center gap-2 bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-colors disabled:opacity-50 ${isMobile ? 'w-full justify-center min-h-[44px]' : ''}`}
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           </button>
@@ -395,7 +397,7 @@ export default function ReportsPage() {
             <TabsContent value="prompts" className="mt-0">
           {/* Search + sort controls */}
           {!loading && responses.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 mb-3">
+            <div className={`flex ${isMobile ? 'flex-col' : 'flex-wrap items-center'} gap-2 mb-3`}>
               {/* Search */}
               <div className="relative flex-1 min-w-[180px]">
                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-faint)] pointer-events-none" />
@@ -433,7 +435,7 @@ export default function ReportsPage() {
             return (
               <div className="mb-4 bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl px-5 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
                 <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">Score Breakdown</p>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {([
                     { label: 'Live Search', s: liveS,  models: 'Perplexity · Gemini',  color: 'var(--success)' },
                     { label: 'AI Index',    s: indexS, models: 'GPT-4o-mini · Claude', color: 'var(--accent-light)' },
@@ -695,7 +697,7 @@ export default function ReportsPage() {
               </div>
 
               {/* Table header */}
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto scroll-hint-right">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-[rgba(255,255,255,0.06)]">

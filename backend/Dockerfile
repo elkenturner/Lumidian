@@ -18,4 +18,6 @@ ENV PORT=8000
 
 EXPOSE $PORT
 
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port $PORT"]
+COPY start.sh .
+RUN chmod +x start.sh
+CMD ["./start.sh"]

@@ -769,8 +769,76 @@ function DashboardMockup() {
   );
 }
 
+function PricingCell({ value }: { value: string | boolean }) {
+  if (value === true) return <span className="text-[#22c55e] font-bold text-base">&#10003;</span>;
+  if (value === false) return <span className="text-[#64748b]">—</span>;
+  return <span className="text-sm text-[#94a3b8]">{value}</span>;
+}
+
 function PricingSection() {
-  return <section className="py-24 flex items-center justify-center text-[#64748b]">Pricing placeholder</section>;
+  return (
+    <section id="pricing" className="py-24 scroll-mt-20">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FadeUp>
+          <h2
+            className="text-3xl sm:text-4xl font-bold text-center text-[#f8fafc] mb-4"
+            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+          >
+            Simple, transparent pricing
+          </h2>
+        </FadeUp>
+        <FadeUp delay={100}>
+          <p className="text-center text-[#94a3b8] mb-12">
+            Start free. Upgrade when you need more.
+          </p>
+        </FadeUp>
+
+        <FadeUp delay={200}>
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-[#1e293b]">
+                  <th className="text-left text-sm font-semibold text-[#f8fafc] p-4 rounded-tl-xl">Feature</th>
+                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Free</th>
+                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Starter</th>
+                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4 rounded-tr-xl bg-[rgba(99,102,241,0.2)] border-b-2 border-[#6366f1]">
+                    Pro
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {COMPARISON_FEATURES.map((row, i) => (
+                  <tr
+                    key={row.label}
+                    className={`${i % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#020617]'} hover:bg-[rgba(99,102,241,0.05)] transition-colors`}
+                  >
+                    <td className="text-sm text-[#f8fafc] p-4">{row.label}</td>
+                    <td className="text-center p-4"><PricingCell value={row.free} /></td>
+                    <td className="text-center p-4"><PricingCell value={row.starter} /></td>
+                    <td className="text-center p-4 bg-[rgba(99,102,241,0.05)] border-l border-r border-[rgba(99,102,241,0.2)]">
+                      <PricingCell value={row.pro} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </FadeUp>
+
+        <FadeUp delay={300}>
+          <div className="mt-8 text-center">
+            <Link
+              href="/register"
+              className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)]"
+            >
+              Get started free
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+        </FadeUp>
+      </div>
+    </section>
+  );
 }
 
 function FAQSection() {

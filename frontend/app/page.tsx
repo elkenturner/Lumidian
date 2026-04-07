@@ -355,14 +355,6 @@ function HeroSection() {
         }}
       />
 
-      {/* Dot grid overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none opacity-[0.15]"
-        style={{
-          backgroundImage: 'radial-gradient(circle, rgba(148,163,184,0.8) 1px, transparent 1px)',
-          backgroundSize: '32px 32px',
-        }}
-      />
 
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {/* Badge */}
@@ -1096,7 +1088,7 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-[#020617] text-[#f8fafc]">
+    <div className="min-h-screen bg-[#020617] text-[#f8fafc] relative">
       <Header scrolled={scrolled} />
       <main>
         <HeroSection />
@@ -1108,6 +1100,32 @@ export default function LandingPage() {
         <CTASection />
       </main>
       <Footer />
+
+      {/* Dot grid — spans Hero + ModelsBar + Features, fades out at edges */}
+      <div
+        className="absolute top-0 left-0 right-0 pointer-events-none"
+        style={{
+          height: 'calc(100vh + 600px)',
+          backgroundImage: 'radial-gradient(circle, rgba(148,163,184,0.8) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          opacity: 0.15,
+          maskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 75%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 8%, black 75%, transparent 100%)',
+        }}
+      />
+
+      {/* Dot grid — CTA section area, fades in and out */}
+      <div
+        className="absolute bottom-0 left-0 right-0 pointer-events-none"
+        style={{
+          height: '500px',
+          backgroundImage: 'radial-gradient(circle, rgba(148,163,184,0.8) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+          opacity: 0.1,
+          maskImage: 'linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%)',
+          WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 30%, black 70%, transparent 100%)',
+        }}
+      />
     </div>
   );
 }

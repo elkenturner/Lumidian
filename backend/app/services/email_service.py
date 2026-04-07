@@ -1,34 +1,41 @@
 """
-Email service — sends via SMTP if configured, else logs to console.
+Email service — sends via Resend HTTP API if configured, else logs to console.
 
-Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS in .env to enable real delivery.
-Works with Gmail app passwords, SendGrid SMTP relay, Mailgun, Postmark, etc.
+Set RESEND_API_KEY (or SMTP_PASS with a Resend key) and EMAIL_FROM in .env to
+enable real delivery.  Uses Resend's REST API over HTTPS — no SMTP ports needed,
+so it works on Railway Hobby and other hosts that block port 465/587.
 
-If SMTP_HOST is not set, emails are logged to console (development mode).
+Falls back to console logging when no API key is present (development mode).
 
 Environment variables:
-  SMTP_HOST     — SMTP server hostname (e.g. smtp.gmail.com)
-  SMTP_PORT     — SMTP port (default: 587 for STARTTLS, 465 for SSL)
-  SMTP_USER     — SMTP username / login email
-  SMTP_PASS     — SMTP password or app password
-  EMAIL_FROM    — display From address (defaults to SMTP_USER)
-  FRONTEND_URL  — base URL for action links (default: http://localhost:3000)
+  RESEND_API_KEY — Resend API key (re_...).  Falls back to SMTP_PASS for compat.
+  EMAIL_FROM     — display From address (must be on a verified Resend domain)
+  FRONTEND_URL   — base URL for action links (default: http://localhost:3000)
 """
 from __future__ import annotations
 
 import asyncio
 import logging
 import os
-import smtplib
-import ssl
 from datetime import UTC, datetime
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+
+import resend
 
 logger = logging.getLogger(__name__)
 
 _FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
-_FROM = os.getenv("EMAIL_FROM", "")  # falls back to SMTP_USER if empty
+_FROM = os.getenv("EMAIL_FROM", "")
+
+
+def _get_resend_key() -> str:
+    """Return the Resend API key from RESEND_API_KEY or SMTP_PASS (compat)."""
+    key = os.getenv("RESEND_API_KEY", "").strip()
+    if key:
+        return key
+    smtp_pass = os.getenv("SMTP_PASS", "").strip()
+    if smtp_pass.startswith("re_"):
+        return smtp_pass
+    return ""
 
 
 # ── Internal send primitive ───────────────────────────────────────────────────
@@ -37,38 +44,21 @@ def _send(to: str, subject: str, body: str) -> None:
     """
     Send a plain-text email.
 
-    Uses SMTP if SMTP_HOST is configured; otherwise logs to console.
-    Raises on SMTP failure so callers can catch and log as non-fatal.
+    Uses Resend HTTP API if an API key is available; otherwise logs to console.
+    Raises on failure so callers can catch and log as non-fatal.
     """
-    smtp_host = os.getenv("SMTP_HOST", "").strip()
+    api_key = _get_resend_key()
 
-    if smtp_host:
-        port = int(os.getenv("SMTP_PORT", "587"))
-        user = os.getenv("SMTP_USER", "").strip()
-        password = os.getenv("SMTP_PASS", "").strip()
-        from_addr = _FROM or user
+    if api_key:
+        resend.api_key = api_key
+        from_addr = _FROM or "Lumidian <noreply@lumidian.ai>"
 
-        msg = MIMEMultipart()
-        msg["From"] = from_addr
-        msg["To"] = to
-        msg["Subject"] = subject
-        msg.attach(MIMEText(body, "plain"))
-
-        context = ssl.create_default_context()
-        if port == 465:
-            # SSL from the start
-            with smtplib.SMTP_SSL(smtp_host, port, context=context) as server:
-                if user and password:
-                    server.login(user, password)
-                server.sendmail(from_addr, to, msg.as_string())
-        else:
-            # STARTTLS (port 587 or 25)
-            with smtplib.SMTP(smtp_host, port) as server:
-                server.ehlo()
-                server.starttls(context=context)
-                if user and password:
-                    server.login(user, password)
-                server.sendmail(from_addr, to, msg.as_string())
+        resend.Emails.send({
+            "from": from_addr,
+            "to": [to],
+            "subject": subject,
+            "text": body,
+        })
 
         logger.info("Email sent to %s — %s", to, subject)
     else:
@@ -78,7 +68,7 @@ def _send(to: str, subject: str, body: str) -> None:
         logger.info(
             "\n"
             "╔══════════════════════════════════════════════════════════════╗\n"
-            "║  📧  EMAIL (console mode — set SMTP_HOST to send for real)  ║\n"
+            "║  EMAIL (console mode — set RESEND_API_KEY to send for real) ║\n"
             "╠══════════════════════════════════════════════════════════════╣\n"
             "║  To:      %-51s║\n"
             "║  From:    %-51s║\n"

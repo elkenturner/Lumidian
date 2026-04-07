@@ -112,6 +112,24 @@ COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 from app.routers.billing import TIER_LIMITS  # noqa: E402 — single source of truth
 
 
+def _validate_password(password: str) -> None:
+    """Enforce password complexity: 8+ chars, uppercase, lowercase, digit."""
+    errors: list[str] = []
+    if len(password) < 8:
+        errors.append("at least 8 characters")
+    if not re.search(r"[A-Z]", password):
+        errors.append("one uppercase letter")
+    if not re.search(r"[a-z]", password):
+        errors.append("one lowercase letter")
+    if not re.search(r"\d", password):
+        errors.append("one number")
+    if errors:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Password must contain {', '.join(errors)}.",
+        )
+
+
 def create_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id),
@@ -176,11 +194,17 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     request = body
     _rate_check(http_req.client.host if http_req.client else "unknown", _register_attempts, _MAX_REGISTER)
     email = request.email.strip().lower()
-    existing = await db.execute(select(User).where(User.email == email))
-    if existing.scalar_one_or_none():
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-    if len(request.password) < 6:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Password must be at least 6 characters")
+
+    _validate_password(request.password)
+
+    existing_result = await db.execute(select(User).where(User.email == email))
+    existing = existing_result.scalar_one_or_none()
+    if existing:
+        if existing.email_verified:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
+        # Unverified account with this email — replace it so the user can re-register
+        await db.delete(existing)
+        await db.flush()
 
     verification_code = f"{secrets.randbelow(1_000_000):06d}"
     code_hash = hash_password(verification_code)
@@ -200,8 +224,7 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     await db.commit()
     await db.refresh(user)
 
-    token = create_token(user.id)
-    set_auth_cookies(response, token)
+    # Do NOT set auth cookies — user must verify email first, then log in.
 
     from app.services.analytics_service import log_event
     await log_event("user_registered", {"plan": user.subscription_tier}, user_id=user.id)
@@ -209,7 +232,7 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     from app.services.email_service import send_email_background, send_email_verification
     send_email_background(send_email_verification, email=user.email, name=user.name, code=verification_code)
 
-    return user_to_dict(user)
+    return {"email": email, "needs_verification": True}
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
@@ -239,6 +262,12 @@ async def login(body: LoginRequest, http_req: Request, response: Response, db: D
     if not user or not user.password_hash or not verify_password(request.password, user.password_hash):
         logger.warning("failed login attempt email=%s ip=%s", email, http_req.client.host if http_req.client else "unknown")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+
+    if not getattr(user, "email_verified", True):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Please verify your email before signing in. Check your inbox for a verification code.",
+        )
 
     # If 2FA is enabled, issue a short-lived challenge token instead of a session
     if user.totp_enabled:
@@ -574,11 +603,7 @@ class ResetPasswordRequest(BaseModel):
 async def reset_password(request: ResetPasswordRequest, http_req: Request, db: DbDep):
     """Validate reset token and update user's password."""
     _rate_check(http_req.client.host if http_req.client else "unknown", _reset_attempts, _MAX_RESET)
-    if len(request.new_password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Password must be at least 6 characters",
-        )
+    _validate_password(request.new_password)
 
     # Tokens are stored as bcrypt hashes — find all unexpired, unused tokens and verify
     now_lookup = datetime.now(UTC).replace(tzinfo=None)
@@ -614,6 +639,7 @@ async def reset_password(request: ResetPasswordRequest, http_req: Request, db: D
 # ── Email verification ────────────────────────────────────────────────────────
 
 class VerifyEmailRequest(BaseModel):
+    email: str
     code: str
 
 
@@ -621,69 +647,88 @@ class VerifyEmailRequest(BaseModel):
 async def verify_email(
     body: VerifyEmailRequest,
     http_req: Request,
-    current_user: AllowUnverifiedUser,
     db: DbDep,
 ):
-    """Validate the 6-digit code and mark the user's email as verified."""
+    """Validate the 6-digit code and mark the user's email as verified.
+    No auth cookie required — uses email + code for identification."""
     _rate_check(http_req.client.host if http_req.client else "unknown", _verify_attempts, _MAX_VERIFY)
-    if getattr(current_user, "email_verified", True):
+
+    email = body.email.strip().lower()
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid code. Please try again.")
+
+    if getattr(user, "email_verified", True):
         return {"message": "Email already verified"}
 
-    if not current_user.email_verification_code or not current_user.email_verification_expires_at:
+    if not user.email_verification_code or not user.email_verification_expires_at:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No pending verification. Please resend the code.",
         )
 
     now = datetime.now(UTC).replace(tzinfo=None)
-    if current_user.email_verification_expires_at < now:
+    if user.email_verification_expires_at < now:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Code expired. Please request a new one.",
         )
 
-    if not verify_password(body.code.strip(), current_user.email_verification_code):
+    if not verify_password(body.code.strip(), user.email_verification_code):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid code. Please try again.",
         )
 
-    current_user.email_verified = True
-    current_user.email_verification_code = None
-    current_user.email_verification_expires_at = None
+    user.email_verified = True
+    user.email_verification_code = None
+    user.email_verification_expires_at = None
     await db.commit()
 
     return {"message": "Email verified successfully"}
 
 
+class ResendVerificationRequest(BaseModel):
+    email: str
+
+
 @router.post("/resend-verification", status_code=status.HTTP_200_OK)
 async def resend_verification(
+    body: ResendVerificationRequest,
     http_req: Request,
-    current_user: AllowUnverifiedUser,
     db: DbDep,
 ):
-    """Generate a fresh 6-digit code and resend the verification email."""
+    """Generate a fresh 6-digit code and resend the verification email.
+    No auth cookie required — uses email for identification."""
     _rate_check(http_req.client.host if http_req.client else "unknown", _resend_attempts, _MAX_RESEND)
-    if getattr(current_user, "email_verified", True):
-        return {"message": "Email already verified"}
+
+    email = body.email.strip().lower()
+    result = await db.execute(select(User).where(User.email == email))
+    user = result.scalar_one_or_none()
+
+    # Always return success to prevent email enumeration
+    if not user or getattr(user, "email_verified", True):
+        return {"message": "If that email is pending verification, a new code has been sent."}
 
     verification_code = f"{secrets.randbelow(1_000_000):06d}"
     code_hash = hash_password(verification_code)
     code_expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=24)
 
-    current_user.email_verification_code = code_hash
-    current_user.email_verification_expires_at = code_expires_at
+    user.email_verification_code = code_hash
+    user.email_verification_expires_at = code_expires_at
     await db.commit()
 
     from app.services.email_service import send_email_background, send_email_verification
     send_email_background(
         send_email_verification,
-        email=current_user.email,
-        name=current_user.name,
+        email=user.email,
+        name=user.name,
         code=verification_code,
     )
 
-    return {"message": "Verification email resent"}
+    return {"message": "If that email is pending verification, a new code has been sent."}
 
 
 # ── Admin: reset any user's password ──────────────────────────────────────────
@@ -703,11 +748,7 @@ async def admin_reset_password(
     if not current_user.is_admin:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
 
-    if len(request.new_password) < 6:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Password must be at least 6 characters",
-        )
+    _validate_password(request.new_password)
 
     email = request.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))

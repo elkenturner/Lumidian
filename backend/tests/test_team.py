@@ -58,7 +58,7 @@ async def test_accept_invite(client: httpx.AsyncClient):
 
     # Verify acceptor is now a member by logging in as owner
     await client.post("/api/auth/logout")
-    await login_user(client, email=owner_email, password="password123")
+    await login_user(client, email=owner_email, password="Password123")
     members = (await client.get("/api/team/members")).json()
     assert any(m["invited_email"] == acceptor_email and m["accepted"] for m in members)
 

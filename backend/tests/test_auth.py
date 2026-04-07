@@ -5,14 +5,15 @@ Tests for authentication endpoints:
   POST /api/auth/logout
   GET  /api/auth/me
   JWT validation
-  Password length enforcement
+  Password complexity enforcement
+  Email verification flow
 """
 import logging
 
 import httpx
 import pytest
 
-from tests.conftest import register_and_login, register_user
+from tests.conftest import AsyncSessionLocal, register_and_login, register_user
 
 pytestmark = pytest.mark.asyncio
 
@@ -22,87 +23,135 @@ pytestmark = pytest.mark.asyncio
 async def test_register_success(client: httpx.AsyncClient):
     resp = await client.post(
         "/api/auth/register",
-        json={"email": "newuser@example.com", "password": "password123", "name": "New User"},
+        json={"email": "newuser@example.com", "password": "Password123", "name": "New User"},
     )
     assert resp.status_code == 201
     data = resp.json()
     assert data["email"] == "newuser@example.com"
-    assert data["name"] == "New User"
+    assert data["needs_verification"] is True
     assert "password" not in data
     assert "password_hash" not in data
 
 
-async def test_register_sets_cookie(client: httpx.AsyncClient):
+async def test_register_does_not_set_cookie(client: httpx.AsyncClient):
     resp = await client.post(
         "/api/auth/register",
-        json={"email": "cookie@example.com", "password": "password123"},
+        json={"email": "cookie@example.com", "password": "Password123"},
     )
     assert resp.status_code == 201
-    assert "clarity_token" in resp.cookies
+    assert "clarity_token" not in resp.cookies
 
 
-async def test_register_duplicate_email(client: httpx.AsyncClient):
-    await register_user(client, email="dup@example.com")
+async def test_register_duplicate_verified_email(client: httpx.AsyncClient):
+    """Verified account blocks re-registration with same email."""
+    await register_and_login(client, email="dup@example.com")
     resp = await client.post(
         "/api/auth/register",
-        json={"email": "dup@example.com", "password": "password123"},
+        json={"email": "dup@example.com", "password": "Password123"},
     )
     assert resp.status_code == 409
 
 
-async def test_register_short_password(client: httpx.AsyncClient):
+async def test_register_allows_reuse_of_unverified_email(client: httpx.AsyncClient):
+    """Unverified account can be replaced by re-registering the same email."""
+    await register_user(client, email="reuse@example.com")
     resp = await client.post(
         "/api/auth/register",
-        json={"email": "short@example.com", "password": "abc"},
+        json={"email": "reuse@example.com", "password": "NewPassword1", "name": "Retry"},
+    )
+    assert resp.status_code == 201
+    assert resp.json()["email"] == "reuse@example.com"
+
+
+async def test_register_weak_password_rejected(client: httpx.AsyncClient):
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "weak@example.com", "password": "abc"},
     )
     assert resp.status_code == 422
+
+
+async def test_register_password_needs_uppercase(client: httpx.AsyncClient):
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "noup@example.com", "password": "password123"},
+    )
+    assert resp.status_code == 422
+    assert "uppercase" in resp.json()["detail"].lower()
+
+
+async def test_register_password_needs_lowercase(client: httpx.AsyncClient):
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "nolow@example.com", "password": "PASSWORD123"},
+    )
+    assert resp.status_code == 422
+    assert "lowercase" in resp.json()["detail"].lower()
+
+
+async def test_register_password_needs_digit(client: httpx.AsyncClient):
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "nodigit@example.com", "password": "PasswordAbc"},
+    )
+    assert resp.status_code == 422
+    assert "number" in resp.json()["detail"].lower()
 
 
 async def test_register_email_normalised(client: httpx.AsyncClient):
     resp = await client.post(
         "/api/auth/register",
-        json={"email": "  Upper@EXAMPLE.COM  ", "password": "password123"},
+        json={"email": "  Upper@EXAMPLE.COM  ", "password": "Password123"},
     )
     assert resp.status_code == 201
     assert resp.json()["email"] == "upper@example.com"
 
 
 async def test_register_admin_flag(client: httpx.AsyncClient):
-    """A user whose email is in ADMIN_EMAILS env var should get is_admin=True."""
+    """A user whose email is in ADMIN_EMAILS env var should get is_admin in the DB."""
     resp = await client.post(
         "/api/auth/register",
-        json={"email": "admin@test.com", "password": "password123"},
+        json={"email": "admin@test.com", "password": "Password123"},
     )
     assert resp.status_code == 201
-    assert resp.json()["is_admin"] is True
+    # Registration returns minimal data; verify via DB
+    from sqlalchemy import text
+    async with AsyncSessionLocal() as db:
+        row = await db.execute(text("SELECT is_admin FROM users WHERE email = 'admin@test.com'"))
+        assert row.scalar_one() == 1
 
 
 async def test_register_non_admin(client: httpx.AsyncClient):
     resp = await client.post(
         "/api/auth/register",
-        json={"email": "regular@example.com", "password": "password123"},
+        json={"email": "regular@example.com", "password": "Password123"},
     )
     assert resp.status_code == 201
-    assert resp.json()["is_admin"] is False
+    from sqlalchemy import text
+    async with AsyncSessionLocal() as db:
+        row = await db.execute(text("SELECT is_admin FROM users WHERE email = 'regular@example.com'"))
+        assert row.scalar_one() == 0
 
 
 # ── Login ─────────────────────────────────────────────────────────────────────
 
 async def test_login_success(client: httpx.AsyncClient):
-    await register_user(client, email="login@example.com", password="mypassword")
+    await register_and_login(client, email="login@example.com", password="MyPassword1")
+    await client.post("/api/auth/logout")
     resp = await client.post(
         "/api/auth/login",
-        json={"email": "login@example.com", "password": "mypassword"},
+        json={"email": "login@example.com", "password": "MyPassword1"},
     )
     assert resp.status_code == 200
     assert "clarity_token" in resp.cookies
 
 
 async def test_login_wrong_password(client: httpx.AsyncClient):
-    await register_user(client, email="wrongpw@example.com", password="correct")
+    await register_and_login(client, email="wrongpw@example.com", password="Correct123")
+    await client.post("/api/auth/logout")
     resp = await client.post(
         "/api/auth/login",
-        json={"email": "wrongpw@example.com", "password": "wrong"},
+        json={"email": "wrongpw@example.com", "password": "Wrong123456"},
     )
     assert resp.status_code == 401
 
@@ -110,18 +159,30 @@ async def test_login_wrong_password(client: httpx.AsyncClient):
 async def test_login_unknown_email(client: httpx.AsyncClient):
     resp = await client.post(
         "/api/auth/login",
-        json={"email": "nobody@example.com", "password": "password123"},
+        json={"email": "nobody@example.com", "password": "Password123"},
     )
     assert resp.status_code == 401
 
 
 async def test_login_case_insensitive(client: httpx.AsyncClient):
-    await register_user(client, email="case@example.com", password="password123")
+    await register_and_login(client, email="case@example.com", password="Password123")
+    await client.post("/api/auth/logout")
     resp = await client.post(
         "/api/auth/login",
-        json={"email": "CASE@EXAMPLE.COM", "password": "password123"},
+        json={"email": "CASE@EXAMPLE.COM", "password": "Password123"},
     )
     assert resp.status_code == 200
+
+
+async def test_login_blocked_for_unverified_user(client: httpx.AsyncClient):
+    """Unverified users must not be able to log in."""
+    await register_user(client, email="unverif_login@example.com")
+    resp = await client.post(
+        "/api/auth/login",
+        json={"email": "unverif_login@example.com", "password": "Password123"},
+    )
+    assert resp.status_code == 403
+    assert "verify your email" in resp.json()["detail"].lower()
 
 
 # ── Logout ────────────────────────────────────────────────────────────────────
@@ -176,11 +237,7 @@ async def test_tampered_token_rejected(client: httpx.AsyncClient):
     assert resp.status_code == 401
 
 
-# ── Password reset token placeholder (tested in test_password_reset.py) ───────
-# (full tests are in test_password_reset.py once Task 2 is implemented)
-
-
-# ── Task 2: Auth Event Logging ────────────────────────────────────────────────
+# ── Auth Event Logging ────────────────────────────────────────────────────────
 
 async def test_failed_login_is_logged(client, caplog):
     """A wrong-password login attempt must emit a warning log."""
@@ -193,7 +250,7 @@ async def test_failed_login_is_logged(client, caplog):
     assert any("failed login" in r.message.lower() for r in caplog.records)
 
 
-# ── Task 3: Google OAuth Open Redirect Fix ────────────────────────────────────
+# ── Google OAuth Open Redirect Fix ────────────────────────────────────────────
 
 from datetime import UTC
 
@@ -223,25 +280,15 @@ def test_safe_redirect_path_handles_none():
     assert _safe_redirect_path("") == "/dashboard"
 
 
-# ── Task 4: TOTP Setup Rate Limiting ─────────────────────────────────────────
+# ── TOTP Setup Rate Limiting ─────────────────────────────────────────────────
 
 async def test_totp_setup_rate_limited(client):
     """2FA setup must be rate-limited."""
-    from sqlalchemy import text
-
     from app.routers.auth import _totp_setup_attempts
-    from tests.conftest import AsyncSessionLocal
     _totp_setup_attempts.clear()
 
     email = "totp_rate@example.com"
-    await register_and_login(client, email=email, password="password123")
-    # Mark email as verified so get_current_user allows access
-    async with AsyncSessionLocal() as db:
-        await db.execute(
-            text("UPDATE users SET email_verified = 1 WHERE email = :email"),
-            {"email": email},
-        )
-        await db.commit()
+    await register_and_login(client, email=email, password="Password123")
 
     for _ in range(5):
         resp = await client.post("/api/auth/2fa/setup")
@@ -251,7 +298,7 @@ async def test_totp_setup_rate_limited(client):
     assert resp.status_code == 429
 
 
-# ── Task 7: CSRF Origin Check Middleware ──────────────────────────────────────
+# ── CSRF Origin Check Middleware ──────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_csrf_rejects_cross_origin_post(client):
@@ -275,7 +322,7 @@ async def test_csrf_allows_no_origin_header(client):
     assert resp.status_code == 401
 
 
-# ── Task 6: Password Reset Token Hashing ─────────────────────────────────────
+# ── Password Reset Token Hashing ─────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_password_reset_token_stored_as_hash(client, db_session):
@@ -286,7 +333,7 @@ async def test_password_reset_token_stored_as_hash(client, db_session):
 
     # Register a user
     await client.post("/api/auth/register", json={
-        "email": "hashtest@example.com", "password": "password123"
+        "email": "hashtest@example.com", "password": "Password123"
     })
     # Trigger a reset
     resp = await client.post("/api/auth/forgot-password", json={"email": "hashtest@example.com"})
@@ -305,19 +352,21 @@ async def test_password_reset_end_to_end(client, db_session):
     """Full reset flow: request reset, redeem hashed token, verify new password works."""
     from unittest.mock import patch
 
-    from sqlalchemy import select as sa_select
+    from sqlalchemy import select as sa_select, text
 
     from app.models import PasswordResetToken
 
-    # Register user
+    # Register and verify user
     await client.post("/api/auth/register", json={
-        "email": "e2ereset@example.com", "password": "oldpassword123"
+        "email": "e2ereset@example.com", "password": "OldPassword123"
     })
+    async with AsyncSessionLocal() as db:
+        await db.execute(text("UPDATE users SET email_verified = 1 WHERE email = 'e2ereset@example.com'"))
+        await db.commit()
 
     captured_link = {}
 
     def mock_send_bg(fn, **kwargs):
-        # Capture the reset_link from the kwargs passed to send_password_reset_email
         if "reset_link" in kwargs:
             captured_link["url"] = kwargs["reset_link"]
 
@@ -326,25 +375,21 @@ async def test_password_reset_end_to_end(client, db_session):
 
     assert "url" in captured_link, "Reset link was not captured"
 
-    # Extract raw token from the URL
     raw_token = captured_link["url"].split("token=")[-1]
 
-    # Redeem the token
     resp = await client.post("/api/auth/reset-password", json={
         "token": raw_token,
-        "new_password": "newpassword456"
+        "new_password": "NewPassword456"
     })
     assert resp.status_code == 200
 
-    # Verify the token is now marked used
     result = await db_session.execute(sa_select(PasswordResetToken))
     tokens = result.scalars().all()
     assert all(t.used for t in tokens), "Token should be marked used after redemption"
 
-    # Verify login with new password works
     login_resp = await client.post("/api/auth/login", json={
         "email": "e2ereset@example.com",
-        "password": "newpassword456"
+        "password": "NewPassword456"
     })
     assert login_resp.status_code == 200
 
@@ -407,7 +452,7 @@ async def test_totp_disable_with_correct_password(client: httpx.AsyncClient):
     """Disable 2FA with the correct password — returns 200."""
     import pyotp
     email = "totp_dis@example.com"
-    password = "password123"
+    password = "Password123"
     await register_and_login(client, email=email, password=password)
     setup_resp = await client.post("/api/auth/2fa/setup")
     totp = pyotp.TOTP(setup_resp.json()["secret"])
@@ -423,7 +468,7 @@ async def test_totp_disable_with_wrong_password(client: httpx.AsyncClient):
     setup_resp = await client.post("/api/auth/2fa/setup")
     totp = pyotp.TOTP(setup_resp.json()["secret"])
     await client.post("/api/auth/2fa/enable", json={"code": totp.now()})
-    resp = await client.post("/api/auth/2fa/disable", json={"password": "wrongpass"})
+    resp = await client.post("/api/auth/2fa/disable", json={"password": "WrongPass1"})
     assert resp.status_code == 401
 
 
@@ -431,7 +476,7 @@ async def test_login_with_2fa_enabled_returns_challenge(client: httpx.AsyncClien
     """Login when 2FA is enabled returns requires_2fa=True and a challenge_token."""
     import pyotp
     email = "totp_challenge@example.com"
-    password = "password123"
+    password = "Password123"
     await register_and_login(client, email=email, password=password)
     setup_resp = await client.post("/api/auth/2fa/setup")
     totp = pyotp.TOTP(setup_resp.json()["secret"])
@@ -449,7 +494,7 @@ async def test_2fa_verify_completes_login(client: httpx.AsyncClient):
     """Full 2FA login: challenge + valid code sets auth cookie and allows /me."""
     import pyotp
     email = "totp_verify_ok@example.com"
-    password = "password123"
+    password = "Password123"
     await register_and_login(client, email=email, password=password)
     setup_resp = await client.post("/api/auth/2fa/setup")
     secret = setup_resp.json()["secret"]
@@ -474,33 +519,6 @@ async def test_2fa_verify_completes_login(client: httpx.AsyncClient):
 
 # ── Email verification endpoint tests ────────────────────────────────────────
 
-async def test_register_returns_email_unverified(client: httpx.AsyncClient):
-    """Registration response includes email_verified=False for new users."""
-    resp = await client.post(
-        "/api/auth/register",
-        json={"email": "unverif_reg@example.com", "password": "password123", "name": "Test"},
-    )
-    assert resp.status_code == 201
-    assert resp.json()["email_verified"] is False
-
-
-async def test_unverified_user_blocked_from_protected_endpoint(client: httpx.AsyncClient):
-    """Unverified user gets 403 on any protected endpoint."""
-    await register_user(client, email="unverif_gate@example.com")
-    # Cookie is set by registration — but user is unverified
-    resp = await client.get("/api/brands")
-    assert resp.status_code == 403
-    assert resp.json()["detail"] == "email_not_verified"
-
-
-async def test_unverified_user_can_call_me(client: httpx.AsyncClient):
-    """/auth/me works for unverified users (uses AllowUnverifiedUser)."""
-    await register_user(client, email="unverif_me@example.com")
-    resp = await client.get("/api/auth/me")
-    assert resp.status_code == 200
-    assert resp.json()["email_verified"] is False
-
-
 async def test_verify_email_with_valid_code(client: httpx.AsyncClient, db_session):
     """Correct 6-digit code marks user as verified."""
     from sqlalchemy import text
@@ -521,27 +539,29 @@ async def test_verify_email_with_valid_code(client: httpx.AsyncClient, db_sessio
     )
     await db_session.commit()
 
-    resp = await client.post("/api/auth/verify-email", json={"code": known_code})
+    resp = await client.post("/api/auth/verify-email", json={"email": email, "code": known_code})
     assert resp.status_code == 200
     assert "verified" in resp.json()["message"].lower()
-
-    # Confirm user is now verified
-    me = await client.get("/api/auth/me")
-    assert me.json()["email_verified"] is True
 
 
 async def test_verify_email_with_wrong_code(client: httpx.AsyncClient):
     """Wrong 6-digit code returns 400."""
-    await register_user(client, email="verify_bad@example.com")
-    resp = await client.post("/api/auth/verify-email", json={"code": "000000"})
+    email = "verify_bad@example.com"
+    await register_user(client, email=email)
+    resp = await client.post("/api/auth/verify-email", json={"email": email, "code": "000000"})
     assert resp.status_code == 400
 
 
 async def test_resend_verification_returns_200(client: httpx.AsyncClient):
-    """Resend endpoint returns 200 and updates the stored code."""
+    """Resend endpoint returns 200."""
     email = "resend_ok@example.com"
     await register_user(client, email=email)
 
-    resp = await client.post("/api/auth/resend-verification")
+    resp = await client.post("/api/auth/resend-verification", json={"email": email})
     assert resp.status_code == 200
-    assert "resent" in resp.json()["message"].lower()
+
+
+async def test_resend_verification_no_enumeration(client: httpx.AsyncClient):
+    """Resend for unknown email returns 200 (no enumeration)."""
+    resp = await client.post("/api/auth/resend-verification", json={"email": "nobody@example.com"})
+    assert resp.status_code == 200

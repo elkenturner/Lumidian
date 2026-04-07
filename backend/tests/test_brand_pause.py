@@ -10,7 +10,7 @@ from tests.conftest import register_and_login
 @pytest.mark.asyncio
 async def test_paused_pitch_brand_blocks_run(client: AsyncClient):
     """Expired pitch brand should block tracking runs."""
-    await register_and_login(client, "pause@test.com", "password123")
+    await register_and_login(client, "pause@test.com", "Password123")
 
     # Create a pitch brand
     brand_resp = await client.post(
@@ -37,7 +37,7 @@ async def test_paused_pitch_brand_blocks_run(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_paused_brand_allows_read(client: AsyncClient):
     """Paused brand should still allow reading data."""
-    await register_and_login(client, "pauseread@test.com", "password123")
+    await register_and_login(client, "pauseread@test.com", "Password123")
 
     # Create a pitch brand
     brand_resp = await client.post(
@@ -63,7 +63,7 @@ async def test_paused_brand_allows_read(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_lapsed_subscription_blocks_run(client: AsyncClient):
     """Lapsed subscription should block tracking runs."""
-    token = await register_and_login(client, "lapsed@test.com", "password123")
+    token = await register_and_login(client, "lapsed@test.com", "Password123")
 
     # Create a brand
     brand_resp = await client.post(

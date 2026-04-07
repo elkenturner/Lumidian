@@ -73,6 +73,90 @@ def _detect_mention(
     return mentioned
 
 
+async def _persist_prompt_run_scores(
+    db,
+    run_id: int,
+    brand_id: int,
+    query_results: list,
+) -> int:
+    """Compute and add per-prompt per-model PromptRunScore rows to the session.
+    Does NOT commit — caller is responsible for committing."""
+    from app.models import PromptRunScore
+
+    prompt_model_stats: dict[tuple[int, str], dict] = {}
+    for qr in query_results:
+        if qr.error:
+            continue
+        key = (qr.prompt_id, qr.model)
+        if key not in prompt_model_stats:
+            prompt_model_stats[key] = {"total": 0, "mentioned": 0}
+        stats = prompt_model_stats[key]
+        stats["total"] += 1
+        if qr.mentioned:
+            stats["mentioned"] += 1
+
+    count = 0
+    for (prompt_id, model), stats in prompt_model_stats.items():
+        tq = stats["total"]
+        tm = stats["mentioned"]
+        score = round(tm / tq * 100.0, 2) if tq > 0 else 0.0
+        db.add(PromptRunScore(
+            prompt_id=prompt_id,
+            tracking_run_id=run_id,
+            brand_id=brand_id,
+            model=model,
+            score=score,
+            mentioned_count=tm,
+            query_count=tq,
+        ))
+        count += 1
+    logger.info("Added %d PromptRunScore rows for run %d", count, run_id)
+    return count
+
+
+async def _log_score_change_events(
+    brand_id: int,
+    run_id: int,
+    new_scores: list[dict],
+) -> None:
+    """Log ContentEvent for any prompt+model score changes >= 5pp from previous run."""
+    from app.models import PromptRunScore
+    from app.services.content_event_service import log_content_event
+
+    THRESHOLD = 5.0
+
+    async with AsyncSessionLocal() as db:
+        for ns in new_scores:
+            result = await db.execute(
+                select(PromptRunScore)
+                .where(
+                    PromptRunScore.prompt_id == ns["prompt_id"],
+                    PromptRunScore.model == ns["model"],
+                    PromptRunScore.tracking_run_id != run_id,
+                )
+                .order_by(PromptRunScore.created_at.desc())
+                .limit(1)
+            )
+            prev = result.scalar_one_or_none()
+            if prev is None:
+                continue
+            delta = round(ns["score"] - prev.score, 2)
+            if abs(delta) >= THRESHOLD:
+                await log_content_event(
+                    event_type="score_change",
+                    brand_id=brand_id,
+                    prompt_id=ns["prompt_id"],
+                    data={
+                        "prompt_id": ns["prompt_id"],
+                        "model": ns["model"],
+                        "old_score": prev.score,
+                        "new_score": ns["score"],
+                        "delta": delta,
+                        "tracking_run_id": run_id,
+                    },
+                )
+
+
 async def run_tracking(
     brand_id: int,
     run_type: str = "manual",
@@ -239,6 +323,9 @@ async def run_tracking(
                 run.total_queries = overall_queries
                 run.total_mentions = overall_mentions
 
+            # Persist per-prompt per-model scores for impact timelines
+            await _persist_prompt_run_scores(db, run_id, brand_id, query_results)
+
             await db.commit()
             logger.info(
                 "Tracking run %d completed. Score=%.2f%% (%d/%d)",
@@ -380,6 +467,22 @@ async def run_tracking(
         logger.warning(
             "Gap analysis failed for run %d (non-fatal): %s", run_id, exc
         )
+
+    # ── 8b. Log significant prompt score changes ────────────────────────────
+    try:
+        from app.models import PromptRunScore as _PRS
+        async with AsyncSessionLocal() as prs_db:
+            prs_result = await prs_db.execute(
+                select(_PRS).where(_PRS.tracking_run_id == run_id)
+            )
+            new_scores = [
+                {"prompt_id": s.prompt_id, "model": s.model, "score": s.score}
+                for s in prs_result.scalars().all()
+            ]
+        if new_scores:
+            await _log_score_change_events(brand_id, run_id, new_scores)
+    except Exception as exc:
+        logger.warning("Score change event logging failed for run %d (non-fatal): %s", run_id, exc)
 
     # ── 9b. Onboarding post-processing pipeline ──────────────────────────────
     if run_type == "onboarding":

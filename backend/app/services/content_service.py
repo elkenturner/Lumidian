@@ -479,6 +479,18 @@ async def post_draft(
         brand_id=draft.brand_id,
     )
 
+    from app.services.content_event_service import log_content_event
+    await log_content_event(
+        event_type="draft_posted",
+        brand_id=draft.brand_id,
+        prompt_id=draft.prompt_id,
+        data={
+            "draft_id": draft_id,
+            "platform": draft.platform,
+            "visibility_at_post": draft.visibility_at_post,
+        },
+    )
+
     return content_post
 
 

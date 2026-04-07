@@ -765,6 +765,14 @@ function PricingCell({ value }: { value: string | boolean }) {
 }
 
 function PricingSection() {
+  const [mobileTier, setMobileTier] = useState<'free' | 'starter' | 'pro'>('pro');
+
+  const tierMeta: Record<string, { name: string; price: string }> = {
+    free: { name: 'Free Plan', price: '$0' },
+    starter: { name: 'Starter Plan', price: '$300/mo' },
+    pro: { name: 'Pro Plan', price: '$500/mo' },
+  };
+
   return (
     <section id="pricing" className="py-24 scroll-mt-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -782,8 +790,9 @@ function PricingSection() {
           </p>
         </FadeUp>
 
+        {/* Desktop table */}
         <FadeUp delay={200}>
-          <div className="overflow-x-auto">
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full border-collapse" style={{ minWidth: 500 }}>
               <thead>
                 <tr className="bg-[#1e293b]">
@@ -811,6 +820,71 @@ function PricingSection() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </FadeUp>
+
+        {/* Mobile tab switcher */}
+        <FadeUp delay={200}>
+          <div className="md:hidden">
+            {/* Tabs */}
+            <div className="flex gap-2 mb-6 bg-[#0f172a] rounded-full p-1 border border-[rgba(51,65,85,0.5)]">
+              {(['free', 'starter', 'pro'] as const).map((tier) => (
+                <button
+                  key={tier}
+                  onClick={() => setMobileTier(tier)}
+                  className={`flex-1 py-2.5 text-sm font-semibold rounded-full transition-all ${
+                    mobileTier === tier
+                      ? 'bg-[#6366f1] text-white shadow-[0_0_12px_rgba(99,102,241,0.4)]'
+                      : 'text-[#94a3b8] hover:text-white'
+                  }`}
+                >
+                  {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            {/* Card */}
+            <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-6">
+              <p
+                className="text-lg font-bold text-[#f8fafc] mb-1"
+                style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+              >
+                {tierMeta[mobileTier].name}
+              </p>
+              <p className="text-3xl font-extrabold text-[#f8fafc] mb-6" style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}>
+                {tierMeta[mobileTier].price}
+              </p>
+
+              <div className="space-y-3">
+                {COMPARISON_FEATURES.map((row) => {
+                  const val = row[mobileTier as keyof typeof row];
+                  const isTrue = val === true;
+                  const isFalse = val === false || val === '—';
+                  return (
+                    <div key={row.label} className="flex items-center gap-3">
+                      {isTrue ? (
+                        <Check size={16} className="text-[#22c55e] flex-shrink-0" />
+                      ) : isFalse ? (
+                        <X size={16} className="text-[#475569] flex-shrink-0" />
+                      ) : (
+                        <Check size={16} className="text-[#22c55e] flex-shrink-0" />
+                      )}
+                      <span className={`text-sm ${isFalse ? 'text-[#475569]' : 'text-[#94a3b8]'}`}>
+                        {typeof val === 'string' && val !== '—' ? `${val} — ${row.label}` : row.label}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <Link
+                href="/register"
+                className="mt-6 w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white py-3 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)]"
+              >
+                Get started free
+                <ArrowRight size={16} />
+              </Link>
+            </div>
           </div>
         </FadeUp>
 

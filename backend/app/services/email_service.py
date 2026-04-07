@@ -94,6 +94,10 @@ def _send(to: str, subject: str, body: str) -> None:
 
 # ── Async fire-and-forget helper ──────────────────────────────────────────────
 
+# Strong reference set — prevents GC from collecting background email tasks
+_background_tasks: set[asyncio.Task] = set()
+
+
 def send_email_background(fn, *args, **kwargs) -> None:
     """
     Run a synchronous email function in a thread-pool executor so it doesn't
@@ -104,18 +108,32 @@ def send_email_background(fn, *args, **kwargs) -> None:
     async def _run():
         loop = asyncio.get_running_loop()
         try:
+            logger.info("Background email starting (%s)", fn.__name__)
             await loop.run_in_executor(None, functools.partial(fn, *args, **kwargs))
+            logger.info("Background email completed (%s)", fn.__name__)
         except Exception as exc:
-            logger.warning("Background email failed (%s): %s", fn.__name__, exc)
+            logger.error("Background email failed (%s): %s", fn.__name__, exc, exc_info=True)
+
+    def _task_done(task: asyncio.Task) -> None:
+        _background_tasks.discard(task)
+        if task.cancelled():
+            logger.warning("Background email task cancelled (%s)", fn.__name__)
+        elif task.exception():
+            logger.error("Background email task exception (%s): %s", fn.__name__, task.exception())
 
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(_run())
-        else:
-            fn(*args, **kwargs)   # fallback for non-async callers (tests, CLI)
+        loop = asyncio.get_running_loop()
+        task = loop.create_task(_run(), name=f"email:{fn.__name__}")
+        _background_tasks.add(task)
+        task.add_done_callback(_task_done)
+    except RuntimeError:
+        # No running loop — sync fallback for tests/CLI
+        try:
+            fn(*args, **kwargs)
+        except Exception as exc:
+            logger.error("Sync email failed (%s): %s", fn.__name__, exc, exc_info=True)
     except Exception as exc:
-        logger.warning("send_email_background setup failed (%s): %s", fn.__name__, exc)
+        logger.error("send_email_background setup failed (%s): %s", fn.__name__, exc, exc_info=True)
 
 
 # ── Public email functions ────────────────────────────────────────────────────

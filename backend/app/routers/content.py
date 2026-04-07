@@ -412,6 +412,17 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
             {"draft_id": draft.id, "platform": draft.platform},
             brand_id=draft.brand_id,
         )
+        from app.services.content_event_service import log_content_event
+        await log_content_event(
+            event_type="draft_posted",
+            brand_id=draft.brand_id,
+            prompt_id=draft.prompt_id,
+            data={
+                "draft_id": draft.id,
+                "platform": draft.platform,
+                "visibility_at_post": draft.visibility_at_post,
+            },
+        )
         await _create_draft_attribution(db, draft)
 
     return ContentDraftSchema.model_validate(draft)

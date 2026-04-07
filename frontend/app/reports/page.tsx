@@ -6,6 +6,7 @@ import { logError } from '@/lib/utils/errors';
 import {
   BarChart2,
   ChevronDown,
+  ChevronRight,
   Loader2,
   RefreshCw,
   Download,
@@ -22,8 +23,10 @@ import {
   getCaseStudyEligibility,
   exportCaseStudyPDF,
   getCompetitorAnalysis,
+  getPromptsOverview,
   Brand,
   BrandDetail,
+  PromptsOverviewData,
   TrendPoint,
   QueryResult,
   TrackingRun,
@@ -32,6 +35,7 @@ import {
   CaseStudyEligibility,
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
+import PromptSparkline from '@/components/PromptSparkline';
 import { useBrand } from '@/contexts/BrandContext';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -132,6 +136,7 @@ export default function ReportsPage() {
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysis | null>(null);
   const [competitorModelFilter, setCompetitorModelFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'prompts' | 'competitors'>('prompts');
+  const [promptsOverview, setPromptsOverview] = useState<PromptsOverviewData | null>(null);
   const loadAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => { document.title = 'Reports — Lumidian'; }, []);
@@ -189,6 +194,7 @@ export default function ReportsPage() {
       if (compAnalysis?.has_data) setCompetitorAnalysis(compAnalysis);
       // Check case study eligibility (endpoint not yet implemented — silently ignore)
       getCaseStudyEligibility(brandId).then(setCaseStudyEligibility).catch(() => {});
+      getPromptsOverview(brandId).then(setPromptsOverview).catch((err) => { logError(err, 'Reports: fetch prompts overview'); });
     } catch { /* ignore */ } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -590,6 +596,27 @@ export default function ReportsPage() {
                             </div>
                           ))}
                         </div>
+
+                        {/* Sparkline + detail link */}
+                        {(() => {
+                          const overview = promptsOverview?.prompts.find((p) => p.prompt_id === g.promptId);
+                          if (!overview || overview.sparkline.length < 2) return null;
+                          return (
+                            <div className="flex items-center gap-3 mt-2.5">
+                              <div className="flex-1 max-w-[200px]">
+                                <PromptSparkline sparkline={overview.sparkline} height={48} />
+                              </div>
+                              <Link
+                                href={`/tracker/${selectedBrandId}/prompt/${g.promptId}`}
+                                className="flex items-center gap-1 text-[10px] text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors flex-shrink-0"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                View details
+                                <ChevronRight size={12} />
+                              </Link>
+                            </div>
+                          );
+                        })()}
 
                         {/* Gap explanation */}
                         {overallPct < 50 && selectedBrand && (() => {

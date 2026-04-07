@@ -35,7 +35,6 @@ import {
   CaseStudyEligibility,
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
-import PromptSparkline from '@/components/PromptSparkline';
 import { useBrand } from '@/contexts/BrandContext';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
@@ -562,53 +561,39 @@ export default function ReportsPage() {
                           </div>
                         </div>
 
-                        {/* Model breakdown + sparkline side by side */}
-                        <div className="flex items-start gap-4">
-                          {/* Model breakdown badges — grouped by Live Search / AI Index */}
-                          <div className="flex flex-col gap-1.5 flex-1">
-                            {([
-                              { category: 'Live', models: ['perplexity', 'gemini'], color: 'var(--success)' },
-                              { category: 'Index', models: ['chatgpt', 'claude'],   color: 'var(--accent-light)' },
-                            ] as Array<{ category: string; models: string[]; color: string }>).map(({ category, models: catModels, color }) => (
-                              <div key={category} className="flex items-center gap-2">
-                                <span
-                                  className="text-[9px] font-bold uppercase tracking-wider flex-shrink-0 w-9"
-                                  style={{ color }}
-                                >
-                                  {category}
-                                </span>
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {catModels.map(modelKey => {
-                                    const ms = g.modelStats.get(modelKey);
-                                    const cfg = getModelCfg(modelKey);
-                                    const pct = ms && ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : null;
-                                    const mentionColor = pct === null ? 'var(--text-faint)' : pct >= 60 ? 'var(--success)' : pct >= 30 ? 'var(--warning)' : 'var(--danger)';
-                                    return (
-                                      <div
-                                        key={modelKey}
-                                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)]"
-                                      >
-                                        <span className="text-xs font-semibold" style={{ color: pct === null ? 'var(--text-faint)' : cfg.text }}>{cfg.label}</span>
-                                        <span className="text-[rgba(255,255,255,0.10)]">·</span>
-                                        <span className="text-xs font-bold tabular-nums font-mono" style={{ color: mentionColor }}>{pct !== null ? `${pct}%` : '—'}</span>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
+                        {/* Model breakdown badges — grouped by Live Search / AI Index */}
+                        <div className="flex flex-col gap-1.5">
+                          {([
+                            { category: 'Live', models: ['perplexity', 'gemini'], color: 'var(--success)' },
+                            { category: 'Index', models: ['chatgpt', 'claude'],   color: 'var(--accent-light)' },
+                          ] as Array<{ category: string; models: string[]; color: string }>).map(({ category, models: catModels, color }) => (
+                            <div key={category} className="flex items-center gap-2">
+                              <span
+                                className="text-[9px] font-bold uppercase tracking-wider flex-shrink-0 w-9"
+                                style={{ color }}
+                              >
+                                {category}
+                              </span>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                {catModels.map(modelKey => {
+                                  const ms = g.modelStats.get(modelKey);
+                                  const cfg = getModelCfg(modelKey);
+                                  const pct = ms && ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : null;
+                                  const mentionColor = pct === null ? 'var(--text-faint)' : pct >= 60 ? 'var(--success)' : pct >= 30 ? 'var(--warning)' : 'var(--danger)';
+                                  return (
+                                    <div
+                                      key={modelKey}
+                                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)]"
+                                    >
+                                      <span className="text-xs font-semibold" style={{ color: pct === null ? 'var(--text-faint)' : cfg.text }}>{cfg.label}</span>
+                                      <span className="text-[rgba(255,255,255,0.10)]">·</span>
+                                      <span className="text-xs font-bold tabular-nums font-mono" style={{ color: mentionColor }}>{pct !== null ? `${pct}%` : '—'}</span>
+                                    </div>
+                                  );
+                                })}
                               </div>
-                            ))}
-                          </div>
-
-                          {/* Sparkline on the right */}
-                          {(() => {
-                            const overview = promptsOverview?.prompts.find((p) => p.prompt_id === g.promptId);
-                            if (!overview || overview.sparkline.length < 2) return null;
-                            return (
-                              <div className="flex-shrink-0 w-[140px]">
-                                <PromptSparkline sparkline={overview.sparkline} height={48} />
-                              </div>
-                            );
-                          })()}
+                            </div>
+                          ))}
                         </div>
 
                         {/* View details link */}

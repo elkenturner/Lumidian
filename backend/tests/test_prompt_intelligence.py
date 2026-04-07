@@ -171,3 +171,63 @@ async def test_prompts_overview_endpoint(client):
     assert "prompts" in data
     assert len(data["prompts"]) == 1
     assert data["prompts"][0]["prompt_text"] == "best project management tool"
+
+
+@pytest.mark.asyncio
+async def test_prompt_timeline_endpoint(client):
+    """GET /api/results/{brand_id}/prompt/{prompt_id}/timeline returns timeline data."""
+    await register_and_login(client)
+    brand_data = await create_brand(client, "TimelineBrand", ["best AI tool"])
+    brand_id = brand_data["id"]
+
+    # Get prompt id
+    brand_resp = await client.get(f"/api/brands/{brand_id}")
+    prompt_id = brand_resp.json()["prompts"][0]["id"]
+
+    resp = await client.get(f"/api/results/{brand_id}/prompt/{prompt_id}/timeline")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["prompt_id"] == prompt_id
+    assert "timeline" in data
+    assert "content_events" in data
+
+
+@pytest.mark.asyncio
+async def test_prompt_timeline_404_wrong_prompt(client):
+    """Timeline endpoint returns 404 for non-existent prompt."""
+    await register_and_login(client)
+    brand_data = await create_brand(client, "Timeline404Brand", ["test"])
+
+    resp = await client.get(f"/api/results/{brand_data['id']}/prompt/99999/timeline")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_prompt_detail_endpoint(client):
+    """GET /api/results/{brand_id}/prompt/{prompt_id}/detail returns full detail."""
+    await register_and_login(client)
+    brand_data = await create_brand(client, "DetailBrand", ["best CRM software"])
+    brand_id = brand_data["id"]
+
+    brand_resp = await client.get(f"/api/brands/{brand_id}")
+    prompt_id = brand_resp.json()["prompts"][0]["id"]
+
+    resp = await client.get(f"/api/results/{brand_id}/prompt/{prompt_id}/detail")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["prompt_id"] == prompt_id
+    assert "timeline" in data
+    assert "insights" in data
+    assert "drafts" in data
+    assert "competitors" in data
+    assert "recent_responses" in data
+
+
+@pytest.mark.asyncio
+async def test_prompt_detail_404_wrong_prompt(client):
+    """Detail endpoint returns 404 for non-existent prompt."""
+    await register_and_login(client)
+    brand_data = await create_brand(client, "Detail404Brand", ["test"])
+
+    resp = await client.get(f"/api/results/{brand_data['id']}/prompt/99999/detail")
+    assert resp.status_code == 404

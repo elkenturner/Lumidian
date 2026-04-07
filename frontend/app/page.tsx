@@ -905,6 +905,28 @@ function CTASection() {
         background: 'radial-gradient(ellipse at 50% 100%, rgba(99,102,241,0.15) 0%, transparent 60%)',
       }}
     >
+      {/* Animated gradient orb */}
+      <div
+        className="absolute inset-0 pointer-events-none overflow-hidden"
+      >
+        <div
+          className="absolute w-[600px] h-[600px] rounded-full opacity-20 blur-[120px]"
+          style={{
+            background: 'radial-gradient(circle, #6366f1 0%, #a855f7 50%, transparent 70%)',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            animation: 'ctaOrb 10s ease-in-out infinite',
+          }}
+        />
+      </div>
+      <style>{`
+        @keyframes ctaOrb {
+          0%, 100% { transform: translate(-50%, -50%) scale(1); }
+          33% { transform: translate(-45%, -55%) scale(1.1); }
+          66% { transform: translate(-55%, -45%) scale(0.95); }
+        }
+      `}</style>
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeUp>
           <h2

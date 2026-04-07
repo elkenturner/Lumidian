@@ -16,6 +16,8 @@ import {
   Play,
   Menu,
   X,
+  Users,
+  Activity,
 } from 'lucide-react';
 import LumidianLogo from '@/components/LumidianLogo';
 
@@ -151,7 +153,7 @@ const FEATURES = [
   {
     icon: TrendingUp,
     title: 'Monitor Trends',
-    desc: 'Track visibility changes over time with automated reports and historical charts.',
+    desc: 'Track visibility changes over time with trend charts, shareable PDF reports, and email alerts when your score drops.',
   },
   {
     icon: MessageSquare,
@@ -162,6 +164,16 @@ const FEATURES = [
     icon: Settings2,
     title: 'Brand Voice Control',
     desc: 'Define your tone and guidelines so every draft matches your brand exactly.',
+  },
+  {
+    icon: Users,
+    title: 'Competitor Intelligence',
+    desc: 'Track how often competitors appear alongside your brand. Compare mention rates, share of voice, and see who\'s winning each prompt.',
+  },
+  {
+    icon: Activity,
+    title: 'Sentiment & Position',
+    desc: 'Know whether AI models describe your brand positively, neutrally, or negatively — and where you appear in the response.',
   },
 ];
 
@@ -457,7 +469,7 @@ function FeaturesSection() {
           </p>
         </FadeUp>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {FEATURES.map((feature, i) => {
             const Icon = feature.icon;
             return (

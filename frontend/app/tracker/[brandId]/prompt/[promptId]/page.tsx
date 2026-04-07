@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Loader2, FileText } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import {
   getPromptDetail,
   PromptDetailData,
@@ -10,8 +10,6 @@ import {
 import { MODEL_ORDER, getModelConfig } from '@/lib/constants/models';
 import PromptImpactTimeline from '@/components/PromptImpactTimeline';
 import PromptInsightCard from '@/components/PromptInsightCard';
-import { format } from 'date-fns';
-import { parseUTCISO } from '@/lib/utils/formatting';
 import { logError } from '@/lib/utils/errors';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
@@ -138,76 +136,26 @@ export default function PromptDetailPage() {
         />
       </div>
 
-      {/* Insights + Content Activity — two columns on desktop */}
-      <div className={`grid ${isMobile ? 'grid-cols-1' : 'grid-cols-2'} gap-4 mb-6`}>
-        {/* Insights */}
-        <div className="card p-5">
-          <h3 className="text-[13px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
-            Insights
-          </h3>
-          {data.insights.length === 0 ? (
-            <p className="text-xs text-[var(--text-faint)]">No insights yet — more data needed</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {data.insights.map((insight) => (
-                <PromptInsightCard
-                  key={insight.id}
-                  id={insight.id}
-                  message={insight.message}
-                  severity={insight.severity}
-                  model={insight.model}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Content Activity */}
-        <div className="card p-5">
-          <h3 className="text-[13px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
-            Content Activity
-          </h3>
-          {data.drafts.length === 0 ? (
-            <p className="text-xs text-[var(--text-faint)]">No drafts targeting this prompt</p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {data.drafts.map((draft) => (
-                <div
-                  key={draft.id}
-                  className="flex items-start gap-3 px-3 py-2.5 rounded-lg hover:bg-[rgba(255,255,255,0.02)] transition-colors"
-                >
-                  <FileText size={14} className="text-[var(--accent-light)] mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-medium text-[var(--text-primary)] capitalize">
-                        {draft.platform}
-                      </span>
-                      <span className="text-[10px] text-[var(--text-faint)] capitalize">{draft.status}</span>
-                    </div>
-                    {draft.posted_at && (
-                      <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                        Posted {format(parseUTCISO(draft.posted_at), 'MMM d')}
-                        {draft.score_snapshot.delta != null && (
-                          <span
-                            className="ml-1.5 font-bold"
-                            style={{
-                              color: draft.score_snapshot.delta > 0 ? 'var(--success)' : draft.score_snapshot.delta < 0 ? 'var(--danger)' : 'var(--text-faint)',
-                            }}
-                          >
-                            {draft.score_snapshot.delta > 0 ? '+' : ''}{Math.round(draft.score_snapshot.delta)}pp since
-                          </span>
-                        )}
-                      </p>
-                    )}
-                    {!draft.posted_at && (
-                      <p className="text-[10px] text-[var(--text-faint)] mt-0.5">Draft — not yet posted</p>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* Insights */}
+      <div className="card p-5 mb-6">
+        <h3 className="text-[13px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
+          Insights
+        </h3>
+        {data.insights.length === 0 ? (
+          <p className="text-xs text-[var(--text-faint)]">No insights yet — more data needed</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {data.insights.map((insight) => (
+              <PromptInsightCard
+                key={insight.id}
+                id={insight.id}
+                message={insight.message}
+                severity={insight.severity}
+                model={insight.model}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Competitor Presence */}

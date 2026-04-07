@@ -889,7 +889,7 @@ function PricingSection() {
         </FadeUp>
 
         <FadeUp delay={300}>
-          <div className="mt-8 text-center">
+          <div className="mt-8 text-center hidden md:block">
             <Link
               href="/register"
               className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)]"

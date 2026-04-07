@@ -90,7 +90,7 @@ export default function PromptImpactTimeline({
     });
   };
 
-  if (filteredData.length < 2) {
+  if (filteredData.length === 0) {
     return (
       <div className="card" style={{ padding: '28px 20px 24px' }}>
         <div className="flex items-center justify-between mb-4">

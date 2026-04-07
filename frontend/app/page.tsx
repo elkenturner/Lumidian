@@ -552,6 +552,7 @@ function DashboardMockup() {
   const { ref: liveRef, value: liveVal } = useCountUp(66, 1400);
   const { ref: indexRef, value: indexVal } = useCountUp(67, 1400);
   const [barWidths, setBarWidths] = useState([0, 0, 0, 0]);
+  const [compWidths, setCompWidths] = useState([0, 0]);
   const barTriggered = useRef(false);
   const { ref: barRef, inView: barInView } = useInView(0.2);
 
@@ -561,6 +562,9 @@ function DashboardMockup() {
     setTimeout(() => {
       setBarWidths(DEMO_MODELS.map((m) => m.score));
     }, 200);
+    setTimeout(() => {
+      setCompWidths([72, 38]);
+    }, 400);
   }, [barInView]);
 
   // Sparkline data
@@ -710,6 +714,33 @@ function DashboardMockup() {
                   </span>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Competitor comparison */}
+          <div className="col-span-2 bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-2xl p-4">
+            <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-3">vs Competitors</p>
+            <div className="space-y-2.5">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-[#94a3b8] w-24 flex-shrink-0">Your Brand</span>
+                <div className="flex-1 h-2 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${compWidths[0]}%`, backgroundColor: '#6366f1' }}
+                  />
+                </div>
+                <span className="text-xs font-bold text-[#f8fafc] w-10 text-right">72%</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-medium text-[#94a3b8] w-24 flex-shrink-0">Competitor A</span>
+                <div className="flex-1 h-2 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{ width: `${compWidths[1]}%`, backgroundColor: '#64748b', transitionDelay: '100ms' }}
+                  />
+                </div>
+                <span className="text-xs font-bold text-[#f8fafc] w-10 text-right">38%</span>
+              </div>
             </div>
           </div>
         </div>

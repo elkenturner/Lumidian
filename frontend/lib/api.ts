@@ -1234,3 +1234,108 @@ export async function getBackgroundStatus(): Promise<BackgroundStatus> {
   const res = await api.get<BackgroundStatus>('/tracking/background-status');
   return res.data;
 }
+
+// ── Prompt Intelligence ─────────────────────────────────────────────────────
+
+export interface PromptTimelinePoint {
+  run_id: number;
+  completed_at: string | null;
+  scores: Record<string, number>;
+  overall: number;
+}
+
+export interface ContentEventItem {
+  id: number;
+  event_type: string;
+  created_at: string;
+  data: Record<string, unknown> | null;
+}
+
+export interface PromptTimelineData {
+  prompt_id: number;
+  prompt_text: string;
+  timeline: PromptTimelinePoint[];
+  content_events: ContentEventItem[];
+  current_scores: Record<string, number>;
+  total_drafts_targeting: number;
+  latest_draft_posted_at: string | null;
+}
+
+export interface PromptDraftSnapshot {
+  id: number;
+  platform: string;
+  status: string;
+  posted_at: string | null;
+  visibility_at_post: number | null;
+  content_preview: string;
+  score_snapshot: {
+    at_posting: number | null;
+    current: number | null;
+    delta: number | null;
+    runs_since: number | null;
+  };
+}
+
+export interface PromptInsightData {
+  id: string;
+  message: string;
+  severity: 'positive' | 'warning' | 'negative' | 'info';
+  model: string | null;
+}
+
+export interface PromptRecentResponseData {
+  model: string;
+  response_text: string | null;
+  mentioned: boolean;
+  sentiment: string | null;
+  created_at: string;
+}
+
+export interface PromptCompetitorData {
+  name: string;
+  mention_rate: number;
+  trend: 'increasing' | 'decreasing' | 'stable';
+}
+
+export interface PromptDetailData {
+  prompt_id: number;
+  prompt_text: string;
+  prompt_type: string;
+  current_scores: Record<string, number>;
+  score_trend: 'improving' | 'declining' | 'stable';
+  timeline: PromptTimelinePoint[];
+  content_events: ContentEventItem[];
+  drafts: PromptDraftSnapshot[];
+  competitors: PromptCompetitorData[];
+  insights: PromptInsightData[];
+  recent_responses: PromptRecentResponseData[];
+}
+
+export interface PromptOverviewItem {
+  prompt_id: number;
+  prompt_text: string;
+  current_overall: number;
+  trend: 'improving' | 'declining' | 'stable';
+  sparkline: number[];
+  model_scores: Record<string, number>;
+  drafts_posted: number;
+  last_draft_at: string | null;
+  has_recent_content_event: boolean;
+}
+
+export interface PromptsOverviewData {
+  prompts: PromptOverviewItem[];
+}
+
+export async function getPromptsOverview(brandId: number): Promise<PromptsOverviewData> {
+  return dedupedGet<PromptsOverviewData>(`/results/${brandId}/prompts/overview`);
+}
+
+export async function getPromptTimeline(brandId: number, promptId: number, days?: number): Promise<PromptTimelineData> {
+  const params = days ? { days } : undefined;
+  return dedupedGet<PromptTimelineData>(`/results/${brandId}/prompt/${promptId}/timeline`, params);
+}
+
+export async function getPromptDetail(brandId: number, promptId: number): Promise<PromptDetailData> {
+  return dedupedGet<PromptDetailData>(`/results/${brandId}/prompt/${promptId}/detail`);
+}

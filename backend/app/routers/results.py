@@ -558,7 +558,7 @@ async def get_prompt_detail(
             status=d.status,
             posted_at=d.posted_at,
             visibility_at_post=d.visibility_at_post,
-            content_preview=d.content_text[:150] if d.content_text else "",
+            content_preview=d.content_text[:1000] if d.content_text else "",
             score_snapshot=snapshot,
         ))
 

@@ -9,6 +9,8 @@ GET /api/results/{brand_id}/responses   — paginated query results (filter by r
 """
 from __future__ import annotations
 
+import json
+from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -19,12 +21,26 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
-from app.models import Brand, ContentAttribution, QueryResult, RunModelScore, TrackingRun
+from app.models import (
+    Brand, Competitor, CompetitorMention, ContentAttribution, ContentDraft,
+    ContentEvent, DraftAttribution, Prompt, PromptRunScore, QueryResult,
+    RunModelScore, TrackingRun,
+)
 from app.schemas import (
     ContentAttributionSummary,
+    ContentEventResponse,
     ModelScoreResponse,
     OverviewResponse,
     PaginatedQueryResults,
+    PromptCompetitorSummary,
+    PromptDetailResponse,
+    PromptDraftSnapshot,
+    PromptInsight,
+    PromptOverviewItem,
+    PromptRecentResponse,
+    PromptTimelinePoint,
+    PromptTimelineResponse,
+    PromptsOverviewResponse,
     QueryResultResponse,
     TrackingRunSummary,
     TrendPoint,
@@ -135,8 +151,7 @@ async def get_trends(
     else:
         all_model_scores = []
 
-    from collections import defaultdict as _dd
-    scores_by_run: dict[int, dict[str, float]] = _dd(dict)
+    scores_by_run: dict[int, dict[str, float]] = defaultdict(dict)
     for ms in all_model_scores:
         key = normalise_model(ms.model)
         scores_by_run[ms.tracking_run_id][key] = round(ms.score, 1)
@@ -227,4 +242,396 @@ async def get_responses(
         page=page,
         page_size=page_size,
         items=items,
+    )
+
+
+# ── Prompts Overview (for sparklines) ────────────────────────────────────────
+
+@router.get("/{brand_id}/prompts/overview", response_model=PromptsOverviewResponse)
+async def get_prompts_overview(brand_id: int, db: DbDep, user: CurrentUser):
+    brand = await get_brand_for_user(brand_id, db, user)
+
+    # Get all prompts for this brand
+    prompts_result = await db.execute(
+        select(Prompt).where(Prompt.brand_id == brand_id)
+    )
+    prompts = prompts_result.scalars().all()
+    if not prompts:
+        return PromptsOverviewResponse(prompts=[])
+
+    prompt_ids = [p.id for p in prompts]
+
+    # Get PromptRunScore data per prompt
+    scores_result = await db.execute(
+        select(PromptRunScore)
+        .where(PromptRunScore.brand_id == brand_id)
+        .order_by(PromptRunScore.created_at.desc())
+    )
+    all_scores = scores_result.scalars().all()
+
+    # Group by prompt_id
+    scores_by_prompt: dict[int, list] = defaultdict(list)
+    for s in all_scores:
+        scores_by_prompt[s.prompt_id].append(s)
+
+    # Count posted drafts per prompt
+    draft_result = await db.execute(
+        select(ContentDraft)
+        .where(
+            ContentDraft.brand_id == brand_id,
+            ContentDraft.status == "posted",
+            ContentDraft.prompt_id.in_(prompt_ids),
+        )
+        .order_by(ContentDraft.posted_at.desc())
+    )
+    drafts = draft_result.scalars().all()
+    drafts_by_prompt: dict[int, list] = defaultdict(list)
+    for d in drafts:
+        if d.prompt_id:
+            drafts_by_prompt[d.prompt_id].append(d)
+
+    # Check for recent content events
+    thirty_days_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
+    events_result = await db.execute(
+        select(ContentEvent)
+        .where(
+            ContentEvent.brand_id == brand_id,
+            ContentEvent.created_at >= thirty_days_ago,
+        )
+    )
+    recent_events = events_result.scalars().all()
+    prompts_with_events = {e.prompt_id for e in recent_events if e.prompt_id}
+
+    items = []
+    for p in prompts:
+        prompt_scores = scores_by_prompt.get(p.id, [])
+
+        # Get unique runs, sorted by time (most recent first, then reverse for sparkline)
+        runs_seen: dict[int, dict[str, float]] = {}
+        for s in prompt_scores:
+            if s.tracking_run_id not in runs_seen:
+                runs_seen[s.tracking_run_id] = {}
+            runs_seen[s.tracking_run_id][s.model] = s.score
+
+        # Build sparkline from overall averages (last 10 runs)
+        run_overalls = []
+        for run_id, model_scores in runs_seen.items():
+            avg = round(sum(model_scores.values()) / len(model_scores), 1) if model_scores else 0
+            run_overalls.append(avg)
+        sparkline = list(reversed(run_overalls[:10]))  # oldest-to-newest, max 10
+
+        # Current scores from most recent run
+        current_model_scores = {}
+        if runs_seen:
+            latest_run_id = next(iter(runs_seen))
+            current_model_scores = runs_seen[latest_run_id]
+        current_overall = round(sum(current_model_scores.values()) / len(current_model_scores), 1) if current_model_scores else 0
+
+        # Trend
+        trend = "stable"
+        if len(sparkline) >= 3:
+            recent_avg = sum(sparkline[-3:]) / 3
+            older_avg = sum(sparkline[:3]) / 3
+            if recent_avg - older_avg >= 3:
+                trend = "improving"
+            elif older_avg - recent_avg >= 3:
+                trend = "declining"
+
+        prompt_drafts = drafts_by_prompt.get(p.id, [])
+        items.append(PromptOverviewItem(
+            prompt_id=p.id,
+            prompt_text=p.text,
+            current_overall=current_overall,
+            trend=trend,
+            sparkline=sparkline,
+            model_scores=current_model_scores,
+            drafts_posted=len(prompt_drafts),
+            last_draft_at=prompt_drafts[0].posted_at if prompt_drafts else None,
+            has_recent_content_event=p.id in prompts_with_events,
+        ))
+
+    return PromptsOverviewResponse(prompts=items)
+
+
+# ── Prompt Timeline ──────────────────────────────────────────────────────────
+
+@router.get("/{brand_id}/prompt/{prompt_id}/timeline", response_model=PromptTimelineResponse)
+async def get_prompt_timeline(
+    brand_id: int,
+    prompt_id: int,
+    db: DbDep,
+    user: CurrentUser,
+    days: int = Query(90, ge=7, le=365),
+):
+    brand = await get_brand_for_user(brand_id, db, user)
+
+    # Get the prompt
+    prompt_result = await db.execute(
+        select(Prompt).where(Prompt.id == prompt_id, Prompt.brand_id == brand_id)
+    )
+    prompt = prompt_result.scalar_one_or_none()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
+
+    # Get PromptRunScores
+    scores_result = await db.execute(
+        select(PromptRunScore)
+        .join(TrackingRun, PromptRunScore.tracking_run_id == TrackingRun.id)
+        .where(
+            PromptRunScore.prompt_id == prompt_id,
+            PromptRunScore.created_at >= cutoff,
+        )
+        .order_by(PromptRunScore.created_at.asc())
+    )
+    scores = scores_result.scalars().all()
+
+    # Build timeline grouped by run
+    runs_data: dict[int, dict] = {}
+    for s in scores:
+        if s.tracking_run_id not in runs_data:
+            runs_data[s.tracking_run_id] = {"scores": {}, "completed_at": s.created_at}
+        runs_data[s.tracking_run_id]["scores"][s.model] = s.score
+
+    timeline = []
+    for run_id, rd in runs_data.items():
+        model_scores = rd["scores"]
+        overall = round(sum(model_scores.values()) / len(model_scores), 1) if model_scores else 0
+        timeline.append(PromptTimelinePoint(
+            run_id=run_id,
+            completed_at=rd["completed_at"],
+            scores=model_scores,
+            overall=overall,
+        ))
+
+    # Get content events
+    events_result = await db.execute(
+        select(ContentEvent)
+        .where(
+            ContentEvent.prompt_id == prompt_id,
+            ContentEvent.event_type.in_(["draft_posted", "content_correlated"]),
+            ContentEvent.created_at >= cutoff,
+        )
+        .order_by(ContentEvent.created_at.asc())
+    )
+    events = events_result.scalars().all()
+
+    content_events = [
+        ContentEventResponse(
+            id=e.id,
+            event_type=e.event_type,
+            created_at=e.created_at,
+            data=json.loads(e.data) if e.data else None,
+        )
+        for e in events
+    ]
+
+    # Current scores (from latest timeline point)
+    current_scores = timeline[-1].scores if timeline else {}
+
+    # Draft count
+    draft_count_result = await db.execute(
+        select(ContentDraft)
+        .where(ContentDraft.prompt_id == prompt_id, ContentDraft.status == "posted")
+    )
+    posted_drafts = draft_count_result.scalars().all()
+
+    return PromptTimelineResponse(
+        prompt_id=prompt.id,
+        prompt_text=prompt.text,
+        timeline=timeline,
+        content_events=content_events,
+        current_scores=current_scores,
+        total_drafts_targeting=len(posted_drafts),
+        latest_draft_posted_at=posted_drafts[0].posted_at if posted_drafts else None,
+    )
+
+
+# ── Prompt Detail ────────────────────────────────────────────────────────────
+
+@router.get("/{brand_id}/prompt/{prompt_id}/detail", response_model=PromptDetailResponse)
+async def get_prompt_detail(
+    brand_id: int,
+    prompt_id: int,
+    db: DbDep,
+    user: CurrentUser,
+):
+    brand = await get_brand_for_user(brand_id, db, user)
+
+    # Get prompt
+    prompt_result = await db.execute(
+        select(Prompt).where(Prompt.id == prompt_id, Prompt.brand_id == brand_id)
+    )
+    prompt = prompt_result.scalar_one_or_none()
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt not found")
+
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=90)
+
+    # Scores
+    scores_result = await db.execute(
+        select(PromptRunScore)
+        .where(PromptRunScore.prompt_id == prompt_id, PromptRunScore.created_at >= cutoff)
+        .order_by(PromptRunScore.created_at.asc())
+    )
+    scores = scores_result.scalars().all()
+
+    runs_data: dict[int, dict] = {}
+    for s in scores:
+        if s.tracking_run_id not in runs_data:
+            runs_data[s.tracking_run_id] = {"scores": {}, "completed_at": s.created_at}
+        runs_data[s.tracking_run_id]["scores"][s.model] = s.score
+
+    timeline = []
+    for run_id, rd in runs_data.items():
+        ms = rd["scores"]
+        overall = round(sum(ms.values()) / len(ms), 1) if ms else 0
+        timeline.append(PromptTimelinePoint(
+            run_id=run_id, completed_at=rd["completed_at"], scores=ms, overall=overall,
+        ))
+
+    current_scores = timeline[-1].scores if timeline else {}
+
+    # Score trend
+    trend = "stable"
+    if len(timeline) >= 3:
+        recent = sum(t.overall for t in timeline[-3:]) / 3
+        older = sum(t.overall for t in timeline[:3]) / 3
+        if recent - older >= 3:
+            trend = "improving"
+        elif older - recent >= 3:
+            trend = "declining"
+
+    # Content events
+    events_result = await db.execute(
+        select(ContentEvent)
+        .where(ContentEvent.prompt_id == prompt_id, ContentEvent.created_at >= cutoff)
+        .order_by(ContentEvent.created_at.asc())
+    )
+    events = events_result.scalars().all()
+    content_events = [
+        ContentEventResponse(
+            id=e.id, event_type=e.event_type, created_at=e.created_at,
+            data=json.loads(e.data) if e.data else None,
+        )
+        for e in events
+    ]
+
+    # Drafts targeting this prompt
+    drafts_result = await db.execute(
+        select(ContentDraft)
+        .where(ContentDraft.prompt_id == prompt_id)
+        .order_by(ContentDraft.created_at.desc())
+    )
+    drafts = drafts_result.scalars().all()
+
+    # Get DraftAttribution for posted drafts
+    draft_snapshots = []
+    for d in drafts:
+        snapshot = {"at_posting": None, "current": None, "delta": None, "runs_since": None}
+        if d.status == "posted":
+            attr_result = await db.execute(
+                select(DraftAttribution).where(DraftAttribution.draft_id == d.id).limit(1)
+            )
+            attr = attr_result.scalar_one_or_none()
+            if attr:
+                snapshot = {
+                    "at_posting": attr.score_at_posting,
+                    "current": attr.current_score,
+                    "delta": attr.delta,
+                    "runs_since": attr.runs_since_posting,
+                }
+        draft_snapshots.append(PromptDraftSnapshot(
+            id=d.id,
+            platform=d.platform,
+            status=d.status,
+            posted_at=d.posted_at,
+            visibility_at_post=d.visibility_at_post,
+            content_preview=d.content_text[:150] if d.content_text else "",
+            score_snapshot=snapshot,
+        ))
+
+    # Competitors on this prompt
+    comp_result = await db.execute(
+        select(Competitor).where(Competitor.brand_id == brand_id)
+    )
+    competitors = comp_result.scalars().all()
+
+    competitor_summaries = []
+    if competitors:
+        for comp in competitors:
+            mentions_result = await db.execute(
+                select(CompetitorMention)
+                .join(TrackingRun, CompetitorMention.tracking_run_id == TrackingRun.id)
+                .where(
+                    CompetitorMention.competitor_id == comp.id,
+                    CompetitorMention.prompt_id == prompt_id,
+                    TrackingRun.completed_at >= cutoff,
+                )
+            )
+            mentions = mentions_result.scalars().all()
+            if mentions:
+                rate = round(sum(1 for m in mentions if m.mentioned) / len(mentions), 2)
+                competitor_summaries.append(PromptCompetitorSummary(
+                    name=comp.name, mention_rate=rate, trend="stable",
+                ))
+
+    # Heuristics
+    from app.services.heuristic_service import evaluate_heuristics
+    history = [{"overall": t.overall, "run_id": t.run_id} for t in timeline]
+    event_dicts = [{"event_type": e.event_type, "created_at": str(e.created_at), "data": e.data} for e in events]
+    raw_insights = evaluate_heuristics(
+        prompt_id=prompt_id,
+        current_scores=current_scores,
+        score_history=history,
+        content_events=event_dicts,
+        drafts_posted=sum(1 for d in drafts if d.status == "posted"),
+    )
+    insights = [PromptInsight(**{k: v for k, v in i.items() if k in ("id", "message", "severity", "model")}) for i in raw_insights]
+
+    # Recent AI responses (latest run, one per model)
+    latest_run_result = await db.execute(
+        select(TrackingRun)
+        .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+        .order_by(TrackingRun.completed_at.desc())
+        .limit(1)
+    )
+    latest_run = latest_run_result.scalar_one_or_none()
+
+    recent_responses = []
+    if latest_run:
+        resp_result = await db.execute(
+            select(QueryResult)
+            .where(
+                QueryResult.tracking_run_id == latest_run.id,
+                QueryResult.prompt_id == prompt_id,
+            )
+            .order_by(QueryResult.model)
+        )
+        resps = resp_result.scalars().all()
+        seen_models = set()
+        for r in resps:
+            if r.model not in seen_models:
+                seen_models.add(r.model)
+                recent_responses.append(PromptRecentResponse(
+                    model=r.model,
+                    response_text=r.response_text,
+                    mentioned=r.mentioned,
+                    sentiment=r.sentiment,
+                    created_at=r.created_at,
+                ))
+
+    return PromptDetailResponse(
+        prompt_id=prompt.id,
+        prompt_text=prompt.text,
+        prompt_type=prompt.prompt_type or "standard",
+        current_scores=current_scores,
+        score_trend=trend,
+        timeline=timeline,
+        content_events=content_events,
+        drafts=draft_snapshots,
+        competitors=competitor_summaries,
+        insights=insights,
+        recent_responses=recent_responses,
     )

@@ -666,3 +666,85 @@ class FetchWebsiteContextRequest(BaseModel):
 class FetchWebsiteContextResponse(BaseModel):
     context: str
     description: str | None = None
+
+
+# ── Prompt Intelligence schemas ──────────────────────────────────────────────
+
+class PromptTimelinePoint(BaseModel):
+    run_id: int
+    completed_at: datetime | None
+    scores: dict[str, float]
+    overall: float
+
+class ContentEventResponse(BaseModel):
+    id: int
+    event_type: str
+    created_at: datetime
+    data: dict | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+class PromptTimelineResponse(BaseModel):
+    prompt_id: int
+    prompt_text: str
+    timeline: list[PromptTimelinePoint]
+    content_events: list[ContentEventResponse]
+    current_scores: dict[str, float]
+    total_drafts_targeting: int
+    latest_draft_posted_at: datetime | None
+
+class PromptDraftSnapshot(BaseModel):
+    id: int
+    platform: str
+    status: str
+    posted_at: datetime | None
+    visibility_at_post: float | None
+    content_preview: str
+    score_snapshot: dict
+
+class PromptCompetitorSummary(BaseModel):
+    name: str
+    mention_rate: float
+    trend: str
+
+class PromptInsight(BaseModel):
+    id: str
+    message: str
+    severity: str
+    model: str | None = None
+
+class PromptRecentResponse(BaseModel):
+    model: str
+    response_text: str | None
+    mentioned: bool
+    sentiment: str | None
+    created_at: datetime
+
+class PromptDetailResponse(BaseModel):
+    prompt_id: int
+    prompt_text: str
+    prompt_type: str
+    current_scores: dict[str, float]
+    score_trend: str
+    timeline: list[PromptTimelinePoint]
+    content_events: list[ContentEventResponse]
+    drafts: list[PromptDraftSnapshot]
+    competitors: list[PromptCompetitorSummary]
+    insights: list[PromptInsight]
+    recent_responses: list[PromptRecentResponse]
+
+class PromptOverviewItem(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    prompt_id: int
+    prompt_text: str
+    current_overall: float
+    trend: str
+    sparkline: list[float]
+    model_scores: dict[str, float]
+    drafts_posted: int
+    last_draft_at: datetime | None
+    has_recent_content_event: bool
+
+class PromptsOverviewResponse(BaseModel):
+    prompts: list[PromptOverviewItem]

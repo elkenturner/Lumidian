@@ -5,11 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, ArrowLeft } from 'lucide-react';
 import LumidianLogo from '@/components/LumidianLogo';
 import { authVerifyEmail, authResendVerification } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function VerifyEmailPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email') || '';
+  const { refresh } = useAuth();
 
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,8 +43,9 @@ export default function VerifyEmailPage() {
     try {
       await authVerifyEmail(email, trimmed);
       setVerified(true);
-      // Redirect to login after a brief moment so they see the success state
-      setTimeout(() => router.push('/login'), 1500);
+      // Backend sets auth cookies on verify — refresh auth state and go to dashboard
+      await refresh();
+      setTimeout(() => router.push('/dashboard'), 1200);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
       setError(e?.response?.data?.detail || 'Invalid code. Please try again.');
@@ -89,7 +92,7 @@ export default function VerifyEmailPage() {
             <>
               <h1 className="text-2xl font-bold text-[#f8fafc] mb-1">Email verified</h1>
               <p className="text-sm text-[#94a3b8]">
-                Redirecting you to sign in...
+                Redirecting you to your dashboard...
               </p>
             </>
           ) : (

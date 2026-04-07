@@ -27,7 +27,7 @@ import bcrypt
 import httpx
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -224,7 +224,7 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     await db.commit()
     await db.refresh(user)
 
-    # Do NOT set auth cookies — user must verify email first, then log in.
+    # Do NOT set auth cookies — user must verify email first (verify-email sets cookies).
 
     from app.services.analytics_service import log_event
     await log_event("user_registered", {"plan": user.subscription_tier}, user_id=user.id)
@@ -687,7 +687,11 @@ async def verify_email(
     user.email_verification_expires_at = None
     await db.commit()
 
-    return {"message": "Email verified successfully"}
+    # Auto-login: set auth cookies so the user doesn't have to log in again
+    token = create_token(user.id)
+    resp = JSONResponse(content={"message": "Email verified successfully", "user": user_to_dict(user)})
+    set_auth_cookies(resp, token)
+    return resp
 
 
 class ResendVerificationRequest(BaseModel):

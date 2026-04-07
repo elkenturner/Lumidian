@@ -355,6 +355,15 @@ function HeroSection() {
         }}
       />
 
+      {/* Dot grid overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none opacity-[0.15]"
+        style={{
+          backgroundImage: 'radial-gradient(circle, rgba(148,163,184,0.8) 1px, transparent 1px)',
+          backgroundSize: '32px 32px',
+        }}
+      />
+
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {/* Badge */}
         <FadeUp>
@@ -474,7 +483,7 @@ function FeaturesSection() {
             const Icon = feature.icon;
             return (
               <FadeUp key={feature.title} delay={i * 80}>
-                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-5 md:p-7 h-full transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(71,85,105,0.5)] hover:shadow-[0_8px_32px_rgba(0,0,0,0.3)]">
+                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-5 md:p-7 h-full transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(99,102,241,0.3)] hover:shadow-[0_0_24px_rgba(99,102,241,0.15),0_8px_32px_rgba(0,0,0,0.3)]">
                   <div className="w-11 h-11 rounded-xl bg-[rgba(99,102,241,0.15)] flex items-center justify-center mb-4">
                     <Icon size={20} className="text-[#6366f1]" />
                   </div>

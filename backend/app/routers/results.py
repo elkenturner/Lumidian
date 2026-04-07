@@ -3,9 +3,12 @@ Results router — analytics and response data for a brand.
 
 Routes
 ------
-GET /api/results/{brand_id}/overview    — latest run stats + per-model breakdown
-GET /api/results/{brand_id}/trends      — all completed runs (for trend chart)
-GET /api/results/{brand_id}/responses   — paginated query results (filter by run_id)
+GET /api/results/{brand_id}/overview              — latest run stats + per-model breakdown
+GET /api/results/{brand_id}/trends                — all completed runs (for trend chart)
+GET /api/results/{brand_id}/responses             — paginated query results (filter by run_id)
+GET /api/results/{brand_id}/prompts/overview      — per-prompt sparkline + score summaries
+GET /api/results/{brand_id}/prompt/{id}/timeline  — time-series scores + content events
+GET /api/results/{brand_id}/prompt/{id}/detail    — comprehensive prompt intelligence
 """
 from __future__ import annotations
 
@@ -21,6 +24,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
+from app.services.heuristic_service import evaluate_heuristics
 from app.models import (
     Brand, Competitor, CompetitorMention, ContentAttribution, ContentDraft,
     ContentEvent, DraftAttribution, Prompt, PromptRunScore, QueryResult,
@@ -50,18 +54,18 @@ from app.utils import normalise_model
 
 router = APIRouter(prefix="/results", tags=["results"])
 
+
+def _safe_json(data: str | None) -> dict | None:
+    """Parse JSON data, returning None on failure."""
+    if not data:
+        return None
+    try:
+        return json.loads(data)
+    except (json.JSONDecodeError, TypeError):
+        return None
+
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
-
-async def _get_brand_or_404(db: AsyncSession, brand_id: int) -> Brand:
-    result = await db.execute(select(Brand).where(Brand.id == brand_id))
-    brand = result.scalar_one_or_none()
-    if brand is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Brand {brand_id} not found",
-        )
-    return brand
 
 
 # ── Overview ──────────────────────────────────────────────────────────────────
@@ -422,7 +426,7 @@ async def get_prompt_timeline(
             id=e.id,
             event_type=e.event_type,
             created_at=e.created_at,
-            data=json.loads(e.data) if e.data else None,
+            data=_safe_json(e.data),
         )
         for e in events
     ]
@@ -434,6 +438,7 @@ async def get_prompt_timeline(
     draft_count_result = await db.execute(
         select(ContentDraft)
         .where(ContentDraft.prompt_id == prompt_id, ContentDraft.status == "posted")
+        .order_by(ContentDraft.posted_at.desc())
     )
     posted_drafts = draft_count_result.scalars().all()
 
@@ -513,7 +518,7 @@ async def get_prompt_detail(
     content_events = [
         ContentEventResponse(
             id=e.id, event_type=e.event_type, created_at=e.created_at,
-            data=json.loads(e.data) if e.data else None,
+            data=_safe_json(e.data),
         )
         for e in events
     ]
@@ -526,22 +531,27 @@ async def get_prompt_detail(
     )
     drafts = drafts_result.scalars().all()
 
-    # Get DraftAttribution for posted drafts
+    # Batch-fetch DraftAttribution for posted drafts (avoids N+1)
+    posted_draft_ids = [d.id for d in drafts if d.status == "posted"]
+    attrs_by_draft: dict[int, DraftAttribution] = {}
+    if posted_draft_ids:
+        attr_result = await db.execute(
+            select(DraftAttribution).where(DraftAttribution.draft_id.in_(posted_draft_ids))
+        )
+        for attr in attr_result.scalars().all():
+            attrs_by_draft[attr.draft_id] = attr
+
     draft_snapshots = []
     for d in drafts:
         snapshot = {"at_posting": None, "current": None, "delta": None, "runs_since": None}
-        if d.status == "posted":
-            attr_result = await db.execute(
-                select(DraftAttribution).where(DraftAttribution.draft_id == d.id).limit(1)
-            )
-            attr = attr_result.scalar_one_or_none()
-            if attr:
-                snapshot = {
-                    "at_posting": attr.score_at_posting,
-                    "current": attr.current_score,
-                    "delta": attr.delta,
-                    "runs_since": attr.runs_since_posting,
-                }
+        attr = attrs_by_draft.get(d.id)
+        if attr:
+            snapshot = {
+                "at_posting": attr.score_at_posting,
+                "current": attr.current_score,
+                "delta": attr.delta,
+                "runs_since": attr.runs_since_posting,
+            }
         draft_snapshots.append(PromptDraftSnapshot(
             id=d.id,
             platform=d.platform,
@@ -560,25 +570,28 @@ async def get_prompt_detail(
 
     competitor_summaries = []
     if competitors:
-        for comp in competitors:
-            mentions_result = await db.execute(
-                select(CompetitorMention)
-                .join(TrackingRun, CompetitorMention.tracking_run_id == TrackingRun.id)
-                .where(
-                    CompetitorMention.competitor_id == comp.id,
-                    CompetitorMention.prompt_id == prompt_id,
-                    TrackingRun.completed_at >= cutoff,
-                )
+        comp_ids = [c.id for c in competitors]
+        comp_by_id = {c.id: c for c in competitors}
+        mentions_result = await db.execute(
+            select(CompetitorMention)
+            .join(TrackingRun, CompetitorMention.tracking_run_id == TrackingRun.id)
+            .where(
+                CompetitorMention.competitor_id.in_(comp_ids),
+                CompetitorMention.prompt_id == prompt_id,
+                TrackingRun.completed_at >= cutoff,
             )
-            mentions = mentions_result.scalars().all()
-            if mentions:
-                rate = round(sum(1 for m in mentions if m.mentioned) / len(mentions), 2)
-                competitor_summaries.append(PromptCompetitorSummary(
-                    name=comp.name, mention_rate=rate, trend="stable",
-                ))
+        )
+        all_mentions = mentions_result.scalars().all()
+        mentions_by_comp: dict[int, list] = defaultdict(list)
+        for m in all_mentions:
+            mentions_by_comp[m.competitor_id].append(m)
+        for comp_id, mentions in mentions_by_comp.items():
+            rate = round(sum(1 for m in mentions if m.mentioned) / len(mentions), 2)
+            competitor_summaries.append(PromptCompetitorSummary(
+                name=comp_by_id[comp_id].name, mention_rate=rate, trend="stable",
+            ))
 
     # Heuristics
-    from app.services.heuristic_service import evaluate_heuristics
     history = [{"overall": t.overall, "run_id": t.run_id} for t in timeline]
     event_dicts = [{"event_type": e.event_type, "created_at": str(e.created_at), "data": e.data} for e in events]
     raw_insights = evaluate_heuristics(

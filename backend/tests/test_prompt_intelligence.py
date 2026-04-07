@@ -157,3 +157,17 @@ async def test_heuristic_inactive_prompt():
     inactive_insights = [i for i in insights if i["id"] == "inactive_prompt"]
     assert len(inactive_insights) == 1
     assert inactive_insights[0]["severity"] == "info"
+
+
+@pytest.mark.asyncio
+async def test_prompts_overview_endpoint(client):
+    """GET /api/results/{brand_id}/prompts/overview returns prompt summaries."""
+    await register_and_login(client)
+    brand_data = await create_brand(client, "OverviewBrand", ["best project management tool"])
+
+    resp = await client.get(f"/api/results/{brand_data['id']}/prompts/overview")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "prompts" in data
+    assert len(data["prompts"]) == 1
+    assert data["prompts"][0]["prompt_text"] == "best project management tool"

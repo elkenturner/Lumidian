@@ -23,10 +23,8 @@ import {
   getCaseStudyEligibility,
   exportCaseStudyPDF,
   getCompetitorAnalysis,
-  getPromptsOverview,
   Brand,
   BrandDetail,
-  PromptsOverviewData,
   TrendPoint,
   QueryResult,
   TrackingRun,
@@ -135,7 +133,6 @@ export default function ReportsPage() {
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysis | null>(null);
   const [competitorModelFilter, setCompetitorModelFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'prompts' | 'competitors'>('prompts');
-  const [promptsOverview, setPromptsOverview] = useState<PromptsOverviewData | null>(null);
   const loadAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => { document.title = 'Reports — Lumidian'; }, []);
@@ -193,7 +190,6 @@ export default function ReportsPage() {
       if (compAnalysis?.has_data) setCompetitorAnalysis(compAnalysis);
       // Check case study eligibility (endpoint not yet implemented — silently ignore)
       getCaseStudyEligibility(brandId).then(setCaseStudyEligibility).catch(() => {});
-      getPromptsOverview(brandId).then(setPromptsOverview).catch((err) => { logError(err, 'Reports: fetch prompts overview'); });
     } catch { /* ignore */ } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -597,22 +593,16 @@ export default function ReportsPage() {
                         </div>
 
                         {/* View details link */}
-                        {(() => {
-                          const overview = promptsOverview?.prompts.find((p) => p.prompt_id === g.promptId);
-                          if (!overview) return null;
-                          return (
-                            <div className="flex justify-end mt-2.5">
-                              <Link
-                                href={`/tracker/${selectedBrandId}/prompt/${g.promptId}`}
-                                className="flex items-center gap-1 text-[10px] text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                View details
-                                <ChevronRight size={12} />
-                              </Link>
-                            </div>
-                          );
-                        })()}
+                        <div className="flex justify-end mt-2.5">
+                          <Link
+                            href={`/tracker/${selectedBrandId}/prompt/${g.promptId}`}
+                            className="flex items-center gap-1 text-[10px] text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            View details
+                            <ChevronRight size={12} />
+                          </Link>
+                        </div>
 
                         {/* Gap explanation */}
                         {overallPct < 50 && selectedBrand && (() => {

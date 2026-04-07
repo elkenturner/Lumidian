@@ -68,6 +68,7 @@ async def clean_tables():
         from sqlalchemy import text
         # Order matters for FK constraints
         for table in [
+            "prompt_run_scores", "content_events",
             "analytics_events", "content_attribution", "content_posts",
             "content_drafts", "content_gaps", "content_opportunities",
             "run_model_scores", "query_results", "tracking_runs",

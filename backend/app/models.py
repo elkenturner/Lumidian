@@ -563,6 +563,51 @@ class AnalyticsEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
+# ── Prompt-level time-series scores ──────────────────────────────────────────
+
+class PromptRunScore(Base):
+    """Per-prompt per-model visibility score snapshot for each tracking run."""
+    __tablename__ = "prompt_run_scores"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    prompt_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("prompts.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tracking_run_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tracking_runs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    brand_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    model: Mapped[str] = mapped_column(String(50), nullable=False)
+    score: Mapped[float] = mapped_column(Float, nullable=False)
+    mentioned_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    query_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("prompt_id", "tracking_run_id", "model", name="uq_prompt_run_score"),
+    )
+
+
+# ── Content event log (silent storage for future intelligence) ───────────────
+
+class ContentEvent(Base):
+    """Flexible event log for content-related signals. JSON data column for arbitrary payloads."""
+    __tablename__ = "content_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    brand_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    prompt_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("prompts.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    data: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON blob
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
 class Notification(Base):
     __tablename__ = "notifications"
 

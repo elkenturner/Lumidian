@@ -300,6 +300,13 @@ async def run_migrations():
         "ALTER TABLE brand_content_settings ADD COLUMN drafting_frequency TEXT NOT NULL DEFAULT 'weekly'",
         # 2026-04-02: Add prompt_limit column to brands
         "ALTER TABLE brands ADD COLUMN prompt_limit INTEGER DEFAULT 25",
+        # 2026-04-07: Content Impact Intelligence tables
+        "CREATE TABLE IF NOT EXISTS prompt_run_scores (id INTEGER PRIMARY KEY, prompt_id INTEGER NOT NULL REFERENCES prompts(id) ON DELETE CASCADE, tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, model TEXT NOT NULL, score REAL NOT NULL, mentioned_count INTEGER NOT NULL, query_count INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(prompt_id, tracking_run_id, model))",
+        "CREATE INDEX IF NOT EXISTS idx_prompt_run_scores_prompt_model ON prompt_run_scores(prompt_id, model, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_prompt_run_scores_brand ON prompt_run_scores(brand_id, created_at)",
+        "CREATE TABLE IF NOT EXISTS content_events (id INTEGER PRIMARY KEY, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL, event_type TEXT NOT NULL, data TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
+        "CREATE INDEX IF NOT EXISTS idx_content_events_brand_type ON content_events(brand_id, event_type, created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_content_events_prompt ON content_events(prompt_id, created_at)",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

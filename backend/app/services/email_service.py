@@ -94,28 +94,67 @@ def _send(to: str, subject: str, body: str) -> None:
 
 # ── Async fire-and-forget helper ──────────────────────────────────────────────
 
+# Module-level set to hold strong references to in-flight tasks so they are
+# not garbage-collected before they finish.
+_background_tasks: set = set()
+
+
 def send_email_background(fn, *args, **kwargs) -> None:
     """
-    Run a synchronous email function in a thread-pool executor so it doesn't
-    block the async event loop.  Exceptions are caught and logged non-fatally.
+    Schedule a synchronous email function to run in a thread-pool executor so
+    it doesn't block the async event loop.  Exceptions are always logged, even
+    when they surface after the HTTP response has already been sent.
+
+    The created Task is kept in ``_background_tasks`` until it completes so
+    that the garbage collector cannot silently discard it mid-flight.
     """
     import functools
 
     async def _run():
         loop = asyncio.get_running_loop()
+        logger.info("Background email task starting: %s", fn.__name__)
         try:
             await loop.run_in_executor(None, functools.partial(fn, *args, **kwargs))
+            logger.info("Background email task completed: %s", fn.__name__)
         except Exception as exc:
-            logger.warning("Background email failed (%s): %s", fn.__name__, exc)
+            logger.exception(
+                "Background email task failed (%s): %s", fn.__name__, exc
+            )
+
+    def _on_done(task: asyncio.Task) -> None:
+        _background_tasks.discard(task)
+        exc = task.exception() if not task.cancelled() else None
+        if exc is not None:
+            logger.exception(
+                "Background email task raised unhandled exception (%s): %s",
+                fn.__name__,
+                exc,
+                exc_info=exc,
+            )
 
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            asyncio.ensure_future(_run())
-        else:
-            fn(*args, **kwargs)   # fallback for non-async callers (tests, CLI)
+        loop = asyncio.get_running_loop()
+        task = loop.create_task(_run())
+        _background_tasks.add(task)
+        task.add_done_callback(_on_done)
+        logger.debug(
+            "Background email task scheduled: %s (active tasks: %d)",
+            fn.__name__,
+            len(_background_tasks),
+        )
+    except RuntimeError:
+        # No running event loop — called from a sync context (tests, CLI, etc.)
+        logger.debug("No running event loop; calling %s synchronously", fn.__name__)
+        try:
+            fn(*args, **kwargs)
+        except Exception as exc:
+            logger.exception(
+                "Synchronous email call failed (%s): %s", fn.__name__, exc
+            )
     except Exception as exc:
-        logger.warning("send_email_background setup failed (%s): %s", fn.__name__, exc)
+        logger.exception(
+            "send_email_background setup failed (%s): %s", fn.__name__, exc
+        )
 
 
 # ── Public email functions ────────────────────────────────────────────────────

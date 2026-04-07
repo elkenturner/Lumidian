@@ -1,11 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { Loader2, Eye, EyeOff, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Loader2, Eye, EyeOff, ArrowLeft, CheckCircle, Check, X } from 'lucide-react';
 import LumidianLogo from '@/components/LumidianLogo';
 import { resetPassword } from '@/lib/api';
+
+const PASSWORD_RULES = [
+  { label: '8+ characters', test: (p: string) => p.length >= 8 },
+  { label: 'Uppercase letter', test: (p: string) => /[A-Z]/.test(p) },
+  { label: 'Lowercase letter', test: (p: string) => /[a-z]/.test(p) },
+  { label: 'Number', test: (p: string) => /\d/.test(p) },
+];
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -17,6 +24,9 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  const passwordChecks = useMemo(() => PASSWORD_RULES.map(r => r.test(password)), [password]);
+  const passwordValid = passwordChecks.every(Boolean);
 
   useEffect(() => {
     document.title = 'Set New Password — Lumidian';
@@ -31,8 +41,8 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError('');
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+    if (!passwordValid) {
+      setError('Please meet all password requirements.');
       return;
     }
     if (password !== confirm) {
@@ -113,8 +123,8 @@ export default function ResetPasswordPage() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
-                      placeholder="Min. 6 characters"
-                      minLength={6}
+                      placeholder="Min. 8 characters"
+                      minLength={8}
                       className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 pr-10 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
                     />
                     <button
@@ -126,6 +136,20 @@ export default function ResetPasswordPage() {
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                     </button>
                   </div>
+                  {password.length > 0 && (
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2">
+                      {PASSWORD_RULES.map((rule, i) => (
+                        <div key={rule.label} className="flex items-center gap-1.5">
+                          {passwordChecks[i]
+                            ? <Check size={12} className="text-emerald-400 shrink-0" />
+                            : <X size={12} className="text-[#64748b] shrink-0" />}
+                          <span className={`text-xs ${passwordChecks[i] ? 'text-emerald-400' : 'text-[#64748b]'}`}>
+                            {rule.label}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#94a3b8] mb-1.5">Confirm password</label>

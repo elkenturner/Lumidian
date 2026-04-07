@@ -115,7 +115,7 @@ async def client():
 async def register_user(
     client: httpx.AsyncClient,
     email: str = "user@example.com",
-    password: str = "password123",
+    password: str = "Password123",
     name: str = "Test User",
 ) -> dict:
     resp = await client.post(
@@ -129,7 +129,7 @@ async def register_user(
 async def login_user(
     client: httpx.AsyncClient,
     email: str = "user@example.com",
-    password: str = "password123",
+    password: str = "Password123",
 ) -> httpx.Cookies:
     resp = await client.post(
         "/api/auth/login",
@@ -142,10 +142,10 @@ async def login_user(
 async def register_and_login(
     client: httpx.AsyncClient,
     email: str = "user@example.com",
-    password: str = "password123",
+    password: str = "Password123",
     subscription_tier: str = "starter",
 ) -> None:
-    """Register + login in one call — sets cookies on the client.
+    """Register + verify + login in one call — sets cookies on the client.
 
     Grants 'starter' subscription by default so brand/prompt creation works.
     Pass subscription_tier=None to test free-tier limits.

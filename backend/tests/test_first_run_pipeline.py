@@ -12,7 +12,7 @@ pytestmark = pytest.mark.asyncio
 
 async def test_first_run_triggers_onboarding_pipeline(client: httpx.AsyncClient):
     """First tracking run for a brand should be created with run_type='onboarding'."""
-    await register_and_login(client, email="firstrun@test.com", password="password123")
+    await register_and_login(client, email="firstrun@test.com", password="Password123")
 
     # Create a brand with prompts
     brand = await create_brand(client, name="FirstRunBrand", prompts=["What is FirstRunBrand?"])
@@ -37,7 +37,7 @@ async def test_first_run_triggers_onboarding_pipeline(client: httpx.AsyncClient)
 
 async def test_second_run_is_manual_not_onboarding(client: httpx.AsyncClient):
     """Second tracking run should be manual type, not onboarding."""
-    await register_and_login(client, email="secondrun@test.com", password="password123")
+    await register_and_login(client, email="secondrun@test.com", password="Password123")
 
     brand = await create_brand(client, name="SecondRunBrand", prompts=["test"])
     brand_id = brand["id"]
@@ -74,7 +74,7 @@ async def test_second_run_is_manual_not_onboarding(client: httpx.AsyncClient):
 
 async def test_onboarding_pipeline_fires_after_first_run_completes(client: httpx.AsyncClient):
     """After an onboarding run completes, _onboarding_post_process should be called."""
-    await register_and_login(client, email="onboardingpipeline@test.com", password="password123")
+    await register_and_login(client, email="onboardingpipeline@test.com", password="Password123")
 
     brand = await create_brand(client, name="OnboardingPipelineBrand", prompts=["test prompt"])
     brand_id = brand["id"]

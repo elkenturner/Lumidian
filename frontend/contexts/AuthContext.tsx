@@ -16,7 +16,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 // Mirrored from middleware.ts — paths that don't require authentication
-const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/team/accept'];
+const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/team/accept'];
 
 // Set/clear the JS-accessible session flag that Next.js middleware reads.
 // (The httponly clarity_token is set by the backend; this companion cookie
@@ -61,12 +61,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh().finally(() => setLoading(false));
   }, []);
 
-  // Redirect unverified users to /verify-email; send already-verified users away from it
+  // Verified users who land on /verify-email should be sent to dashboard
   useEffect(() => {
     if (loading || user === null) return;
-    if (!user.email_verified && pathname !== '/verify-email') {
-      router.push('/verify-email');
-    } else if (user.email_verified && pathname === '/verify-email') {
+    if (user.email_verified && pathname === '/verify-email') {
       router.push('/dashboard');
     }
   }, [loading, user, pathname, router]);
@@ -82,9 +80,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function register(email: string, password: string, name?: string) {
-    const u = await authRegister({ email, password, name });
-    setUser(u);
-    setSessionCookie();
+    // Registration no longer returns a session — just creates the account
+    // and sends a verification code. Caller redirects to /verify-email.
+    await authRegister({ email, password, name });
   }
 
   async function logout() {

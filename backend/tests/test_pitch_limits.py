@@ -25,7 +25,7 @@ _STANDARD_BRAND = {
 
 async def test_pitch_brand_daily_run_limit(client: httpx.AsyncClient):
     """Pitch brand should be limited to 1 manual run per day."""
-    await register_and_login(client, "pitchrun@test.com", "password123")
+    await register_and_login(client, "pitchrun@test.com", "Password123")
 
     brand_resp = await client.post(
         "/api/brands",
@@ -57,7 +57,7 @@ async def test_pitch_brand_daily_run_limit(client: httpx.AsyncClient):
 
 async def test_pitch_brand_daily_run_limit_first_run_allowed(client: httpx.AsyncClient):
     """Pitch brand should allow the first manual run of the day."""
-    await register_and_login(client, "pitchrunfirst@test.com", "password123")
+    await register_and_login(client, "pitchrunfirst@test.com", "Password123")
 
     brand_resp = await client.post(
         "/api/brands",
@@ -74,7 +74,7 @@ async def test_pitch_brand_daily_run_limit_first_run_allowed(client: httpx.Async
 
 async def test_pitch_brand_yesterday_run_does_not_block(client: httpx.AsyncClient):
     """A manual run from yesterday should not block today's run for a pitch brand."""
-    await register_and_login(client, "pitchrunyest@test.com", "password123")
+    await register_and_login(client, "pitchrunyest@test.com", "Password123")
 
     brand_resp = await client.post(
         "/api/brands",
@@ -106,7 +106,7 @@ async def test_pitch_brand_yesterday_run_does_not_block(client: httpx.AsyncClien
 
 async def test_standard_brand_not_affected_by_pitch_limit(client: httpx.AsyncClient):
     """A standard brand should not be subject to the pitch brand 1/day per-brand limit."""
-    await register_and_login(client, "standardrun@test.com", "password123")
+    await register_and_login(client, "standardrun@test.com", "Password123")
 
     brand_resp = await client.post(
         "/api/brands",
@@ -137,7 +137,7 @@ async def test_standard_brand_not_affected_by_pitch_limit(client: httpx.AsyncCli
 
 async def test_pitch_brand_weekly_scan_limit(client: httpx.AsyncClient):
     """Pitch brand should be limited to 1 manual scan per week."""
-    await register_and_login(client, "pitchscan@test.com", "password123", subscription_tier="starter")
+    await register_and_login(client, "pitchscan@test.com", "Password123", subscription_tier="starter")
 
     brand_resp = await client.post(
         "/api/brands",
@@ -169,7 +169,7 @@ async def test_pitch_brand_weekly_scan_limit(client: httpx.AsyncClient):
 
 async def test_pitch_brand_weekly_scan_limit_first_scan_allowed(client: httpx.AsyncClient):
     """Pitch brand should allow the first manual scan of the week."""
-    await register_and_login(client, "pitchscanfirst@test.com", "password123", subscription_tier="starter")
+    await register_and_login(client, "pitchscanfirst@test.com", "Password123", subscription_tier="starter")
 
     brand_resp = await client.post(
         "/api/brands",
@@ -186,7 +186,7 @@ async def test_pitch_brand_weekly_scan_limit_first_scan_allowed(client: httpx.As
 
 async def test_pitch_brand_old_scan_does_not_block(client: httpx.AsyncClient):
     """A scan from more than 7 days ago should not block this week's scan."""
-    await register_and_login(client, "pitchscanold@test.com", "password123", subscription_tier="starter")
+    await register_and_login(client, "pitchscanold@test.com", "Password123", subscription_tier="starter")
 
     brand_resp = await client.post(
         "/api/brands",

@@ -822,12 +822,17 @@ export interface AuthUser {
   team_owner_email?: string | null;
 }
 
+export interface RegisterResult {
+  email: string;
+  needs_verification: boolean;
+}
+
 export async function authRegister(data: {
   email: string;
   password: string;
   name?: string;
-}): Promise<AuthUser> {
-  const res = await api.post<AuthUser>('/auth/register', data);
+}): Promise<RegisterResult> {
+  const res = await api.post<RegisterResult>('/auth/register', data);
   return res.data;
 }
 
@@ -845,13 +850,13 @@ export async function authLogout(): Promise<void> {
   await api.post('/auth/logout');
 }
 
-export async function authVerifyEmail(code: string): Promise<{ message: string }> {
-  const res = await api.post<{ message: string }>('/auth/verify-email', { code });
+export async function authVerifyEmail(email: string, code: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/auth/verify-email', { email, code });
   return res.data;
 }
 
-export async function authResendVerification(): Promise<{ message: string }> {
-  const res = await api.post<{ message: string }>('/auth/resend-verification');
+export async function authResendVerification(email: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/auth/resend-verification', { email });
   return res.data;
 }
 

@@ -24,7 +24,7 @@ async def test_manual_scan_sets_scanning_state(client: httpx.AsyncClient):
     # Track whether the brand was in scanning_brands when _scan_and_log ran
     scanning_during_call = []
 
-    async def mock_scan_and_log(bid):
+    async def mock_scan_and_log(bid, **kwargs):
         scanning_during_call.append(bid in state.scanning_brands)
 
     with patch("app.routers.opportunities._scan_and_log", side_effect=mock_scan_and_log):
@@ -48,7 +48,7 @@ async def test_scanning_state_cleared_after_scan(client: httpx.AsyncClient):
 
     state.scanning_brands.clear()
 
-    async def mock_scan_and_log(bid):
+    async def mock_scan_and_log(bid, **kwargs):
         pass  # instant completion
 
     with patch("app.routers.opportunities._scan_and_log", side_effect=mock_scan_and_log):
@@ -71,7 +71,7 @@ async def test_scanning_state_cleared_after_scan_error(client: httpx.AsyncClient
 
     state.scanning_brands.clear()
 
-    async def mock_scan_and_log_raises(bid):
+    async def mock_scan_and_log_raises(bid, **kwargs):
         raise RuntimeError("simulated scan failure")
 
     with patch("app.routers.opportunities._scan_and_log", side_effect=mock_scan_and_log_raises):

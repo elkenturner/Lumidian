@@ -90,6 +90,30 @@ PLATFORM_GUIDELINES: dict[str, dict] = {
         "disclaimer": None,
         "workflow": "article",
     },
+    "linkedin": {
+        "tone": "Professional, thought leadership, authentic",
+        "rules": [
+            "Write for a professional audience",
+            "Lead with insight — no generic openers",
+            "Brand mentions should be contextual and earned",
+            "Short paragraphs and line breaks for readability",
+            "No hard-sell or overtly promotional language",
+        ],
+        "disclaimer": None,
+        "workflow": "post_or_article",
+    },
+    "x": {
+        "tone": "Concise, direct, conversational",
+        "rules": [
+            "280 characters max per post",
+            "Hook in the first line",
+            "Brand mentions only when directly relevant",
+            "No jargon or corporate speak",
+            "Threads should flow naturally post-to-post",
+        ],
+        "disclaimer": None,
+        "workflow": "post_or_thread",
+    },
 }
 
 

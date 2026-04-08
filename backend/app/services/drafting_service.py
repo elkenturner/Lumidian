@@ -49,6 +49,7 @@ from app.services.drafting import (
     build_wikipedia_prompt,
     call_claude,
     classify_subreddit,
+    enforce_x_char_limit,
     estimate_visibility_impact,
     extract_title_and_body,
     parse_wikipedia_draft,
@@ -656,6 +657,7 @@ async def generate_gap_draft(
 
     raw_text = await call_claude(claude_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform, 2500))
     raw_text = remove_hedging(raw_text)
+    raw_text = enforce_x_char_limit(raw_text, platform)
 
     # Quality check: brand name must appear in the content.
     # Skip retry for restricted subreddits — the prompt intentionally omits the brand.
@@ -703,6 +705,10 @@ async def generate_gap_draft(
         )
     elif platform == "reddit" and suggested_subreddit:
         brief = f"r/{suggested_subreddit} — {prompt.text}"
+    elif platform in ("linkedin_article", "linkedin_post"):
+        brief = custom_brief or f'LinkedIn draft for: "{prompt.text}"'
+    elif platform in ("x_thread", "x_post"):
+        brief = custom_brief or f'X draft for: "{prompt.text}"'
     elif custom_brief:
         brief = custom_brief
     else:

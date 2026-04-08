@@ -10,7 +10,7 @@ because search_quora_questions is imported inside scan_brand_opportunities at ca
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import pytest
 
@@ -132,9 +132,9 @@ def test_score_question_three_matches_nonzero():
 
 # ── scan_brand_opportunities ──────────────────────────────────────────────────
 
-def _make_question(url: str, title: str, snippet: str = "") -> dict:
+def _make_question(url: str, title: str, snippet: str = "", date: str = "") -> dict:
     """Build a mock search result dict matching the shape search_quora_questions returns."""
-    return {"url": url, "title": title, "snippet": snippet}
+    return {"url": url, "title": title, "snippet": snippet, "date": date}
 
 
 @pytest.mark.asyncio
@@ -237,7 +237,6 @@ async def test_scan_deduplication(tmp_db):
 
 def test_search_quora_passes_date_field():
     """search_quora_questions must include the 'date' field from Serper results."""
-    from unittest.mock import patch, MagicMock
     import app.services.quora_search_service as svc
 
     fake_response = MagicMock()
@@ -262,7 +261,7 @@ def test_search_quora_passes_date_field():
         mock_client.return_value.__exit__ = MagicMock(return_value=False)
         results = svc.search_quora_questions("saas tool", num_results=5)
 
-    assert len(results) >= 1
+    assert len(results) == 1
     assert "date" in results[0]
     assert results[0]["date"] == "3 days ago"
 

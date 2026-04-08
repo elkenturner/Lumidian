@@ -72,7 +72,7 @@ def search_quora_questions(
     """
     Search for real Quora question pages matching *query* via Serper.dev.
 
-    Returns a list of dicts: {title, url, snippet}
+    Returns a list of dicts: {title, url, snippet, date}
     Returns [] gracefully on missing credentials, API errors, or no matches.
     """
     # Cache check

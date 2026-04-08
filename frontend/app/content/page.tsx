@@ -25,8 +25,6 @@ import {
   BookOpen,
   ArrowRight,
   BarChart2,
-  MessageSquare,
-  Globe2,
   Lightbulb,
   Shield,
 } from 'lucide-react';
@@ -60,6 +58,7 @@ import {
   QuoraQuestion,
 } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
+import PlatformIcon from '@/components/PlatformIcon';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -968,6 +967,7 @@ function RequestDraftModal({
                       disabled
                       className="py-2 rounded-lg text-xs font-medium capitalize transition-colors border bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.06)] text-[var(--text-faint)] opacity-50 cursor-not-allowed flex items-center justify-center gap-1.5"
                     >
+                      <PlatformIcon platform={p} size={12} color="var(--text-faint)" />
                       {label}
                       <span className="text-[9px] bg-[rgba(99,102,241,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
                     </button>
@@ -978,12 +978,13 @@ function RequestDraftModal({
                   <button
                     key={p}
                     onClick={() => { setPlatform(p); if (p !== 'quora') setSelectedQuestion(null); }}
-                    className={`py-2 rounded-lg text-xs font-medium capitalize transition-colors border ${
+                    className={`py-2 rounded-lg text-xs font-medium capitalize transition-colors border flex items-center justify-center gap-1.5 ${
                       platform === p
                         ? 'bg-[var(--accent)]/20 border-[var(--accent)]/50 text-[var(--accent)]'
                         : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                     }`}
                   >
+                    <PlatformIcon platform={p} size={12} color={platform === p ? 'var(--accent)' : 'var(--text-muted)'} />
                     {label}
                   </button>
                 );
@@ -1790,7 +1791,7 @@ export default function ContentHubPage() {
   // ── Right panel actions ────────────────────────────────────────────────────
 
   async function handleGenerateNow() {
-    if (!selectedBrandId) return;
+    if (!selectedBrandId || scanning) return;
     setGenerating(true);
     setGenerateError(null);
 
@@ -1871,7 +1872,7 @@ export default function ContentHubPage() {
   }
 
   const handleScanNow = useCallback(async () => {
-    if (!selectedBrandId || scanning) return;
+    if (!selectedBrandId || scanning || generating) return;
     setScanning(true);
 
     // Clear existing opportunities immediately so UI shows loading state
@@ -2068,7 +2069,7 @@ export default function ContentHubPage() {
           reddit: {
             label: 'Reddit',
             subtitle: 'Discussion posts & replies',
-            icon: MessageSquare,
+            iconKey: 'reddit',
             color: '#ff4500',
             colorMuted: 'rgba(255,69,0,0.10)',
             colorBorder: 'rgba(255,69,0,0.20)',
@@ -2085,7 +2086,7 @@ export default function ContentHubPage() {
           quora: {
             label: 'Quora',
             subtitle: 'Q&A answers',
-            icon: HelpCircle,
+            iconKey: 'quora',
             color: '#b92b27',
             colorMuted: 'rgba(185,43,39,0.10)',
             colorBorder: 'rgba(185,43,39,0.20)',
@@ -2102,7 +2103,7 @@ export default function ContentHubPage() {
           medium: {
             label: 'Medium',
             subtitle: 'Long-form articles',
-            icon: FileText,
+            iconKey: 'medium',
             color: '#94a3b8',
             colorMuted: 'rgba(148,163,184,0.10)',
             colorBorder: 'rgba(148,163,184,0.18)',
@@ -2120,7 +2121,7 @@ export default function ContentHubPage() {
           wikipedia: {
             label: 'Wikipedia',
             subtitle: 'Article edits — handle with care',
-            icon: Globe2,
+            iconKey: 'wikipedia',
             color: '#64748b',
             colorMuted: 'rgba(100,116,139,0.10)',
             colorBorder: 'rgba(100,116,139,0.20)',
@@ -2137,7 +2138,6 @@ export default function ContentHubPage() {
         } as const;
 
         const p = PLATFORMS[postingPlatform];
-        const PlatformIcon = p.icon;
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -2175,7 +2175,6 @@ export default function ContentHubPage() {
                     {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((key) => {
                       const active = postingPlatform === key;
                       const pl = PLATFORMS[key];
-                      const TabIcon = pl.icon;
                       return (
                         <button
                           key={key}
@@ -2188,7 +2187,7 @@ export default function ContentHubPage() {
                             boxShadow: active ? `0 0 12px ${pl.colorMuted}` : 'none',
                           }}
                         >
-                          <TabIcon size={12} />
+                          <PlatformIcon platform={key} size={12} color={active ? pl.color : 'var(--text-faint)'} />
                           {pl.label}
                         </button>
                       );
@@ -2204,7 +2203,7 @@ export default function ContentHubPage() {
                 <div className="flex items-center justify-between gap-3 mb-2 p-4 rounded-xl" style={{ background: p.gradient }}>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: p.colorMuted, border: `1px solid ${p.colorBorder}` }}>
-                      <PlatformIcon size={18} style={{ color: p.color }} />
+                      <PlatformIcon platform={p.iconKey} size={18} color={p.color} />
                     </div>
                     <div>
                       <p className="text-[15px] font-semibold text-[var(--text-primary)]">{p.label}</p>
@@ -2484,7 +2483,7 @@ export default function ContentHubPage() {
                         <>
                           <button
                             onClick={handleScanNow}
-                            disabled={scanning || !selectedBrandId}
+                            disabled={scanning || generating || !selectedBrandId}
                             className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40"
                           >
                             {scanning ? (
@@ -2507,7 +2506,7 @@ export default function ContentHubPage() {
                         <>
                           <button
                             onClick={handleGenerateNow}
-                            disabled={generating || onCooldown || weeklyExhausted}
+                            disabled={generating || scanning || onCooldown || weeklyExhausted}
                             className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40"
                           >
                             {generating ? (
@@ -2601,13 +2600,13 @@ export default function ContentHubPage() {
               <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">Platforms</p>
               <div className="space-y-1">
                 {([
-                  { key: 'reddit', icon: MessageSquare, color: '#ff4500', proOnly: false },
-                  { key: 'quora', icon: HelpCircle, color: '#b92b27', proOnly: false },
-                  { key: 'medium', icon: FileText, color: '#94a3b8', proOnly: false },
-                  { key: 'wikipedia', icon: Globe2, color: '#64748b', proOnly: false },
-                  { key: 'linkedin', icon: Globe2, color: '#0a66c2', proOnly: true },
-                  { key: 'x', icon: MessageSquare, color: '#94a3b8', proOnly: true },
-                ] as const).map(({ key, icon: Icon, color, proOnly }) => {
+                  { key: 'reddit', color: '#ff4500', proOnly: false },
+                  { key: 'quora', color: '#b92b27', proOnly: false },
+                  { key: 'medium', color: '#94a3b8', proOnly: false },
+                  { key: 'wikipedia', color: '#64748b', proOnly: false },
+                  { key: 'linkedin', color: '#0a66c2', proOnly: true },
+                  { key: 'x', color: '#94a3b8', proOnly: true },
+                ] as const).map(({ key, color, proOnly }) => {
                   const isLocked = proOnly && user?.subscription_tier !== 'pro' && !user?.is_admin;
                   const setting = contentSettings.find((s) => s.platform === key);
                   const enabled = setting?.enabled ?? true;
@@ -2630,7 +2629,7 @@ export default function ContentHubPage() {
                             border: `1px solid ${enabled && !isLocked ? `${color}30` : 'rgba(255,255,255,0.06)'}`,
                           }}
                         >
-                          <Icon size={12} style={{ color: enabled && !isLocked ? color : 'var(--text-faint)' }} className="transition-colors duration-200" />
+                          <PlatformIcon platform={key} size={12} color={enabled && !isLocked ? color : 'var(--text-faint)'} />
                         </div>
                         <span className={`text-[13px] font-medium capitalize transition-colors duration-200 ${enabled && !isLocked ? 'text-[var(--text-secondary)]' : 'text-[var(--text-faint)]'}`}>
                           {key === 'linkedin' ? 'LinkedIn' : key === 'x' ? 'X' : key}

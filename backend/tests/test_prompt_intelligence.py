@@ -231,3 +231,80 @@ async def test_prompt_detail_404_wrong_prompt(client):
 
     resp = await client.get(f"/api/results/{brand_data['id']}/prompt/99999/detail")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_log_score_change_events(db_session):
+    """_log_score_change_events creates ContentEvent rows for significant score changes."""
+    from app.models import Brand, ContentEvent, Prompt, PromptRunScore, TrackingRun, User
+    from app.services.tracking_service import _log_score_change_events
+    from sqlalchemy import select
+
+    user = User(email="scorechange@test.com", password_hash="x", email_verified=1)
+    db_session.add(user)
+    await db_session.flush()
+    brand = Brand(name="ScoreChangeBrand", slug="scorechangebrand", user_id=user.id, tier="basic")
+    db_session.add(brand)
+    await db_session.flush()
+    prompt = Prompt(brand_id=brand.id, text="score change test prompt")
+    db_session.add(prompt)
+    await db_session.flush()
+
+    # Create a previous run with scores
+    run1 = TrackingRun(brand_id=brand.id, status="completed")
+    db_session.add(run1)
+    await db_session.flush()
+    prev_score = PromptRunScore(
+        prompt_id=prompt.id, tracking_run_id=run1.id, brand_id=brand.id,
+        model="chatgpt", score=40.0, mentioned_count=2, query_count=5,
+    )
+    db_session.add(prev_score)
+    await db_session.commit()
+
+    # Create a new run with a significant score change (+20pp) and a small change (+3pp)
+    run2 = TrackingRun(brand_id=brand.id, status="completed")
+    db_session.add(run2)
+    await db_session.flush()
+    new_score_big = PromptRunScore(
+        prompt_id=prompt.id, tracking_run_id=run2.id, brand_id=brand.id,
+        model="chatgpt", score=60.0, mentioned_count=3, query_count=5,
+    )
+    new_score_small = PromptRunScore(
+        prompt_id=prompt.id, tracking_run_id=run2.id, brand_id=brand.id,
+        model="claude", score=43.0, mentioned_count=2, query_count=5,
+    )
+    db_session.add_all([new_score_big, new_score_small])
+    await db_session.commit()
+
+    # Also add a previous claude score so the small change has a baseline
+    prev_claude = PromptRunScore(
+        prompt_id=prompt.id, tracking_run_id=run1.id, brand_id=brand.id,
+        model="claude", score=40.0, mentioned_count=2, query_count=5,
+    )
+    db_session.add(prev_claude)
+    await db_session.commit()
+
+    # Run the function — should log event for chatgpt (+20pp) but not claude (+3pp)
+    await _log_score_change_events(
+        brand_id=brand.id,
+        run_id=run2.id,
+        new_scores=[
+            {"prompt_id": prompt.id, "model": "chatgpt", "score": 60.0},
+            {"prompt_id": prompt.id, "model": "claude", "score": 43.0},
+        ],
+    )
+
+    async with AsyncSessionLocal() as check_db:
+        result = await check_db.execute(
+            select(ContentEvent).where(
+                ContentEvent.brand_id == brand.id,
+                ContentEvent.event_type == "score_change",
+            )
+        )
+        events = result.scalars().all()
+        assert len(events) == 1
+        data = json.loads(events[0].data)
+        assert data["model"] == "chatgpt"
+        assert data["old_score"] == 40.0
+        assert data["new_score"] == 60.0
+        assert data["delta"] == 20.0

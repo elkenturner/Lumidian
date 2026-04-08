@@ -266,7 +266,11 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             anchor_ids = {o.id for o in by_relevance[:_ANCHOR]}
 
             remaining = [o for o in by_relevance if o.id not in anchor_ids]
-            by_recency = sorted(remaining, key=lambda o: o.created_at, reverse=True)
+            by_recency = sorted(
+                remaining,
+                key=lambda o: o.posted_at or o.created_at,
+                reverse=True,
+            )
             fresh_ids = {o.id for o in by_recency[:_FRESH]}
 
             keep_ids = anchor_ids | fresh_ids

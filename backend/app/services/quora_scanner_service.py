@@ -78,8 +78,13 @@ def _parse_serper_date(date_str: str | None) -> datetime | None:
     return None
 
 
-def _score_question(title: str, snippet: str, prompt_text: str) -> float:
-    """Simple relevance score: keyword overlap between prompt and question."""
+def _score_question(
+    title: str,
+    snippet: str,
+    prompt_text: str,
+    posted_at: datetime | None = None,
+) -> float:
+    """Relevance + recency score for a Quora question, aligned with Reddit scoring."""
     import re
 
     _STOP = frozenset("""
@@ -107,7 +112,25 @@ def _score_question(title: str, snippet: str, prompt_text: str) -> float:
     if matches < 2:
         return 0.0
 
-    return round(relevance * 100.0, 1)
+    # Recency — graduated, matching Reddit's approach
+    if posted_at is not None:
+        age_days = (datetime.now(UTC).replace(tzinfo=None) - posted_at).total_seconds() / 86400
+    else:
+        age_days = 180  # Unknown date → assume moderately old
+
+    if age_days <= 7:
+        recency = 1.0
+    elif age_days <= 30:
+        recency = 0.7
+    elif age_days <= 60:
+        recency = 0.4
+    elif age_days <= 90:
+        recency = 0.2
+    else:
+        recency = 0.05
+
+    score = relevance * 70.0 + recency * 30.0
+    return round(min(score, 100.0), 1)
 
 
 async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) -> int:
@@ -196,11 +219,11 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 if url in existing_urls:
                     continue
 
-                score = _score_question(title, snippet, prompt.text)
+                posted_at = _parse_serper_date(q.get("date"))
+
+                score = _score_question(title, snippet, prompt.text, posted_at=posted_at)
                 if score < _MIN_SCORE:
                     continue
-
-                posted_at = _parse_serper_date(q.get("date"))
 
                 opp = ContentOpportunity(
                     brand_id=brand_id,

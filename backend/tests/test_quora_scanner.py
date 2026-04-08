@@ -118,7 +118,7 @@ def test_score_question_two_matches_returns_score():
         snippet="short snippet here",
         prompt_text="what is the best reg a+ advisory platform for direct listings and capital raise",
     )
-    assert score == 25.0
+    assert score == 19.0  # relevance=0.25 * 70 + recency=0.05 * 30 (no date → old)
 
 def test_score_question_three_matches_nonzero():
     """3 keyword matches returns nonzero score."""
@@ -264,6 +264,99 @@ def test_search_quora_passes_date_field():
     assert len(results) == 1
     assert "date" in results[0]
     assert results[0]["date"] == "3 days ago"
+
+
+def test_score_recent_question_higher_than_old():
+    """A recent question should score higher than an identical old one."""
+    recent = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=2)
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=120)
+    score_recent = _score_question(
+        "What is the best project management saas tool for teams",
+        "project management saas tool remote teams",
+        "what is the best project management saas tool",
+        posted_at=recent,
+    )
+    score_old = _score_question(
+        "What is the best project management saas tool for teams",
+        "project management saas tool remote teams",
+        "what is the best project management saas tool",
+        posted_at=old,
+    )
+    assert score_recent > score_old
+
+
+def test_score_no_date_assumes_moderately_old():
+    """When posted_at is None (date unknown), score uses a penalty but not zero."""
+    score_with_date = _score_question(
+        "What is the best project management saas tool for teams",
+        "project management saas tool remote teams",
+        "what is the best project management saas tool",
+        posted_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=5),
+    )
+    score_no_date = _score_question(
+        "What is the best project management saas tool for teams",
+        "project management saas tool remote teams",
+        "what is the best project management saas tool",
+        posted_at=None,
+    )
+    assert score_no_date > 0
+    assert score_with_date > score_no_date
+
+
+def test_score_old_question_not_zero():
+    """Very old questions still get a non-zero score if relevant (evergreen content)."""
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=365)
+    score = _score_question(
+        "What is the best project management saas tool for teams",
+        "project management saas tool remote teams",
+        "what is the best project management saas tool",
+        posted_at=old,
+    )
+    assert score > 0
+
+
+@pytest.mark.asyncio
+async def test_scan_recent_question_scores_higher(tmp_db):
+    """A question with a recent date should get a higher relevance_score than one without."""
+    from sqlalchemy import select
+    from app.database import AsyncSessionLocal
+    from app.models import ContentOpportunity
+    from app.services import quora_scanner_service
+
+    brand_id = await tmp_db.create_brand_with_prompt(
+        name="RecencyTest",
+        prompt="what is the best project management saas tool",
+    )
+    questions = [
+        {
+            "url": "https://www.quora.com/What-is-the-best-project-management-saas-tool-recent",
+            "title": "What is the best project management saas tool for teams",
+            "snippet": "project management saas tool remote teams",
+            "date": "2 days ago",
+        },
+        {
+            "url": "https://www.quora.com/What-is-the-best-project-management-saas-tool-old",
+            "title": "What is the best project management saas tool for teams",
+            "snippet": "project management saas tool remote teams",
+            "date": "",
+        },
+    ]
+    with patch("app.services.quora_search_service.search_quora_questions", return_value=questions):
+        await quora_scanner_service.scan_brand_opportunities(brand_id)
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(
+            select(ContentOpportunity).where(
+                ContentOpportunity.brand_id == brand_id,
+                ContentOpportunity.platform == "quora",
+            )
+        )
+        opps = {o.thread_url: o for o in result.scalars().all()}
+
+    recent = opps["https://www.quora.com/What-is-the-best-project-management-saas-tool-recent"]
+    old = opps["https://www.quora.com/What-is-the-best-project-management-saas-tool-old"]
+    assert recent.relevance_score > old.relevance_score
+    assert recent.posted_at is not None
 
 
 @pytest.mark.asyncio

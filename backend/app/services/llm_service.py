@@ -32,6 +32,11 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 # run to fail while early ones succeed, producing inconsistent report data.
 _PERPLEXITY_SEM = asyncio.Semaphore(2)
 
+# Claude rate-limit guard: Anthropic enforces 50 req/min on claude-haiku.
+# With ~2-3s per call, 3 concurrent slots ≈ 60-90 req/min at peak.
+# Combined with the 65s retry backoff for 429s, this keeps us under the limit.
+_CLAUDE_SEM = asyncio.Semaphore(3)
+
 # Human-readable display names for each model (used in placeholder messages)
 _MODEL_DISPLAY_NAMES = {
     "chatgpt": "ChatGPT",
@@ -135,11 +140,12 @@ async def _query_claude(prompt: str, brand_name: str) -> dict:
         import anthropic
 
         client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
-        response = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=1024,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        async with _CLAUDE_SEM:
+            response = await client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=1024,
+                messages=[{"role": "user", "content": prompt}],
+            )
         latency_ms = int((time.monotonic() - start) * 1000)
         text = response.content[0].text if response.content else None
         if not text:
@@ -224,11 +230,11 @@ async def _query_gemini(prompt: str, brand_name: str) -> dict:
         # loop free.
         # Enable Google Search grounding so Gemini queries the live web index —
         # the closest available API proxy for Google AI brand mentions in real-time.
-        # Try both proto paths; SDK 0.8.x may expose GoogleSearch as an inner
-        # class of Tool or as a top-level proto type depending on build.
+        # SDK 0.8.x uses GoogleSearchRetrieval; older/newer builds may use GoogleSearch.
         gen_kwargs: dict = {}
         _grounding_ok = False
         for _build_tool in (
+            lambda: genai.protos.Tool(google_search_retrieval=genai.protos.GoogleSearchRetrieval()),
             lambda: genai.protos.Tool(google_search=genai.protos.Tool.GoogleSearch()),
             lambda: genai.protos.Tool(google_search=genai.protos.GoogleSearch()),
         ):
@@ -236,7 +242,7 @@ async def _query_gemini(prompt: str, brand_name: str) -> dict:
                 gen_kwargs = {"tools": [_build_tool()]}
                 _grounding_ok = True
                 break
-            except AttributeError:
+            except (AttributeError, TypeError):
                 continue
         if not _grounding_ok:
             logger.warning(

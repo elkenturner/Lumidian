@@ -59,6 +59,7 @@ import {
 } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
 import PlatformIcon from '@/components/PlatformIcon';
+import ProgressBanner from '@/components/ProgressBanner';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -1615,8 +1616,9 @@ export default function ContentHubPage() {
     contentSettings.filter((s) => !s.enabled).map((s) => s.platform)
   );
 
-  // Active platform filter (All / specific platform)
-  const [platformFilter, setPlatformFilter] = useState<string>('all');
+  // Active platform filters (independent per tab)
+  const [draftPlatformFilter, setDraftPlatformFilter] = useState<string>('all');
+  const [oppPlatformFilter, setOppPlatformFilter] = useState<string>('all');
 
   // Tab counts (using filtered draft/scheduled counts)
   const tabCounts = {
@@ -1685,6 +1687,8 @@ export default function ContentHubPage() {
       generatePollRef.current = null;
       setGenerating(false);
     }
+    setDraftPlatformFilter('all');
+    setOppPlatformFilter('all');
     loadAbortRef.current?.abort();
     const controller = new AbortController();
     loadAbortRef.current = controller;
@@ -1982,11 +1986,11 @@ export default function ContentHubPage() {
   // Filter drafts to only show enabled platforms + active platform filter
   const oppScanEnabled = !_disabledPlatforms.has('reddit') || !_disabledPlatforms.has('quora');
   const visibleDraftItems = draftItems.filter(
-    (d) => !_disabledPlatforms.has(d.platform) && (platformFilter === 'all' || d.platform === platformFilter)
+    (d) => !_disabledPlatforms.has(d.platform) && (draftPlatformFilter === 'all' || d.platform === draftPlatformFilter)
   );
   const visibleScheduledItems = scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform));
   const visibleOpportunities = opportunities.filter(
-    (o) => platformFilter === 'all' || o.platform === platformFilter
+    (o) => oppPlatformFilter === 'all' || o.platform === oppPlatformFilter
   );
 
   const TABS: { key: QueueTab; label: string }[] = [
@@ -2006,20 +2010,30 @@ export default function ContentHubPage() {
       )}
 
       {/* Progress banner for regeneration actions */}
-      {(generating || scanning) && (
-        <div className="mb-6 bg-[rgba(99,102,241,0.12)] border border-[rgba(99,102,241,0.3)] rounded-xl px-5 py-4 flex items-center gap-3">
-          <Loader2 size={18} className="animate-spin text-[var(--accent-foreground)]" />
-          <div>
-            <p className="text-sm font-medium text-[var(--text-primary)]">
-              {generating ? 'Generating fresh drafts…' : 'Scanning Reddit & Quora…'}
-            </p>
-            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-              {generating
-                ? 'Creating up to 20 AI drafts. This takes about 30 seconds.'
-                : 'Finding new content opportunities. This takes about 15 seconds.'}
-            </p>
-          </div>
-        </div>
+      {generating && (
+        <ProgressBanner
+          title="Generating fresh drafts…"
+          subtitle="Creating up to 20 AI drafts. This takes about 30 seconds."
+          items={[
+            { key: 'reddit', label: 'Reddit', icon: <PlatformIcon platform="reddit" size={18} color="#FF4500" />, color: '#FF4500' },
+            { key: 'quora', label: 'Quora', icon: <PlatformIcon platform="quora" size={18} color="#B92B27" />, color: '#B92B27' },
+            { key: 'linkedin', label: 'LinkedIn', icon: <PlatformIcon platform="linkedin" size={18} color="#0A66C2" />, color: '#0A66C2' },
+            { key: 'x', label: 'X', icon: <PlatformIcon platform="x" size={18} color="var(--text-secondary)" />, color: 'var(--text-secondary)' },
+            { key: 'medium', label: 'Medium', icon: <PlatformIcon platform="medium" size={18} color="var(--text-secondary)" />, color: 'var(--text-secondary)' },
+          ]}
+        />
+      )}
+      {scanning && (
+        <ProgressBanner
+          title="Scanning for new opportunities…"
+          subtitle="Finding new content opportunities. This takes about 15 seconds."
+          items={[
+            { key: 'reddit', label: 'Reddit', icon: <PlatformIcon platform="reddit" size={18} color="#FF4500" />, color: '#FF4500' },
+            { key: 'quora', label: 'Quora', icon: <PlatformIcon platform="quora" size={18} color="#B92B27" />, color: '#B92B27' },
+            { key: 'linkedin', label: 'LinkedIn', icon: <PlatformIcon platform="linkedin" size={18} color="#0A66C2" />, color: '#0A66C2' },
+            { key: 'x', label: 'X', icon: <PlatformIcon platform="x" size={18} color="var(--text-secondary)" />, color: 'var(--text-secondary)' },
+          ]}
+        />
       )}
 
       {/* Request Draft modal */}
@@ -2425,8 +2439,10 @@ export default function ContentHubPage() {
               visibleOpportunities={visibleOpportunities}
               brandProfile={brandProfile}
               brandPrompts={brandPrompts}
-              platformFilter={platformFilter}
-              setPlatformFilter={setPlatformFilter}
+              draftPlatformFilter={draftPlatformFilter}
+              setDraftPlatformFilter={setDraftPlatformFilter}
+              oppPlatformFilter={oppPlatformFilter}
+              setOppPlatformFilter={setOppPlatformFilter}
               _disabledPlatforms={_disabledPlatforms}
               draftStatus={draftStatus}
               generating={generating}
@@ -2613,8 +2629,14 @@ export default function ContentHubPage() {
                   return (
                     <button
                       key={key}
-                      onClick={() => !isLocked && handleTogglePlatform(key, !enabled)}
-                      disabled={isLocked}
+                      onClick={() => {
+                        if (isLocked) {
+                          setUpgradeModalReason(`${key === 'linkedin' ? 'LinkedIn' : 'X'} scanning and drafting requires a Pro subscription.`);
+                          setUpgradeModalOpen(true);
+                          return;
+                        }
+                        handleTogglePlatform(key, !enabled);
+                      }}
                       className={`w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg transition-all duration-200 group ${
                         isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[rgba(255,255,255,0.03)]'
                       }`}

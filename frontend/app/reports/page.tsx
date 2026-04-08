@@ -14,6 +14,8 @@ import {
   ArrowUpDown,
   Plus,
 } from 'lucide-react';
+import ProgressBanner from '@/components/ProgressBanner';
+import ModelIcon from '@/components/ModelIcon';
 import {
   getBrand,
   getTrends,
@@ -364,10 +366,16 @@ export default function ReportsPage() {
           {/* Trend chart */}
           <div className="mb-4">
             {loading ? (
-              <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-6 shadow-[0_4px_24px_rgba(0,0,0,0.30)] animate-pulse">
-                <div className="h-5 bg-[rgba(255,255,255,0.06)] rounded w-32 mb-4" />
-                <div className="h-48 bg-[rgba(255,255,255,0.06)] rounded-lg" />
-              </div>
+              <ProgressBanner
+                title="Loading report data…"
+                subtitle="Pulling latest visibility scores across models."
+                items={[
+                  { key: 'chatgpt', label: 'ChatGPT', icon: <ModelIcon model="chatgpt" size={18} />, color: 'var(--color-chatgpt)' },
+                  { key: 'claude', label: 'Claude', icon: <ModelIcon model="claude" size={18} />, color: 'var(--color-claude)' },
+                  { key: 'perplexity', label: 'Perplexity', icon: <ModelIcon model="perplexity" size={18} />, color: 'var(--color-perplexity)' },
+                  { key: 'gemini', label: 'Gemini', icon: <ModelIcon model="gemini" size={18} />, color: 'var(--color-gemini)' },
+                ]}
+              />
             ) : (
               <TrendChart data={trends} />
             )}

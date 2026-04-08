@@ -719,6 +719,9 @@ async def update_brand_settings(
     """Update content settings for a specific platform for a brand."""
     await get_brand_for_user(brand_id, db, user)
 
+    from app.dependencies import require_pro_for_platform
+    require_pro_for_platform(platform, user)
+
     if platform not in SUPPORTED_PLATFORMS:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

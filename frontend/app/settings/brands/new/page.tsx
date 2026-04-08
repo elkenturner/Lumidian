@@ -264,28 +264,26 @@ export default function NewBrandPage() {
 
               {/* Starter brand */}
               {(() => {
-                const locked = !isOnPaidPlan || standardRemaining === 0;
-                const lockedMsg = !isOnPaidPlan
-                  ? 'Requires a paid plan.'
-                  : 'No slots remaining — upgrade to add more.';
+                const needsUpgrade = !isOnPaidPlan;
+                const noSlots = !needsUpgrade && standardRemaining === 0;
+                const locked = needsUpgrade || noSlots;
                 return (
                   <button
-                    onClick={() => !locked && handleSelectType('starter')}
-                    disabled={locked}
-                    className={`w-full text-left rounded-xl p-4 border transition-all ${
+                    onClick={() => locked ? router.push('/settings/billing') : handleSelectType('starter')}
+                    className={`w-full text-left rounded-xl p-4 border transition-all cursor-pointer ${
                       locked
-                        ? 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] opacity-50 cursor-not-allowed'
-                        : 'border-[var(--accent-muted)] bg-[var(--accent-muted)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)] cursor-pointer'
+                        ? 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--accent-muted)] hover:bg-[rgba(255,255,255,0.05)]'
+                        : 'border-[var(--accent-muted)] bg-[var(--accent-muted)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)]'
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="w-9 h-9 rounded-lg bg-[var(--accent-muted)] border border-[var(--accent-muted)] flex items-center justify-center flex-shrink-0">
-                        {locked ? <Lock size={15} className="text-[var(--text-faint)]" /> : <BarChart2 size={15} className="text-[var(--accent-foreground)]" />}
+                        <BarChart2 size={15} className="text-[var(--accent-foreground)]" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
                           <p className="text-sm font-semibold text-[var(--text-primary)]">Starter brand</p>
-                          {!isAdmin && billing && (
+                          {!isAdmin && billing && !needsUpgrade && (
                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                               standardRemaining === 0
                                 ? 'bg-[var(--danger)]/12 text-[var(--danger)]'
@@ -298,7 +296,8 @@ export default function NewBrandPage() {
                         <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                           Up to <span className="text-[var(--text-secondary)] font-medium">25 prompts</span>. Full tracking with visibility reports and content drafts.
                         </p>
-                        {locked && <p className="text-[11px] text-[var(--danger)] mt-1.5">{lockedMsg}</p>}
+                        {needsUpgrade && <p className="text-[11px] text-[var(--accent-foreground)] mt-1.5">Requires a paid plan — <span className="underline">upgrade</span></p>}
+                        {noSlots && <p className="text-[11px] text-[var(--danger)] mt-1.5">No slots remaining — <span className="underline">upgrade to add more</span></p>}
                       </div>
                     </div>
                   </button>
@@ -307,23 +306,21 @@ export default function NewBrandPage() {
 
               {/* Pro brand */}
               {(() => {
-                const locked = !isPro || standardRemaining === 0;
-                const lockedMsg = !isPro
-                  ? 'Requires a Pro plan.'
-                  : 'No slots remaining — upgrade to add more.';
+                const needsUpgrade = !isPro;
+                const noSlots = !needsUpgrade && standardRemaining === 0;
+                const locked = needsUpgrade || noSlots;
                 return (
                   <button
-                    onClick={() => !locked && handleSelectType('pro')}
-                    disabled={locked}
-                    className={`w-full text-left rounded-xl p-4 border transition-all ${
+                    onClick={() => locked ? router.push('/settings/billing') : handleSelectType('pro')}
+                    className={`w-full text-left rounded-xl p-4 border transition-all cursor-pointer ${
                       locked
-                        ? 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] opacity-50 cursor-not-allowed'
-                        : 'border-[var(--color-perplexity)]/28 bg-[var(--color-perplexity)]/6 hover:border-[var(--accent)] hover:bg-[var(--color-perplexity)]/12 cursor-pointer'
+                        ? 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--color-perplexity)]/28 hover:bg-[rgba(255,255,255,0.05)]'
+                        : 'border-[var(--color-perplexity)]/28 bg-[var(--color-perplexity)]/6 hover:border-[var(--accent)] hover:bg-[var(--color-perplexity)]/12'
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <div className="w-9 h-9 rounded-lg bg-[var(--color-perplexity)]/12 border border-[var(--color-perplexity)]/28 flex items-center justify-center flex-shrink-0">
-                        {locked ? <Lock size={15} className="text-[var(--text-faint)]" /> : <Zap size={15} className="text-[var(--accent-foreground)]" />}
+                        <Zap size={15} className="text-[var(--accent-foreground)]" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
@@ -348,7 +345,8 @@ export default function NewBrandPage() {
                         <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                           Up to <span className="text-[var(--text-secondary)] font-medium">100 prompts</span>. Deeper tracking with higher prompt coverage.
                         </p>
-                        {locked && <p className="text-[11px] text-[var(--danger)] mt-1.5">{lockedMsg}</p>}
+                        {needsUpgrade && <p className="text-[11px] text-[var(--accent-foreground)] mt-1.5">Requires a Pro plan — <span className="underline">upgrade</span></p>}
+                        {noSlots && <p className="text-[11px] text-[var(--danger)] mt-1.5">No slots remaining — <span className="underline">upgrade to add more</span></p>}
                       </div>
                     </div>
                   </button>

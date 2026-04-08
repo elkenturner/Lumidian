@@ -5,9 +5,11 @@ Re-exports public API from submodules.
 from .client import call_claude
 from .pipeline import (
     clean_wiki_text,
+    enforce_x_char_limit,
     estimate_visibility_impact,
     extract_title_and_body,
     parse_wikipedia_draft,
+    parse_x_thread,
     remove_hedging,
 )
 from .platforms import (
@@ -27,4 +29,5 @@ __all__ = [
     "call_claude",
     "remove_hedging", "clean_wiki_text", "parse_wikipedia_draft",
     "extract_title_and_body", "estimate_visibility_impact",
+    "enforce_x_char_limit", "parse_x_thread",
 ]

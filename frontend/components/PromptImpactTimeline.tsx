@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   ComposedChart,
   Area,
@@ -9,17 +9,28 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ReferenceLine,
   ResponsiveContainer,
+  Customized,
 } from 'recharts';
 import { format } from 'date-fns';
+import { ChevronDown, X } from 'lucide-react';
 import { MODEL_ORDER, getModelConfig } from '@/lib/constants/models';
 import { parseUTCISO } from '@/lib/utils/formatting';
-import type { PromptTimelinePoint, ContentEventItem } from '@/lib/api';
+import type { PromptTimelinePoint, ContentEventItem, PromptDraftSnapshot } from '@/lib/api';
+
+interface DraftMarkerInfo {
+  draftId: number;
+  platform: string;
+}
+
+interface ExpandedDraftData {
+  drafts: PromptDraftSnapshot[];
+}
 
 interface PromptImpactTimelineProps {
   timeline: PromptTimelinePoint[];
   contentEvents: ContentEventItem[];
+  drafts?: PromptDraftSnapshot[];
   height?: number;
 }
 
@@ -28,10 +39,19 @@ type Timeframe = '7d' | '30d' | '90d' | 'all';
 export default function PromptImpactTimeline({
   timeline,
   contentEvents,
+  drafts = [],
   height = 320,
 }: PromptImpactTimelineProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>('90d');
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
+  const [expandedDraft, setExpandedDraft] = useState<ExpandedDraftData | null>(null);
+
+  // Map draft_id to draft data for click expansion
+  const draftsById = useMemo(() => {
+    const map = new Map<number, PromptDraftSnapshot>();
+    drafts.filter((d) => d.status === 'posted').forEach((d) => map.set(d.id, d));
+    return map;
+  }, [drafts]);
 
   const filteredData = useMemo(() => {
     const now = Date.now();
@@ -57,11 +77,12 @@ export default function PromptImpactTimeline({
       }));
   }, [timeline, timeframe]);
 
-  // Map content events to nearest timeline index for ReferenceLine
-  const draftMarkers = useMemo(() => {
-    return contentEvents
+  // Build marker index: map data index → array of drafts (supports multiple per day)
+  const markersByIndex = useMemo(() => {
+    const map = new Map<number, DraftMarkerInfo[]>();
+    contentEvents
       .filter((e) => e.event_type === 'draft_posted')
-      .map((e) => {
+      .forEach((e) => {
         const eventTime = parseUTCISO(e.created_at).getTime();
         let closestIdx = 0;
         let closestDist = Infinity;
@@ -73,13 +94,130 @@ export default function PromptImpactTimeline({
             closestIdx = i;
           }
         });
-        return {
-          ...e,
-          dataIndex: closestIdx,
-          label: (e.data as Record<string, unknown>)?.platform as string || 'Draft',
-        };
+        const eventData = e.data as Record<string, unknown>;
+        const platform = (eventData?.platform as string) || 'Draft';
+        const draftId = (eventData?.draft_id as number) || 0;
+        const existing = map.get(closestIdx) || [];
+        existing.push({ draftId, platform });
+        map.set(closestIdx, existing);
       });
+    return map;
   }, [contentEvents, filteredData]);
+
+  const hasMarkers = markersByIndex.size > 0;
+
+  // Handle diamond click — find matching drafts and show expansion panel
+  const handleMarkerClick = useCallback((dataIndex: number) => {
+    const markers = markersByIndex.get(dataIndex);
+    if (!markers) return;
+    const matchedDrafts = markers
+      .map((m) => draftsById.get(m.draftId))
+      .filter((d): d is PromptDraftSnapshot => d != null);
+    if (matchedDrafts.length === 0) return;
+    setExpandedDraft((prev) =>
+      prev && prev.drafts[0]?.id === matchedDrafts[0]?.id ? null : { drafts: matchedDrafts },
+    );
+  }, [markersByIndex, draftsById]);
+
+  // Custom renderer that draws diamonds pinned to the top of the chart
+  // Uses Recharts internal xAxisMap/yAxisMap props passed to Customized components
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const DraftMarkerLayer = useCallback((props: any) => {
+    const { xAxisMap, yAxisMap } = props;
+    if (!xAxisMap || !yAxisMap || !hasMarkers) return null;
+
+    const xAxis = Object.values(xAxisMap)[0] as Record<string, unknown>;
+    const yAxis = Object.values(yAxisMap)[0] as Record<string, unknown>;
+    if (!xAxis || !yAxis) return null;
+
+    const axisX = (xAxis.x as number) ?? 0;
+    const axisWidth = (xAxis.width as number) ?? 0;
+    const axisY = (yAxis.y as number) ?? 0;
+    const axisHeight = (yAxis.height as number) ?? 0;
+    const dataLen = filteredData.length;
+    if (dataLen === 0) return null;
+
+    return (
+      <g>
+        {Array.from(markersByIndex.entries()).map(([idx, markers]) => {
+          const cx = dataLen === 1
+            ? axisX + axisWidth / 2
+            : axisX + (idx / (dataLen - 1)) * axisWidth;
+          const diamondY = axisY + 6;
+          const bottomY = axisY + axisHeight;
+          const size = 7;
+          const count = markers.length;
+          const label = count > 1
+            ? `${count} posts`
+            : markers[0].platform;
+
+          return (
+            <g
+              key={idx}
+              style={{ cursor: 'pointer' }}
+              onClick={() => handleMarkerClick(idx)}
+            >
+              {/* Hit area */}
+              <rect
+                x={cx - 20}
+                y={diamondY - 20}
+                width={40}
+                height={40}
+                fill="transparent"
+              />
+              {/* Dashed line from diamond down to baseline */}
+              <line
+                x1={cx}
+                y1={diamondY + size + 2}
+                x2={cx}
+                y2={bottomY}
+                stroke="var(--accent-light)"
+                strokeWidth={1}
+                strokeDasharray="4 3"
+                strokeOpacity={0.4}
+              />
+              {/* Diamond */}
+              <polygon
+                points={`${cx},${diamondY - size} ${cx + size},${diamondY} ${cx},${diamondY + size} ${cx - size},${diamondY}`}
+                fill="var(--accent-light)"
+                stroke="rgba(255,255,255,0.8)"
+                strokeWidth={1.2}
+                style={{ filter: 'drop-shadow(0 0 4px var(--accent))' }}
+              />
+              {/* Count badge for multiple posts */}
+              {count > 1 && (
+                <>
+                  <circle cx={cx + size + 4} cy={diamondY - size + 1} r={6} fill="var(--accent)" />
+                  <text
+                    x={cx + size + 4}
+                    y={diamondY - size + 4.5}
+                    textAnchor="middle"
+                    fill="white"
+                    fontSize={8}
+                    fontWeight={700}
+                  >
+                    {count}
+                  </text>
+                </>
+              )}
+              {/* Platform label below diamond */}
+              <text
+                x={cx}
+                y={diamondY + size + 14}
+                textAnchor="middle"
+                fill="var(--accent-light)"
+                fontSize={9}
+                fontWeight={500}
+                opacity={0.8}
+              >
+                {label}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  }, [filteredData, markersByIndex, hasMarkers, handleMarkerClick]);
 
   const toggleModel = (model: string) => {
     setHiddenModels((prev) => {
@@ -140,7 +278,7 @@ export default function PromptImpactTimeline({
         }}
       >
         <ResponsiveContainer width="100%" height={height}>
-          <ComposedChart data={filteredData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+          <ComposedChart data={filteredData} margin={{ top: 24, right: 10, left: -10, bottom: 0 }}>
             <defs>
               <linearGradient id="overallGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.2} />
@@ -192,22 +330,8 @@ export default function PromptImpactTimeline({
               }}
             />
 
-            {/* Draft posted markers */}
-            {draftMarkers.map((marker) => (
-              <ReferenceLine
-                key={marker.id}
-                x={filteredData[marker.dataIndex]?.date}
-                stroke="var(--accent-light)"
-                strokeDasharray="3 3"
-                strokeOpacity={0.6}
-                label={{
-                  value: '\u25C6',
-                  position: 'top',
-                  fill: 'var(--accent-light)',
-                  fontSize: 10,
-                }}
-              />
-            ))}
+            {/* Draft posted markers — diamonds pinned to top */}
+            <Customized component={DraftMarkerLayer} />
 
             {/* Overall area */}
             <Area
@@ -243,6 +367,31 @@ export default function PromptImpactTimeline({
         </ResponsiveContainer>
       </div>
 
+      {/* Expanded draft panel — appears below chart when a marker is clicked */}
+      {expandedDraft && (
+        <div
+          className="mt-3 rounded-lg border border-[var(--border-subtle)] overflow-hidden"
+          style={{ background: 'rgba(99,102,241,0.04)' }}
+        >
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border-subtle)]">
+            <span className="text-[11px] font-semibold text-[var(--accent-light)]">
+              {expandedDraft.drafts.length === 1 ? 'Posted Draft' : `${expandedDraft.drafts.length} Posted Drafts`}
+            </span>
+            <button
+              onClick={() => setExpandedDraft(null)}
+              className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <div className="flex flex-col">
+            {expandedDraft.drafts.map((draft, i) => (
+              <DraftExpansionRow key={draft.id} draft={draft} showBorder={i > 0} />
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-3 mt-3 px-1">
         <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
@@ -273,11 +422,57 @@ export default function PromptImpactTimeline({
             </button>
           );
         })}
-        <div className="flex items-center gap-1.5 text-[11px] text-[var(--accent-light)]">
-          <span style={{ fontSize: 10 }}>{'\u25C6'}</span>
-          Draft posted
-        </div>
+        {hasMarkers && (
+          <div className="flex items-center gap-1.5 text-[11px] text-[var(--accent-light)]">
+            <span style={{ fontSize: 10 }}>{'\u25C6'}</span>
+            Draft posted
+          </div>
+        )}
       </div>
+    </div>
+  );
+}
+
+/** Expandable row showing a single posted draft */
+function DraftExpansionRow({ draft, showBorder }: { draft: PromptDraftSnapshot; showBorder: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className={showBorder ? 'border-t border-[var(--border-subtle)]' : ''}>
+      <button
+        className="w-full px-4 py-2.5 flex items-center gap-3 hover:bg-[rgba(255,255,255,0.02)] transition-colors text-left"
+        onClick={() => setExpanded(!expanded)}
+      >
+        <span className="text-[11px] font-medium text-[var(--text-primary)] capitalize">
+          {draft.platform}
+        </span>
+        {draft.posted_at && (
+          <span className="text-[10px] text-[var(--text-faint)]">
+            {format(parseUTCISO(draft.posted_at), 'MMM d, yyyy')}
+          </span>
+        )}
+        {draft.score_snapshot.delta != null && draft.score_snapshot.delta !== 0 && (
+          <span
+            className="text-[10px] font-bold"
+            style={{
+              color: draft.score_snapshot.delta > 0 ? 'var(--success)' : 'var(--danger)',
+            }}
+          >
+            {draft.score_snapshot.delta > 0 ? '+' : ''}{Math.round(draft.score_snapshot.delta)}pp
+          </span>
+        )}
+        <ChevronDown
+          size={12}
+          className={`ml-auto text-[var(--text-faint)] transition-transform ${expanded ? 'rotate-180' : ''}`}
+        />
+      </button>
+      {expanded && draft.content_preview && (
+        <div className="px-4 py-3 border-t border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)]">
+          <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+            {draft.content_preview}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

@@ -30,7 +30,6 @@ def evaluate_heuristics(
     insights.extend(_check_model_gap(prompt_id, current_scores))
     insights.extend(_check_score_dropping(prompt_id, score_history))
     insights.extend(_check_inactive_prompt(prompt_id, content_events, drafts_posted))
-    insights.extend(_check_model_responding(prompt_id, score_history, content_events))
     return insights
 
 
@@ -95,12 +94,3 @@ def _check_inactive_prompt(
     return []
 
 
-def _check_model_responding(
-    prompt_id: int, score_history: list[dict], content_events: list[dict]
-) -> list[dict]:
-    """Fire when a model score improved >=10pp and there was a recent draft_posted event.
-    Simplified version — checks overall trend after any content event."""
-    draft_events = [e for e in content_events if e.get("event_type") == "draft_posted"]
-    if not draft_events or len(score_history) < 2:
-        return []
-    return []

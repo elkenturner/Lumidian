@@ -2,9 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ChevronDown, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
-import { parseUTCISO } from '@/lib/utils/formatting';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import {
   getPromptDetail,
   PromptDetailData,
@@ -24,7 +22,6 @@ export default function PromptDetailPage() {
 
   const [data, setData] = useState<PromptDetailData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [expandedDraftId, setExpandedDraftId] = useState<number | null>(null);
 
   useEffect(() => {
     document.title = 'Prompt Detail — Lumidian';
@@ -136,65 +133,9 @@ export default function PromptDetailPage() {
         <PromptImpactTimeline
           timeline={data.timeline}
           contentEvents={data.content_events}
+          drafts={data.drafts}
         />
       </div>
-
-      {/* Posted Content */}
-      {data.drafts.filter((d) => d.status === 'posted').length > 0 && (
-        <div className="card p-5 mb-6">
-          <h3 className="text-[13px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">
-            Posted Content
-          </h3>
-          <div className="flex flex-col gap-2">
-            {data.drafts
-              .filter((d) => d.status === 'posted')
-              .map((draft) => {
-                const isExpanded = expandedDraftId === draft.id;
-                return (
-                  <div
-                    key={draft.id}
-                    className="rounded-lg border border-[var(--border-subtle)] overflow-hidden"
-                  >
-                    <button
-                      className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[rgba(255,255,255,0.02)] transition-colors text-left"
-                      onClick={() => setExpandedDraftId(isExpanded ? null : draft.id)}
-                    >
-                      <span className="text-xs font-medium text-[var(--text-primary)] capitalize">
-                        {draft.platform}
-                      </span>
-                      {draft.posted_at && (
-                        <span className="text-[10px] text-[var(--text-muted)]">
-                          {format(parseUTCISO(draft.posted_at), 'MMM d, yyyy')}
-                        </span>
-                      )}
-                      {draft.score_snapshot.delta != null && (
-                        <span
-                          className="text-[10px] font-bold"
-                          style={{
-                            color: draft.score_snapshot.delta > 0 ? 'var(--success)' : draft.score_snapshot.delta < 0 ? 'var(--danger)' : 'var(--text-faint)',
-                          }}
-                        >
-                          {draft.score_snapshot.delta > 0 ? '+' : ''}{Math.round(draft.score_snapshot.delta)}pp
-                        </span>
-                      )}
-                      <ChevronDown
-                        size={12}
-                        className={`ml-auto text-[var(--text-faint)] transition-transform ${isExpanded ? 'rotate-180' : ''}`}
-                      />
-                    </button>
-                    {isExpanded && draft.content_preview && (
-                      <div className="px-4 py-3 border-t border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)]">
-                        <p className="text-xs text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
-                          {draft.content_preview}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-          </div>
-        </div>
-      )}
 
       {/* Insights */}
       <div className="card p-5 mb-6">

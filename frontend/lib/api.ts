@@ -1311,26 +1311,6 @@ export interface PromptDetailData {
   recent_responses: PromptRecentResponseData[];
 }
 
-export interface PromptOverviewItem {
-  prompt_id: number;
-  prompt_text: string;
-  current_overall: number;
-  trend: 'improving' | 'declining' | 'stable';
-  sparkline: number[];
-  model_scores: Record<string, number>;
-  drafts_posted: number;
-  last_draft_at: string | null;
-  has_recent_content_event: boolean;
-}
-
-export interface PromptsOverviewData {
-  prompts: PromptOverviewItem[];
-}
-
-export async function getPromptsOverview(brandId: number): Promise<PromptsOverviewData> {
-  return dedupedGet<PromptsOverviewData>(`/results/${brandId}/prompts/overview`);
-}
-
 export async function getPromptTimeline(brandId: number, promptId: number, days?: number): Promise<PromptTimelineData> {
   const params = days ? { days } : undefined;
   return dedupedGet<PromptTimelineData>(`/results/${brandId}/prompt/${promptId}/timeline`, params);

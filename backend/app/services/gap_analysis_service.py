@@ -35,7 +35,7 @@ from app.models import (
 
 logger = logging.getLogger(__name__)
 
-PLATFORMS = ["reddit", "quora", "medium", "wikipedia"]
+PLATFORMS = ["reddit", "quora", "medium", "wikipedia", "linkedin", "x"]
 GAP_THRESHOLD = 50.0  # visibility below this triggers a gap
 
 

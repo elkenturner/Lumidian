@@ -23,7 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_brand_active
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, is_pro_only_platform, require_brand_active
 from app.models import Brand, ContentOpportunity, Prompt
 from app.schemas import ContentDraftSchema, ContentOpportunitySchema
 
@@ -63,7 +63,7 @@ async def list_opportunities(
     opp_status: str | None = Query(None, alias="status", description="Filter by status: new, drafted, dismissed"),
     limit: int = Query(20, ge=1, le=200),
 ):
-    """List content opportunities (Reddit/Quora threads) for a brand."""
+    """List content opportunities for a brand, balanced across platforms."""
     await get_brand_for_user(brand_id, db, user)
 
     stmt = (
@@ -73,26 +73,56 @@ async def list_opportunities(
     if opp_status is not None:
         stmt = stmt.where(ContentOpportunity.status == opp_status)
     else:
-        # Default: only show new ones
         stmt = stmt.where(ContentOpportunity.status == "new")
 
     stmt = stmt.order_by(
         ContentOpportunity.relevance_score.desc(),
         ContentOpportunity.created_at.desc(),
-    ).limit(limit)
-
+    )
     result = await db.execute(stmt)
-    opps = list(result.scalars().all())
+    all_opps = list(result.scalars().all())
+
+    # Filter out Pro-only platforms for non-Pro users
+    user_tier = getattr(user, "subscription_tier", None)
+    is_admin = getattr(user, "is_admin", False)
+    if not is_admin and user_tier != "pro":
+        all_opps = [o for o in all_opps if not is_pro_only_platform(o.platform)]
+
+    # Balanced interleaving: distribute evenly across platforms
+    from collections import defaultdict
+    by_platform: dict[str, list] = defaultdict(list)
+    for opp in all_opps:
+        by_platform[opp.platform].append(opp)
+
+    n_platforms = len(by_platform)
+    if n_platforms == 0:
+        interleaved = []
+    else:
+        interleaved = []
+        platform_iters = {
+            p: iter(opps) for p, opps in by_platform.items()
+        }
+        exhausted = set()
+        while len(interleaved) < limit and len(exhausted) < n_platforms:
+            for p in list(by_platform.keys()):
+                if p in exhausted:
+                    continue
+                try:
+                    interleaved.append(next(platform_iters[p]))
+                except StopIteration:
+                    exhausted.add(p)
+                if len(interleaved) >= limit:
+                    break
 
     # Bulk load prompt texts
-    prompt_ids = list({o.prompt_id for o in opps if o.prompt_id})
+    prompt_ids = list({o.prompt_id for o in interleaved if o.prompt_id})
     prompt_text_map: dict[int, str] = {}
     if prompt_ids:
         pr_result = await db.execute(select(Prompt).where(Prompt.id.in_(prompt_ids)))
         for p in pr_result.scalars().all():
             prompt_text_map[p.id] = p.text
 
-    return [_enrich_opportunity(o, prompt_text_map) for o in opps]
+    return [_enrich_opportunity(o, prompt_text_map) for o in interleaved]
 
 
 @router.delete("/{opportunity_id}/dismiss", status_code=status.HTTP_204_NO_CONTENT)
@@ -118,6 +148,8 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     from app.services.drafting_service import generate_opportunity_draft
 
     opp = await _get_opportunity_or_404(db, opportunity_id)
+    from app.dependencies import require_pro_for_platform
+    require_pro_for_platform(opp.platform, user)
     brand = await get_brand_for_user(opp.brand_id, db, user)
 
     # Check if brand is paused
@@ -156,6 +188,17 @@ async def _scan_and_log(brand_id: int) -> None:
     from app.services import linkedin_scanner_service, quora_scanner_service, reddit_scanner_service, x_scanner_service
     from app.services.analytics_service import log_event
 
+    scan_tasks = [
+        reddit_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
+        quora_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
+    ]
+
+    # LinkedIn/X scanners only for Pro users
+    if user_tier == "pro":
+        from app.services import linkedin_scanner_service, x_scanner_service
+        scan_tasks.append(linkedin_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True))
+        scan_tasks.append(x_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True))
+
     try:
         await asyncio.gather(
             reddit_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
@@ -173,7 +216,6 @@ async def _scan_and_log(brand_id: int) -> None:
         cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=10)
         async with AsyncSessionLocal() as db:
             from sqlalchemy import select as _select
-
             from app.models import ContentOpportunity
             result = await db.execute(
                 _select(ContentOpportunity).where(
@@ -271,14 +313,14 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     # Add to scanning state before starting so the banner appears immediately
     _state.scanning_brands.add(brand_id)
 
-    async def _scan_with_state_cleanup(bid: int):
+    async def _scan_with_state_cleanup(bid: int, tier: str | None):
         try:
-            await _scan_and_log(bid)
+            await _scan_and_log(bid, user_tier=tier)
         finally:
             _state.scanning_brands.discard(bid)
 
     asyncio.create_task(
-        _scan_with_state_cleanup(brand_id),
+        _scan_with_state_cleanup(brand_id, user.subscription_tier),
         name=f"reddit-scan-{brand_id}",
     )
     return {"message": f"Scan started for brand {brand_id}", "brand_id": brand_id}

@@ -61,7 +61,7 @@ export default function BrandAvatar({
             e.nativeEvent.stopImmediatePropagation();
             setImgState((s) => s === 'clearbit' ? 'google' : 'initial');
           }}
-          style={{ width: size, height: size, objectFit: 'contain' }}
+          style={{ width: size, height: size, objectFit: 'contain', background: '#fff', borderRadius: 4 }}
         />
       ) : (
         <span className={textClassName} style={textStyle}>

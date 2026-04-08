@@ -413,6 +413,7 @@ async def get_prompt_timeline(
     events_result = await db.execute(
         select(ContentEvent)
         .where(
+            ContentEvent.brand_id == brand_id,
             ContentEvent.prompt_id == prompt_id,
             ContentEvent.event_type.in_(["draft_posted", "content_correlated"]),
             ContentEvent.created_at >= cutoff,
@@ -437,7 +438,7 @@ async def get_prompt_timeline(
     # Draft count
     draft_count_result = await db.execute(
         select(ContentDraft)
-        .where(ContentDraft.prompt_id == prompt_id, ContentDraft.status == "posted")
+        .where(ContentDraft.brand_id == brand_id, ContentDraft.prompt_id == prompt_id, ContentDraft.status == "posted")
         .order_by(ContentDraft.posted_at.desc())
     )
     posted_drafts = draft_count_result.scalars().all()
@@ -511,7 +512,7 @@ async def get_prompt_detail(
     # Content events
     events_result = await db.execute(
         select(ContentEvent)
-        .where(ContentEvent.prompt_id == prompt_id, ContentEvent.created_at >= cutoff)
+        .where(ContentEvent.brand_id == brand_id, ContentEvent.prompt_id == prompt_id, ContentEvent.created_at >= cutoff)
         .order_by(ContentEvent.created_at.asc())
     )
     events = events_result.scalars().all()
@@ -526,7 +527,7 @@ async def get_prompt_detail(
     # Drafts targeting this prompt
     drafts_result = await db.execute(
         select(ContentDraft)
-        .where(ContentDraft.prompt_id == prompt_id)
+        .where(ContentDraft.brand_id == brand_id, ContentDraft.prompt_id == prompt_id)
         .order_by(ContentDraft.created_at.desc())
     )
     drafts = drafts_result.scalars().all()

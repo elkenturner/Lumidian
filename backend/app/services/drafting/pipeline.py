@@ -142,7 +142,7 @@ def extract_title_and_body(raw_text: str, platform: str) -> tuple[str | None, st
     The prompt instructs Claude to separate title from body with a blank line.
     Strips markdown bold (**) and 'Title:' prefix if Claude adds them anyway.
     """
-    title_platforms = {"reddit", "medium"}
+    title_platforms = {"reddit", "medium", "linkedin_article"}
     text = raw_text.strip()
     if platform not in title_platforms:
         return None, text
@@ -193,3 +193,72 @@ def estimate_visibility_impact(
     platform_bonus = 20.0 if recent_posts == 0 else max(0.0, 10.0 - recent_posts * 2)
     raw = gap_score * 0.8 + platform_bonus
     return round(min(100.0, raw), 1)
+
+
+# ── X character enforcement ───────────────────────────────────────────────────
+
+_X_CHAR_LIMIT = 280
+_X_PLATFORMS = {"x_post", "x_reply", "x_thread"}
+_THREAD_NUM_RE = _re.compile(r"^(\d+)/\s*")
+
+
+def parse_x_thread(raw_text: str) -> list[str]:
+    """
+    Split raw thread output into individual tweets by N/ numbering.
+    Returns a list of tweet strings. If no numbering is found, returns the
+    whole text as a single-element list.
+    """
+    lines = raw_text.strip().splitlines()
+    tweets: list[str] = []
+    current: list[str] = []
+
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if _THREAD_NUM_RE.match(stripped):
+            if current:
+                tweets.append(" ".join(current).strip())
+                current = []
+            # Normalize spacing after the number prefix
+            normalized = _THREAD_NUM_RE.sub(
+                lambda m: f"{m.group(1)}/ ", stripped
+            )
+            current.append(normalized.strip())
+        else:
+            current.append(stripped)
+
+    if current:
+        tweets.append(" ".join(current).strip())
+
+    return tweets if tweets else [raw_text.strip()]
+
+
+def _trim_to_limit(text: str, limit: int = _X_CHAR_LIMIT) -> str:
+    """Trim text to fit within character limit at a word boundary."""
+    if len(text) <= limit:
+        return text
+    # Leave room for ellipsis
+    truncated = text[: limit - 3]
+    last_space = truncated.rfind(" ")
+    if last_space > limit // 2:
+        truncated = truncated[:last_space]
+    return truncated.rstrip() + "..."
+
+
+def enforce_x_char_limit(text: str, platform: str) -> str:
+    """
+    Enforce the 280-character limit for X platforms.
+    - x_post / x_reply: trim the whole text.
+    - x_thread: parse into tweets, trim each individually, rejoin.
+    - Other platforms: return unchanged.
+    """
+    if platform not in _X_PLATFORMS:
+        return text
+
+    if platform == "x_thread":
+        tweets = parse_x_thread(text)
+        trimmed = [_trim_to_limit(t) for t in tweets]
+        return "\n".join(trimmed)
+
+    return _trim_to_limit(text)

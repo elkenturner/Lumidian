@@ -262,9 +262,19 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                           <p className={`text-[12px] font-medium truncate leading-tight ${isActive ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>
                             {brand.name}
                           </p>
-                          {brand.brand_type === 'pitch' && (
-                            <p className="text-[10px] text-[var(--warning)] leading-tight">Pitch brand</p>
-                          )}
+                          <p className={`text-[10px] leading-tight ${
+                            brand.brand_type === 'pitch'
+                              ? 'text-[var(--warning)]'
+                              : (user?.subscription_tier === 'pro' || user?.is_admin)
+                                ? 'text-[var(--accent-foreground)]'
+                                : 'text-[var(--text-faint)]'
+                          }`}>
+                            {brand.brand_type === 'pitch'
+                              ? 'Pitch'
+                              : (user?.subscription_tier === 'pro' || user?.is_admin)
+                                ? 'Pro'
+                                : 'Starter'}
+                          </p>
                         </div>
                         {isActive && <Check size={12} className="flex-shrink-0 text-[var(--accent)]" />}
                       </button>

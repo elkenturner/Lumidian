@@ -1616,8 +1616,9 @@ export default function ContentHubPage() {
     contentSettings.filter((s) => !s.enabled).map((s) => s.platform)
   );
 
-  // Active platform filter (All / specific platform)
-  const [platformFilter, setPlatformFilter] = useState<string>('all');
+  // Active platform filters (independent per tab)
+  const [draftPlatformFilter, setDraftPlatformFilter] = useState<string>('all');
+  const [oppPlatformFilter, setOppPlatformFilter] = useState<string>('all');
 
   // Tab counts (using filtered draft/scheduled counts)
   const tabCounts = {
@@ -1686,6 +1687,8 @@ export default function ContentHubPage() {
       generatePollRef.current = null;
       setGenerating(false);
     }
+    setDraftPlatformFilter('all');
+    setOppPlatformFilter('all');
     loadAbortRef.current?.abort();
     const controller = new AbortController();
     loadAbortRef.current = controller;
@@ -1983,11 +1986,11 @@ export default function ContentHubPage() {
   // Filter drafts to only show enabled platforms + active platform filter
   const oppScanEnabled = !_disabledPlatforms.has('reddit') || !_disabledPlatforms.has('quora');
   const visibleDraftItems = draftItems.filter(
-    (d) => !_disabledPlatforms.has(d.platform) && (platformFilter === 'all' || d.platform === platformFilter)
+    (d) => !_disabledPlatforms.has(d.platform) && (draftPlatformFilter === 'all' || d.platform === draftPlatformFilter)
   );
   const visibleScheduledItems = scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform));
   const visibleOpportunities = opportunities.filter(
-    (o) => platformFilter === 'all' || o.platform === platformFilter
+    (o) => oppPlatformFilter === 'all' || o.platform === oppPlatformFilter
   );
 
   const TABS: { key: QueueTab; label: string }[] = [
@@ -2436,8 +2439,10 @@ export default function ContentHubPage() {
               visibleOpportunities={visibleOpportunities}
               brandProfile={brandProfile}
               brandPrompts={brandPrompts}
-              platformFilter={platformFilter}
-              setPlatformFilter={setPlatformFilter}
+              draftPlatformFilter={draftPlatformFilter}
+              setDraftPlatformFilter={setDraftPlatformFilter}
+              oppPlatformFilter={oppPlatformFilter}
+              setOppPlatformFilter={setOppPlatformFilter}
               _disabledPlatforms={_disabledPlatforms}
               draftStatus={draftStatus}
               generating={generating}

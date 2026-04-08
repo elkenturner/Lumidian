@@ -64,9 +64,11 @@ export interface ContentTabPanelsProps {
   // Profile / prompts
   brandProfile: BrandProfile | null;
   brandPrompts: Prompt[];
-  // Platform filter
-  platformFilter: string;
-  setPlatformFilter: (v: string) => void;
+  // Platform filters (independent per tab)
+  draftPlatformFilter: string;
+  setDraftPlatformFilter: (v: string) => void;
+  oppPlatformFilter: string;
+  setOppPlatformFilter: (v: string) => void;
   _disabledPlatforms: Set<string>;
   // Status
   draftStatus: DraftQueueStatus | null;
@@ -1765,8 +1767,8 @@ function EmptyState({
 
 function DraftsPanel(props: ContentTabPanelsProps) {
   const {
-    brands, selectedBrandId, draftItems, _disabledPlatforms, platformFilter,
-    setPlatformFilter, visibleDraftItems, pinnedDraftId, brandProfile, brandPrompts,
+    brands, selectedBrandId, draftItems, _disabledPlatforms, draftPlatformFilter,
+    setDraftPlatformFilter, visibleDraftItems, pinnedDraftId, brandProfile, brandPrompts,
     postedItems, draftStatus, generating, handleGenerateNow, handleApprove,
     handleDelete, handleSaved, setDraftItems, user, onRequestDraft,
   } = props;
@@ -1785,16 +1787,16 @@ function DraftsPanel(props: ContentTabPanelsProps) {
       {draftPlatforms.length >= 2 ? (
         <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 self-start">
           <button
-            onClick={() => setPlatformFilter('all')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+            onClick={() => setDraftPlatformFilter('all')}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${draftPlatformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
           >
             All
           </button>
           {draftPlatforms.map((p) => (
             <button
               key={p}
-              onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+              onClick={() => setDraftPlatformFilter(draftPlatformFilter === p ? 'all' : p)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${draftPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
             >
               {p}
             </button>
@@ -1819,9 +1821,9 @@ function DraftsPanel(props: ContentTabPanelsProps) {
         {filterBar}
         <EmptyState
           icon={<FileText size={48} className="text-[var(--accent-foreground)]" />}
-          title={platformFilter !== 'all' ? `No ${platformFilter} drafts` : 'No drafts yet'}
-          description={platformFilter !== 'all' ? 'Try switching to "All" or generate new drafts.' : 'Use "Regenerate Drafts" or request a custom draft to get started.'}
-          action={platformFilter === 'all' && (user?.subscription_tier || user?.is_admin) ? (() => {
+          title={draftPlatformFilter !== 'all' ? `No ${draftPlatformFilter} drafts` : 'No drafts yet'}
+          description={draftPlatformFilter !== 'all' ? 'Try switching to "All" or generate new drafts.' : 'Use "Regenerate Drafts" or request a custom draft to get started.'}
+          action={draftPlatformFilter === 'all' && (user?.subscription_tier || user?.is_admin) ? (() => {
             const cooldownLabel = generateAvailableLabel(draftStatus?.next_generate_at ?? null);
             const onCooldown = !!cooldownLabel;
             return (
@@ -1918,7 +1920,7 @@ function ScheduledPanel(props: ContentTabPanelsProps) {
 
 function OpportunitiesPanel(props: ContentTabPanelsProps) {
   const {
-    opportunities, visibleOpportunities, platformFilter, setPlatformFilter,
+    opportunities, visibleOpportunities, oppPlatformFilter, setOppPlatformFilter,
     handleDraftOpportunity, handleDismissOpportunity, draftStatus, setOppHelpOpen,
   } = props;
 
@@ -1939,20 +1941,20 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
     </>
   );
 
-  const oppPlatforms = Array.from(new Set(opportunities.map((o) => o.platform))).sort();
+  const oppPlatforms = ['reddit', 'quora', 'linkedin', 'x'];
   const oppFilterBar = oppPlatforms.length >= 2 ? (
     <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 mb-4 self-start">
       <button
-        onClick={() => setPlatformFilter('all')}
-        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${platformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+        onClick={() => setOppPlatformFilter('all')}
+        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${oppPlatformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
       >
         All
       </button>
       {oppPlatforms.map((p) => (
         <button
           key={p}
-          onClick={() => setPlatformFilter(platformFilter === p ? 'all' : p)}
-          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${platformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+          onClick={() => setOppPlatformFilter(oppPlatformFilter === p ? 'all' : p)}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${oppPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
         >
           {p}
         </button>
@@ -1989,7 +1991,7 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
         {visibleOpportunities.length === 0 && (
           <EmptyState
             icon={<Radio size={26} className="text-[var(--accent-foreground)]" />}
-            title={`No ${platformFilter} opportunities`}
+            title={`No ${oppPlatformFilter} opportunities`}
             description='Try "All" or switch platform.'
           />
         )}

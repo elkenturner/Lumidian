@@ -90,6 +90,30 @@ PLATFORM_GUIDELINES: dict[str, dict] = {
         "disclaimer": None,
         "workflow": "article",
     },
+    "linkedin": {
+        "tone": "Professional, thought leadership, industry-focused",
+        "rules": [
+            "Write for a professional audience — avoid casual slang",
+            "Brand mentions must be contextual and earned, not promotional",
+            "Include concrete data or professional experience",
+            "Focus on industry insights, not product features",
+            "Original perspective required — not a rehash of common knowledge",
+        ],
+        "disclaimer": None,
+        "workflow": "article_or_post",
+    },
+    "x": {
+        "tone": "Sharp, concise, informative",
+        "rules": [
+            "Each tweet must be under 280 characters",
+            "Threads should have 4-8 tweets with a strong opening hook",
+            "Brand mentions must be natural and limited (1-2 per thread)",
+            "No engagement bait or empty calls to action",
+            "Substance over style — every tweet should deliver value",
+        ],
+        "disclaimer": None,
+        "workflow": "post_or_thread",
+    },
 }
 
 

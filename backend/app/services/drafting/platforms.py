@@ -190,6 +190,17 @@ PLATFORM_SPECS: dict[str, dict] = {
 ALL_PLATFORMS = list(PLATFORM_SPECS.keys())
 CONTENT_PLATFORMS = [p for p in ALL_PLATFORMS if p not in ("reddit_reply", "linkedin_reply", "x_reply")]
 
+# Base platform names stored in BrandContentSettings — map to their default
+# gap-draft variant so auto_draft_top_gaps can accept either form.
+_BASE_PLATFORM_MAP: dict[str, str] = {
+    "linkedin": "linkedin_article",
+    "x": "x_thread",
+}
+
+def resolve_platform_key(platform: str) -> str:
+    """Map a base platform name (e.g. 'linkedin') to its draft variant ('linkedin_article')."""
+    return _BASE_PLATFORM_MAP.get(platform, platform)
+
 # Per-platform max_tokens for gap drafts (opportunity reply uses its own limit)
 PLATFORM_MAX_TOKENS: dict[str, int] = {
     "reddit": 1200,

@@ -60900,3 +60900,833 @@ task: <Task pending name='reddit-scan-1' coro=<trigger_scan.<locals>._scan_with_
 2026-04-07 20:28:24  INFO      app.services.quora_scanner_service — Quora scanner: brand_id=1 clear_existing=True
 2026-04-07 20:28:24  INFO      app.services.quora_scanner_service — Quora scanner: 1 new opportunities for brand_id=1
 2026-04-07 20:28:25  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:15:52  INFO      app.main — CORS allowed origins: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-07 23:15:53  INFO      app.main — Google OAuth: GOOGLE_CLIENT_ID loaded (973043252641-8dj8lsg…)
+2026-04-07 23:15:53  INFO      app.main — Lumidian startup: creating database tables...
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS brand_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL UNIQUE REFERENCES brands(id) ON DELETE CASCADE,
+            company_description TEXT,
+            key_stats TEXT,
+            tone_of_voice TEXT,
+            what_not_to_say TEXT,
+            target_audience TEXT,
+            approved_language TEXT,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_opportunities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            platform TEXT NOT NULL DEFAULT 'reddit',
+            thread_url TEXT NOT NULL,
+            thread_title TEXT,
+            subreddit TEXT,
+            body_preview TEXT,
+            posted_at DATETIME,
+            relevance_score REAL NOT NULL DEFAULT 0.0,
+            prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL,
+            status TEXT NOT NULL DEFAULT 'new',
+            created_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_gaps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            model TEXT,
+            severity_score REAL NOT NULL DEFAULT 0.0,
+            opportunity_score REAL NOT NULL DEFAULT 0.0,
+            recency_score REAL NOT NULL DEFAULT 0.0,
+            gap_score REAL NOT NULL DEFAULT 0.0,
+            competitor_mentions TEXT,
+            platforms_lacking TEXT,
+            prompt_visibility REAL,
+            last_content_at DATETIME,
+            identified_at DATETIME,
+            created_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT,
+            google_id TEXT UNIQUE,
+            name TEXT,
+            subscription_tier TEXT,
+            subscription_status TEXT,
+            stripe_customer_id TEXT,
+            stripe_subscription_id TEXT,
+            is_admin INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS analytics_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            brand_id INTEGER REFERENCES brands(id) ON DELETE SET NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            data TEXT,
+            created_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: UPDATE brands SET user_id = (
+            SELECT id FROM users WHERE email = COALESCE(NULL, '') LIMIT 1
+        ) WHERE user_id IS NULL AND '' != ''
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token TEXT NOT NULL UNIQUE,
+            expires_at DATETIME NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS competitor_mentions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            competitor_id INTEGER NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id),
+            model TEXT NOT NULL,
+            run_number INTEGER NOT NULL,
+            mentioned INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_attribution (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content_post_id INTEGER NOT NULL REFERENCES content_posts(id) ON DELETE CASCADE,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id),
+            brand_id INTEGER NOT NULL REFERENCES brands(id),
+            visibility_before REAL,
+            visibility_after REAL,
+            improvement_pct REAL,
+            measured_at DATETIME NOT NULL,
+            created_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_attributions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            draft_id INTEGER NOT NULL REFERENCES content_drafts(id) ON DELETE CASCADE,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL,
+            posted_at DATETIME NOT NULL,
+            score_at_posting REAL,
+            current_score REAL,
+            delta REAL,
+            runs_since_posting INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS team_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            invited_email TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            invite_token TEXT NOT NULL UNIQUE,
+            invited_at DATETIME,
+            accepted_at DATETIME,
+            expires_at DATETIME NOT NULL
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_brand_status ON tracking_runs(brand_id, status, completed_at)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_id ON query_results(tracking_run_id)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_text ON query_results(tracking_run_id, response_text)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_opportunities_brand_status ON content_opportunities(brand_id, status)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT,
+            link TEXT,
+            read INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read, created_at)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_manual_daily ON tracking_runs(brand_id, run_type, created_at)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_drafts_source ON content_drafts(brand_id, source, created_at)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_drafts_brand_status ON content_drafts(brand_id, status)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_brand_completed ON tracking_runs(brand_id, completed_at DESC)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read) WHERE read = 0
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_gaps_brand ON content_gaps(brand_id, identified_at DESC)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_gaps_brand_score ON content_gaps(brand_id, gap_score DESC)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_opportunities_brand_platform_status ON content_opportunities(brand_id, platform, status)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: DROP INDEX IF EXISTS idx_query_results_run_text
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_created ON query_results(created_at DESC)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_created ON query_results(tracking_run_id, created_at DESC)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS prompt_run_scores (id INTEGER PRIMARY KEY, prompt_id INTEGER NOT NULL REFERENCES prompts(id) ON DELETE CASCADE, tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, model TEXT NOT NULL, score REAL NOT NULL, mentioned_count INTEGER NOT NULL, query_count INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(prompt_id, tracking_run_id, model))
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_prompt_run_scores_prompt_model ON prompt_run_scores(prompt_id, model, created_at)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_prompt_run_scores_brand ON prompt_run_scores(brand_id, created_at)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_events (id INTEGER PRIMARY KEY, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL, event_type TEXT NOT NULL, data TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_events_brand_type ON content_events(brand_id, event_type, created_at)
+2026-04-07 23:15:53  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_events_prompt ON content_events(prompt_id, created_at)
+2026-04-07 23:15:53  INFO      app.main — Database tables ready.
+2026-04-07 23:15:53  INFO      app.main — Starting background scheduler...
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Added job "Morning tracking sweep (08:00 UTC)" to job store "default"
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Added job "Reddit opportunity scanner (Monday 03:15 UTC)" to job store "default"
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Added job "Quora opportunity scanner (Monday 03:30 UTC)" to job store "default"
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Added job "Auto-draft scheduler (Monday 03:00 UTC)" to job store "default"
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Added job "Monthly website context refresh (04:00 UTC, day 1)" to job store "default"
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Added job "Daily SQLite backup (02:00 UTC)" to job store "default"
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Added job "Pitch brand expiry warnings & cleanup (06:00 UTC)" to job store "default"
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Added job "Visibility drop alerts (21:00 UTC)" to job store "default"
+2026-04-07 23:15:53  INFO      apscheduler.scheduler — Scheduler started
+2026-04-07 23:15:53  INFO      app.scheduler — Scheduler started. Jobs: ['morning_sweep', 'visibility_alerts', 'sqlite_backup', 'pitch_expiry', 'auto_draft', 'reddit_scanner', 'quora_scanner', 'website_context_refresh']
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:35  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:38  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:41  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:44  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:47  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:50  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:51  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:51  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:51  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:51  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:51  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:16:53  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:56  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:58  INFO      app.main — Lumidian shutdown: stopping scheduler...
+2026-04-07 23:16:58  INFO      app.scheduler — Scheduler stopped.
+2026-04-07 23:16:58  INFO      app.main — Scheduler stopped. Goodbye.
+2026-04-07 23:16:58  INFO      apscheduler.scheduler — Scheduler has been shut down
+2026-04-07 23:16:59  INFO      app.main — CORS allowed origins: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-07 23:16:59  INFO      app.main — Google OAuth: GOOGLE_CLIENT_ID loaded (973043252641-8dj8lsg…)
+2026-04-07 23:16:59  INFO      app.main — Lumidian startup: creating database tables...
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS brand_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL UNIQUE REFERENCES brands(id) ON DELETE CASCADE,
+            company_description TEXT,
+            key_stats TEXT,
+            tone_of_voice TEXT,
+            what_not_to_say TEXT,
+            target_audience TEXT,
+            approved_language TEXT,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_opportunities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            platform TEXT NOT NULL DEFAULT 'reddit',
+            thread_url TEXT NOT NULL,
+            thread_title TEXT,
+            subreddit TEXT,
+            body_preview TEXT,
+            posted_at DATETIME,
+            relevance_score REAL NOT NULL DEFAULT 0.0,
+            prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL,
+            status TEXT NOT NULL DEFAULT 'new',
+            created_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_gaps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            model TEXT,
+            severity_score REAL NOT NULL DEFAULT 0.0,
+            opportunity_score REAL NOT NULL DEFAULT 0.0,
+            recency_score REAL NOT NULL DEFAULT 0.0,
+            gap_score REAL NOT NULL DEFAULT 0.0,
+            competitor_mentions TEXT,
+            platforms_lacking TEXT,
+            prompt_visibility REAL,
+            last_content_at DATETIME,
+            identified_at DATETIME,
+            created_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT,
+            google_id TEXT UNIQUE,
+            name TEXT,
+            subscription_tier TEXT,
+            subscription_status TEXT,
+            stripe_customer_id TEXT,
+            stripe_subscription_id TEXT,
+            is_admin INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS analytics_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            brand_id INTEGER REFERENCES brands(id) ON DELETE SET NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            data TEXT,
+            created_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: UPDATE brands SET user_id = (
+            SELECT id FROM users WHERE email = COALESCE(NULL, '') LIMIT 1
+        ) WHERE user_id IS NULL AND '' != ''
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token TEXT NOT NULL UNIQUE,
+            expires_at DATETIME NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS competitor_mentions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            competitor_id INTEGER NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id),
+            model TEXT NOT NULL,
+            run_number INTEGER NOT NULL,
+            mentioned INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_attribution (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content_post_id INTEGER NOT NULL REFERENCES content_posts(id) ON DELETE CASCADE,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id),
+            brand_id INTEGER NOT NULL REFERENCES brands(id),
+            visibility_before REAL,
+            visibility_after REAL,
+            improvement_pct REAL,
+            measured_at DATETIME NOT NULL,
+            created_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_attributions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            draft_id INTEGER NOT NULL REFERENCES content_drafts(id) ON DELETE CASCADE,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL,
+            posted_at DATETIME NOT NULL,
+            score_at_posting REAL,
+            current_score REAL,
+            delta REAL,
+            runs_since_posting INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS team_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            invited_email TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            invite_token TEXT NOT NULL UNIQUE,
+            invited_at DATETIME,
+            accepted_at DATETIME,
+            expires_at DATETIME NOT NULL
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_brand_status ON tracking_runs(brand_id, status, completed_at)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_id ON query_results(tracking_run_id)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_text ON query_results(tracking_run_id, response_text)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_opportunities_brand_status ON content_opportunities(brand_id, status)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT,
+            link TEXT,
+            read INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read, created_at)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_manual_daily ON tracking_runs(brand_id, run_type, created_at)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_drafts_source ON content_drafts(brand_id, source, created_at)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_drafts_brand_status ON content_drafts(brand_id, status)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_brand_completed ON tracking_runs(brand_id, completed_at DESC)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read) WHERE read = 0
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_gaps_brand ON content_gaps(brand_id, identified_at DESC)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_gaps_brand_score ON content_gaps(brand_id, gap_score DESC)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_opportunities_brand_platform_status ON content_opportunities(brand_id, platform, status)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: DROP INDEX IF EXISTS idx_query_results_run_text
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_created ON query_results(created_at DESC)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_created ON query_results(tracking_run_id, created_at DESC)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS prompt_run_scores (id INTEGER PRIMARY KEY, prompt_id INTEGER NOT NULL REFERENCES prompts(id) ON DELETE CASCADE, tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, model TEXT NOT NULL, score REAL NOT NULL, mentioned_count INTEGER NOT NULL, query_count INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(prompt_id, tracking_run_id, model))
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_prompt_run_scores_prompt_model ON prompt_run_scores(prompt_id, model, created_at)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_prompt_run_scores_brand ON prompt_run_scores(brand_id, created_at)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_events (id INTEGER PRIMARY KEY, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL, event_type TEXT NOT NULL, data TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_events_brand_type ON content_events(brand_id, event_type, created_at)
+2026-04-07 23:16:59  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_events_prompt ON content_events(prompt_id, created_at)
+2026-04-07 23:16:59  INFO      app.main — Database tables ready.
+2026-04-07 23:16:59  INFO      app.main — Starting background scheduler...
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Added job "Morning tracking sweep (08:00 UTC)" to job store "default"
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Added job "Reddit opportunity scanner (Monday 03:15 UTC)" to job store "default"
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Added job "Quora opportunity scanner (Monday 03:30 UTC)" to job store "default"
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Added job "LinkedIn opportunity scanner (Monday 03:40 UTC)" to job store "default"
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Added job "X opportunity scanner (Monday 03:50 UTC)" to job store "default"
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Added job "Auto-draft scheduler (Monday 03:00 UTC)" to job store "default"
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Added job "Monthly website context refresh (04:00 UTC, day 1)" to job store "default"
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Added job "Daily SQLite backup (02:00 UTC)" to job store "default"
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Added job "Pitch brand expiry warnings & cleanup (06:00 UTC)" to job store "default"
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Added job "Visibility drop alerts (21:00 UTC)" to job store "default"
+2026-04-07 23:16:59  INFO      apscheduler.scheduler — Scheduler started
+2026-04-07 23:16:59  INFO      app.scheduler — Scheduler started. Jobs: ['morning_sweep', 'visibility_alerts', 'sqlite_backup', 'pitch_expiry', 'auto_draft', 'reddit_scanner', 'quora_scanner', 'linkedin_scanner', 'x_scanner', 'website_context_refresh']
+2026-04-07 23:16:59  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:16:59  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:16:59  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:17:00  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:00  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:17:00  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:00  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:17:00  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:00  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:17:00  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:00  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:00  INFO      app.dependencies — get_brand_for_user: brand_id=4, user.id=7, user.is_admin=True
+2026-04-07 23:17:00  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:17:00  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:17:00  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:17:00  INFO      app.dependencies — get_brand_for_user: admin bypass for user 7
+2026-04-07 23:17:02  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:05  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:08  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:11  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:14  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:17  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:20  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:23  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:26  INFO      app.main — Lumidian shutdown: stopping scheduler...
+2026-04-07 23:17:26  INFO      app.scheduler — Scheduler stopped.
+2026-04-07 23:17:26  INFO      app.main — Scheduler stopped. Goodbye.
+2026-04-07 23:17:26  INFO      apscheduler.scheduler — Scheduler has been shut down
+2026-04-07 23:17:27  INFO      app.main — CORS allowed origins: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-07 23:17:27  INFO      app.main — Google OAuth: GOOGLE_CLIENT_ID loaded (973043252641-8dj8lsg…)
+2026-04-07 23:17:27  INFO      app.main — Lumidian startup: creating database tables...
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS brand_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL UNIQUE REFERENCES brands(id) ON DELETE CASCADE,
+            company_description TEXT,
+            key_stats TEXT,
+            tone_of_voice TEXT,
+            what_not_to_say TEXT,
+            target_audience TEXT,
+            approved_language TEXT,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_opportunities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            platform TEXT NOT NULL DEFAULT 'reddit',
+            thread_url TEXT NOT NULL,
+            thread_title TEXT,
+            subreddit TEXT,
+            body_preview TEXT,
+            posted_at DATETIME,
+            relevance_score REAL NOT NULL DEFAULT 0.0,
+            prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL,
+            status TEXT NOT NULL DEFAULT 'new',
+            created_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_gaps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            model TEXT,
+            severity_score REAL NOT NULL DEFAULT 0.0,
+            opportunity_score REAL NOT NULL DEFAULT 0.0,
+            recency_score REAL NOT NULL DEFAULT 0.0,
+            gap_score REAL NOT NULL DEFAULT 0.0,
+            competitor_mentions TEXT,
+            platforms_lacking TEXT,
+            prompt_visibility REAL,
+            last_content_at DATETIME,
+            identified_at DATETIME,
+            created_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT,
+            google_id TEXT UNIQUE,
+            name TEXT,
+            subscription_tier TEXT,
+            subscription_status TEXT,
+            stripe_customer_id TEXT,
+            stripe_subscription_id TEXT,
+            is_admin INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS analytics_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            brand_id INTEGER REFERENCES brands(id) ON DELETE SET NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            data TEXT,
+            created_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: UPDATE brands SET user_id = (
+            SELECT id FROM users WHERE email = COALESCE(NULL, '') LIMIT 1
+        ) WHERE user_id IS NULL AND '' != ''
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token TEXT NOT NULL UNIQUE,
+            expires_at DATETIME NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS competitor_mentions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            competitor_id INTEGER NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id),
+            model TEXT NOT NULL,
+            run_number INTEGER NOT NULL,
+            mentioned INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_attribution (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content_post_id INTEGER NOT NULL REFERENCES content_posts(id) ON DELETE CASCADE,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id),
+            brand_id INTEGER NOT NULL REFERENCES brands(id),
+            visibility_before REAL,
+            visibility_after REAL,
+            improvement_pct REAL,
+            measured_at DATETIME NOT NULL,
+            created_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_attributions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            draft_id INTEGER NOT NULL REFERENCES content_drafts(id) ON DELETE CASCADE,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL,
+            posted_at DATETIME NOT NULL,
+            score_at_posting REAL,
+            current_score REAL,
+            delta REAL,
+            runs_since_posting INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS team_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            invited_email TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            invite_token TEXT NOT NULL UNIQUE,
+            invited_at DATETIME,
+            accepted_at DATETIME,
+            expires_at DATETIME NOT NULL
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_brand_status ON tracking_runs(brand_id, status, completed_at)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_id ON query_results(tracking_run_id)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_text ON query_results(tracking_run_id, response_text)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_opportunities_brand_status ON content_opportunities(brand_id, status)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT,
+            link TEXT,
+            read INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read, created_at)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_manual_daily ON tracking_runs(brand_id, run_type, created_at)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_drafts_source ON content_drafts(brand_id, source, created_at)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_drafts_brand_status ON content_drafts(brand_id, status)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_brand_completed ON tracking_runs(brand_id, completed_at DESC)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read) WHERE read = 0
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_gaps_brand ON content_gaps(brand_id, identified_at DESC)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_gaps_brand_score ON content_gaps(brand_id, gap_score DESC)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_opportunities_brand_platform_status ON content_opportunities(brand_id, platform, status)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: DROP INDEX IF EXISTS idx_query_results_run_text
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_created ON query_results(created_at DESC)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_created ON query_results(tracking_run_id, created_at DESC)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS prompt_run_scores (id INTEGER PRIMARY KEY, prompt_id INTEGER NOT NULL REFERENCES prompts(id) ON DELETE CASCADE, tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, model TEXT NOT NULL, score REAL NOT NULL, mentioned_count INTEGER NOT NULL, query_count INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(prompt_id, tracking_run_id, model))
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_prompt_run_scores_prompt_model ON prompt_run_scores(prompt_id, model, created_at)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_prompt_run_scores_brand ON prompt_run_scores(brand_id, created_at)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_events (id INTEGER PRIMARY KEY, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL, event_type TEXT NOT NULL, data TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_events_brand_type ON content_events(brand_id, event_type, created_at)
+2026-04-07 23:17:27  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_events_prompt ON content_events(prompt_id, created_at)
+2026-04-07 23:17:27  INFO      app.main — Database tables ready.
+2026-04-07 23:17:27  INFO      app.main — Starting background scheduler...
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Added job "Morning tracking sweep (08:00 UTC)" to job store "default"
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Added job "Reddit opportunity scanner (Monday 03:15 UTC)" to job store "default"
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Added job "Quora opportunity scanner (Monday 03:30 UTC)" to job store "default"
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Added job "LinkedIn opportunity scanner (Monday 03:40 UTC)" to job store "default"
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Added job "X opportunity scanner (Monday 03:50 UTC)" to job store "default"
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Added job "Auto-draft scheduler (Monday 03:00 UTC)" to job store "default"
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Added job "Monthly website context refresh (04:00 UTC, day 1)" to job store "default"
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Added job "Daily SQLite backup (02:00 UTC)" to job store "default"
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Added job "Pitch brand expiry warnings & cleanup (06:00 UTC)" to job store "default"
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Added job "Visibility drop alerts (21:00 UTC)" to job store "default"
+2026-04-07 23:17:27  INFO      apscheduler.scheduler — Scheduler started
+2026-04-07 23:17:27  INFO      app.scheduler — Scheduler started. Jobs: ['morning_sweep', 'visibility_alerts', 'sqlite_backup', 'pitch_expiry', 'auto_draft', 'reddit_scanner', 'quora_scanner', 'linkedin_scanner', 'x_scanner', 'website_context_refresh']
+2026-04-07 23:17:27  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:29  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:32  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:35  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True
+2026-04-07 23:17:36  INFO      app.main — Lumidian shutdown: stopping scheduler...
+2026-04-07 23:17:36  INFO      app.scheduler — Scheduler stopped.
+2026-04-07 23:17:36  INFO      app.main — Scheduler stopped. Goodbye.
+2026-04-07 23:17:36  INFO      apscheduler.scheduler — Scheduler has been shut down
+2026-04-07 23:17:37  INFO      app.main — CORS allowed origins: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://127.0.0.1:3000', 'http://127.0.0.1:3001', 'http://127.0.0.1:3002']
+2026-04-07 23:17:37  INFO      app.main — Google OAuth: GOOGLE_CLIENT_ID loaded (973043252641-8dj8lsg…)
+2026-04-07 23:17:37  INFO      app.main — Lumidian startup: creating database tables...
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS brand_profiles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL UNIQUE REFERENCES brands(id) ON DELETE CASCADE,
+            company_description TEXT,
+            key_stats TEXT,
+            tone_of_voice TEXT,
+            what_not_to_say TEXT,
+            target_audience TEXT,
+            approved_language TEXT,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_opportunities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            platform TEXT NOT NULL DEFAULT 'reddit',
+            thread_url TEXT NOT NULL,
+            thread_title TEXT,
+            subreddit TEXT,
+            body_preview TEXT,
+            posted_at DATETIME,
+            relevance_score REAL NOT NULL DEFAULT 0.0,
+            prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL,
+            status TEXT NOT NULL DEFAULT 'new',
+            created_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS system_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_gaps (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id) ON DELETE CASCADE,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            model TEXT,
+            severity_score REAL NOT NULL DEFAULT 0.0,
+            opportunity_score REAL NOT NULL DEFAULT 0.0,
+            recency_score REAL NOT NULL DEFAULT 0.0,
+            gap_score REAL NOT NULL DEFAULT 0.0,
+            competitor_mentions TEXT,
+            platforms_lacking TEXT,
+            prompt_visibility REAL,
+            last_content_at DATETIME,
+            identified_at DATETIME,
+            created_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            email TEXT NOT NULL UNIQUE,
+            password_hash TEXT,
+            google_id TEXT UNIQUE,
+            name TEXT,
+            subscription_tier TEXT,
+            subscription_status TEXT,
+            stripe_customer_id TEXT,
+            stripe_subscription_id TEXT,
+            is_admin INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS analytics_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL,
+            brand_id INTEGER REFERENCES brands(id) ON DELETE SET NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            data TEXT,
+            created_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: UPDATE brands SET user_id = (
+            SELECT id FROM users WHERE email = COALESCE(NULL, '') LIMIT 1
+        ) WHERE user_id IS NULL AND '' != ''
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS password_reset_tokens (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            token TEXT NOT NULL UNIQUE,
+            expires_at DATETIME NOT NULL,
+            used INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS competitor_mentions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            competitor_id INTEGER NOT NULL REFERENCES competitors(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id),
+            model TEXT NOT NULL,
+            run_number INTEGER NOT NULL,
+            mentioned INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_attribution (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            content_post_id INTEGER NOT NULL REFERENCES content_posts(id) ON DELETE CASCADE,
+            tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE,
+            prompt_id INTEGER NOT NULL REFERENCES prompts(id),
+            brand_id INTEGER NOT NULL REFERENCES brands(id),
+            visibility_before REAL,
+            visibility_after REAL,
+            improvement_pct REAL,
+            measured_at DATETIME NOT NULL,
+            created_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_attributions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            draft_id INTEGER NOT NULL REFERENCES content_drafts(id) ON DELETE CASCADE,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL,
+            posted_at DATETIME NOT NULL,
+            score_at_posting REAL,
+            current_score REAL,
+            delta REAL,
+            runs_since_posting INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME,
+            updated_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS team_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_owner_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            invited_email TEXT NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            role TEXT NOT NULL DEFAULT 'viewer',
+            invite_token TEXT NOT NULL UNIQUE,
+            invited_at DATETIME,
+            accepted_at DATETIME,
+            expires_at DATETIME NOT NULL
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_brand_status ON tracking_runs(brand_id, status, completed_at)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_id ON query_results(tracking_run_id)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_text ON query_results(tracking_run_id, response_text)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_opportunities_brand_status ON content_opportunities(brand_id, status)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            type TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT,
+            link TEXT,
+            read INTEGER NOT NULL DEFAULT 0,
+            created_at DATETIME
+        )
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, read, created_at)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_manual_daily ON tracking_runs(brand_id, run_type, created_at)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_drafts_source ON content_drafts(brand_id, source, created_at)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_drafts_brand_status ON content_drafts(brand_id, status)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_tracking_runs_brand_completed ON tracking_runs(brand_id, completed_at DESC)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, read) WHERE read = 0
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_gaps_brand ON content_gaps(brand_id, identified_at DESC)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_gaps_brand_score ON content_gaps(brand_id, gap_score DESC)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_opportunities_brand_platform_status ON content_opportunities(brand_id, platform, status)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: DROP INDEX IF EXISTS idx_query_results_run_text
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_created ON query_results(created_at DESC)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_query_results_run_created ON query_results(tracking_run_id, created_at DESC)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS prompt_run_scores (id INTEGER PRIMARY KEY, prompt_id INTEGER NOT NULL REFERENCES prompts(id) ON DELETE CASCADE, tracking_run_id INTEGER NOT NULL REFERENCES tracking_runs(id) ON DELETE CASCADE, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, model TEXT NOT NULL, score REAL NOT NULL, mentioned_count INTEGER NOT NULL, query_count INTEGER NOT NULL, created_at DATETIME DEFAULT CURRENT_TIMESTAMP, UNIQUE(prompt_id, tracking_run_id, model))
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_prompt_run_scores_prompt_model ON prompt_run_scores(prompt_id, model, created_at)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_prompt_run_scores_brand ON prompt_run_scores(brand_id, created_at)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE TABLE IF NOT EXISTS content_events (id INTEGER PRIMARY KEY, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL, event_type TEXT NOT NULL, data TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_events_brand_type ON content_events(brand_id, event_type, created_at)
+2026-04-07 23:17:37  INFO      app.database — Migration applied: CREATE INDEX IF NOT EXISTS idx_content_events_prompt ON content_events(prompt_id, created_at)
+2026-04-07 23:17:37  INFO      app.main — Database tables ready.
+2026-04-07 23:17:37  INFO      app.main — Starting background scheduler...
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Added job "Morning tracking sweep (08:00 UTC)" to job store "default"
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Added job "Reddit opportunity scanner (Monday 03:15 UTC)" to job store "default"
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Added job "Quora opportunity scanner (Monday 03:30 UTC)" to job store "default"
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Added job "LinkedIn opportunity scanner (Monday 03:40 UTC)" to job store "default"
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Added job "X opportunity scanner (Monday 03:50 UTC)" to job store "default"
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Added job "Auto-draft scheduler (Monday 03:00 UTC)" to job store "default"
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Added job "Monthly website context refresh (04:00 UTC, day 1)" to job store "default"
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Added job "Daily SQLite backup (02:00 UTC)" to job store "default"
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Added job "Pitch brand expiry warnings & cleanup (06:00 UTC)" to job store "default"
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Added job "Visibility drop alerts (21:00 UTC)" to job store "default"
+2026-04-07 23:17:37  INFO      apscheduler.scheduler — Scheduler started
+2026-04-07 23:17:37  INFO      app.scheduler — Scheduler started. Jobs: ['morning_sweep', 'visibility_alerts', 'sqlite_backup', 'pitch_expiry', 'auto_draft', 'reddit_scanner', 'quora_scanner', 'linkedin_scanner', 'x_scanner', 'website_context_refresh']
+2026-04-07 23:17:38  INFO      app.dependencies — get_current_user: id=7 email=ken@lumidian.ai is_admin=True is_paused=True email_verified=True

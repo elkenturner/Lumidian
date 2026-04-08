@@ -88,10 +88,107 @@ PLATFORM_SPECS: dict[str, dict] = {
         ),
         "posting_tip": "Post as a requested edit on the article's Talk page.",
     },
+    "linkedin_article": {
+        "format": "article",
+        "word_range": (600, 1500),
+        "tone": "long-form editorial, professional thought leadership — structured, authoritative, written by a respected industry voice",
+        "rules": [
+            "Open with a strong hook in the first 1-2 sentences — a surprising stat, a bold claim, or a direct answer to the target query",
+            "Structure with short focused sections separated by blank lines — headers are acceptable on LinkedIn Articles",
+            "The brand name must appear at least once, in a concrete context (a claim, an example, a data point) — not as a pitch",
+            "Every major claim must be backed by specific data, examples, or evidence from the Brand Profile",
+            "Where the Brand Profile includes publications, cite them naturally (e.g. 'A study published in...')",
+            "End with a specific, actionable takeaway — not a generic conclusion",
+            "No marketing language, no superlatives, no calls to action to 'follow' or 'like'",
+            "1-3 relevant hashtags at the very end, on their own line",
+            "Content must read as written by a knowledgeable industry professional, not by a brand spokesperson",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Publish as a LinkedIn Article (not a post) for Google indexation — articles are crawled by search engines.",
+    },
+    "linkedin_post": {
+        "format": "post",
+        "word_range": (80, 250),
+        "tone": "professional but conversational — like a respected colleague sharing an insight",
+        "rules": [
+            "Open with a direct statement or insight — no 'I've been thinking about...' preamble",
+            "Write in short paragraphs (1-3 sentences each) with line breaks between them — LinkedIn's feed rewards scannable formatting",
+            "Brand mention only if it directly supports the point being made — never forced",
+            "No clickbait hooks ('You won't believe...', 'Stop doing this...')",
+            "No excessive emoji or formatting gimmicks",
+            "1-3 relevant hashtags at the end",
+            "Contractions are fine — sound like a person, not a press release",
+            "No links unless essential to the point",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Post from your company's LinkedIn page or personal profile.",
+    },
+    "linkedin_reply": {
+        "format": "reply",
+        "word_range": (30, 100),
+        "tone": "direct, professional, helpful — like replying to a colleague's post",
+        "rules": [
+            "1-4 sentences only — replies should be direct and add concrete value",
+            "Address the specific point or question in the original post",
+            "Brand mention only if it directly answers the question being asked",
+            "No hedging, no preamble — get to the point immediately",
+            "No hashtags in replies",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Reply directly to the original post.",
+    },
+    "x_thread": {
+        "format": "thread",
+        "word_range": (150, 500),
+        "tone": "narrative, educational — each tweet stands alone but builds toward a point",
+        "rules": [
+            "Format each tweet on its own line, prefixed with 1/, 2/, etc.",
+            "Each tweet must be under 280 characters — hard limit, no exceptions",
+            "First tweet must hook — state a surprising fact, a bold claim, or a direct answer to the target query",
+            "Each tweet should make sense on its own if read in isolation",
+            "The brand name should appear naturally in one tweet (not the first) where it supports the argument",
+            "Last tweet should deliver a concrete takeaway or insight — not a generic wrap-up",
+            "0-1 hashtags total, in the last tweet only if natural",
+            "No 'Thread:' or 'A thread' prefix — just start with the content",
+            "Vary tweet length — mix short punchy tweets with longer substantive ones",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Post as a thread from your brand's X account.",
+    },
+    "x_post": {
+        "format": "post",
+        "word_range": (15, 65),
+        "tone": "concise, punchy, conversational — like a smart person tweeting an insight",
+        "rules": [
+            "Must be under 280 characters — hard limit",
+            "One clear idea per tweet — do not try to pack multiple points",
+            "Brand mention only if it is the most natural way to make the point",
+            "0-1 hashtags, only if genuinely relevant",
+            "No thread numbering (this is a standalone tweet)",
+            "Contractions, casual phrasing, and direct address are encouraged",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Post from your brand's X account.",
+    },
+    "x_reply": {
+        "format": "reply",
+        "word_range": (10, 50),
+        "tone": "direct, helpful, brief — like replying to someone's tweet",
+        "rules": [
+            "Must be under 280 characters — hard limit",
+            "1-2 sentences maximum — direct and to the point",
+            "Answer the specific question or add to the specific discussion",
+            "Brand mention only if it directly and obviously answers the question",
+            "No hashtags in replies",
+            "No hedging — be direct",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Reply directly to the tweet.",
+    },
 }
 
 ALL_PLATFORMS = list(PLATFORM_SPECS.keys())
-CONTENT_PLATFORMS = [p for p in ALL_PLATFORMS if p != "reddit_reply"]
+CONTENT_PLATFORMS = [p for p in ALL_PLATFORMS if p not in ("reddit_reply", "linkedin_reply", "x_reply")]
 
 # Per-platform max_tokens for gap drafts (opportunity reply uses its own limit)
 PLATFORM_MAX_TOKENS: dict[str, int] = {
@@ -99,6 +196,12 @@ PLATFORM_MAX_TOKENS: dict[str, int] = {
     "quora": 1800,
     "medium": 3500,
     "wikipedia": 900,  # handled in separate branch, kept here for reference
+    "linkedin_article": 3000,
+    "linkedin_post": 800,
+    "linkedin_reply": 400,
+    "x_thread": 1500,
+    "x_post": 300,
+    "x_reply": 200,
 }
 
 

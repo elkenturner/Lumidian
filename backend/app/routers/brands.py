@@ -346,6 +346,14 @@ async def update_brand(brand_id: int, payload: BrandUpdate, db: DbDep, user: Cur
 @router.delete("/{brand_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_brand(brand_id: int, db: DbDep, user: CurrentUser):
     brand = await _get_brand_or_404(db, brand_id, user)
+    # Clean up rows that reference this brand's prompts/runs without ondelete rules
+    prompt_ids = [p.id for p in brand.prompts] if brand.prompts else []
+    if prompt_ids:
+        await db.execute(sa_delete(ContentAttribution).where(ContentAttribution.prompt_id.in_(prompt_ids)))
+        await db.execute(sa_delete(CompetitorMention).where(CompetitorMention.prompt_id.in_(prompt_ids)))
+        await db.execute(sa_delete(QueryResult).where(QueryResult.prompt_id.in_(prompt_ids)))
+        await db.execute(sa_delete(ContentDraft).where(ContentDraft.prompt_id.in_(prompt_ids)))
+    await db.execute(sa_delete(ContentAttribution).where(ContentAttribution.brand_id == brand_id))
     await db.delete(brand)
     await db.commit()
 

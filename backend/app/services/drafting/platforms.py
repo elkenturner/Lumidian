@@ -88,6 +88,74 @@ PLATFORM_SPECS: dict[str, dict] = {
         ),
         "posting_tip": "Post as a requested edit on the article's Talk page.",
     },
+    "linkedin_article": {
+        "format": "long_form_article",
+        "word_range": (600, 1500),
+        "tone": "professional thought leadership — insightful but accessible, written for industry peers",
+        "rules": [
+            "Open with a compelling hook that frames a professional challenge or insight — not 'I've been thinking about...'",
+            "Structure with clear sections using bold text for section breaks (NOT markdown ## headers — LinkedIn renders bold, not headers)",
+            "Write as a credible industry voice sharing hard-won expertise, not a brand spokesperson",
+            "Include concrete data, examples, or case studies to support every major claim",
+            "The brand name MUST appear at least once, in a concrete professional context — a specific result, capability, or approach",
+            "End with a specific, actionable takeaway — not a generic call to action or 'what do you think?'",
+            "No hashtags in the body text — they go at the very end if anywhere",
+            "No promotional language, no superlatives, no buzzwords",
+            "Use line breaks between paragraphs for LinkedIn readability",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Publish as a LinkedIn article from your personal or company profile.",
+    },
+    "linkedin_post": {
+        "format": "short_form_post",
+        "word_range": (80, 250),
+        "tone": "conversational professional — direct, punchy, written for the LinkedIn feed",
+        "rules": [
+            "First line must hook — it's the only thing visible before 'see more'. Make it count.",
+            "Short paragraphs (1-2 sentences each) with line breaks between them for mobile readability",
+            "Write as a real person sharing a professional insight, not a corporate account",
+            "One clear idea per post — don't try to cover everything",
+            "Brand mention only if it fits naturally in a concrete claim or example",
+            "No hashtags in the body — add 3-5 relevant hashtags on the final line, separated from the body by a blank line",
+            "No emojis as bullet points. No emoji spam. One emoji maximum, only if natural.",
+            "No 'Agree?' or 'Thoughts?' engagement bait at the end",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Post directly to your LinkedIn feed.",
+    },
+    "x_thread": {
+        "format": "thread",
+        "word_range": (400, 800),
+        "tone": "sharp, direct, informative — written for fast-scrolling readers who reward substance",
+        "rules": [
+            "Format as a numbered thread: 1/ first tweet, 2/ second tweet, etc.",
+            "First tweet (1/) must be a strong standalone hook — it determines whether anyone reads the rest",
+            "Each tweet MUST be under 280 characters individually",
+            "4-8 tweets total. Each tweet should make one clear point.",
+            "Use short sentences. No filler. Every word earns its place.",
+            "Brand mention in 1-2 tweets maximum, in a concrete context (a specific result or approach)",
+            "Last tweet: a specific takeaway or insight, NOT 'follow for more' or 'RT if you agree'",
+            "No hashtags except optionally 1-2 on the final tweet",
+            "No emojis as bullet points or thread markers",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Post as a thread on X. The first tweet is your hook.",
+    },
+    "x_post": {
+        "format": "single_post",
+        "word_range": (20, 70),
+        "tone": "sharp, conversational, concise — every character counts",
+        "rules": [
+            "MUST be under 280 characters total — this is a hard limit",
+            "One clear idea or insight. No preamble.",
+            "Brand mention only if it's the direct point of the post",
+            "No hashtags unless they add genuine context (1 max)",
+            "No engagement bait ('RT if...', 'Like if...')",
+            "Write like a knowledgeable person posting, not a brand account",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Post directly to X.",
+    },
 }
 
 ALL_PLATFORMS = list(PLATFORM_SPECS.keys())
@@ -99,6 +167,10 @@ PLATFORM_MAX_TOKENS: dict[str, int] = {
     "quora": 1800,
     "medium": 3500,
     "wikipedia": 900,  # handled in separate branch, kept here for reference
+    "linkedin_article": 3000,
+    "linkedin_post": 800,
+    "x_thread": 2000,
+    "x_post": 300,
 }
 
 

@@ -877,7 +877,7 @@ function QuoraQuestionPicker({
 
 // ── Request Draft modal ───────────────────────────────────────────────────────
 
-const DRAFT_PLATFORMS = ['reddit', 'quora', 'medium', 'wikipedia'] as const;
+const DRAFT_PLATFORMS = ['reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'] as const;
 
 function RequestDraftModal({
   brandId,
@@ -890,13 +890,21 @@ function RequestDraftModal({
   onClose: () => void;
   onCreated: (draft: ContentDraft) => void;
 }) {
+  const { user } = useAuth();
   const [platform, setPlatform] = useState<string>('reddit');
+  const [subPlatform, setSubPlatform] = useState<string>('linkedin_article');
   const [promptId, setPromptId] = useState<number | ''>('');
   const [customTopic, setCustomTopic] = useState('');
   const [notes, setNotes] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedQuestion, setSelectedQuestion] = useState<QuoraQuestion | null>(null);
+
+  // When platform changes, set default sub-platform
+  useEffect(() => {
+    if (platform === 'linkedin') setSubPlatform('linkedin_article');
+    else if (platform === 'x') setSubPlatform('x_thread');
+  }, [platform]);
 
   async function handleSubmit() {
     setCreating(true);
@@ -907,8 +915,10 @@ function RequestDraftModal({
       if (notes.trim()) parts.push(`Additional notes: ${notes.trim()}`);
       const brief = parts.length > 0 ? parts.join('\n\n') : undefined;
 
+      const effectivePlatform = (platform === 'linkedin' || platform === 'x') ? subPlatform : platform;
+
       const draft = await generateDraft(brandId, {
-        platform,
+        platform: effectivePlatform,
         prompt_id: promptId !== '' ? (promptId as number) : undefined,
         custom_brief: brief,
         quora_question_url: selectedQuestion?.url,
@@ -945,21 +955,92 @@ function RequestDraftModal({
           {/* Platform */}
           <div>
             <label className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-wide mb-1.5 block">Platform</label>
-            <div className="grid grid-cols-4 gap-2">
-              {DRAFT_PLATFORMS.map((p) => (
+            <div className="grid grid-cols-3 gap-2">
+              {DRAFT_PLATFORMS.map((p) => {
+                const isPro = p === 'linkedin' || p === 'x';
+                const isLocked = isPro && user?.subscription_tier !== 'pro' && !user?.is_admin;
+                const label = p === 'linkedin' ? 'LinkedIn' : p === 'x' ? 'X' : p;
+
+                if (isLocked) {
+                  return (
+                    <button
+                      key={p}
+                      disabled
+                      className="py-2 rounded-lg text-xs font-medium capitalize transition-colors border bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.06)] text-[var(--text-faint)] opacity-50 cursor-not-allowed flex items-center justify-center gap-1.5"
+                    >
+                      {label}
+                      <span className="text-[9px] bg-[rgba(99,102,241,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
+                    </button>
+                  );
+                }
+
+                return (
+                  <button
+                    key={p}
+                    onClick={() => { setPlatform(p); if (p !== 'quora') setSelectedQuestion(null); }}
+                    className={`py-2 rounded-lg text-xs font-medium capitalize transition-colors border ${
+                      platform === p
+                        ? 'bg-[var(--accent)]/20 border-[var(--accent)]/50 text-[var(--accent)]'
+                        : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* LinkedIn sub-selector */}
+            {platform === 'linkedin' && (
+              <div className="flex gap-2 mt-2">
                 <button
-                  key={p}
-                  onClick={() => { setPlatform(p); if (p !== 'quora') setSelectedQuestion(null); }}
-                  className={`py-2 rounded-lg text-xs font-medium capitalize transition-colors border ${
-                    platform === p
-                      ? 'bg-[var(--accent)]/20 border-[var(--accent)]/50 text-[var(--accent)]'
-                      : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                  onClick={() => setSubPlatform('linkedin_article')}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    subPlatform === 'linkedin_article'
+                      ? 'border-[var(--accent)] bg-[rgba(99,102,241,0.1)] text-[var(--accent)]'
+                      : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
                   }`}
                 >
-                  {p}
+                  Article
                 </button>
-              ))}
-            </div>
+                <button
+                  onClick={() => setSubPlatform('linkedin_post')}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    subPlatform === 'linkedin_post'
+                      ? 'border-[var(--accent)] bg-[rgba(99,102,241,0.1)] text-[var(--accent)]'
+                      : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
+                  }`}
+                >
+                  Post
+                </button>
+              </div>
+            )}
+
+            {/* X sub-selector */}
+            {platform === 'x' && (
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => setSubPlatform('x_thread')}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    subPlatform === 'x_thread'
+                      ? 'border-[var(--accent)] bg-[rgba(99,102,241,0.1)] text-[var(--accent)]'
+                      : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
+                  }`}
+                >
+                  Thread
+                </button>
+                <button
+                  onClick={() => setSubPlatform('x_post')}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    subPlatform === 'x_post'
+                      ? 'border-[var(--accent)] bg-[rgba(99,102,241,0.1)] text-[var(--accent)]'
+                      : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
+                  }`}
+                >
+                  Post
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Target prompt */}

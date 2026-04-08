@@ -2629,8 +2629,14 @@ export default function ContentHubPage() {
                   return (
                     <button
                       key={key}
-                      onClick={() => !isLocked && handleTogglePlatform(key, !enabled)}
-                      disabled={isLocked}
+                      onClick={() => {
+                        if (isLocked) {
+                          setUpgradeModalReason(`${key === 'linkedin' ? 'LinkedIn' : 'X'} scanning and drafting requires a Pro subscription.`);
+                          setUpgradeModalOpen(true);
+                          return;
+                        }
+                        handleTogglePlatform(key, !enabled);
+                      }}
                       className={`w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg transition-all duration-200 group ${
                         isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[rgba(255,255,255,0.03)]'
                       }`}

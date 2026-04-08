@@ -379,7 +379,7 @@ async def get_prompt_timeline(
 
     cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=days)
 
-    # Get PromptRunScores
+    # Get PromptRunScores — fall back to QueryResult for pre-deploy runs
     scores_result = await db.execute(
         select(PromptRunScore)
         .join(TrackingRun, PromptRunScore.tracking_run_id == TrackingRun.id)
@@ -393,10 +393,41 @@ async def get_prompt_timeline(
 
     # Build timeline grouped by run
     runs_data: dict[int, dict] = {}
-    for s in scores:
-        if s.tracking_run_id not in runs_data:
-            runs_data[s.tracking_run_id] = {"scores": {}, "completed_at": s.created_at}
-        runs_data[s.tracking_run_id]["scores"][s.model] = s.score
+    if scores:
+        for s in scores:
+            if s.tracking_run_id not in runs_data:
+                runs_data[s.tracking_run_id] = {"scores": {}, "completed_at": s.created_at}
+            runs_data[s.tracking_run_id]["scores"][s.model] = s.score
+    else:
+        # Fallback: compute from QueryResult for runs without PromptRunScore rows
+        qr_result = await db.execute(
+            select(QueryResult)
+            .join(TrackingRun, QueryResult.tracking_run_id == TrackingRun.id)
+            .where(
+                QueryResult.prompt_id == prompt_id,
+                TrackingRun.brand_id == brand_id,
+                TrackingRun.status == "completed",
+                TrackingRun.completed_at >= cutoff,
+            )
+            .order_by(TrackingRun.completed_at.asc())
+        )
+        qr_rows = qr_result.scalars().all()
+        run_model_stats: dict[int, dict[str, dict]] = defaultdict(lambda: defaultdict(lambda: {"mentioned": 0, "total": 0}))
+        run_times: dict[int, datetime] = {}
+        for qr in qr_rows:
+            if qr.error:
+                continue
+            run_model_stats[qr.tracking_run_id][qr.model]["total"] += 1
+            if qr.mentioned:
+                run_model_stats[qr.tracking_run_id][qr.model]["mentioned"] += 1
+            run_times.setdefault(qr.tracking_run_id, qr.created_at)
+        for rid, models in run_model_stats.items():
+            model_scores = {}
+            for model, stats in models.items():
+                if stats["total"] > 0:
+                    model_scores[model] = round(stats["mentioned"] / stats["total"] * 100, 1)
+            if model_scores:
+                runs_data[rid] = {"scores": model_scores, "completed_at": run_times.get(rid)}
 
     timeline = []
     for run_id, rd in runs_data.items():
@@ -475,7 +506,7 @@ async def get_prompt_detail(
 
     cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=90)
 
-    # Scores
+    # Scores — prefer PromptRunScore, fall back to QueryResult for pre-deploy runs
     scores_result = await db.execute(
         select(PromptRunScore)
         .where(PromptRunScore.prompt_id == prompt_id, PromptRunScore.created_at >= cutoff)
@@ -484,10 +515,42 @@ async def get_prompt_detail(
     scores = scores_result.scalars().all()
 
     runs_data: dict[int, dict] = {}
-    for s in scores:
-        if s.tracking_run_id not in runs_data:
-            runs_data[s.tracking_run_id] = {"scores": {}, "completed_at": s.created_at}
-        runs_data[s.tracking_run_id]["scores"][s.model] = s.score
+    if scores:
+        for s in scores:
+            if s.tracking_run_id not in runs_data:
+                runs_data[s.tracking_run_id] = {"scores": {}, "completed_at": s.created_at}
+            runs_data[s.tracking_run_id]["scores"][s.model] = s.score
+    else:
+        # Fallback: compute from QueryResult for runs without PromptRunScore rows
+        qr_result = await db.execute(
+            select(QueryResult)
+            .join(TrackingRun, QueryResult.tracking_run_id == TrackingRun.id)
+            .where(
+                QueryResult.prompt_id == prompt_id,
+                TrackingRun.brand_id == brand_id,
+                TrackingRun.status == "completed",
+                TrackingRun.completed_at >= cutoff,
+            )
+            .order_by(TrackingRun.completed_at.asc())
+        )
+        qr_rows = qr_result.scalars().all()
+        # Group by run+model, compute mention rate
+        run_model_stats: dict[int, dict[str, dict]] = defaultdict(lambda: defaultdict(lambda: {"mentioned": 0, "total": 0}))
+        run_times: dict[int, datetime] = {}
+        for qr in qr_rows:
+            if qr.error:
+                continue
+            run_model_stats[qr.tracking_run_id][qr.model]["total"] += 1
+            if qr.mentioned:
+                run_model_stats[qr.tracking_run_id][qr.model]["mentioned"] += 1
+            run_times.setdefault(qr.tracking_run_id, qr.created_at)
+        for run_id, models in run_model_stats.items():
+            model_scores = {}
+            for model, stats in models.items():
+                if stats["total"] > 0:
+                    model_scores[model] = round(stats["mentioned"] / stats["total"] * 100, 1)
+            if model_scores:
+                runs_data[run_id] = {"scores": model_scores, "completed_at": run_times.get(run_id)}
 
     timeline = []
     for run_id, rd in runs_data.items():

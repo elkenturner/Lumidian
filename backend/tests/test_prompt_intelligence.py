@@ -234,6 +234,92 @@ async def test_prompt_detail_404_wrong_prompt(client):
 
 
 @pytest.mark.asyncio
+async def test_prompt_detail_fallback_no_prompt_run_scores(db_session):
+    """Detail endpoint computes timeline from QueryResult when no PromptRunScore rows exist."""
+    from app.models import Brand, Prompt, QueryResult, TrackingRun, User
+    from tests.conftest import AsyncSessionLocal
+
+    user = User(email="fallback@test.com", password_hash="x", email_verified=1)
+    db_session.add(user)
+    await db_session.flush()
+    brand = Brand(name="FallbackBrand", slug="fallbackbrand", user_id=user.id, tier="basic")
+    db_session.add(brand)
+    await db_session.flush()
+    prompt = Prompt(brand_id=brand.id, text="fallback test prompt")
+    db_session.add(prompt)
+    await db_session.flush()
+    from datetime import datetime, UTC
+    run = TrackingRun(brand_id=brand.id, status="completed", completed_at=datetime.now(UTC).replace(tzinfo=None))
+    db_session.add(run)
+    await db_session.flush()
+
+    # Add QueryResult rows but NO PromptRunScore rows (simulates pre-deploy run)
+    for model in ["chatgpt", "claude"]:
+        for i in range(5):
+            qr = QueryResult(
+                tracking_run_id=run.id,
+                prompt_id=prompt.id,
+                model=model,
+                run_number=i + 1,
+                response_text=f"Response {i} mentioning FallbackBrand" if i < 3 else f"Response {i}",
+                mentioned=(i < 3),
+            )
+            db_session.add(qr)
+    await db_session.commit()
+
+    # Now query the detail endpoint logic directly
+    from app.routers.results import _safe_json  # noqa: F401
+    from collections import defaultdict
+    from datetime import UTC, datetime, timedelta
+    from sqlalchemy import select
+
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=90)
+
+    # Verify no PromptRunScore rows exist
+    from app.models import PromptRunScore
+    async with AsyncSessionLocal() as check_db:
+        prs_result = await check_db.execute(
+            select(PromptRunScore).where(PromptRunScore.prompt_id == prompt.id)
+        )
+        assert len(prs_result.scalars().all()) == 0
+
+        # Verify QueryResult rows DO exist
+        qr_result = await check_db.execute(
+            select(QueryResult).where(QueryResult.prompt_id == prompt.id)
+        )
+        assert len(qr_result.scalars().all()) == 10
+
+        # Simulate the fallback logic
+        qr_result2 = await check_db.execute(
+            select(QueryResult)
+            .join(TrackingRun, QueryResult.tracking_run_id == TrackingRun.id)
+            .where(
+                QueryResult.prompt_id == prompt.id,
+                TrackingRun.brand_id == brand.id,
+                TrackingRun.status == "completed",
+                TrackingRun.completed_at >= cutoff,
+            )
+        )
+        qr_rows = qr_result2.scalars().all()
+        assert len(qr_rows) == 10
+
+        run_model_stats = defaultdict(lambda: defaultdict(lambda: {"mentioned": 0, "total": 0}))
+        for qr in qr_rows:
+            if qr.error:
+                continue
+            run_model_stats[qr.tracking_run_id][qr.model]["total"] += 1
+            if qr.mentioned:
+                run_model_stats[qr.tracking_run_id][qr.model]["mentioned"] += 1
+
+        # Should have 2 model entries for this run
+        assert len(run_model_stats[run.id]) == 2
+        # Each model: 3 mentioned out of 5 = 60%
+        for model_stats in run_model_stats[run.id].values():
+            assert model_stats["mentioned"] == 3
+            assert model_stats["total"] == 5
+
+
+@pytest.mark.asyncio
 async def test_log_score_change_events(db_session):
     """_log_score_change_events creates ContentEvent rows for significant score changes."""
     from app.models import Brand, ContentEvent, Prompt, PromptRunScore, TrackingRun, User

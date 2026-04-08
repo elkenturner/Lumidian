@@ -43,9 +43,11 @@ export default function VerifyEmailPage() {
     try {
       await authVerifyEmail(email, trimmed);
       setVerified(true);
-      // Backend sets auth cookies on verify — refresh auth state and go to dashboard
+      // Ensure session cookie is visible to refresh() before it checks document.cookie
+      // (Set-Cookie from the response may not be processed yet)
+      document.cookie = 'clarity_session=1; path=/; max-age=604800; samesite=lax';
       await refresh();
-      setTimeout(() => router.push('/dashboard'), 1200);
+      router.push('/dashboard');
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
       setError(e?.response?.data?.detail || 'Invalid code. Please try again.');

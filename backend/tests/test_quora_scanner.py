@@ -235,6 +235,38 @@ async def test_scan_deduplication(tmp_db):
     assert count2 == 0  # already stored on first call
 
 
+def test_search_quora_passes_date_field():
+    """search_quora_questions must include the 'date' field from Serper results."""
+    from unittest.mock import patch, MagicMock
+    import app.services.quora_search_service as svc
+
+    fake_response = MagicMock()
+    fake_response.status_code = 200
+    fake_response.json.return_value = {
+        "organic": [
+            {
+                "link": "https://www.quora.com/What-is-the-best-SaaS-tool",
+                "title": "What is the best SaaS tool - Quora",
+                "snippet": "some snippet",
+                "date": "3 days ago",
+            }
+        ]
+    }
+    fake_response.raise_for_status = MagicMock()
+
+    with patch.dict("os.environ", {"SERPER_API_KEY": "fake-key"}), \
+         patch("httpx.Client") as mock_client:
+        mock_client.return_value.__enter__ = MagicMock(return_value=MagicMock(
+            post=MagicMock(return_value=fake_response)
+        ))
+        mock_client.return_value.__exit__ = MagicMock(return_value=False)
+        results = svc.search_quora_questions("saas tool", num_results=5)
+
+    assert len(results) >= 1
+    assert "date" in results[0]
+    assert results[0]["date"] == "3 days ago"
+
+
 @pytest.mark.asyncio
 async def test_scan_clear_existing(tmp_db):
     """clear_existing=True deletes old rows before storing new ones; no duplicates."""

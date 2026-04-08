@@ -132,6 +132,7 @@ def search_quora_questions(
             'title': _clean_title(title),
             'url': url,
             'snippet': snippet,
+            'date': item.get('date', ''),
         })
 
         if len(results) >= num_results:

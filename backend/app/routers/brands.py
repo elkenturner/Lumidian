@@ -226,38 +226,50 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
     # Ensure slug uniqueness (global namespace)
     existing = await db.execute(select(Brand).where(Brand.slug == slug))
     if existing.scalar_one_or_none():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"A brand with slug '{slug}' already exists",
-        )
-
-    # Per-user deduplication: prevent the same brand occupying multiple slots
-    # (blocks cycling pitch brands or double-tracking via standard + pitch)
-    dup_name_result = await db.execute(
-        select(func.count(Brand.id)).where(
-            Brand.user_id == user.id,
-            Brand.slug == slug,
-        )
-    )
-    if (dup_name_result.scalar_one() or 0) > 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Your account is already tracking a brand with this name.",
-        )
-
-    if payload.website_url:
-        norm_url = payload.website_url.rstrip("/").lower()
-        dup_url_result = await db.execute(
-            select(func.count(Brand.id)).where(
-                Brand.user_id == user.id,
-                func.lower(Brand.website_url) == norm_url,
-            )
-        )
-        if (dup_url_result.scalar_one() or 0) > 0:
+        if user.is_admin:
+            # Admin can create duplicates — generate a unique slug
+            suffix = 2
+            while True:
+                candidate = f"{slug}-{suffix}"
+                check = await db.execute(select(Brand).where(Brand.slug == candidate))
+                if not check.scalar_one_or_none():
+                    slug = candidate
+                    break
+                suffix += 1
+        else:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Your account is already tracking a brand at this website.",
+                detail=f"A brand with slug '{slug}' already exists",
             )
+
+    if not user.is_admin:
+        # Per-user deduplication: prevent the same brand occupying multiple slots
+        # (blocks cycling pitch brands or double-tracking via standard + pitch)
+        dup_name_result = await db.execute(
+            select(func.count(Brand.id)).where(
+                Brand.user_id == user.id,
+                Brand.slug.like(f"{_slugify(payload.name)}%"),
+            )
+        )
+        if (dup_name_result.scalar_one() or 0) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Your account is already tracking a brand with this name.",
+            )
+
+        if payload.website_url:
+            norm_url = payload.website_url.rstrip("/").lower()
+            dup_url_result = await db.execute(
+                select(func.count(Brand.id)).where(
+                    Brand.user_id == user.id,
+                    func.lower(Brand.website_url) == norm_url,
+                )
+            )
+            if (dup_url_result.scalar_one() or 0) > 0:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Your account is already tracking a brand at this website.",
+                )
 
     pitch_expires_at = None
     if payload.brand_type == "pitch":

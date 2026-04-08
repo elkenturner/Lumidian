@@ -212,6 +212,12 @@ INSTRUCTIONS:
 3. OUTPUT FORMAT — follow exactly:
    - Reddit post: Line 1 = post title (plain text, ≤120 chars, no trailing punctuation, no markdown). Blank line. Then the post body.
    - Medium article: Line 1 = article title (plain text, ≤120 chars, no trailing punctuation, no markdown). Blank line. Then the article body.
+   - LinkedIn Article: Line 1 = article title (plain text, ≤120 chars, no trailing punctuation, no markdown). Blank line. Then the article body. Final line = 1-3 hashtags.
+   - LinkedIn post: No title line — start directly with the content body. Final line = 1-3 hashtags.
+   - LinkedIn reply: No title line — start directly with the reply. 1-4 sentences.
+   - X thread: Each tweet on its own line, prefixed with 1/, 2/, etc. Each tweet under 280 characters. 3-7 tweets total.
+   - X post: A single tweet under 280 characters. No title, no numbering.
+   - X reply: A single reply tweet under 280 characters. No title, no numbering.
    - Quora answer, Wikipedia edit: no title line — start directly with the content.
 4. Write the full content body.
 

@@ -66,7 +66,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const FAST_INTERVAL = 3_000;
+    const SLOW_INTERVAL = 15_000;
+
     const poll = async () => {
+      let active = false;
       try {
         const status = await getBackgroundStatus();
         if (!cancelled) {
@@ -74,14 +79,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           setDraftsGenerating(status.drafts_generating);
           setScanning(status.scanning);
           setModelScores(status.model_scores || []);
-          // Clear stale localStorage flags so they don't flash on next page load
+          active = status.report_running || status.drafts_generating || status.scanning;
           try {
             if (!status.report_running) localStorage.removeItem('clarity_report_running');
             if (!status.drafts_generating) localStorage.removeItem('clarity_drafts_generating');
           } catch {}
         }
       } catch {
-        // On poll error, clear banners to avoid stale state
         if (!cancelled) {
           setReportRunning(false);
           setDraftsGenerating(false);
@@ -89,14 +93,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           setModelScores([]);
         }
       }
+      if (!cancelled) {
+        timer = setTimeout(poll, active ? FAST_INTERVAL : SLOW_INTERVAL);
+      }
     };
 
     poll();
-    const interval = setInterval(poll, 3000);
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      clearTimeout(timer);
       window.removeEventListener('storage', syncLocal);
     };
   }, [user]); // eslint-disable-line react-hooks/exhaustive-deps

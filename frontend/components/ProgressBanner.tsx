@@ -26,8 +26,6 @@ const ProgressBanner = memo(function ProgressBanner({ title, subtitle, items }: 
     return () => clearInterval(interval);
   }, [items.length]);
 
-  const activeItem = items[activeIndex];
-
   return (
     <div className="mb-6 relative overflow-hidden rounded-xl border border-[rgba(99,102,241,0.3)] animate-[glow-pulse_2s_ease-in-out_infinite]"
       style={{ background: 'radial-gradient(ellipse at 30% 50%, rgba(99,102,241,0.10) 0%, rgba(99,102,241,0.03) 70%, transparent 100%)' }}
@@ -71,17 +69,6 @@ const ProgressBanner = memo(function ProgressBanner({ title, subtitle, items }: 
         }}
       />
 
-      {/* Inline keyframes */}
-      <style jsx>{`
-        @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
-        }
-        @keyframes glow-pulse {
-          0%, 100% { box-shadow: 0 0 20px rgba(99,102,241,0.12), 0 0 6px rgba(99,102,241,0.06); }
-          50% { box-shadow: 0 0 30px rgba(99,102,241,0.22), 0 0 12px rgba(99,102,241,0.10); }
-        }
-      `}</style>
     </div>
   );
 });

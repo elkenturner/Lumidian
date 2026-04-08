@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 # be more topically broad while still being genuinely relevant.
 _MIN_SCORE = 40.0
 _LEAD_CAP = 15  # keep top N "new" leads per brand (by relevance_score)
+_MAX_AGE_DAYS = 90
 
 # ── Serper ─────────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ _CACHE_TTL = 86_400.0  # 24 hours
 # ── URL filtering ──────────────────────────────────────────────────────────────
 
 # Path segments that indicate a real post / article (not a profile or directory page)
-_ACCEPT_PATHS = ("/posts/", "/pulse/", "/article/")
+_ACCEPT_PATHS = ("/posts/", "/pulse/", "/article/", "/feed/")
 
 # Path segments that should be rejected even if they contain an accepted segment
 _REJECT_PATHS = (
@@ -141,6 +142,9 @@ def _is_valid_linkedin_url(url: str) -> bool:
     Rejects profile, company, jobs, and other directory pages.
     """
     if not url:
+        return False
+    # Must be a linkedin.com URL
+    if "linkedin.com/" not in url:
         return False
     # Must contain at least one accepted path segment
     if not any(pat in url for pat in _ACCEPT_PATHS):
@@ -383,10 +387,14 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
                 if not url or not title:
                     continue
+                if not _is_valid_linkedin_url(url):
+                    continue
                 if url in existing_urls:
                     continue
 
                 posted_at = _parse_serper_date(post.get("date"))
+                if posted_at and (datetime.now(UTC).replace(tzinfo=None) - posted_at).days > _MAX_AGE_DAYS:
+                    continue
 
                 score = _score_post(title, snippet, prompt.text, posted_at=posted_at)
                 if score < _MIN_SCORE:

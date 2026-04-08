@@ -188,17 +188,6 @@ async def _scan_and_log(brand_id: int) -> None:
     from app.services import linkedin_scanner_service, quora_scanner_service, reddit_scanner_service, x_scanner_service
     from app.services.analytics_service import log_event
 
-    scan_tasks = [
-        reddit_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
-        quora_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
-    ]
-
-    # LinkedIn/X scanners only for Pro users
-    if user_tier == "pro":
-        from app.services import linkedin_scanner_service, x_scanner_service
-        scan_tasks.append(linkedin_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True))
-        scan_tasks.append(x_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True))
-
     try:
         await asyncio.gather(
             reddit_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),

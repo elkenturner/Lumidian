@@ -203,13 +203,15 @@ async def _linkedin_scanner_sweep() -> None:
 
     from app import state
     from app.database import AsyncSessionLocal
-    from app.models import Brand
+    from app.models import Brand, User
     from app.services.linkedin_scanner_service import scan_brand_opportunities
 
     logger.info("Scheduler: starting weekly LinkedIn scanner sweep")
 
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Brand))
+        result = await db.execute(
+            select(Brand).join(User, Brand.user_id == User.id).where(User.subscription_tier == "pro")
+        )
         brands = result.scalars().all()
 
     for brand in brands:
@@ -237,13 +239,15 @@ async def _x_scanner_sweep() -> None:
 
     from app import state
     from app.database import AsyncSessionLocal
-    from app.models import Brand
+    from app.models import Brand, User
     from app.services.x_scanner_service import scan_brand_opportunities
 
     logger.info("Scheduler: starting weekly X scanner sweep")
 
     async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Brand))
+        result = await db.execute(
+            select(Brand).join(User, Brand.user_id == User.id).where(User.subscription_tier == "pro")
+        )
         brands = result.scalars().all()
 
     for brand in brands:

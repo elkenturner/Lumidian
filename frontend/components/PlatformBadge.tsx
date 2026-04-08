@@ -1,6 +1,7 @@
 'use client';
 
 import { memo } from 'react';
+import PlatformIcon from '@/components/PlatformIcon';
 
 interface PlatformBadgeProps {
   platform: string;
@@ -13,6 +14,14 @@ const PLATFORM_STYLES: Record<string, { bg: string; text: string; border: string
   quora:     { bg: 'rgba(179,43,39,0.10)',  text: '#b36461', border: 'rgba(179,43,39,0.22)'  },
   medium:    { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
   wikipedia: { bg: 'rgba(45,157,147,0.10)', text: '#4aada4', border: 'rgba(45,157,147,0.22)' },
+  linkedin:  { bg: 'rgba(10,102,194,0.12)', text: '#3b82f6', border: 'rgba(10,102,194,0.25)' },
+  linkedin_article: { bg: 'rgba(10,102,194,0.12)', text: '#3b82f6', border: 'rgba(10,102,194,0.25)' },
+  linkedin_post: { bg: 'rgba(10,102,194,0.12)', text: '#3b82f6', border: 'rgba(10,102,194,0.25)' },
+  linkedin_reply: { bg: 'rgba(10,102,194,0.12)', text: '#3b82f6', border: 'rgba(10,102,194,0.25)' },
+  x:         { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
+  x_thread:  { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
+  x_post:    { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
+  x_reply:   { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
 };
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -20,6 +29,14 @@ const PLATFORM_LABELS: Record<string, string> = {
   quora: 'Quora',
   medium: 'Medium',
   wikipedia: 'Wikipedia',
+  linkedin: 'LinkedIn',
+  linkedin_article: 'LinkedIn Article',
+  linkedin_post: 'LinkedIn Post',
+  linkedin_reply: 'LinkedIn',
+  x: 'X',
+  x_thread: 'X Thread',
+  x_post: 'X',
+  x_reply: 'X',
 };
 
 const PlatformBadge = memo(function PlatformBadge({ platform, size = 'md' }: PlatformBadgeProps) {
@@ -38,6 +55,7 @@ const PlatformBadge = memo(function PlatformBadge({ platform, size = 'md' }: Pla
       style={{
         display: 'inline-flex',
         alignItems: 'center',
+        gap: 5,
         padding,
         fontSize,
         fontWeight: 600,
@@ -50,6 +68,7 @@ const PlatformBadge = memo(function PlatformBadge({ platform, size = 'md' }: Pla
         whiteSpace: 'nowrap',
       }}
     >
+      <PlatformIcon platform={key} size={size === 'sm' ? 10 : 12} color={styles.text} />
       {label}
     </span>
   );

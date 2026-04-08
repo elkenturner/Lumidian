@@ -2601,35 +2601,44 @@ export default function ContentHubPage() {
               <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">Platforms</p>
               <div className="space-y-1">
                 {([
-                  { key: 'reddit', icon: MessageSquare, color: '#ff4500' },
-                  { key: 'quora', icon: HelpCircle, color: '#b92b27' },
-                  { key: 'medium', icon: FileText, color: '#94a3b8' },
-                  { key: 'wikipedia', icon: Globe2, color: '#64748b' },
-                ] as const).map(({ key, icon: Icon, color }) => {
+                  { key: 'reddit', icon: MessageSquare, color: '#ff4500', proOnly: false },
+                  { key: 'quora', icon: HelpCircle, color: '#b92b27', proOnly: false },
+                  { key: 'medium', icon: FileText, color: '#94a3b8', proOnly: false },
+                  { key: 'wikipedia', icon: Globe2, color: '#64748b', proOnly: false },
+                  { key: 'linkedin', icon: Globe2, color: '#0a66c2', proOnly: true },
+                  { key: 'x', icon: MessageSquare, color: '#94a3b8', proOnly: true },
+                ] as const).map(({ key, icon: Icon, color, proOnly }) => {
+                  const isLocked = proOnly && user?.subscription_tier !== 'pro' && !user?.is_admin;
                   const setting = contentSettings.find((s) => s.platform === key);
                   const enabled = setting?.enabled ?? true;
                   return (
                     <button
                       key={key}
-                      onClick={() => handleTogglePlatform(key, !enabled)}
-                      className="w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg hover:bg-[rgba(255,255,255,0.03)] transition-all duration-200 group"
-                      title={enabled ? `Disable ${key}` : `Enable ${key}`}
-                      aria-label={enabled ? `Disable ${key}` : `Enable ${key}`}
+                      onClick={() => !isLocked && handleTogglePlatform(key, !enabled)}
+                      disabled={isLocked}
+                      className={`w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg transition-all duration-200 group ${
+                        isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[rgba(255,255,255,0.03)]'
+                      }`}
+                      title={isLocked ? `${key} requires Pro plan` : enabled ? `Disable ${key}` : `Enable ${key}`}
+                      aria-label={isLocked ? `${key} requires Pro plan` : enabled ? `Disable ${key}` : `Enable ${key}`}
                     >
                       <div className="flex items-center gap-2.5">
                         <div
                           className="w-6 h-6 rounded-md flex items-center justify-center transition-all duration-200"
                           style={{
-                            background: enabled ? `${color}15` : 'rgba(255,255,255,0.04)',
-                            border: `1px solid ${enabled ? `${color}30` : 'rgba(255,255,255,0.06)'}`,
+                            background: enabled && !isLocked ? `${color}15` : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${enabled && !isLocked ? `${color}30` : 'rgba(255,255,255,0.06)'}`,
                           }}
                         >
-                          <Icon size={12} style={{ color: enabled ? color : 'var(--text-faint)' }} className="transition-colors duration-200" />
+                          <Icon size={12} style={{ color: enabled && !isLocked ? color : 'var(--text-faint)' }} className="transition-colors duration-200" />
                         </div>
-                        <span className={`text-[13px] font-medium capitalize transition-colors duration-200 ${enabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-faint)]'}`}>
-                          {key}
+                        <span className={`text-[13px] font-medium capitalize transition-colors duration-200 ${enabled && !isLocked ? 'text-[var(--text-secondary)]' : 'text-[var(--text-faint)]'}`}>
+                          {key === 'linkedin' ? 'LinkedIn' : key === 'x' ? 'X' : key}
                         </span>
-                        {savedPlatform === key && (
+                        {isLocked && (
+                          <span className="text-[9px] bg-[rgba(99,102,241,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
+                        )}
+                        {!isLocked && savedPlatform === key && (
                           <Check size={12} className="text-[var(--success)]" />
                         )}
                       </div>
@@ -2637,13 +2646,13 @@ export default function ContentHubPage() {
                       <div
                         className="relative w-8 h-[18px] rounded-full transition-all duration-200 shrink-0"
                         style={{
-                          background: enabled ? 'var(--accent)' : 'rgba(255,255,255,0.10)',
-                          boxShadow: enabled ? '0 0 8px rgba(99,102,241,0.3)' : 'none',
+                          background: enabled && !isLocked ? 'var(--accent)' : 'rgba(255,255,255,0.10)',
+                          boxShadow: enabled && !isLocked ? '0 0 8px rgba(99,102,241,0.3)' : 'none',
                         }}
                       >
                         <div
                           className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-all duration-200"
-                          style={{ left: enabled ? '14px' : '2px' }}
+                          style={{ left: enabled && !isLocked ? '14px' : '2px' }}
                         />
                       </div>
                     </button>

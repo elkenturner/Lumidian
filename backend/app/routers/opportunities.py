@@ -182,20 +182,24 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     return ContentDraftSchema.model_validate(draft)
 
 
-async def _scan_and_log(brand_id: int) -> None:
+async def _scan_and_log(brand_id: int, user_tier: str | None = None) -> None:
     """Run Reddit, Quora, LinkedIn, and X scanners in parallel, then log the scan_completed event."""
     from app.database import AsyncSessionLocal
-    from app.services import linkedin_scanner_service, quora_scanner_service, reddit_scanner_service, x_scanner_service
+    from app.services import quora_scanner_service, reddit_scanner_service
     from app.services.analytics_service import log_event
 
+    scan_tasks = [
+        reddit_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
+        quora_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
+    ]
+
+    if user_tier == "pro":
+        from app.services import linkedin_scanner_service, x_scanner_service
+        scan_tasks.append(linkedin_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True))
+        scan_tasks.append(x_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True))
+
     try:
-        await asyncio.gather(
-            reddit_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
-            quora_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
-            linkedin_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
-            x_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
-            return_exceptions=True,
-        )
+        await asyncio.gather(*scan_tasks, return_exceptions=True)
     except Exception:
         logger.exception("_scan_and_log: scanner error for brand_id=%d", brand_id)
 

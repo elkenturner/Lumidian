@@ -8,20 +8,20 @@ interface PlatformBadgeProps {
   size?: 'sm' | 'md';
 }
 
-// Muted, dark-bg-appropriate tints
+// Official brand colors with matching bg/border tints for dark UI
 const PLATFORM_STYLES: Record<string, { bg: string; text: string; border: string }> = {
-  reddit:    { bg: 'rgba(194,91,52,0.12)',  text: '#c2713a', border: 'rgba(194,91,52,0.25)'  },
-  quora:     { bg: 'rgba(179,43,39,0.10)',  text: '#b36461', border: 'rgba(179,43,39,0.22)'  },
-  medium:    { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
-  wikipedia: { bg: 'rgba(45,157,147,0.10)', text: '#4aada4', border: 'rgba(45,157,147,0.22)' },
-  linkedin:  { bg: 'rgba(10,102,194,0.12)', text: '#3b82f6', border: 'rgba(10,102,194,0.25)' },
-  linkedin_article: { bg: 'rgba(10,102,194,0.12)', text: '#3b82f6', border: 'rgba(10,102,194,0.25)' },
-  linkedin_post: { bg: 'rgba(10,102,194,0.12)', text: '#3b82f6', border: 'rgba(10,102,194,0.25)' },
-  linkedin_reply: { bg: 'rgba(10,102,194,0.12)', text: '#3b82f6', border: 'rgba(10,102,194,0.25)' },
-  x:         { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
-  x_thread:  { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
-  x_post:    { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
-  x_reply:   { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
+  reddit:          { bg: 'rgba(255,69,0,0.10)',    text: '#FF4500', border: 'rgba(255,69,0,0.22)'    },
+  quora:           { bg: 'rgba(185,43,39,0.10)',   text: '#B92B27', border: 'rgba(185,43,39,0.22)'   },
+  medium:          { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
+  wikipedia:       { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
+  linkedin:        { bg: 'rgba(10,102,194,0.12)',  text: '#0A66C2', border: 'rgba(10,102,194,0.25)'  },
+  linkedin_article:{ bg: 'rgba(10,102,194,0.12)',  text: '#0A66C2', border: 'rgba(10,102,194,0.25)'  },
+  linkedin_post:   { bg: 'rgba(10,102,194,0.12)',  text: '#0A66C2', border: 'rgba(10,102,194,0.25)'  },
+  linkedin_reply:  { bg: 'rgba(10,102,194,0.12)',  text: '#0A66C2', border: 'rgba(10,102,194,0.25)'  },
+  x:               { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
+  x_thread:        { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
+  x_post:          { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
+  x_reply:         { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
 };
 
 const PLATFORM_LABELS: Record<string, string> = {

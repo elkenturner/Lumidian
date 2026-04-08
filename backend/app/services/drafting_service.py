@@ -55,6 +55,7 @@ from app.services.drafting import (
     parse_wikipedia_draft,
     remove_hedging,
 )
+from app.services.drafting.platforms import resolve_platform_key
 
 logger = logging.getLogger(__name__)
 
@@ -579,7 +580,14 @@ async def generate_gap_draft(
     if platform == "reddit" and suggested_subreddit:
         _reddit_strategy = classify_subreddit(suggested_subreddit)
 
-    spec = PLATFORM_SPECS[platform]
+    # Map base platform names to their gap-draft variants
+    platform_key = platform
+    if platform == "linkedin":
+        platform_key = "linkedin_article"
+    elif platform == "x":
+        platform_key = "x_thread"
+
+    spec = PLATFORM_SPECS[platform_key]
 
     # For Quora targeted drafts, build context from the question.
     # Serper snippet is the primary source — Quora blocks all Jina requests with a
@@ -645,7 +653,7 @@ async def generate_gap_draft(
 
     claude_prompt = build_prompt(
         brand_name=brand.name,
-        platform=platform,
+        platform=platform_key,
         prompt_text=prompt.text,
         visibility_pct=visibility_pct,
         profile_context=profile_context,
@@ -655,9 +663,14 @@ async def generate_gap_draft(
         existing_drafts_context=existing_drafts_context,
     )
 
-    raw_text = await call_claude(claude_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform, 2500))
+    raw_text = await call_claude(claude_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500))
     raw_text = remove_hedging(raw_text)
     raw_text = enforce_x_char_limit(raw_text, platform)
+
+    # Enforce X character limits
+    if platform_key.startswith("x_"):
+        from app.services.drafting import enforce_x_char_limit
+        raw_text = enforce_x_char_limit(raw_text, platform_key)
 
     # Quality check: brand name must appear in the content.
     # Skip retry for restricted subreddits — the prompt intentionally omits the brand.
@@ -667,7 +680,7 @@ async def generate_gap_draft(
             + f"\n\n⚠ QUALITY REQUIREMENT: Your previous output did not mention '{brand.name}'."
             f" You MUST include '{brand.name}' naturally at least once in the content body."
         )
-        _retry_raw = await call_claude(_retry_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform, 2500))
+        _retry_raw = await call_claude(_retry_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500))
         _retry_raw = remove_hedging(_retry_raw)
         if brand.name.lower() in _retry_raw.lower():
             raw_text = _retry_raw
@@ -681,7 +694,7 @@ async def generate_gap_draft(
                 "[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
             )
 
-    title, body = extract_title_and_body(raw_text, platform)
+    title, body = extract_title_and_body(raw_text, platform_key)
 
     if platform == "quora" and quora_question_url and quora_question_title:
         # Targeted draft: store URL in brief, title in guidelines_override
@@ -773,10 +786,13 @@ async def generate_opportunity_draft(
             prompt_text = pr.text
             visibility_pct = await _get_prompt_visibility(db, opp.prompt_id)
 
-    # Select platform spec and token budget based on actual opportunity platform.
-    # Reddit opportunities use the short reddit_reply format (20-80 words).
-    # Quora and other platforms use their own full spec.
-    platform_key = "reddit_reply" if opp.platform == "reddit" else opp.platform
+    # Select platform spec based on opportunity platform
+    platform_key_map = {
+        "reddit": "reddit_reply",
+        "linkedin": "linkedin_reply",
+        "x": "x_reply",
+    }
+    platform_key = platform_key_map.get(opp.platform, opp.platform)
     spec = PLATFORM_SPECS.get(platform_key, PLATFORM_SPECS["reddit_reply"])
     max_tokens = PLATFORM_MAX_TOKENS.get(platform_key, 600)
 
@@ -815,13 +831,18 @@ async def generate_opportunity_draft(
         opportunity_context=opportunity_context,
     )
 
-    # Use haiku for short reddit replies — cheaper and fast enough for 20-80 word content
+    # Use haiku for short reply formats — cheaper and fast enough for short content
     _opp_model = (
-        "claude-haiku-4-5-20251001" if platform_key == "reddit_reply"
+        "claude-haiku-4-5-20251001" if platform_key in ("reddit_reply", "linkedin_reply", "x_reply")
         else "claude-sonnet-4-6"
     )
     raw_text = await call_claude(claude_prompt, max_tokens=max_tokens, model=_opp_model)
     raw_text = remove_hedging(raw_text)
+
+    # Enforce X character limits
+    if platform_key.startswith("x_"):
+        from app.services.drafting import enforce_x_char_limit
+        raw_text = enforce_x_char_limit(raw_text, platform_key)
 
     # Quality check: brand name must appear.
     # Skip for restricted subreddits — the prompt intentionally avoids direct brand mentions.

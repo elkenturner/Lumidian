@@ -191,6 +191,38 @@ async def _quora_scanner_sweep() -> None:
     logger.info("Scheduler: weekly Quora scanner sweep complete")
 
 
+async def _linkedin_scanner_sweep() -> None:
+    """Weekly LinkedIn scan for all Pro-tier brands (03:40 UTC, Monday)."""
+    if await _is_scheduler_paused():
+        logger.info("Scheduler paused — skipping LinkedIn scanner sweep")
+        return
+
+    from app.services.linkedin_scanner_service import scan_all_brands
+
+    logger.info("Scheduler: starting weekly LinkedIn scanner sweep")
+    try:
+        await scan_all_brands()
+    except Exception:
+        logger.exception("LinkedIn scanner sweep failed")
+    logger.info("Scheduler: weekly LinkedIn scanner sweep complete")
+
+
+async def _x_scanner_sweep() -> None:
+    """Weekly X/Twitter scan for all Pro-tier brands (03:50 UTC, Monday)."""
+    if await _is_scheduler_paused():
+        logger.info("Scheduler paused — skipping X scanner sweep")
+        return
+
+    from app.services.x_scanner_service import scan_all_brands
+
+    logger.info("Scheduler: starting weekly X scanner sweep")
+    try:
+        await scan_all_brands()
+    except Exception:
+        logger.exception("X scanner sweep failed")
+    logger.info("Scheduler: weekly X scanner sweep complete")
+
+
 async def _auto_draft_sweep() -> None:
     """
     Weekly auto-draft job (03:00 UTC, Monday).
@@ -580,6 +612,24 @@ def start_scheduler() -> None:
         trigger=CronTrigger(day_of_week="mon", hour=3, minute=30, timezone="UTC"),
         id="quora_scanner",
         name="Quora opportunity scanner (Monday 03:30 UTC)",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
+    scheduler.add_job(
+        _linkedin_scanner_sweep,
+        trigger=CronTrigger(day_of_week="mon", hour=3, minute=40, timezone="UTC"),
+        id="linkedin_scanner",
+        name="LinkedIn opportunity scanner (Monday 03:40 UTC)",
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+
+    scheduler.add_job(
+        _x_scanner_sweep,
+        trigger=CronTrigger(day_of_week="mon", hour=3, minute=50, timezone="UTC"),
+        id="x_scanner",
+        name="X opportunity scanner (Monday 03:50 UTC)",
         replace_existing=True,
         misfire_grace_time=3600,
     )

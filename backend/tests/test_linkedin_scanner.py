@@ -1,7 +1,7 @@
 """
 Tests for the LinkedIn scanner service.
 
-Mock boundary: patch("app.services.serper_search_service.search_site", ...)
+Mock boundary: patch("app.services.linkedin_scanner_service._search_linkedin_posts", ...)
 """
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import pytest
 
 from app.services.linkedin_scanner_service import (
     _is_valid_linkedin_url,
-    _score_result,
+    _score_post as _score_result,
 )
 
 
@@ -101,7 +101,7 @@ def test_score_old_not_zero():
 @pytest.mark.asyncio
 async def test_scan_nonexistent_brand_returns_zero():
     from app.services import linkedin_scanner_service
-    with patch("app.services.serper_search_service.search_site", return_value=[]):
+    with patch("app.services.linkedin_scanner_service._search_linkedin_posts", return_value=[]):
         count = await linkedin_scanner_service.scan_brand_opportunities(brand_id=99999)
     assert count == 0
 
@@ -119,7 +119,7 @@ async def test_scan_stores_relevant_post(tmp_db):
         "snippet": "project management saas tool remote teams collaboration platform",
         "date": "3 days ago",
     }]
-    with patch("app.services.serper_search_service.search_site", return_value=results):
+    with patch("app.services.linkedin_scanner_service._search_linkedin_posts", return_value=results):
         count = await linkedin_scanner_service.scan_brand_opportunities(brand_id)
     assert count >= 1
 
@@ -137,7 +137,7 @@ async def test_scan_filters_irrelevant_post(tmp_db):
         "snippet": "cats love napping in the sun",
         "date": "",
     }]
-    with patch("app.services.serper_search_service.search_site", return_value=results):
+    with patch("app.services.linkedin_scanner_service._search_linkedin_posts", return_value=results):
         count = await linkedin_scanner_service.scan_brand_opportunities(brand_id)
     assert count == 0
 
@@ -155,7 +155,7 @@ async def test_scan_filters_job_urls(tmp_db):
         "snippet": "project management saas tool remote teams",
         "date": "1 day ago",
     }]
-    with patch("app.services.serper_search_service.search_site", return_value=results):
+    with patch("app.services.linkedin_scanner_service._search_linkedin_posts", return_value=results):
         count = await linkedin_scanner_service.scan_brand_opportunities(brand_id)
     assert count == 0
 
@@ -173,7 +173,7 @@ async def test_scan_deduplication(tmp_db):
         "snippet": "project management saas tool remote teams",
         "date": "2 days ago",
     }]
-    with patch("app.services.serper_search_service.search_site", return_value=result):
+    with patch("app.services.linkedin_scanner_service._search_linkedin_posts", return_value=result):
         await linkedin_scanner_service.scan_brand_opportunities(brand_id)
         count2 = await linkedin_scanner_service.scan_brand_opportunities(brand_id)
     assert count2 == 0

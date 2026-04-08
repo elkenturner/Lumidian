@@ -1,7 +1,7 @@
 """
 Tests for the X/Twitter scanner service.
 
-Mock boundary: patch("app.services.serper_search_service.search_site", ...)
+Mock boundary: patch("app.services.x_scanner_service._search_x_posts", ...)
 """
 from __future__ import annotations
 
@@ -10,7 +10,12 @@ from unittest.mock import patch
 
 import pytest
 
-from app.services.x_scanner_service import _is_valid_x_url, _score_result
+from app.services.x_scanner_service import _POST_URL_RE, _score_post as _score_result
+
+
+def _is_valid_x_url(url: str) -> bool:
+    """Test helper — wraps the regex used by the X scanner."""
+    return bool(_POST_URL_RE.match(url))
 
 
 # ── URL validation ────────────────────────────────────────────────────────────
@@ -79,7 +84,7 @@ def test_score_no_date_penalized():
 @pytest.mark.asyncio
 async def test_scan_nonexistent_brand_returns_zero():
     from app.services import x_scanner_service
-    with patch("app.services.serper_search_service.search_site", return_value=[]):
+    with patch("app.services.x_scanner_service._search_x_posts", return_value=[]):
         count = await x_scanner_service.scan_brand_opportunities(brand_id=99999)
     assert count == 0
 
@@ -97,7 +102,7 @@ async def test_scan_stores_relevant_tweet(tmp_db):
         "snippet": "project management saas tool remote teams collaboration platform workflow",
         "date": "2 days ago",
     }]
-    with patch("app.services.serper_search_service.search_site", return_value=results):
+    with patch("app.services.x_scanner_service._search_x_posts", return_value=results):
         count = await x_scanner_service.scan_brand_opportunities(brand_id)
     assert count >= 1
 
@@ -115,7 +120,7 @@ async def test_scan_filters_profile_urls(tmp_db):
         "snippet": "project management saas tool expert",
         "date": "",
     }]
-    with patch("app.services.serper_search_service.search_site", return_value=results):
+    with patch("app.services.x_scanner_service._search_x_posts", return_value=results):
         count = await x_scanner_service.scan_brand_opportunities(brand_id)
     assert count == 0
 
@@ -133,7 +138,7 @@ async def test_scan_filters_short_snippets(tmp_db):
         "snippet": "pic",
         "date": "1 day ago",
     }]
-    with patch("app.services.serper_search_service.search_site", return_value=results):
+    with patch("app.services.x_scanner_service._search_x_posts", return_value=results):
         count = await x_scanner_service.scan_brand_opportunities(brand_id)
     assert count == 0
 
@@ -151,7 +156,7 @@ async def test_scan_deduplication(tmp_db):
         "snippet": "project management saas tool remote teams collaboration",
         "date": "3 days ago",
     }]
-    with patch("app.services.serper_search_service.search_site", return_value=result):
+    with patch("app.services.x_scanner_service._search_x_posts", return_value=result):
         await x_scanner_service.scan_brand_opportunities(brand_id)
         count2 = await x_scanner_service.scan_brand_opportunities(brand_id)
     assert count2 == 0

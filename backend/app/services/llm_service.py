@@ -230,13 +230,14 @@ async def _query_gemini(prompt: str, brand_name: str) -> dict:
         # loop free.
         # Enable Google Search grounding so Gemini queries the live web index —
         # the closest available API proxy for Google AI brand mentions in real-time.
-        # SDK 0.8.x uses GoogleSearchRetrieval; older/newer builds may use GoogleSearch.
+        # google_search is the current API-supported tool; google_search_retrieval
+        # is deprecated server-side (returns 400) but kept as last-resort fallback.
         gen_kwargs: dict = {}
         _grounding_ok = False
         for _build_tool in (
-            lambda: genai.protos.Tool(google_search_retrieval=genai.protos.GoogleSearchRetrieval()),
-            lambda: genai.protos.Tool(google_search=genai.protos.Tool.GoogleSearch()),
             lambda: genai.protos.Tool(google_search=genai.protos.GoogleSearch()),
+            lambda: genai.protos.Tool(google_search=genai.protos.Tool.GoogleSearch()),
+            lambda: genai.protos.Tool(google_search_retrieval=genai.protos.GoogleSearchRetrieval()),
         ):
             try:
                 gen_kwargs = {"tools": [_build_tool()]}

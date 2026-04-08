@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # Minimum composite score required to store an opportunity
 _MIN_SCORE = 40.0
 _LEAD_CAP = 15  # keep top N "new" leads per brand (by relevance_score)
+_MAX_AGE_DAYS = 90
 
 # ── Regex for valid X post URLs ────────────────────────────────────────────────
 
@@ -376,10 +377,14 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
                 if not url or not title:
                     continue
+                if not _POST_URL_RE.match(url):
+                    continue
                 if url in existing_urls:
                     continue
 
                 posted_at = _parse_serper_date(post.get("date"))
+                if posted_at and (datetime.now(UTC).replace(tzinfo=None) - posted_at).days > _MAX_AGE_DAYS:
+                    continue
 
                 score = _score_post(title, snippet, prompt.text, posted_at=posted_at)
                 if score < _MIN_SCORE:

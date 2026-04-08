@@ -228,29 +228,25 @@ async def _query_gemini(prompt: str, brand_name: str) -> dict:
         # google-generativeai does not provide a native async client for
         # generate_content, so we run it in a thread pool to keep the event
         # loop free.
-        # Enable Google Search grounding so Gemini queries the live web index —
-        # the closest available API proxy for Google AI brand mentions in real-time.
-        # google_search is the current API-supported tool; google_search_retrieval
-        # is deprecated server-side (returns 400) but kept as last-resort fallback.
+        # Enable Google Search grounding so Gemini queries the live web index.
+        # SDK ≥0.8.6 supports the google_search Tool proto field; older builds
+        # only have google_search_retrieval (now rejected server-side with 400).
         gen_kwargs: dict = {}
-        _grounding_ok = False
-        for _build_tool in (
-            lambda: genai.protos.Tool(google_search=genai.protos.GoogleSearch()),
-            lambda: genai.protos.Tool(google_search=genai.protos.Tool.GoogleSearch()),
-            lambda: genai.protos.Tool(google_search_retrieval=genai.protos.GoogleSearchRetrieval()),
-        ):
+        _tool = genai.protos.Tool()
+        if "google_search" in [f.name for f in genai.protos.Tool.meta.fields.values()]:
+            _tool.google_search = {}
+            gen_kwargs = {"tools": [_tool]}
+        else:
             try:
-                gen_kwargs = {"tools": [_build_tool()]}
-                _grounding_ok = True
-                break
+                gen_kwargs = {"tools": [genai.protos.Tool(
+                    google_search_retrieval=genai.protos.GoogleSearchRetrieval()
+                )]}
             except (AttributeError, TypeError):
-                continue
-        if not _grounding_ok:
-            logger.warning(
-                "[gemini] Google Search grounding unavailable in this SDK build "
-                "(google-generativeai %s) — running ungrounded",
-                getattr(genai, "__version__", "unknown"),
-            )
+                logger.warning(
+                    "[gemini] Google Search grounding unavailable in this SDK build "
+                    "(google-generativeai %s) — running ungrounded",
+                    getattr(genai, "__version__", "unknown"),
+                )
         loop = asyncio.get_running_loop()
         response = await asyncio.wait_for(
             loop.run_in_executor(

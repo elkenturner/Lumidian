@@ -54,6 +54,7 @@ from app.services.drafting import (
     parse_wikipedia_draft,
     remove_hedging,
 )
+from app.services.drafting.platforms import resolve_platform_key
 
 logger = logging.getLogger(__name__)
 

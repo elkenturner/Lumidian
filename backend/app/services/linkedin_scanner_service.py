@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 _MIN_SCORE = 45.0
 _LEAD_CAP = 20
+_MAX_AGE_DAYS = 90
 
 # URL patterns that indicate actual LinkedIn content (not profiles/jobs/company pages)
 _VALID_PATH_PATTERNS = ("/posts/", "/pulse/", "/feed/update/")
@@ -181,6 +182,8 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                     continue
 
                 posted_at = _parse_serper_date(r.get("date"))
+                if posted_at and (datetime.now(UTC).replace(tzinfo=None) - posted_at).days > _MAX_AGE_DAYS:
+                    continue
                 score = _score_result(title, snippet, prompt.text, posted_at)
                 if score < _MIN_SCORE:
                     continue

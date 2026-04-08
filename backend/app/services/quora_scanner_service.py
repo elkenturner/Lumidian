@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # A real Quora question URL + at least 1 prompt keyword hit counts.
 _MIN_SCORE = 45.0
 _LEAD_CAP = 20  # keep top N "new" leads per brand (by relevance_score)
+_MAX_AGE_DAYS = 90
 
 
 _RELATIVE_RE = re.compile(
@@ -220,6 +221,8 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                     continue
 
                 posted_at = _parse_serper_date(q.get("date"))
+                if posted_at and (datetime.now(UTC).replace(tzinfo=None) - posted_at).days > _MAX_AGE_DAYS:
+                    continue
 
                 score = _score_question(title, snippet, prompt.text, posted_at=posted_at)
                 if score < _MIN_SCORE:

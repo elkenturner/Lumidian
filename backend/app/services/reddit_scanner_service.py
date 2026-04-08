@@ -665,6 +665,8 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 datetime.fromtimestamp(cand["created_utc"], tz=UTC).replace(tzinfo=None)
                 if cand["created_utc"] else None
             )
+            if posted_dt and (datetime.now(UTC).replace(tzinfo=None) - posted_dt).days > 90:
+                continue
 
             opp = ContentOpportunity(
                 brand_id=brand_id,

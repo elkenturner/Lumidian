@@ -430,6 +430,8 @@ async def generate_gap_draft(
     Generate a draft targeting a specific prompt/platform gap.
     Uses full BrandProfile context and response analysis.
     """
+    from app.services.drafting.platforms import resolve_platform_key
+    platform = resolve_platform_key(platform)
     if platform not in PLATFORM_SPECS:
         raise ValueError(f"Unsupported platform: {platform}. Choose from {ALL_PLATFORMS}")
 
@@ -972,9 +974,10 @@ async def auto_draft_top_gaps(
         )
     )
     enabled_settings = list(settings_result.scalars().all())
+    from app.services.drafting.platforms import resolve_platform_key
     enabled_platforms = [
-        s.platform for s in enabled_settings
-        if s.platform in CONTENT_PLATFORMS
+        resolve_platform_key(s.platform) for s in enabled_settings
+        if resolve_platform_key(s.platform) in CONTENT_PLATFORMS
     ]
     if not enabled_platforms:
         enabled_platforms = ["reddit", "quora"]

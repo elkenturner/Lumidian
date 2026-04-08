@@ -1991,7 +1991,7 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
         {visibleOpportunities.length === 0 && (
           <EmptyState
             icon={<Radio size={26} className="text-[var(--accent-foreground)]" />}
-            title={`No ${oppPlatformFilter} opportunities`}
+            title={oppPlatformFilter !== 'all' ? `No ${oppPlatformFilter} opportunities` : 'No opportunities'}
             description='Try "All" or switch platform.'
           />
         )}

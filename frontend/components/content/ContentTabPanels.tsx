@@ -734,6 +734,48 @@ function DraftCard({
             );
           })()}
         </>
+      ) : draft.platform === 'linkedin_article' || draft.platform === 'linkedin' ? (
+        <>
+          <a
+            href="https://www.linkedin.com/article/new/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-[rgba(10,102,194,0.07)] border border-[rgba(10,102,194,0.20)] rounded-lg px-3 py-2 group transition-colors hover:border-[rgba(10,102,194,0.35)] hover:bg-[rgba(10,102,194,0.11)]"
+          >
+            <span className="text-[#0a66c2] text-xs flex-shrink-0">↗</span>
+            <span className="text-xs text-[#0a66c2] font-medium flex-1 min-w-0 truncate">
+              Post on LinkedIn
+            </span>
+            <ExternalLink size={11} className="text-[#0a66c2]/60 flex-shrink-0 group-hover:text-[#0a66c2]" />
+          </a>
+          {draft.content_brief && (
+            <p className="text-xs text-[var(--text-faint)] leading-relaxed line-clamp-2">
+              <span className="text-[var(--text-muted)]">Targeting: </span>
+              {draft.content_brief}
+            </p>
+          )}
+        </>
+      ) : draft.platform === 'x_thread' || draft.platform === 'x' ? (
+        <>
+          <a
+            href="https://x.com/compose/post"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 bg-[rgba(148,163,184,0.07)] border border-[rgba(148,163,184,0.18)] rounded-lg px-3 py-2 group transition-colors hover:border-[rgba(148,163,184,0.35)] hover:bg-[rgba(148,163,184,0.11)]"
+          >
+            <span className="text-[var(--text-secondary)] text-xs flex-shrink-0">↗</span>
+            <span className="text-xs text-[var(--text-secondary)] font-medium flex-1 min-w-0 truncate">
+              Post on X
+            </span>
+            <ExternalLink size={11} className="text-[var(--text-secondary)]/60 flex-shrink-0 group-hover:text-[var(--text-secondary)]" />
+          </a>
+          {draft.content_brief && (
+            <p className="text-xs text-[var(--text-faint)] leading-relaxed line-clamp-2">
+              <span className="text-[var(--text-muted)]">Targeting: </span>
+              {draft.content_brief}
+            </p>
+          )}
+        </>
       ) : draft.platform === 'medium' ? (
         <>
           <a

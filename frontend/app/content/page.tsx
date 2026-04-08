@@ -25,8 +25,6 @@ import {
   BookOpen,
   ArrowRight,
   BarChart2,
-  MessageSquare,
-  Globe2,
   Lightbulb,
   Shield,
 } from 'lucide-react';
@@ -60,6 +58,7 @@ import {
   QuoraQuestion,
 } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
+import PlatformIcon from '@/components/PlatformIcon';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -877,7 +876,7 @@ function QuoraQuestionPicker({
 
 // ── Request Draft modal ───────────────────────────────────────────────────────
 
-const DRAFT_PLATFORMS = ['reddit', 'quora', 'medium', 'wikipedia'] as const;
+const DRAFT_PLATFORMS = ['reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'] as const;
 
 function RequestDraftModal({
   brandId,
@@ -890,13 +889,21 @@ function RequestDraftModal({
   onClose: () => void;
   onCreated: (draft: ContentDraft) => void;
 }) {
+  const { user } = useAuth();
   const [platform, setPlatform] = useState<string>('reddit');
+  const [subPlatform, setSubPlatform] = useState<string>('linkedin_article');
   const [promptId, setPromptId] = useState<number | ''>('');
   const [customTopic, setCustomTopic] = useState('');
   const [notes, setNotes] = useState('');
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedQuestion, setSelectedQuestion] = useState<QuoraQuestion | null>(null);
+
+  // When platform changes, set default sub-platform
+  useEffect(() => {
+    if (platform === 'linkedin') setSubPlatform('linkedin_article');
+    else if (platform === 'x') setSubPlatform('x_thread');
+  }, [platform]);
 
   async function handleSubmit() {
     setCreating(true);
@@ -907,8 +914,10 @@ function RequestDraftModal({
       if (notes.trim()) parts.push(`Additional notes: ${notes.trim()}`);
       const brief = parts.length > 0 ? parts.join('\n\n') : undefined;
 
+      const effectivePlatform = (platform === 'linkedin' || platform === 'x') ? subPlatform : platform;
+
       const draft = await generateDraft(brandId, {
-        platform,
+        platform: effectivePlatform,
         prompt_id: promptId !== '' ? (promptId as number) : undefined,
         custom_brief: brief,
         quora_question_url: selectedQuestion?.url,
@@ -945,21 +954,94 @@ function RequestDraftModal({
           {/* Platform */}
           <div>
             <label className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-wide mb-1.5 block">Platform</label>
-            <div className="grid grid-cols-4 gap-2">
-              {DRAFT_PLATFORMS.map((p) => (
+            <div className="grid grid-cols-3 gap-2">
+              {DRAFT_PLATFORMS.map((p) => {
+                const isPro = p === 'linkedin' || p === 'x';
+                const isLocked = isPro && user?.subscription_tier !== 'pro' && !user?.is_admin;
+                const label = p === 'linkedin' ? 'LinkedIn' : p === 'x' ? 'X' : p;
+
+                if (isLocked) {
+                  return (
+                    <button
+                      key={p}
+                      disabled
+                      className="py-2 rounded-lg text-xs font-medium capitalize transition-colors border bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.06)] text-[var(--text-faint)] opacity-50 cursor-not-allowed flex items-center justify-center gap-1.5"
+                    >
+                      <PlatformIcon platform={p} size={12} color="var(--text-faint)" />
+                      {label}
+                      <span className="text-[9px] bg-[rgba(99,102,241,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
+                    </button>
+                  );
+                }
+
+                return (
+                  <button
+                    key={p}
+                    onClick={() => { setPlatform(p); if (p !== 'quora') setSelectedQuestion(null); }}
+                    className={`py-2 rounded-lg text-xs font-medium capitalize transition-colors border flex items-center justify-center gap-1.5 ${
+                      platform === p
+                        ? 'bg-[var(--accent)]/20 border-[var(--accent)]/50 text-[var(--accent)]'
+                        : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    <PlatformIcon platform={p} size={12} color={platform === p ? 'var(--accent)' : 'var(--text-muted)'} />
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* LinkedIn sub-selector */}
+            {platform === 'linkedin' && (
+              <div className="flex gap-2 mt-2">
                 <button
-                  key={p}
-                  onClick={() => { setPlatform(p); if (p !== 'quora') setSelectedQuestion(null); }}
-                  className={`py-2 rounded-lg text-xs font-medium capitalize transition-colors border ${
-                    platform === p
-                      ? 'bg-[var(--accent)]/20 border-[var(--accent)]/50 text-[var(--accent)]'
-                      : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                  onClick={() => setSubPlatform('linkedin_article')}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    subPlatform === 'linkedin_article'
+                      ? 'border-[var(--accent)] bg-[rgba(99,102,241,0.1)] text-[var(--accent)]'
+                      : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
                   }`}
                 >
-                  {p}
+                  Article
                 </button>
-              ))}
-            </div>
+                <button
+                  onClick={() => setSubPlatform('linkedin_post')}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    subPlatform === 'linkedin_post'
+                      ? 'border-[var(--accent)] bg-[rgba(99,102,241,0.1)] text-[var(--accent)]'
+                      : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
+                  }`}
+                >
+                  Post
+                </button>
+              </div>
+            )}
+
+            {/* X sub-selector */}
+            {platform === 'x' && (
+              <div className="flex gap-2 mt-2">
+                <button
+                  onClick={() => setSubPlatform('x_thread')}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    subPlatform === 'x_thread'
+                      ? 'border-[var(--accent)] bg-[rgba(99,102,241,0.1)] text-[var(--accent)]'
+                      : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
+                  }`}
+                >
+                  Thread
+                </button>
+                <button
+                  onClick={() => setSubPlatform('x_post')}
+                  className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
+                    subPlatform === 'x_post'
+                      ? 'border-[var(--accent)] bg-[rgba(99,102,241,0.1)] text-[var(--accent)]'
+                      : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
+                  }`}
+                >
+                  Post
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Target prompt */}
@@ -1709,7 +1791,7 @@ export default function ContentHubPage() {
   // ── Right panel actions ────────────────────────────────────────────────────
 
   async function handleGenerateNow() {
-    if (!selectedBrandId) return;
+    if (!selectedBrandId || scanning) return;
     setGenerating(true);
     setGenerateError(null);
 
@@ -1790,7 +1872,7 @@ export default function ContentHubPage() {
   }
 
   const handleScanNow = useCallback(async () => {
-    if (!selectedBrandId || scanning) return;
+    if (!selectedBrandId || scanning || generating) return;
     setScanning(true);
 
     // Clear existing opportunities immediately so UI shows loading state
@@ -1987,7 +2069,7 @@ export default function ContentHubPage() {
           reddit: {
             label: 'Reddit',
             subtitle: 'Discussion posts & replies',
-            icon: MessageSquare,
+            iconKey: 'reddit',
             color: '#ff4500',
             colorMuted: 'rgba(255,69,0,0.10)',
             colorBorder: 'rgba(255,69,0,0.20)',
@@ -2004,7 +2086,7 @@ export default function ContentHubPage() {
           quora: {
             label: 'Quora',
             subtitle: 'Q&A answers',
-            icon: HelpCircle,
+            iconKey: 'quora',
             color: '#b92b27',
             colorMuted: 'rgba(185,43,39,0.10)',
             colorBorder: 'rgba(185,43,39,0.20)',
@@ -2021,7 +2103,7 @@ export default function ContentHubPage() {
           medium: {
             label: 'Medium',
             subtitle: 'Long-form articles',
-            icon: FileText,
+            iconKey: 'medium',
             color: '#94a3b8',
             colorMuted: 'rgba(148,163,184,0.10)',
             colorBorder: 'rgba(148,163,184,0.18)',
@@ -2039,7 +2121,7 @@ export default function ContentHubPage() {
           wikipedia: {
             label: 'Wikipedia',
             subtitle: 'Article edits — handle with care',
-            icon: Globe2,
+            iconKey: 'wikipedia',
             color: '#64748b',
             colorMuted: 'rgba(100,116,139,0.10)',
             colorBorder: 'rgba(100,116,139,0.20)',
@@ -2056,7 +2138,6 @@ export default function ContentHubPage() {
         } as const;
 
         const p = PLATFORMS[postingPlatform];
-        const PlatformIcon = p.icon;
 
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -2094,7 +2175,6 @@ export default function ContentHubPage() {
                     {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((key) => {
                       const active = postingPlatform === key;
                       const pl = PLATFORMS[key];
-                      const TabIcon = pl.icon;
                       return (
                         <button
                           key={key}
@@ -2107,7 +2187,7 @@ export default function ContentHubPage() {
                             boxShadow: active ? `0 0 12px ${pl.colorMuted}` : 'none',
                           }}
                         >
-                          <TabIcon size={12} />
+                          <PlatformIcon platform={key} size={12} color={active ? pl.color : 'var(--text-faint)'} />
                           {pl.label}
                         </button>
                       );
@@ -2123,7 +2203,7 @@ export default function ContentHubPage() {
                 <div className="flex items-center justify-between gap-3 mb-2 p-4 rounded-xl" style={{ background: p.gradient }}>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: p.colorMuted, border: `1px solid ${p.colorBorder}` }}>
-                      <PlatformIcon size={18} style={{ color: p.color }} />
+                      <PlatformIcon platform={p.iconKey} size={18} color={p.color} />
                     </div>
                     <div>
                       <p className="text-[15px] font-semibold text-[var(--text-primary)]">{p.label}</p>
@@ -2403,7 +2483,7 @@ export default function ContentHubPage() {
                         <>
                           <button
                             onClick={handleScanNow}
-                            disabled={scanning || !selectedBrandId}
+                            disabled={scanning || generating || !selectedBrandId}
                             className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40"
                           >
                             {scanning ? (
@@ -2426,7 +2506,7 @@ export default function ContentHubPage() {
                         <>
                           <button
                             onClick={handleGenerateNow}
-                            disabled={generating || onCooldown || weeklyExhausted}
+                            disabled={generating || scanning || onCooldown || weeklyExhausted}
                             className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40"
                           >
                             {generating ? (
@@ -2520,35 +2600,44 @@ export default function ContentHubPage() {
               <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">Platforms</p>
               <div className="space-y-1">
                 {([
-                  { key: 'reddit', icon: MessageSquare, color: '#ff4500' },
-                  { key: 'quora', icon: HelpCircle, color: '#b92b27' },
-                  { key: 'medium', icon: FileText, color: '#94a3b8' },
-                  { key: 'wikipedia', icon: Globe2, color: '#64748b' },
-                ] as const).map(({ key, icon: Icon, color }) => {
+                  { key: 'reddit', color: '#ff4500', proOnly: false },
+                  { key: 'quora', color: '#b92b27', proOnly: false },
+                  { key: 'medium', color: '#94a3b8', proOnly: false },
+                  { key: 'wikipedia', color: '#64748b', proOnly: false },
+                  { key: 'linkedin', color: '#0a66c2', proOnly: true },
+                  { key: 'x', color: '#94a3b8', proOnly: true },
+                ] as const).map(({ key, color, proOnly }) => {
+                  const isLocked = proOnly && user?.subscription_tier !== 'pro' && !user?.is_admin;
                   const setting = contentSettings.find((s) => s.platform === key);
                   const enabled = setting?.enabled ?? true;
                   return (
                     <button
                       key={key}
-                      onClick={() => handleTogglePlatform(key, !enabled)}
-                      className="w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg hover:bg-[rgba(255,255,255,0.03)] transition-all duration-200 group"
-                      title={enabled ? `Disable ${key}` : `Enable ${key}`}
-                      aria-label={enabled ? `Disable ${key}` : `Enable ${key}`}
+                      onClick={() => !isLocked && handleTogglePlatform(key, !enabled)}
+                      disabled={isLocked}
+                      className={`w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg transition-all duration-200 group ${
+                        isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[rgba(255,255,255,0.03)]'
+                      }`}
+                      title={isLocked ? `${key} requires Pro plan` : enabled ? `Disable ${key}` : `Enable ${key}`}
+                      aria-label={isLocked ? `${key} requires Pro plan` : enabled ? `Disable ${key}` : `Enable ${key}`}
                     >
                       <div className="flex items-center gap-2.5">
                         <div
                           className="w-6 h-6 rounded-md flex items-center justify-center transition-all duration-200"
                           style={{
-                            background: enabled ? `${color}15` : 'rgba(255,255,255,0.04)',
-                            border: `1px solid ${enabled ? `${color}30` : 'rgba(255,255,255,0.06)'}`,
+                            background: enabled && !isLocked ? `${color}15` : 'rgba(255,255,255,0.04)',
+                            border: `1px solid ${enabled && !isLocked ? `${color}30` : 'rgba(255,255,255,0.06)'}`,
                           }}
                         >
-                          <Icon size={12} style={{ color: enabled ? color : 'var(--text-faint)' }} className="transition-colors duration-200" />
+                          <PlatformIcon platform={key} size={12} color={enabled && !isLocked ? color : 'var(--text-faint)'} />
                         </div>
-                        <span className={`text-[13px] font-medium capitalize transition-colors duration-200 ${enabled ? 'text-[var(--text-secondary)]' : 'text-[var(--text-faint)]'}`}>
-                          {key}
+                        <span className={`text-[13px] font-medium capitalize transition-colors duration-200 ${enabled && !isLocked ? 'text-[var(--text-secondary)]' : 'text-[var(--text-faint)]'}`}>
+                          {key === 'linkedin' ? 'LinkedIn' : key === 'x' ? 'X' : key}
                         </span>
-                        {savedPlatform === key && (
+                        {isLocked && (
+                          <span className="text-[9px] bg-[rgba(99,102,241,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
+                        )}
+                        {!isLocked && savedPlatform === key && (
                           <Check size={12} className="text-[var(--success)]" />
                         )}
                       </div>
@@ -2556,13 +2645,13 @@ export default function ContentHubPage() {
                       <div
                         className="relative w-8 h-[18px] rounded-full transition-all duration-200 shrink-0"
                         style={{
-                          background: enabled ? 'var(--accent)' : 'rgba(255,255,255,0.10)',
-                          boxShadow: enabled ? '0 0 8px rgba(99,102,241,0.3)' : 'none',
+                          background: enabled && !isLocked ? 'var(--accent)' : 'rgba(255,255,255,0.10)',
+                          boxShadow: enabled && !isLocked ? '0 0 8px rgba(99,102,241,0.3)' : 'none',
                         }}
                       >
                         <div
                           className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-all duration-200"
-                          style={{ left: enabled ? '14px' : '2px' }}
+                          style={{ left: enabled && !isLocked ? '14px' : '2px' }}
                         />
                       </div>
                     </button>

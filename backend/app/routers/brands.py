@@ -23,13 +23,13 @@ logger = logging.getLogger(__name__)
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, get_data_owner_id
-from app.models import Brand, Competitor, Prompt, TrackingRun, User
+from app.models import Brand, CompetitorMention, Competitor, ContentAttribution, ContentDraft, Prompt, QueryResult, TrackingRun, User
 from app.schemas import (
     BrandCreate,
     BrandDetail,
@@ -418,6 +418,11 @@ async def delete_prompt(brand_id: int, prompt_id: int, db: DbDep, user: CurrentU
             detail=f"Prompt {prompt_id} not found for brand {brand_id}",
         )
     prompt_text = prompt.text
+    # Clean up related rows that reference this prompt (no ondelete cascade)
+    await db.execute(sa_delete(ContentAttribution).where(ContentAttribution.prompt_id == prompt_id))
+    await db.execute(sa_delete(CompetitorMention).where(CompetitorMention.prompt_id == prompt_id))
+    await db.execute(sa_delete(QueryResult).where(QueryResult.prompt_id == prompt_id))
+    await db.execute(sa_delete(ContentDraft).where(ContentDraft.prompt_id == prompt_id))
     await db.delete(prompt)
     await db.commit()
 

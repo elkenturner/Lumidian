@@ -179,6 +179,21 @@ def _build_pdf(
         bottomMargin=18 * mm,
     )
 
+    def _page_bg(canvas, doc):
+        """Paint the full page background dark with accent stripe."""
+        canvas.saveState()
+        # Full page background
+        canvas.setFillColor(COL_BG)
+        canvas.rect(0, 0, W, H, stroke=0, fill=1)
+        # Indigo accent stripe at very top
+        canvas.setFillColor(COL_INDIGO)
+        canvas.rect(0, H - 3 * mm, W, 3 * mm, stroke=0, fill=1)
+        # Page number (bottom center, skip first page)
+        canvas.setFont("Helvetica", 7)
+        canvas.setFillColor(COL_MUTED)
+        canvas.drawCentredString(W / 2, 10 * mm, f"Page {doc.page}")
+        canvas.restoreState()
+
     styles = getSampleStyleSheet()
     body_w = W - 36 * mm
 
@@ -205,46 +220,49 @@ def _build_pdf(
     story = []
 
     # ── Header ────────────────────────────────────────────────────────────────
+    S_BRAND = style("Brand", fontSize=8, textColor=COL_INDIGO_LT, fontName="Helvetica-Bold",
+                     leading=11, spaceAfter=2, letterSpacing=2)
+    story.append(Paragraph("LUMIDIAN", S_BRAND))
     story.append(Paragraph("AI Visibility Report", S_TITLE))
     story.append(Paragraph(f"<b>{brand_name}</b>  ·  Generated {generated_at.strftime('%B %d, %Y')}", S_SUB))
     story.append(Spacer(1, 4 * mm))
-    story.append(HRFlowable(width="100%", thickness=1, color=COL_BORDER, spaceAfter=6 * mm))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=COL_BORDER, spaceAfter=6 * mm))
 
     # ── Overall score card ────────────────────────────────────────────────────
     if overall_score is not None:
         sc = round(overall_score, 1)
         sc_col = score_color(sc)
-        score_style = ParagraphStyle("ScBig", fontSize=36, textColor=sc_col,
+        score_style = ParagraphStyle("ScBig", fontSize=34, textColor=sc_col,
                                      fontName="Helvetica-Bold", leading=40, alignment=TA_CENTER)
         score_data = [[
             Paragraph(f"{sc}%", score_style),
-            Paragraph("Overall Visibility Score<br/><font size='8' color='#64748b'>Percentage of AI responses that mention your brand</font>",
-                      ParagraphStyle("ScD", fontSize=11, textColor=COL_TEXT, fontName="Helvetica-Bold",
-                                     leading=16, alignment=TA_LEFT)),
+            Paragraph("Overall Visibility Score<br/><font size='8' color='#94a3b8'>Percentage of AI responses that mention your brand</font>",
+                      ParagraphStyle("ScD", fontSize=12, textColor=COL_TEXT, fontName="Helvetica-Bold",
+                                     leading=18, alignment=TA_LEFT)),
         ]]
-        score_table = Table(score_data, colWidths=[40 * mm, body_w - 40 * mm])
+        score_table = Table(score_data, colWidths=[50 * mm, body_w - 50 * mm])
         score_table.setStyle(TableStyle([
             ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
-            ("LEFTPADDING",  (0, 0), (-1, -1), 10),
-            ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-            ("TOPPADDING",   (0, 0), (-1, -1), 8),
-            ("BOTTOMPADDING",(0, 0), (-1, -1), 8),
-            ("BACKGROUND",   (0, 0), (-1, -1), COL_CARD),
+            ("LEFTPADDING",  (0, 0), (-1, -1), 12),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+            ("TOPPADDING",   (0, 0), (-1, -1), 14),
+            ("BOTTOMPADDING",(0, 0), (-1, -1), 14),
+            ("BACKGROUND",   (0, 0), (-1, -1), colors.HexColor("#161625")),
             ("ROUNDEDCORNERS", (0, 0), (-1, -1), [6, 6, 6, 6]),
-            ("BOX",          (0, 0), (-1, -1), 1, COL_BORDER),
+            ("BOX",          (0, 0), (-1, -1), 0.5, colors.HexColor("#4f46e5")),
         ]))
         story.append(score_table)
-        story.append(Spacer(1, 5 * mm))
+        story.append(Spacer(1, 6 * mm))
 
     # ── Per-model breakdown ───────────────────────────────────────────────────
     if model_scores:
         story.append(Paragraph("Model Breakdown", S_H2))
         ms_headers = [Paragraph(MODEL_LABELS.get(m, m.title()), ParagraphStyle(
-            "MH", fontSize=9, textColor=COL_MUTED, fontName="Helvetica-Bold",
+            "MH", fontSize=9, textColor=colors.HexColor("#94a3b8"), fontName="Helvetica-Bold",
             leading=12, alignment=TA_CENTER)) for m in MODEL_ORDER if m in model_scores]
         ms_values = [Paragraph(f"{model_scores[m]}%", ParagraphStyle(
-            "MV", fontSize=15, fontName="Helvetica-Bold",
-            textColor=score_color(model_scores[m]), leading=18, alignment=TA_CENTER))
+            "MV", fontSize=18, fontName="Helvetica-Bold",
+            textColor=score_color(model_scores[m]), leading=22, alignment=TA_CENTER))
             for m in MODEL_ORDER if m in model_scores]
 
         cols = len(ms_headers)
@@ -252,17 +270,17 @@ def _build_pdf(
             col_w = body_w / cols
             ms_table = Table([ms_headers, ms_values], colWidths=[col_w] * cols)
             ms_table.setStyle(TableStyle([
-                ("BACKGROUND",   (0, 0), (-1, -1), COL_CARD),
+                ("BACKGROUND",   (0, 0), (-1, -1), colors.HexColor("#161625")),
                 ("BOX",          (0, 0), (-1, -1), 1, COL_BORDER),
                 ("INNERGRID",    (0, 0), (-1, -1), 0.5, COL_BORDER),
-                ("TOPPADDING",   (0, 0), (-1, -1), 7),
-                ("BOTTOMPADDING",(0, 0), (-1, -1), 7),
+                ("TOPPADDING",   (0, 0), (-1, -1), 10),
+                ("BOTTOMPADDING",(0, 0), (-1, -1), 10),
                 ("LEFTPADDING",  (0, 0), (-1, -1), 6),
                 ("RIGHTPADDING", (0, 0), (-1, -1), 6),
                 ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
             ]))
             story.append(ms_table)
-            story.append(Spacer(1, 5 * mm))
+            story.append(Spacer(1, 6 * mm))
 
     # ── Trend table ───────────────────────────────────────────────────────────
     if completed_runs:
@@ -393,13 +411,13 @@ def _build_pdf(
             story.append(Spacer(1, 2 * mm))
 
     # ── Footer note ───────────────────────────────────────────────────────────
-    story.append(Spacer(1, 4 * mm))
-    story.append(HRFlowable(width="100%", thickness=1, color=COL_BORDER, spaceAfter=3 * mm))
+    story.append(Spacer(1, 6 * mm))
+    story.append(HRFlowable(width="100%", thickness=0.5, color=COL_BORDER, spaceAfter=4 * mm))
     story.append(Paragraph(
-        f"Generated by Lumidian  ·  {generated_at.strftime('%Y-%m-%d %H:%M')} UTC",
+        f"<font color='#818cf8'>Lumidian</font>  ·  {generated_at.strftime('%Y-%m-%d %H:%M')} UTC  ·  lumidian.com",
         ParagraphStyle("Footer", fontSize=8, textColor=COL_MUTED, fontName="Helvetica",
                        leading=11, alignment=TA_CENTER),
     ))
 
-    doc.build(story)
+    doc.build(story, onFirstPage=_page_bg, onLaterPages=_page_bg)
     return buf.getvalue()

@@ -208,6 +208,8 @@ async def ai_fill_profile(brand_id: int, db: DbDep, user: CurrentUser):
 
     prompt = f"""You are a brand analyst. Based on the website content below, extract structured brand profile information.
 
+IMPORTANT: Always generate a description based on the website content provided, even if the brand name doesn't exactly match the website.
+
 Website content for brand "{brand.name}":
 ---
 {context[:8000]}
@@ -221,7 +223,7 @@ Return a JSON object with exactly these keys (use null for anything you cannot d
   "key_stats": ["list", "of", "up to 5 specific facts, numbers, or claims found on the site"]
 }}
 
-Return ONLY the JSON object, no markdown, no explanation."""
+Return ONLY the JSON object, no markdown, no explanation. Never refuse or explain why you cannot generate a description — always produce your best answer from the content."""
 
     try:
         import anthropic
@@ -241,6 +243,11 @@ Return ONLY the JSON object, no markdown, no explanation."""
     except Exception as exc:
         logger.warning("AI fill: LLM call failed for brand %d: %s", brand_id, exc)
         raise HTTPException(status_code=502, detail="AI generation failed. Please try again.")
+
+    # Guard against LLM refusal text leaking through
+    desc = data.get("company_description") or ""
+    if any(desc.lower().startswith(p) for p in ["i cannot", "i can't", "i'm unable", "sorry,", "unfortunately,"]):
+        data["company_description"] = None
 
     return AiFillProfileResponse(
         company_description=data.get("company_description") or None,

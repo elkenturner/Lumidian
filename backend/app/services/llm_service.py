@@ -272,7 +272,7 @@ async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemi
             loop.run_in_executor(
                 None, lambda: model.generate_content(prompt, **gen_kwargs)
             ),
-            timeout=30.0,  # 30s timeout to avoid hanging
+            timeout=20.0,  # 20s timeout to avoid hanging
         )
         # response.text raises ValueError when the response was blocked by a
         # safety filter or finished with a non-STOP reason (e.g. RECITATION,
@@ -306,8 +306,8 @@ async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemi
         return _build_result(text, brand_name, latency_ms)
     except asyncio.TimeoutError:
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.error("[gemini] Request timed out after 30s for prompt %r", prompt[:100])
-        return _build_result(None, brand_name, latency_ms, error="Request timed out (30s)")
+        logger.error("[gemini] Request timed out after 20s for prompt %r", prompt[:100])
+        return _build_result(None, brand_name, latency_ms, error="Request timed out (20s)")
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.error("[gemini] API error for prompt %r: %s", prompt[:100], exc)
@@ -332,7 +332,7 @@ _DISPATCHERS = {
 SUPPORTED_MODELS = list(_DISPATCHERS.keys())
 
 
-async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 3, model_version: str = "") -> dict:
+async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 2, model_version: str = "") -> dict:
     """
     Call handler(prompt, brand_name, model_version) and retry up to max_attempts
     times if the response is empty or errored (but not due to a missing API key,

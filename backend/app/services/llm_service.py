@@ -111,7 +111,7 @@ def _build_result(
 
 # ── ChatGPT ───────────────────────────────────────────────────────────────────
 
-async def _query_chatgpt(prompt: str, brand_name: str) -> dict:
+async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt-4.1-mini") -> dict:
     if not OPENAI_API_KEY:
         return _api_key_placeholder("chatgpt")
     start = time.monotonic()
@@ -120,7 +120,7 @@ async def _query_chatgpt(prompt: str, brand_name: str) -> dict:
 
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
         response = await client.chat.completions.create(
-            model="gpt-4.1-mini",
+            model=model_version,
             messages=[{"role": "user", "content": prompt}],
             max_completion_tokens=1024,
         )
@@ -149,7 +149,7 @@ async def _query_chatgpt(prompt: str, brand_name: str) -> dict:
 
 # ── Claude ────────────────────────────────────────────────────────────────────
 
-async def _query_claude(prompt: str, brand_name: str) -> dict:
+async def _query_claude(prompt: str, brand_name: str, model_version: str = "claude-haiku-4-5-20251001") -> dict:
     if not ANTHROPIC_API_KEY:
         return _api_key_placeholder("claude")
     start = time.monotonic()
@@ -159,7 +159,7 @@ async def _query_claude(prompt: str, brand_name: str) -> dict:
         client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
         async with _CLAUDE_SEM:
             response = await client.messages.create(
-                model="claude-haiku-4-5-20251001",
+                model=model_version,
                 max_tokens=1024,
                 messages=[{"role": "user", "content": prompt}],
             )
@@ -188,7 +188,7 @@ async def _query_claude(prompt: str, brand_name: str) -> dict:
 
 # ── Perplexity ────────────────────────────────────────────────────────────────
 
-async def _query_perplexity(prompt: str, brand_name: str) -> dict:
+async def _query_perplexity(prompt: str, brand_name: str, model_version: str = "sonar") -> dict:
     if not PERPLEXITY_API_KEY:
         return _api_key_placeholder("perplexity")
     start = time.monotonic()
@@ -203,7 +203,7 @@ async def _query_perplexity(prompt: str, brand_name: str) -> dict:
         # blast Perplexity's per-minute quota and cause 429s on later prompts.
         async with _PERPLEXITY_SEM:
             response = await client.chat.completions.create(
-                model="sonar",
+                model=model_version,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1024,
                 temperature=0.7,
@@ -233,7 +233,7 @@ async def _query_perplexity(prompt: str, brand_name: str) -> dict:
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
 
-async def _query_gemini(prompt: str, brand_name: str) -> dict:
+async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemini-2.5-flash") -> dict:
     if not GEMINI_API_KEY:
         return _api_key_placeholder("gemini")
     start = time.monotonic()
@@ -241,7 +241,7 @@ async def _query_gemini(prompt: str, brand_name: str) -> dict:
         import google.generativeai as genai
 
         genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel(model_version)
         # google-generativeai does not provide a native async client for
         # generate_content, so we run it in a thread pool to keep the event
         # loop free.
@@ -329,17 +329,17 @@ _DISPATCHERS = {
 SUPPORTED_MODELS = list(_DISPATCHERS.keys())
 
 
-async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 3) -> dict:
+async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 3, model_version: str = "") -> dict:
     """
-    Call handler(prompt, brand_name) and retry up to max_attempts times if the
-    response is empty or errored (but not due to a missing API key, which is
-    a permanent configuration issue).
+    Call handler(prompt, brand_name, model_version) and retry up to max_attempts
+    times if the response is empty or errored (but not due to a missing API key,
+    which is a permanent configuration issue).
     """
     display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
     errors: list[str] = []
 
     for attempt in range(1, max_attempts + 1):
-        result = await handler(prompt, brand_name)
+        result = await handler(prompt, brand_name, model_version)
 
         # Successful response — return immediately
         if result.get("response_text") and not result.get("error"):
@@ -380,7 +380,7 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
     }
 
 
-async def query_model(model: str, prompt: str, brand_name: str) -> dict:
+async def query_model(model: str, prompt: str, brand_name: str, pro: bool = False) -> dict:
     """
     Query a single LLM model with the given prompt.
 
@@ -388,6 +388,7 @@ async def query_model(model: str, prompt: str, brand_name: str) -> dict:
         model:      One of 'chatgpt', 'claude', 'perplexity', 'gemini'.
         prompt:     The text prompt to send.
         brand_name: The brand name to check for in the response.
+        pro:        Whether the user has a Pro subscription (selects upgraded models).
 
     Returns:
         {
@@ -405,4 +406,6 @@ async def query_model(model: str, prompt: str, brand_name: str) -> dict:
             "latency_ms": 0,
             "error": f"Unknown model: {model}",
         }
-    return await _with_retry(handler, prompt, brand_name, model)
+
+    model_version = _get_model_version(model, pro)
+    return await _with_retry(handler, prompt, brand_name, model, model_version=model_version)

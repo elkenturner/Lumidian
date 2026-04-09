@@ -41,11 +41,12 @@ function DropdownMenuSubContent({ className, ...props }: React.ComponentProps<ty
   )
 }
 
-function DropdownMenuContent({ className, sideOffset = 4, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
+function DropdownMenuContent({ className, sideOffset = 4, style, ...props }: React.ComponentProps<typeof DropdownMenuPrimitive.Content>) {
   return (
     <DropdownMenuPrimitive.Portal>
       <DropdownMenuPrimitive.Content
         sideOffset={sideOffset}
+        style={{ transformOrigin: 'var(--radix-dropdown-menu-content-transform-origin)', ...style }}
         className={cn(
           "z-50 min-w-[8rem] overflow-hidden rounded-xl bg-[rgba(10,14,24,0.97)] backdrop-blur-xl border border-[var(--border-default)] p-1 shadow-xl",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",

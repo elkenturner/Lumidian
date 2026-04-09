@@ -52,7 +52,11 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
             <div
               key={ms.model}
               className="model-card"
-              style={{ borderLeftColor: unconfigured ? 'var(--border-subtle)' : config.color }}
+              style={{
+                background: unconfigured
+                  ? 'rgba(15,23,42,0.4)'
+                  : `color-mix(in oklch, ${config.color} 4%, rgba(15,23,42,0.4))`,
+              }}
             >
               <div className="flex items-center justify-between mb-2">
                 <span

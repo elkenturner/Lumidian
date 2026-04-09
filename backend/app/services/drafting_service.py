@@ -667,12 +667,7 @@ async def generate_gap_draft(
 
     raw_text = await call_claude(claude_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500))
     raw_text = remove_hedging(raw_text)
-    raw_text = enforce_x_char_limit(raw_text, platform)
-
-    # Enforce X character limits
-    if platform_key.startswith("x_"):
-        from app.services.drafting import enforce_x_char_limit
-        raw_text = enforce_x_char_limit(raw_text, platform_key)
+    raw_text = enforce_x_char_limit(raw_text, platform_key)
 
     # Quality check: brand name must appear in the content.
     # Skip retry for restricted subreddits — the prompt intentionally omits the brand.

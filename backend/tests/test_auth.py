@@ -175,14 +175,18 @@ async def test_login_case_insensitive(client: httpx.AsyncClient):
 
 
 async def test_login_blocked_for_unverified_user(client: httpx.AsyncClient):
-    """Unverified users must not be able to log in."""
+    """Unverified users get a 200 needs_verification response instead of a 403."""
     await register_user(client, email="unverif_login@example.com")
     resp = await client.post(
         "/api/auth/login",
         json={"email": "unverif_login@example.com", "password": "Password123"},
     )
-    assert resp.status_code == 403
-    assert "verify your email" in resp.json()["detail"].lower()
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data.get("needs_verification") is True
+    assert data.get("email") == "unverif_login@example.com"
+    # No auth cookies should be set
+    assert "clarity_token" not in resp.cookies
 
 
 # ── Logout ────────────────────────────────────────────────────────────────────

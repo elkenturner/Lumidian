@@ -333,7 +333,7 @@ async def get_brand(brand_id: int, db: DbDep, user: CurrentUser):
 
 @router.put("/{brand_id}", response_model=BrandDetail)
 async def update_brand(brand_id: int, payload: BrandUpdate, db: DbDep, user: CurrentUser):
-    brand = await _get_brand_or_404(db, brand_id, user, owner_only=True)
+    brand = await _get_brand_or_404(db, brand_id, user)
 
     if payload.name is not None:
         new_slug = _slugify(payload.name)

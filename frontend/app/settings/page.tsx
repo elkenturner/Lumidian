@@ -1,7 +1,7 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { fadeIn } from '@/lib/motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { fadeIn, slideIn } from '@/lib/motion';
 import { useEffect, useState, useRef } from 'react';
 import { logError } from '@/lib/utils/errors';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -759,6 +759,14 @@ export default function SettingsPage() {
         ))}
       </div>
 
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          variants={slideIn}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
       {/* ── GENERAL TAB ──────────────────────────────────────────────────────── */}
       {activeTab === 'general' && brand && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
@@ -1256,6 +1264,8 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Delete brand confirmation modal */}
       {showDeleteBrandConfirm && brand && (

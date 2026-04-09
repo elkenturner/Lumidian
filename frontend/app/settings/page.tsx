@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { fadeIn } from '@/lib/motion';
 import { useEffect, useState, useRef } from 'react';
 import { logError } from '@/lib/utils/errors';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -725,7 +727,12 @@ export default function SettingsPage() {
   const completionPct = profile?.completion_pct ?? 0;
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
+    <motion.div
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
+      className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl"
+    >
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-[var(--text-primary)]" style={{ letterSpacing: '-0.3px' }}>Settings</h1>
@@ -1300,6 +1307,6 @@ export default function SettingsPage() {
         </div>
       )}
       {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
-    </div>
+    </motion.div>
   );
 }

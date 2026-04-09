@@ -239,12 +239,12 @@ export function DraftCard({
     }
   }
 
-  const borderClass = isLowQuality
-    ? 'border-l-[3px] border-l-[var(--danger)]/50 border-[var(--border-default)]'
+  const qualityClass = isLowQuality
+    ? 'bg-[oklch(0.55_0.22_29_/_0.04)] border-[var(--border-default)]'
     : 'border-[var(--border-default)]';
 
   return (
-    <div className={`card card-hover p-5 flex flex-col gap-3 transition-colors ${borderClass}`}>
+    <div className={`card card-hover p-5 flex flex-col gap-3 transition-colors ${qualityClass}`}>
       {/* Top row */}
       <div className="flex items-center justify-between gap-2">
         <PlatformBadge platform={draft.platform} />

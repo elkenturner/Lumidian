@@ -185,12 +185,12 @@ function DraftCard({
     }
   }
 
-  const borderClass = isLowQuality
-    ? 'border-l-[3px] border-l-[var(--danger)]/50'
+  const qualityClass = isLowQuality
+    ? 'bg-[oklch(0.55_0.22_29_/_0.04)]'
     : '';
 
   return (
-    <div className={`card p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] transition-colors ${borderClass}`}>
+    <div className={`card p-5 flex flex-col gap-3 hover:border-[rgba(255,255,255,0.14)] transition-colors ${qualityClass}`}>
       {/* Top row */}
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={draft.platform} />

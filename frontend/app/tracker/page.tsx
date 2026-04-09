@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { fadeIn } from '@/lib/motion';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -111,7 +113,12 @@ export default function TrackerPage() {
   }
 
   return (
-    <div className="px-8 py-8 max-w-7xl">
+    <motion.div
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
+      className="px-8 py-8 max-w-7xl"
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
@@ -404,6 +411,6 @@ export default function TrackerPage() {
           </div>
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }

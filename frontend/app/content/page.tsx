@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { fadeIn } from '@/lib/motion';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { logError } from '@/lib/utils/errors';
 import {
@@ -2040,7 +2042,12 @@ export default function ContentHubPage() {
   ];
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px]">
+    <motion.div
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
+      className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px]"
+    >
       {/* Subscription status banner */}
       {user?.subscription_status && ['past_due', 'canceled', 'unpaid'].includes(user.subscription_status) && (
         <div className="-mx-8 -mt-8 mb-6">
@@ -2729,7 +2736,7 @@ export default function ContentHubPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </motion.div>
   );
 }
 

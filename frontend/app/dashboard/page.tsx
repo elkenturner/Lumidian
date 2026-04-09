@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { fadeIn } from '@/lib/motion';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
@@ -476,7 +478,14 @@ export default function DashboardPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div ref={isMobile ? pullRef : undefined} className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl" style={isMobile ? { overflowY: 'auto', minHeight: '100vh' } : undefined}>
+    <motion.div
+      ref={isMobile ? pullRef : undefined}
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
+      className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl"
+      style={isMobile ? { overflowY: 'auto', minHeight: '100vh' } : undefined}
+    >
       {/* Pull-to-refresh indicator */}
       {isMobile && (pullDistance > 0 || pullRefreshing) && (
         <div
@@ -926,6 +935,6 @@ export default function DashboardPage() {
       )}
 
       {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
-    </div>
+    </motion.div>
   );
 }

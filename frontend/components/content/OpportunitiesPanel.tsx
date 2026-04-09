@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { staggerContainer, staggerChild } from '@/lib/motion';
 import {
   Radio,
   HelpCircle,
@@ -67,15 +69,21 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
     <>
       {header}
       {oppFilterBar}
-      <div className="flex flex-col gap-3">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="flex flex-col gap-3"
+      >
         {visibleOpportunities.map((o) => (
-          <OpportunityCard
-            key={o.id}
-            opp={o}
-            onDraft={handleDraftOpportunity}
-            onDismiss={handleDismissOpportunity}
-            queueFull={!!draftStatus?.draft_queue_full}
-          />
+          <motion.div key={o.id} variants={staggerChild}>
+            <OpportunityCard
+              opp={o}
+              onDraft={handleDraftOpportunity}
+              onDismiss={handleDismissOpportunity}
+              queueFull={!!draftStatus?.draft_queue_full}
+            />
+          </motion.div>
         ))}
         {visibleOpportunities.length === 0 && (
           <EmptyState
@@ -84,7 +92,7 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
             description='Try "All" or switch platform.'
           />
         )}
-      </div>
+      </motion.div>
     </>
   );
 }

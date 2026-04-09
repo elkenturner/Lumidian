@@ -106,7 +106,7 @@ export default function BrandTable({
               : conv.model;
 
             return (
-              <div key={conv.id}>
+              <div key={conv.id} className="stagger-row">
                 <button
                   className="w-full px-5 py-4 hover:bg-[var(--accent-muted)] transition-colors text-left"
                   onClick={() => setExpandedConvId(expandedConvId === conv.id ? null : conv.id)}

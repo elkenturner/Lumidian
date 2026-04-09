@@ -61,7 +61,9 @@ def _slugify(name: str) -> str:
     return slug
 
 
-async def _get_brand_or_404(db: AsyncSession, brand_id: int, user: User | None = None) -> Brand:
+async def _get_brand_or_404(
+    db: AsyncSession, brand_id: int, user: User | None = None, *, owner_only: bool = False
+) -> Brand:
     result = await db.execute(
         select(Brand)
         .where(Brand.id == brand_id)
@@ -73,8 +75,16 @@ async def _get_brand_or_404(db: AsyncSession, brand_id: int, user: User | None =
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Brand {brand_id} not found",
         )
-    if user is not None and brand.user_id != user.id and not getattr(user, "is_admin", False):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+    if user is not None:
+        if getattr(user, "is_admin", False):
+            return brand
+        if owner_only:
+            if brand.user_id != user.id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+        else:
+            effective_owner_id = await get_data_owner_id(db, user)
+            if brand.user_id != effective_owner_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return brand
 
 
@@ -323,7 +333,7 @@ async def get_brand(brand_id: int, db: DbDep, user: CurrentUser):
 
 @router.put("/{brand_id}", response_model=BrandDetail)
 async def update_brand(brand_id: int, payload: BrandUpdate, db: DbDep, user: CurrentUser):
-    brand = await _get_brand_or_404(db, brand_id, user)
+    brand = await _get_brand_or_404(db, brand_id, user, owner_only=True)
 
     if payload.name is not None:
         new_slug = _slugify(payload.name)
@@ -357,7 +367,7 @@ async def update_brand(brand_id: int, payload: BrandUpdate, db: DbDep, user: Cur
 
 @router.delete("/{brand_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_brand(brand_id: int, db: DbDep, user: CurrentUser):
-    brand = await _get_brand_or_404(db, brand_id, user)
+    brand = await _get_brand_or_404(db, brand_id, user, owner_only=True)
     # Clean up rows that reference this brand's prompts/runs without ondelete rules
     prompt_ids = [p.id for p in brand.prompts] if brand.prompts else []
     if prompt_ids:

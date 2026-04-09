@@ -53,16 +53,14 @@ export default function LoginPage() {
       await login(email, password);
       router.push(from);
     } catch (err: unknown) {
-      const e = err as { message?: string; challenge_token?: string; response?: { status?: number; data?: { detail?: string } } };
+      const e = err as { message?: string; challenge_token?: string; email?: string; response?: { status?: number; data?: { detail?: string } } };
       if (e?.message === '2fa_required' && e.challenge_token) {
         setChallengeToken(e.challenge_token);
+      } else if (e?.message === 'needs_verification' && e.email) {
+        router.push(`/verify-email?email=${encodeURIComponent(e.email)}`);
+        return;
       } else {
         const detail = e?.response?.data?.detail || '';
-        // Unverified email — redirect to verification page
-        if (e?.response?.status === 403 && detail.toLowerCase().includes('verify your email')) {
-          router.push(`/verify-email?email=${encodeURIComponent(email.trim().toLowerCase())}`);
-          return;
-        }
         setError(detail || 'Invalid email or password');
       }
     } finally {

@@ -99,6 +99,19 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
                 detail=f"Pitch brands are limited to {DAILY_RUN_LIMITS_PITCH} manual run per day. Try again tomorrow.",
             )
 
+    # Block concurrent runs: reject if this brand already has a pending/running run
+    active_run_result = await db.execute(
+        select(func.count(TrackingRun.id)).where(
+            TrackingRun.brand_id == brand_id,
+            TrackingRun.status.in_(["pending", "running"]),
+        )
+    )
+    if (active_run_result.scalar_one() or 0) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A report is already running for this brand. Please wait for it to finish.",
+        )
+
     # Detect if this is the brand's first-ever run (triggers onboarding pipeline)
     completed_runs_result = await db.execute(
         select(func.count(TrackingRun.id)).where(
@@ -567,6 +580,20 @@ async def trigger_prompt_run(
     prompt = prompt_result.scalar_one_or_none()
     if prompt is None:
         raise HTTPException(status_code=404, detail="Prompt not found for this brand")
+
+    # Block concurrent runs for this brand
+    from sqlalchemy import func as sa_func
+    active_run_result = await db.execute(
+        select(sa_func.count(TrackingRun.id)).where(
+            TrackingRun.brand_id == brand_id,
+            TrackingRun.status.in_(["pending", "running"]),
+        )
+    )
+    if (active_run_result.scalar_one() or 0) > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A report is already running for this brand. Please wait for it to finish.",
+        )
 
     tracking_run = TrackingRun(
         brand_id=brand_id,

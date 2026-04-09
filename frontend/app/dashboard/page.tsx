@@ -7,17 +7,12 @@ import {
   BarChart2,
   TrendingUp,
   Users,
-  MessageSquare,
-  Globe,
   Zap,
-  ChevronDown,
   Building2,
   Play,
   Loader2,
-  RefreshCw,
-  CheckCircle2,
+  Globe,
 } from 'lucide-react';
-import BrandAvatar from '@/components/BrandAvatar';
 import { logError } from '@/lib/utils/errors';
 import {
   getBrand,
@@ -44,363 +39,34 @@ import {
   Prompt,
   Competitor,
   BrandProfile,
-  CompetitorStat,
-  ModelStat,
   BillingStatus,
   BillingUsage,
   parseApiError,
 } from '@/lib/api';
 import { AppToast, ToastData } from '@/components/AppToast';
-import TrendChart from '@/components/TrendChart';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { ManagePromptsModal } from '@/components/ManagePromptsModal';
 import { CompetitorModal } from '@/components/CompetitorModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
-import {
-  AreaChart,
-  Area,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
 import { format } from 'date-fns';
-import { MODEL_ORDER, MODEL_CONFIG as MODEL_CONFIG_SHARED, getModelConfig } from '@/lib/constants/models';
 import { parseUTCISO } from '@/lib/utils/formatting';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
-const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
-  Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.mutedBg, text: v.color }])
-);
-
-function getModelCfg(model: string) {
-  const cfg = getModelConfig(model);
-  return { label: cfg.label, bg: cfg.mutedBg, text: cfg.color, key: cfg.key };
-}
-
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/^#+\s+/gm, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/\[(\d+)\]/g, '')
-    .replace(/\n+/g, ' ')
-    .trim();
-}
-
-// ── Tooltip help icon ──────────────────────────────────────────────────────────
-
-function HelpTooltip({ text }: { text: string }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span
-      className="relative inline-flex ml-1.5 align-middle"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
-      <span className="w-4 h-4 rounded-full bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] text-[var(--text-faint)] text-[10px] font-bold flex items-center justify-center cursor-help select-none">
-        ?
-      </span>
-      {open && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-60 bg-[var(--bg-base)] border border-[var(--accent-border)] rounded-lg p-3 text-xs text-[var(--text-secondary)] leading-relaxed shadow-lg z-50 pointer-events-none whitespace-normal">
-          {text}
-        </span>
-      )}
-    </span>
-  );
-}
-
-// ── Sparkline tooltip ──────────────────────────────────────────────────────────
-
-function SparklineTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: TrendPoint & { formattedDate: string } }> }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  return (
-    <div className="bg-[var(--bg-base)] border border-[var(--accent-border)] rounded-lg p-2 shadow-lg text-xs">
-      <p className="text-[var(--text-muted)]">{d.formattedDate}</p>
-      <p className="text-[var(--accent)] font-bold">{Math.round(d.score)}%</p>
-    </div>
-  );
-}
-
-// ── Top domains chart ────────────────────────────────────────────────────────────
-
-const DOMAIN_COLORS = [
-  { color: '#c4b5fd', glow: 'rgba(129,140,248,0.4)' },
-  { color: '#34d399', glow: 'rgba(52,211,153,0.4)' },
-  { color: '#fbbf24', glow: 'rgba(251,191,36,0.4)' },
-  { color: '#a78bfa', glow: 'rgba(167,139,250,0.4)' },
-  { color: '#f472b6', glow: 'rgba(244,114,182,0.4)' },
-  { color: '#22d3ee', glow: 'rgba(34,211,238,0.4)' },
-];
-
-// Format percentage without redundant decimals (87% not 87.0%)
-const formatPct = (pct: number) => pct % 1 === 0 ? `${Math.round(pct)}%` : `${pct.toFixed(1)}%`;
-
-function DonutDomains({ domains }: { domains: Array<{ domain: string; pct: number; count: number; domain_type: string }> }) {
-  const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const total = domains.reduce((s, d) => s + d.count, 0);
-  const data = domains.map((d) => ({ ...d, value: d.count }));
-
-  const getDomainUrl = (domain: string) => {
-    const clean = domain.replace(/^www\./, '');
-    return `https://${clean}`;
-  };
-
-  return (
-    <div className="flex items-center gap-5 flex-1 min-h-0">
-      {/* Modern Donut */}
-      <div className="relative flex-shrink-0" style={{ width: 110, height: 110 }}>
-        <PieChart width={110} height={110}>
-          <defs>
-            {DOMAIN_COLORS.map((c, i) => (
-              <linearGradient key={i} id={`domainGrad${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor={c.color} stopOpacity={1} />
-                <stop offset="100%" stopColor={c.color} stopOpacity={0.7} />
-              </linearGradient>
-            ))}
-            <filter id="domainGlow" x="-50%" y="-50%" width="200%" height="200%">
-              <feGaussianBlur stdDeviation="2" result="blur" />
-              <feMerge>
-                <feMergeNode in="blur" />
-                <feMergeNode in="SourceGraphic" />
-              </feMerge>
-            </filter>
-          </defs>
-          <Pie
-            data={data}
-            cx={55}
-            cy={55}
-            innerRadius={32}
-            outerRadius={50}
-            cornerRadius={4}
-            paddingAngle={4}
-            dataKey="value"
-            stroke="rgba(0,0,0,0.3)"
-            strokeWidth={1}
-            startAngle={90}
-            endAngle={-270}
-            onMouseEnter={(_, i) => setActiveIndex(i)}
-            onMouseLeave={() => setActiveIndex(null)}
-          >
-            {data.map((_, i) => (
-              <Cell
-                key={i}
-                fill={`url(#domainGrad${i % DOMAIN_COLORS.length})`}
-                opacity={activeIndex === null || activeIndex === i ? 1 : 0.25}
-                style={{ cursor: 'pointer', outline: 'none', transition: 'opacity 0.25s ease-out', filter: activeIndex === i ? 'url(#domainGlow)' : 'none' }}
-              />
-            ))}
-          </Pie>
-        </PieChart>
-        {/* Center text */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-lg font-bold text-[var(--text-primary)] leading-none">{data.length}</span>
-          <span className="text-[9px] text-[var(--text-faint)] mt-0.5 uppercase tracking-wider">sources</span>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="flex-1 min-w-0 space-y-0.5">
-        {data.map((d, i) => {
-          const pct = total > 0 ? (d.count / total) * 100 : 0;
-          const { color, glow } = DOMAIN_COLORS[i % DOMAIN_COLORS.length];
-          const isActive = activeIndex === i;
-          const displayDomain = d.domain.replace(/^www\./, '');
-          return (
-            <a
-              key={d.domain}
-              href={getDomainUrl(d.domain)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2.5 min-w-0 group rounded-lg px-2 py-1.5 -mx-2 transition-all duration-200"
-              onMouseEnter={() => setActiveIndex(i)}
-              onMouseLeave={() => setActiveIndex(null)}
-              style={{
-                opacity: activeIndex === null || isActive ? 1 : 0.4,
-                background: isActive ? 'rgba(255,255,255,0.05)' : 'transparent',
-              }}
-            >
-              <span
-                className="w-2 h-2 rounded-full flex-shrink-0 transition-all duration-200"
-                style={{
-                  background: color,
-                  boxShadow: isActive ? `0 0 10px ${glow}, 0 0 4px ${color}` : 'none',
-                  transform: isActive ? 'scale(1.3)' : 'scale(1)',
-                }}
-              />
-              <span
-                className="text-xs truncate flex-1 min-w-0 transition-colors duration-200"
-                style={{ color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)' }}
-              >
-                {displayDomain}
-              </span>
-              <span
-                className="text-[11px] tabular-nums font-semibold flex-shrink-0 transition-colors duration-200"
-                style={{ color: isActive ? color : 'var(--text-faint)' }}
-              >
-                {formatPct(pct)}
-              </span>
-            </a>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ── Model breakdown bars ───────────────────────────────────────────────────────
-
-const MODEL_BAR_COLORS: Record<string, string> = {
-  chatgpt: 'var(--color-chatgpt)',
-  claude: 'var(--color-claude)',
-  perplexity: 'var(--color-perplexity)',
-  gemini: 'var(--color-gemini)',
-};
-
-function ModelBreakdown({ models, deltas }: { models: ModelStat[]; deltas?: Record<string, number> }) {
-  if (!models.length) return <p className="text-xs text-[var(--text-faint)]">No model data yet</p>;
-  return (
-    <div className="space-y-3 w-full">
-      {models.map((m) => {
-        const pct = Math.round(m.mention_rate * 100);
-        const barColor = MODEL_BAR_COLORS[m.model] ?? 'var(--accent)';
-        const barWidth = `${pct}%`;
-        const delta = deltas?.[m.model];
-        return (
-          <div key={m.model}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-medium text-[var(--text-secondary)]">{m.label}</span>
-              <span className="text-xs tabular-nums text-[var(--text-secondary)] flex items-center gap-1">
-                {delta !== undefined && delta !== 0 && (
-                  <span style={{ color: delta > 0 ? 'var(--success)' : 'var(--danger-text)', fontWeight: 600 }}>
-                    {delta > 0 ? `↑${delta}%` : `↓${Math.abs(delta)}%`}
-                  </span>
-                )}
-                {pct}% <span className="text-[var(--text-faint)]">({m.mention_count}/{m.total})</span>
-              </span>
-            </div>
-            <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-500" style={{ width: barWidth, background: barColor }} />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── Reports tab prompt groups ──────────────────────────────────────────────────
-
-interface PromptGroup {
-  promptId: number;
-  promptText: string;
-  total: number;
-  mentioned: number;
-  modelStats: Map<string, { total: number; mentioned: number }>;
-  responses: QueryResult[];
-}
-
-function buildPromptGroups(responses: QueryResult[]): PromptGroup[] {
-  const map = new Map<number, PromptGroup>();
-  for (const r of responses) {
-    if (!map.has(r.prompt_id)) {
-      map.set(r.prompt_id, { promptId: r.prompt_id, promptText: r.prompt_text ?? '', total: 0, mentioned: 0, modelStats: new Map(), responses: [] });
-    }
-    const pg = map.get(r.prompt_id)!;
-    pg.total++;
-    if (r.mentioned) pg.mentioned++;
-    pg.responses.push(r);
-    if (!pg.modelStats.has(r.model)) pg.modelStats.set(r.model, { total: 0, mentioned: 0 });
-    const ms = pg.modelStats.get(r.model)!;
-    ms.total++;
-    if (r.mentioned) ms.mentioned++;
-  }
-  return Array.from(map.values());
-}
-
-// ── Best Performing Prompt card ────────────────────────────────────────────────
-
-function BestPromptCard({ responses, loading }: { responses: QueryResult[]; loading: boolean }) {
-  // Compute the top prompt by mention rate from available responses
-  const best = (() => {
-    if (!responses.length) return null;
-    const map = new Map<number, { text: string; total: number; mentioned: number; models: Set<string> }>();
-    for (const r of responses) {
-      if (r.error) continue;
-      if (!map.has(r.prompt_id)) {
-        map.set(r.prompt_id, { text: r.prompt_text ?? '', total: 0, mentioned: 0, models: new Set() });
-      }
-      const p = map.get(r.prompt_id)!;
-      p.total++;
-      if (r.mentioned) { p.mentioned++; p.models.add(r.model); }
-    }
-    let top: { text: string; total: number; mentioned: number; models: string[] } | null = null;
-    let topRate = -1;
-    for (const [, p] of Array.from(map)) {
-      if (p.total === 0) continue;
-      const rate = p.mentioned / p.total;
-      if (rate > topRate || (rate === topRate && top && p.mentioned > top.mentioned)) {
-        topRate = rate;
-        top = { text: p.text, total: p.total, mentioned: p.mentioned, models: Array.from(p.models) };
-      }
-    }
-    return top;
-  })();
-
-  return (
-    <div className="self-start card p-5" style={{ borderLeft: '2px solid var(--accent-muted)' }}>
-      <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center mb-3">
-        Best Performing Prompt
-        <HelpTooltip text="The prompt where your brand is mentioned most often across AI models." />
-      </p>
-      {loading ? (
-        <div className="space-y-2 flex-1">
-          <div className="h-3 w-full bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />
-          <div className="h-3 w-2/3 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />
-        </div>
-      ) : best ? (
-        <>
-          <p className="text-sm text-[var(--text-primary)] leading-relaxed line-clamp-2 flex-1">
-            &ldquo;{best.text}&rdquo;
-          </p>
-          <div className="flex items-end justify-between mt-3">
-            <p className="text-2xl font-bold text-[var(--success)] leading-none">
-              {Math.round((best.mentioned / best.total) * 100)}%
-              <span className="text-xs font-normal text-[var(--text-faint)] ml-1">visibility</span>
-            </p>
-            {best.models.length > 0 && (
-              <div className="flex flex-wrap gap-1 justify-end">
-                {best.models.map((m) => {
-                  const cfg = getModelCfg(m);
-                  return (
-                    <span key={m} className="text-[10px] font-medium px-1.5 py-0.5 rounded" style={{ background: cfg.bg, color: cfg.text }}>
-                      {cfg.label}
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </>
-      ) : (
-        <>
-          <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">—</p>
-          <p className="text-xs text-[var(--text-faint)] mt-1">No data yet</p>
-        </>
-      )}
-    </div>
-  );
-}
+import {
+  DashboardHeader,
+  StatsGrid,
+  VisibilityChart,
+  BrandTable,
+  BestPromptCard,
+  DonutDomains,
+  DashboardModelBreakdown,
+  HelpTooltip,
+  buildPromptGroups,
+} from '@/components/dashboard';
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
@@ -486,9 +152,6 @@ export default function DashboardPage() {
     setExpandedConvId(null);
 
     try {
-      // Start getRecentRuns first and chain getResponses off it immediately —
-      // so response fetching begins as soon as run IDs are known, without
-      // waiting for the slower analytics/trends fetches to complete.
       const runsPromise = getRecentRuns(brandId);
       const responsesPromise = runsPromise.then((runs) => {
         const latestCompleted = [...(Array.isArray(runs) ? runs : [])]
@@ -510,7 +173,6 @@ export default function DashboardPage() {
         responsesPromise.catch((err) => { logError(err, 'Dashboard: fetch responses'); return []; }),
       ]);
 
-      // Bail out if the user has already switched to a different brand
       if (signal?.aborted) return;
 
       setOverview(ov);
@@ -532,7 +194,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!selectedBrandId) return;
-    // Cancel any in-flight request for a previous brand
     loadAbortRef.current?.abort();
     const controller = new AbortController();
     loadAbortRef.current = controller;
@@ -585,7 +246,6 @@ export default function DashboardPage() {
           for (const pid of completed) next.delete(pid);
           return next;
         });
-        // Persist updated list to localStorage
         if (typeof window !== 'undefined') {
           const key = 'pendingPromptRuns';
           try {
@@ -594,7 +254,6 @@ export default function DashboardPage() {
             localStorage.setItem(key, JSON.stringify(updated));
           } catch { /* ignore */ }
         }
-        // Refresh dashboard data
         if (selectedBrandId) loadData(selectedBrandId);
       }
     }, 3000);
@@ -608,14 +267,11 @@ export default function DashboardPage() {
       if (params.get('newBrand') === 'true') {
         const newBrandId = parseInt(params.get('brandId') ?? '', 10);
         if (!isNaN(newBrandId)) {
-          // Write to localStorage first so fetchBrands selects the right brand
           setActiveBrandId(newBrandId);
         }
-        // Refetch brands — the new brand won't be in BrandContext's stale list
         refetchBrands();
         setNewBrandMode(true);
         setNewBrandStep('running');
-        // Clean URL without reload
         window.history.replaceState({}, '', '/dashboard');
       }
     }
@@ -649,14 +305,12 @@ export default function DashboardPage() {
           }
           if (selectedBrandId) {
             loadData(selectedBrandId);
-            // Auto-generate drafts for new brand onboarding
             if (newBrandMode && !newBrandHandledRef.current && run.status === 'completed') {
               newBrandHandledRef.current = true;
               setNewBrandStep('drafting');
               try {
                 await generateNow(selectedBrandId, 20);
               } catch { /* non-fatal */ }
-              // Fire-and-forget Reddit scan
               triggerScan(selectedBrandId).catch((err) => logError(err, 'Dashboard: trigger Reddit scan'));
               setNewBrandStep('done');
               setTimeout(() => setNewBrandMode(false), 10000);
@@ -672,7 +326,6 @@ export default function DashboardPage() {
   }, [activeRunId, selectedBrandId, loadData, newBrandMode]);
 
   // Broadcast report-running state to other pages via localStorage
-  // Use overview?.latest_run?.status directly — latestRun is declared later in render
   useEffect(() => {
     try {
       const status = overview?.latest_run?.status;
@@ -693,21 +346,18 @@ export default function DashboardPage() {
 
   async function handleRunReport() {
     if (!selectedBrandId || triggering) return;
-    // Guard: don't trigger if a run is already active (defense-in-depth behind disabled buttons)
     const runStatus = overview?.latest_run?.status;
     if (activeRunId !== null || runStatus === 'running' || runStatus === 'pending') return;
     setTriggering(true);
     try {
       const result = await triggerRun(selectedBrandId);
       setActiveRunId(result.run_id);
-      // Refresh usage after a successful run
       getBillingUsage().then(setUsage).catch((err) => logError(err, 'Dashboard: refresh billing usage after run'));
     } catch (err: unknown) {
       const e = err as { response?: { status?: number; data?: { detail?: string } } };
       const httpStatus = e?.response?.status;
       const detail = parseApiError(err);
       if (httpStatus === 409) {
-        // Already running — show as info toast, not an error
         setToast({ message: 'A report is already running. Please wait for it to finish.', type: 'info' });
       } else if (httpStatus === 429 || httpStatus === 402) {
         setUpgradeModalReason(detail);
@@ -719,6 +369,8 @@ export default function DashboardPage() {
       setTriggering(false);
     }
   }
+
+  // ── Derived state ──────────────────────────────────────────────────────────
 
   const selectedBrand = brands.find((b) => b.id === selectedBrandId);
   const latestRun = overview?.latest_run;
@@ -736,7 +388,6 @@ export default function DashboardPage() {
     ? sparkData[sparkData.length - 1].score - sparkData[sparkData.length - 2].score
     : null;
 
-  // Next auto-report: scheduled once daily at 08:00 UTC
   const nextReportHours: number | null = (() => {
     const now = new Date();
     let next = new Date(Date.UTC(
@@ -747,7 +398,6 @@ export default function DashboardPage() {
     return h > 0 ? h : null;
   })();
 
-  // Time elapsed since last completed run
   const sinceLastRun = latestRun?.completed_at ? (() => {
     const diffMs = Date.now() - parseUTCISO(latestRun.completed_at).getTime();
     const h = Math.floor(diffMs / 3600000);
@@ -771,7 +421,6 @@ export default function DashboardPage() {
     : 'var(--warning)'
     : 'var(--text-faint)';
 
-  // Sort: prompts where brand IS mentioned appear first, then by mention rate within each group
   const promptGroups = useMemo(() => buildPromptGroups(responses).sort((a, b) => {
     const aMentioned = a.mentioned > 0 ? 1 : 0;
     const bMentioned = b.mentioned > 0 ? 1 : 0;
@@ -781,22 +430,16 @@ export default function DashboardPage() {
     return pctB - pctA;
   }), [responses]);
 
-  // Prompts with no run data yet (fix 4)
   const trackedPromptIds = new Set(promptGroups.map((g) => g.promptId));
   const untrackedPrompts: Prompt[] = (brandDetail?.prompts ?? []).filter(
     (p) => !trackedPromptIds.has(p.id)
   );
 
-  // Free-plan daily run limit
   const isAtRunLimit = !user?.is_admin && usage !== null && usage.manual_run_limit !== null && usage.manual_runs_today >= usage.manual_run_limit;
 
-  // Quick stats
   const totalPrompts = (brandDetail?.prompts ?? []).length;
   const totalRuns = trends.length;
-  const totalResponses = trends.reduce((acc, t) => acc + (t.total_queries ?? 0), 0);
 
-  // Live vs Index sub-scores — derived from analytics.model_breakdown (all-time aggregate)
-  // so they stay consistent with the Performance by Model section.
   const liveScore = (() => {
     const mods = (analytics?.model_breakdown ?? []).filter(m => m.model === 'perplexity' || m.model === 'gemini');
     if (!mods.length) return null;
@@ -815,7 +458,6 @@ export default function DashboardPage() {
     ? Math.max(0, Math.floor((Date.now() - parseUTCISO(trends[0].completed_at).getTime()) / 86_400_000))
     : null;
 
-  // Model trend deltas: compare last two trend points' model_scores
   const modelDeltas: Record<string, number> = (() => {
     if (trends.length < 2) return {};
     const prev = trends[trends.length - 2].model_scores ?? {};
@@ -830,6 +472,8 @@ export default function DashboardPage() {
     }
     return result;
   })();
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div ref={isMobile ? pullRef : undefined} className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl" style={isMobile ? { overflowY: 'auto', minHeight: '100vh' } : undefined}>
@@ -867,7 +511,7 @@ export default function DashboardPage() {
           <span className="flex items-center gap-1.5">
             <span className="text-[var(--text-muted)]">{totalPrompts} prompt{totalPrompts !== 1 ? 's' : ''}</span>
           </span>
-          <span className="text-[var(--bg-elevated)]">·</span>
+          <span className="text-[var(--bg-elevated)]">&middot;</span>
           <span className="flex items-center gap-1.5">
             <span className="text-[var(--text-muted)]">Runs today</span>
             <span className="font-semibold tabular-nums text-[var(--text-secondary)]">{usage.manual_runs_today}/{usage.manual_run_limit}</span>
@@ -875,7 +519,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Upgrade modal — shown when a plan limit is hit */}
+      {/* Upgrade modal */}
       <Dialog open={upgradeModalOpen} onOpenChange={(o) => !o && setUpgradeModalOpen(false)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
@@ -911,13 +555,13 @@ export default function DashboardPage() {
             <Loader2 size={18} className="animate-spin text-[var(--accent)] shrink-0" />
           ) : (
             <div className="w-4.5 h-4.5 rounded-full bg-[var(--success)] flex items-center justify-center shrink-0">
-              <span className="text-white text-xs font-bold" aria-hidden="true">✓</span>
+              <span className="text-white text-xs font-bold" aria-hidden="true">&#10003;</span>
             </div>
           )}
           <div>
             {newBrandStep === 'drafting' && (
               <>
-                <p className="text-sm font-medium text-[var(--text-primary)]">Report complete! Generating content drafts…</p>
+                <p className="text-sm font-medium text-[var(--text-primary)]">Report complete! Generating content drafts&hellip;</p>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">Creating drafts for your top visibility gaps.</p>
               </>
             )}
@@ -925,7 +569,7 @@ export default function DashboardPage() {
               <>
                 <p className="text-sm font-medium text-[var(--success)]">All set! Your report and drafts are ready.</p>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                  Your first content drafts are waiting —{' '}
+                  Your first content drafts are waiting &mdash;{' '}
                   <Link href="/content" className="text-[var(--accent)] hover:text-[var(--accent)] underline">
                     check the Content Hub
                   </Link>
@@ -938,87 +582,18 @@ export default function DashboardPage() {
       )}
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div className="flex items-center gap-3">
-          {selectedBrand && (
-            <BrandAvatar
-              name={selectedBrand.name}
-              websiteUrl={selectedBrand.website_url ?? undefined}
-              size={36}
-              className="rounded-xl bg-[var(--accent-muted)] border border-[var(--accent-border)]"
-              style={{ padding: 5 }}
-              textClassName="text-sm font-bold text-[var(--accent)]"
-            />
-          )}
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]" style={{ fontFamily: 'var(--font-syne)', fontWeight: 800, letterSpacing: '-0.3px' }}>
-              {selectedBrand ? selectedBrand.name : 'Dashboard'}
-            </h1>
-            <p className="text-[13px] text-[var(--text-muted)] mt-1.5">AI visibility analytics</p>
-          </div>
-        </div>
-        <div className={`flex ${isMobile ? 'flex-col w-full' : 'items-center'} gap-2 sm:gap-3`}>
-          <div className={`flex ${isMobile ? 'w-full' : ''} items-center gap-2`}>
-          <button
-            onClick={() => setPromptModalOpen(true)}
-            disabled={!selectedBrandId}
-            className={`flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 text-xs transition-all duration-150 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
-          >
-            <MessageSquare size={14} />
-            Prompts
-          </button>
-          <button
-            onClick={() => selectedBrandId && loadData(selectedBrandId)}
-            aria-label="Refresh dashboard"
-            className={`flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-all duration-150 ${isMobile ? 'min-h-[44px]' : ''}`}
-          >
-            <RefreshCw size={14} />
-          </button>
-          </div>
-          <div className={`flex flex-col ${isMobile ? 'w-full' : 'items-end'} gap-1`}>
-            <button
-              onClick={isAtRunLimit ? () => { setUpgradeModalReason("You've used your 1 daily report run. Upgrade to run reports any time."); setUpgradeModalOpen(true); } : handleRunReport}
-              disabled={triggering || isRunning || !selectedBrandId}
-              title={isAtRunLimit ? 'Daily run limit reached — resets at midnight UTC' : undefined}
-              className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${isMobile ? 'w-full justify-center' : ''} ${
-                isAtRunLimit
-                  ? 'bg-[var(--accent-muted)] border border-[var(--accent-border)] text-[var(--text-faint)] cursor-default'
-                  : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40 hover:shadow-xl'
-              }`}
-            >
-              {triggering || isRunning ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  {isRunning ? 'Running...' : 'Starting...'}
-                </>
-              ) : isAtRunLimit ? (
-                <>
-                  <Zap size={14} className="text-[var(--accent)]/60" />
-                  1 run / day
-                </>
-              ) : (
-                <>
-                  <Play size={14} />
-                  Run Report Now
-                </>
-              )}
-            </button>
-            {isAtRunLimit && (
-              <p className="text-[11px] text-[var(--text-faint)]">
-                Resets midnight UTC ·{' '}
-                <button
-                  onClick={() => { setUpgradeModalReason("You've used your 1 daily report run. Upgrade to run reports any time."); setUpgradeModalOpen(true); }}
-                  className="text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors"
-                >
-                  Upgrade
-                </button>
-              </p>
-            )}
-          </div>
-        </div>
-      </div>
-
-
+      <DashboardHeader
+        selectedBrand={selectedBrand}
+        selectedBrandId={selectedBrandId}
+        isMobile={isMobile}
+        triggering={triggering}
+        isRunning={isRunning}
+        isAtRunLimit={isAtRunLimit}
+        onOpenPromptModal={() => setPromptModalOpen(true)}
+        onRefresh={() => selectedBrandId && loadData(selectedBrandId)}
+        onRunReport={handleRunReport}
+        onUpgradeClick={() => { setUpgradeModalReason("You've used your 1 daily report run. Upgrade to run reports any time."); setUpgradeModalOpen(true); }}
+      />
 
       {loadingBrands ? (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1035,7 +610,6 @@ export default function DashboardPage() {
           <p className="text-sm text-[var(--text-muted)] mb-8 max-w-sm leading-relaxed">
             Add your brand, define the prompts you want AI models to mention you for, and we&apos;ll run an instant visibility report and generate content drafts automatically.
           </p>
-          {/* Step cards */}
           <div className="flex flex-col sm:flex-row items-start gap-3 mb-8 text-left w-full">
             {[
               { n: '1', title: 'Add your brand', body: 'Name, website, and the prompts you want to rank for.' },
@@ -1059,7 +633,7 @@ export default function DashboardPage() {
         </div>
       ) : (
         <>
-          {/* ── EMPTY STATE: brand selected but no runs yet ──────────────── */}
+          {/* Empty state: brand selected but no runs */}
           {!loadingBrands && !loadingAnalytics && !isRunning && selectedBrandId && trends.length === 0 && overview !== null && overview?.latest_run == null && (
             <div className="flex flex-col items-center justify-center py-16 text-center max-w-lg mx-auto">
               <div className="w-14 h-14 bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-2xl flex items-center justify-center mb-4">
@@ -1080,7 +654,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ── FIRST-RUN EMPTY STATE ──────────────────────────────────── */}
+          {/* First-run empty state */}
           {isFirstRun && (
             <div className="flex flex-col items-center justify-center py-20 text-center max-w-md mx-auto mb-8">
               <div className="w-16 h-16 bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-2xl flex items-center justify-center mb-5">
@@ -1093,7 +667,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ── OVERVIEW ─────────────────────────────────────────────────── */}
+          {/* Overview */}
           {!isFirstRun && (
           <>
               {/* Brand profile completeness notification */}
@@ -1108,132 +682,34 @@ export default function DashboardPage() {
                     href="/settings?tab=profile"
                     className="text-xs text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors font-medium whitespace-nowrap ml-4"
                   >
-                    Complete profile →
+                    Complete profile &rarr;
                   </Link>
                 </div>
               )}
 
               {/* Quick stats row */}
               {!loadingAnalytics && totalRuns > 0 && (
-                <div className={isMobile ? 'snap-scroll-x gap-3 mb-4 -mx-4 px-4' : 'grid grid-cols-3 gap-3 mb-4'}>
-                  {([
-                    { label: 'Prompts Tracked',   value: totalPrompts || '—',   icon: MessageSquare, accent: 'var(--color-gemini)', iconBg: 'var(--color-gemini-muted)',  borderTop: 'var(--color-gemini)', sub: null, subColor: '' },
-                    { label: 'Days Tracking',     value: daysSinceFirst != null ? daysSinceFirst : '—', icon: TrendingUp, accent: 'var(--warning-text)', iconBg: 'var(--warning-muted)', borderTop: 'var(--warning)', sub: null, subColor: '' },
-                    { label: 'Content Published', value: publishedCount || '—', icon: CheckCircle2, accent: 'var(--success-text)', iconBg: 'var(--success-muted)', borderTop: 'var(--success)', sub: null, subColor: '' },
-                  ] as Array<{ label: string; value: string | number; icon: React.ElementType; accent: string; iconBg: string; borderTop: string; sub: string | null; subColor: string }>).map(({ label, value, icon: Icon, accent, iconBg, borderTop, sub, subColor }) => (
-                    <div
-                      key={label}
-                      className={`bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-xl px-4 py-4 flex items-center gap-3 ${isMobile ? 'min-w-[160px]' : ''}`}
-                      style={{ borderTopColor: borderTop, borderTopWidth: 2 }}
-                    >
-                      <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ background: iconBg, border: `1px solid ${accent}33` }}
-                      >
-                        <Icon size={15} style={{ color: accent }} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xl font-bold text-[var(--text-primary)] leading-tight tabular-nums">{value}</p>
-                        {sub && (
-                          <p className="text-[10px] font-medium leading-tight mt-0.5" style={{ color: subColor }}>{sub}</p>
-                        )}
-                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{label}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <StatsGrid
+                  totalPrompts={totalPrompts}
+                  daysSinceFirst={daysSinceFirst}
+                  publishedCount={publishedCount}
+                  isMobile={isMobile}
+                />
               )}
 
               {/* Row 1: visibility (left) + prompt/sentiment/sov (right) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 {/* Visibility score + sparkline */}
-                <div className="card border-t-2 border-t-[var(--accent)] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.25),0_0_40px_var(--accent-muted),inset_0_1px_0_rgba(255,255,255,0.07)]">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="text-[13px] font-medium text-[var(--text-secondary)] flex items-center">
-                        Visibility Score
-                        <HelpTooltip text="Percentage of AI responses that mention your brand when answering your tracked prompts. A higher score means AI models are more aware of your brand." />
-                      </p>
-                      {loadingAnalytics ? (
-                        <div className="h-14 w-28 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-2" />
-                      ) : (
-                        <>
-                          <p className="text-5xl md:text-6xl font-bold text-[var(--text-primary)] mt-1 leading-none">
-                            {score != null ? `${Math.round(score)}%` : 'N/A'}
-                          </p>
-                          {scoreDelta !== null && (
-                            <p className={`text-xs font-medium mt-2 ${scoreDelta > 0 ? 'text-[var(--success)]' : scoreDelta < 0 ? 'text-[var(--danger-text)]' : 'text-[var(--text-muted)]'}`}>
-                              {scoreDelta > 0 ? `+${scoreDelta}%` : scoreDelta < 0 ? `${scoreDelta}%` : '—'} since {sinceLastRun ?? 'last run'}
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    <div className="w-10 h-10 rounded-xl bg-[rgba(255,255,255,0.06)] flex items-center justify-center text-[var(--accent)]">
-                      <BarChart2 size={18} />
-                    </div>
-                  </div>
-                  {sparkData.length > 1 ? (
-                    <ResponsiveContainer width="100%" height={44}>
-                      <AreaChart data={sparkData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                        <defs>
-                          <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <Tooltip content={<SparklineTooltip />} />
-                        <Area type="monotone" dataKey="score" stroke="var(--accent)" strokeWidth={2.5} fill="url(#sparkGrad)" dot={false} />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <p className="text-xs text-[var(--text-faint)] mt-2">
-                      {sparkData.length === 1 ? '1 run recorded' : 'No trend data yet'}
-                    </p>
-                  )}
-                  {nextReportHours !== null && (
-                    <p className="text-[11px] text-[var(--text-faint)] mt-2">
-                      Next report in {nextReportHours}h
-                    </p>
-                  )}
-
-                  {/* Live / Index sub-score breakdown */}
-                  {!loadingAnalytics && score !== null && (liveScore !== null || indexScore !== null) && (
-                    <div className="mt-3 space-y-2 border-t border-[rgba(255,255,255,0.06)] pt-3">
-                      {([
-                        { label: 'Live Search', s: liveScore,  models: 'Perplexity · Gemini',  color: 'var(--success)' },
-                        { label: 'AI Index',    s: indexScore, models: 'GPT-4o-mini · Claude', color: 'var(--accent-light)' },
-                      ] as Array<{ label: string; s: number | null; models: string; color: string }>).map(({ label, s, models, color }) => (
-                        <div key={label}>
-                          <div className="flex items-center gap-3 mb-0.5">
-                            <div className="flex items-center gap-1.5 w-20 md:w-24 flex-shrink-0">
-                              <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                              <span className="text-[11px] font-medium text-[var(--text-muted)] truncate">{label}</span>
-                            </div>
-                            <div className="flex-1 h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
-                              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${s ?? 0}%`, background: color }} />
-                            </div>
-                            <span className="text-xs font-bold tabular-nums w-9 text-right flex-shrink-0" style={{ color }}>
-                              {s !== null ? `${s}%` : '—'}
-                            </span>
-                          </div>
-                          <p className="text-[9px] text-[var(--text-faint)] pl-[88px] md:pl-[108px] truncate">{models}</p>
-                        </div>
-                      ))}
-                      {liveScore !== null && indexScore !== null && (
-                        <p className="text-[10px] text-[var(--text-muted)] italic pt-0.5">
-                          {liveScore >= 50 && indexScore >= 50
-                            ? 'Strong across live search and AI knowledge.'
-                            : liveScore >= 50 && indexScore < 50
-                              ? 'Trending online — not yet embedded in AI training data.'
-                              : liveScore < 50 && indexScore >= 50
-                                ? 'AI-recognized brand — boost recent content for live visibility.'
-                                : 'Low visibility across channels — more content and coverage needed.'}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <VisibilityChart
+                  score={score}
+                  scoreDelta={scoreDelta}
+                  sinceLastRun={sinceLastRun}
+                  sparkData={sparkData}
+                  nextReportHours={nextReportHours}
+                  loadingAnalytics={loadingAnalytics}
+                  liveScore={liveScore}
+                  indexScore={indexScore}
+                />
 
                 {/* Right column: Best Prompt + Sentiment on top, SOV below */}
                 <div className="flex flex-col gap-3">
@@ -1265,19 +741,19 @@ export default function DashboardPage() {
                             <div style={{ width: `${sentData.negative_pct}%`, background: 'var(--danger)' }} />
                           </div>
                           <p className="text-xs text-[var(--text-faint)] mt-1.5">
-                            {Math.round(sentData.neutral_pct)}% neutral · {Math.round(sentData.negative_pct)}% negative
+                            {Math.round(sentData.neutral_pct)}% neutral &middot; {Math.round(sentData.negative_pct)}% negative
                           </p>
                         </>
                       ) : (
                         <>
-                          <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">—</p>
+                          <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">&mdash;</p>
                           <p className="text-xs text-[var(--text-faint)] mt-1">No mentions to analyze</p>
                         </>
                       )}
                     </div>
                   </div>
 
-                  {/* SOV — fills remaining height */}
+                  {/* SOV */}
                   <div className="flex-1 card p-5">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
@@ -1303,7 +779,6 @@ export default function DashboardPage() {
                       </p>
                     ) : (() => {
                       const allStats = analytics.competitor_comparison;
-                      // Sort: primary brand first, then competitors
                       const sorted = [...allStats].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
                       const count = sorted.length;
 
@@ -1361,12 +836,12 @@ export default function DashboardPage() {
                           ? 'Mentioned early in responses'
                           : analytics.position.score <= 7
                           ? 'Mentioned mid-way in responses'
-                          : 'Mentioned late in responses'} · {analytics.position.sample_count} samples
+                          : 'Mentioned late in responses'} &middot; {analytics.position.sample_count} samples
                       </p>
                     </>
                   ) : (
                     <>
-                      <p className="text-3xl font-bold text-[var(--text-primary)]">—</p>
+                      <p className="text-3xl font-bold text-[var(--text-primary)]">&mdash;</p>
                       <p className="text-xs text-[var(--text-faint)] mt-1">No mentions recorded</p>
                     </>
                   )}
@@ -1408,148 +883,22 @@ export default function DashboardPage() {
                       {[1,2,3,4].map(i => <div key={i} className="h-6 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
                     </div>
                   ) : (
-                    <ModelBreakdown models={analytics?.model_breakdown ?? []} deltas={modelDeltas} />
+                    <DashboardModelBreakdown models={analytics?.model_breakdown ?? []} deltas={modelDeltas} />
                   )}
                 </div>
               </div>
 
               {/* Recent Conversations */}
-              <div className="card overflow-hidden">
-                <div className="px-5 py-4 border-b border-[var(--accent-border)] flex items-center justify-between bg-[var(--accent-muted)]">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare size={16} className="text-[var(--accent)]" />
-                    <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Recent Conversations</h3>
-                    {analytics && (
-                      <span className="text-xs text-[var(--text-muted)] bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] px-2 py-0.5 rounded-full">
-                        {analytics.total_responses_analyzed.toLocaleString()} analyzed
-                      </span>
-                    )}
-                  </div>
-                  {/* Model filter tabs */}
-                  {analytics && analytics.recent_conversations.length > 0 && (() => {
-                    const models = Array.from(new Set(analytics.recent_conversations.map((c) => {
-                      const key = c.model.toLowerCase().replace(/[-_\s]/g, '');
-                      return Object.keys(MODEL_CONFIG).find((k) => key.includes(k)) ?? c.model;
-                    })));
-                    if (models.length < 2) return null;
-                    return (
-                      <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[var(--accent-border)] rounded-lg p-0.5">
-                        <button
-                          onClick={() => setConvModelFilter('all')}
-                          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${convModelFilter === 'all' ? 'bg-[var(--accent-muted)] text-[var(--accent-light)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
-                        >
-                          All
-                        </button>
-                        {models.map((mk) => {
-                          const cfg = MODEL_CONFIG[mk] ?? { label: mk, text: 'var(--text-secondary)' };
-                          return (
-                            <button
-                              key={mk}
-                              onClick={() => setConvModelFilter(convModelFilter === mk ? 'all' : mk)}
-                              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${convModelFilter === mk ? 'bg-[var(--accent-muted)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
-                              style={convModelFilter === mk ? { color: cfg.text } : {}}
-                            >
-                              {cfg.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {loadingAnalytics || isRunning ? (
-                  <div className="divide-y divide-[var(--accent-muted)]">
-                    {[1,2,3,4].map(i => (
-                      <div key={i} className="px-5 py-4 animate-pulse">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="h-3.5 bg-[rgba(255,255,255,0.06)] rounded w-2/5" />
-                          <div className="flex gap-2">
-                            <div className="w-16 h-5 bg-[rgba(255,255,255,0.06)] rounded" />
-                            <div className="w-20 h-5 bg-[rgba(255,255,255,0.06)] rounded" />
-                          </div>
-                        </div>
-                        <div className="h-3 bg-[rgba(255,255,255,0.06)] rounded w-4/5" />
-                      </div>
-                    ))}
-                  </div>
-                ) : analytics && analytics.recent_conversations.length > 0 ? (
-                  <div className="divide-y divide-[var(--accent-muted)]">
-                    {analytics.recent_conversations.filter((conv) => {
-                      if (convModelFilter === 'all') return true;
-                      const key = conv.model.toLowerCase().replace(/[-_\s]/g, '');
-                      return key.includes(convModelFilter);
-                    }).sort((a, b) => (b.mentioned ? 1 : 0) - (a.mentioned ? 1 : 0))
-                    .map((conv) => {
-                      const modelKey = conv.model.toLowerCase().replace(/[-_\s]/g, '');
-                      const mc = Object.entries(MODEL_CONFIG).find(([k]) => modelKey.includes(k))?.[1]
-                        ?? { bg: 'var(--bg-card)', text: 'var(--text-secondary)' };
-                      const label = Object.entries(MODEL_CONFIG).find(([k]) => modelKey.includes(k))
-                        ? MODEL_CONFIG[Object.keys(MODEL_CONFIG).find(k => modelKey.includes(k))!].label
-                        : conv.model;
-
-                      return (
-                        <div key={conv.id}>
-                          <button
-                            className="w-full px-5 py-4 hover:bg-[var(--accent-muted)] transition-colors text-left"
-                            onClick={() => setExpandedConvId(expandedConvId === conv.id ? null : conv.id)}
-                          >
-                            <div className="flex items-start justify-between gap-3 mb-1.5">
-                              <span className="text-xs font-medium text-[var(--text-secondary)] leading-relaxed flex-1 min-w-0">
-                                {conv.prompt_text.length > 80 ? conv.prompt_text.slice(0, 80) + '…' : conv.prompt_text}
-                              </span>
-                              <div className="flex items-center gap-1.5 flex-shrink-0">
-                                <Badge style={{ backgroundColor: mc.bg, color: mc.text, borderColor: 'transparent' }}>
-                                  {label}
-                                </Badge>
-                                {!isMobile && (
-                                  <Badge variant={conv.mentioned ? "success" : "secondary"}>
-                                    {conv.mentioned ? 'Mentioned' : 'Not mentioned'}
-                                  </Badge>
-                                )}
-                                <ChevronDown
-                                  size={12}
-                                  className={`text-[var(--text-faint)] transition-transform ${expandedConvId === conv.id ? 'rotate-180' : ''}`}
-                                />
-                              </div>
-                            </div>
-                            {conv.response_preview && (
-                              <p className="text-xs text-[var(--text-faint)] leading-relaxed line-clamp-2">
-                                {(() => {
-                                  const clean = stripMarkdown(conv.response_preview);
-                                  return clean.length > 120 ? clean.slice(0, 120) + '…' : clean;
-                                })()}
-                              </p>
-                            )}
-                          </button>
-                          {expandedConvId === conv.id && conv.response_text && (
-                            <div className="px-5 pb-4 pt-3 border-t border-[var(--accent-border)] bg-[var(--accent-muted)]">
-                              <p className="text-xs text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap">
-                                {conv.response_text}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div
-                      className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                      style={{
-                        background: 'linear-gradient(135deg, var(--accent-muted), var(--accent-muted))',
-                        border: '1px solid var(--accent-border)',
-                        boxShadow: '0 0 28px var(--accent-muted)',
-                      }}
-                    >
-                      <MessageSquare size={24} className="text-[var(--accent-light)]" />
-                    </div>
-                    <p className="text-base font-semibold text-[var(--text-primary)] mb-1.5">No conversations yet</p>
-                    <p className="text-[13px] text-[var(--text-muted)] max-w-xs leading-relaxed">Run a report to start tracking how AI models respond to your prompts.</p>
-                  </div>
-                )}
-              </div>
+              <BrandTable
+                analytics={analytics}
+                loadingAnalytics={loadingAnalytics}
+                isRunning={isRunning}
+                isMobile={isMobile}
+                expandedConvId={expandedConvId}
+                setExpandedConvId={setExpandedConvId}
+                convModelFilter={convModelFilter}
+                setConvModelFilter={setConvModelFilter}
+              />
             </>
           )}
         </>

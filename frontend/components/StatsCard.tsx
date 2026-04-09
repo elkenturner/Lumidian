@@ -1,8 +1,9 @@
 'use client';
 
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { ReactNode } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import clsx from 'clsx';
+import { useCountUp } from '@/lib/motion';
 
 interface StatsCardProps {
   title: string;
@@ -15,40 +16,6 @@ interface StatsCardProps {
   compact?: boolean;
   accent?: boolean;
   accentColor?: string; // top-border accent color, e.g. '#3b82f6'
-}
-
-function useCountUp(target: number, duration = 700): number {
-  const [count, setCount] = useState(0);
-  const rafRef = useRef<number>(0);
-
-  useEffect(() => {
-    if (
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ) {
-      setCount(target);
-      return;
-    }
-
-    let startTime: number | null = null;
-
-    const animate = (timestamp: number) => {
-      if (!startTime) startTime = timestamp;
-      const elapsed = timestamp - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-      setCount(Math.round(target * eased));
-      if (progress < 1) {
-        rafRef.current = requestAnimationFrame(animate);
-      }
-    };
-
-    setCount(0);
-    rafRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [target, duration]);
-
-  return count;
 }
 
 export default function StatsCard({
@@ -64,7 +31,7 @@ export default function StatsCard({
   accentColor,
 }: StatsCardProps) {
   const isNumeric = typeof value === 'number';
-  const animatedValue = useCountUp(isNumeric ? (value as number) : 0, 700);
+  const animatedValue = useCountUp(isNumeric ? (value as number) : 0);
 
   if (loading) {
     return (

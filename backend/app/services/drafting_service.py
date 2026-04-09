@@ -467,10 +467,12 @@ async def generate_gap_draft(
             f"Approve or dismiss existing drafts before generating another."
         )
 
-    profile_context = await _load_profile_context(db, brand_id)
-    response_analysis = await _analyze_responses_for_prompt(db, brand_id, prompt_id)
-    visibility_pct = await _get_prompt_visibility(db, prompt_id)
-    estimated_impact = await _estimate_impact(db, brand_id, prompt_id, platform)
+    profile_context, response_analysis, visibility_pct, estimated_impact = await asyncio.gather(
+        _load_profile_context(db, brand_id),
+        _analyze_responses_for_prompt(db, brand_id, prompt_id),
+        _get_prompt_visibility(db, prompt_id),
+        _estimate_impact(db, brand_id, prompt_id, platform),
+    )
 
     # Build context about existing drafts so Claude takes a different angle
     existing_drafts_context: str | None = None
@@ -1006,101 +1008,142 @@ async def auto_draft_top_gaps(
     # so we don't waste iterations retrying them.
     exhausted_combos: set[tuple[int, str]] = set()
 
-    while len(created) < max_gaps and attempts < max_attempts:
-        platform = enabled_platforms[platform_idx % n_platforms]
-        prompt = ordered_prompts[prompt_idx % n_prompts]
+    # ── Helper: generate a single draft with its own DB session ────────────
+    async def _generate_one_draft(
+        _brand_id: int,
+        _prompt: Prompt,
+        _platform: str,
+        _quora_url: str | None,
+        _quora_title: str | None,
+        _quora_snippet: str | None,
+        _source: str | None,
+    ) -> tuple[str, ContentDraft | str | Exception, int, str]:
+        """Returns (status, result_or_error, prompt_id, platform)."""
+        from app.database import AsyncSessionLocal
 
-        # Skip exhausted combos (already hit the 3-draft limit or been fully tried)
-        if (prompt.id, platform) in exhausted_combos:
-            if len(exhausted_combos) >= n_prompts * n_platforms:
-                break  # all combos exhausted — nothing left to try
+        async with AsyncSessionLocal() as session:
+            try:
+                draft = await generate_gap_draft(
+                    db=session,
+                    brand_id=_brand_id,
+                    prompt_id=_prompt.id,
+                    platform=_platform,
+                    quora_question_url=_quora_url,
+                    quora_question_title=_quora_title,
+                    quora_question_snippet=_quora_snippet,
+                    source=_source,
+                )
+                return ("ok", draft, _prompt.id, _platform)
+            except ValueError as exc:
+                return ("value_error", str(exc), _prompt.id, _platform)
+            except Exception as exc:
+                return ("error", exc, _prompt.id, _platform)
+
+    BATCH_SIZE = 5
+
+    while len(created) < max_gaps and attempts < max_attempts:
+        # ── Build a batch of up to BATCH_SIZE tasks ──────────────────────
+        batch_tasks: list[tuple] = []  # (coroutine, prompt, platform)
+
+        while len(batch_tasks) < BATCH_SIZE and len(created) + len(batch_tasks) < max_gaps and attempts < max_attempts:
+            platform = enabled_platforms[platform_idx % n_platforms]
+            prompt = ordered_prompts[prompt_idx % n_prompts]
+
+            # Skip exhausted combos (already hit the 3-draft limit or been fully tried)
+            if (prompt.id, platform) in exhausted_combos:
+                if len(exhausted_combos) >= n_prompts * n_platforms:
+                    break  # all combos exhausted — nothing left to try
+                platform_idx += 1
+                if platform_idx % n_platforms == 0:
+                    prompt_idx += 1
+                attempts += 1
+                continue
+
+            # For Quora, resolve a real question first so the draft is targeted.
+            quora_url: str | None = None
+            quora_title: str | None = None
+            quora_snippet: str | None = None
+            if platform == "quora":
+                from app.services.quora_search_service import extract_keywords, search_quora_questions
+                _questions: list[dict] = []
+
+                # 1. Serper (fresh, cache-deduplicated per 24h)
+                try:
+                    _keywords = extract_keywords(prompt.text)
+                    if _keywords:
+                        _questions = await asyncio.to_thread(
+                            search_quora_questions, _keywords, 5, prompt.id
+                        )
+                except Exception as _qe:
+                    logger.debug(
+                        "auto_draft_top_gaps: Serper lookup skipped for prompt %d: %s",
+                        prompt.id, _qe,
+                    )
+
+                # 2. Fallback: stored gap questions (if Serper returned nothing)
+                if not _questions:
+                    _gap = best_gap_by_prompt.get(prompt.id)
+                    if _gap and _gap.quora_questions:
+                        try:
+                            _questions = json.loads(_gap.quora_questions)
+                        except Exception:
+                            pass
+
+                # Pick the next question for this prompt (cycle so each draft is different)
+                if _questions:
+                    _idx = quora_question_idx.get(prompt.id, 0)
+                    _q = _questions[_idx % len(_questions)]
+                    quora_question_idx[prompt.id] = _idx + 1
+                    quora_url = _q.get("url")
+                    quora_title = _q.get("title")
+                    quora_snippet = _q.get("snippet")
+
+            batch_tasks.append((
+                _generate_one_draft(
+                    brand_id, prompt, platform,
+                    quora_url, quora_title, quora_snippet, source,
+                ),
+                prompt, platform,
+            ))
+
+            # Advance: after visiting every platform once for this prompt, move to next prompt
             platform_idx += 1
             if platform_idx % n_platforms == 0:
                 prompt_idx += 1
             attempts += 1
-            continue
 
-        # For Quora, resolve a real question first so the draft is targeted.
-        # Always query Serper for fresh results (24h in-process cache prevents
-        # duplicate API calls within a day). Fall back to stored gap questions
-        # only if Serper fails or returns nothing.
-        quora_url: str | None = None
-        quora_title: str | None = None
-        quora_snippet: str | None = None
-        if platform == "quora":
-            from app.services.quora_search_service import extract_keywords, search_quora_questions
-            _questions: list[dict] = []
+        if not batch_tasks:
+            break  # nothing left to try
 
-            # 1. Serper (fresh, cache-deduplicated per 24h)
-            try:
-                _keywords = extract_keywords(prompt.text)
-                if _keywords:
-                    _questions = await asyncio.to_thread(
-                        search_quora_questions, _keywords, 5, prompt.id
+        # ── Execute the batch concurrently ───────────────────────────────
+        results = await asyncio.gather(*(coro for coro, _, _ in batch_tasks))
+
+        for result_tuple in results:
+            result_status, result_value, pid, plat = result_tuple
+
+            if result_status == "ok":
+                created.append(result_value)
+            elif result_status == "value_error":
+                exc_str = result_value.lower()
+                if "full" in exc_str or "cap" in exc_str:
+                    logger.info(
+                        "auto_draft_top_gaps: draft cap reached for brand_id=%d after %d drafts",
+                        brand_id, len(created),
                     )
-            except Exception as _qe:
-                logger.debug(
-                    "auto_draft_top_gaps: Serper lookup skipped for prompt %d: %s",
-                    prompt.id, _qe,
+                    return created
+                if "3 or more" in exc_str or "drafts already exist" in exc_str:
+                    exhausted_combos.add((pid, plat))
+                logger.warning(
+                    "auto_draft_top_gaps: skipped brand=%d prompt=%d platform=%s: %s",
+                    brand_id, pid, plat, result_value,
                 )
-
-            # 2. Fallback: stored gap questions (if Serper returned nothing)
-            if not _questions:
-                _gap = best_gap_by_prompt.get(prompt.id)
-                if _gap and _gap.quora_questions:
-                    try:
-                        _questions = json.loads(_gap.quora_questions)
-                    except Exception:
-                        pass
-
-            # Pick the next question for this prompt (cycle so each draft is different)
-            if _questions:
-                _idx = quora_question_idx.get(prompt.id, 0)
-                _q = _questions[_idx % len(_questions)]
-                quora_question_idx[prompt.id] = _idx + 1
-                quora_url = _q.get("url")
-                quora_title = _q.get("title")
-                quora_snippet = _q.get("snippet")
-
-        try:
-            draft = await generate_gap_draft(
-                db=db,
-                brand_id=brand_id,
-                prompt_id=prompt.id,
-                platform=platform,
-                quora_question_url=quora_url,
-                quora_question_title=quora_title,
-                quora_question_snippet=quora_snippet,
-                source=source,
-            )
-            created.append(draft)
-        except ValueError as exc:
-            exc_str = str(exc).lower()
-            if "full" in exc_str or "cap" in exc_str:
-                logger.info(
-                    "auto_draft_top_gaps: draft cap reached for brand_id=%d after %d drafts",
-                    brand_id, len(created),
+            else:
+                if last_error is None:
+                    last_error = result_value
+                logger.exception(
+                    "auto_draft_top_gaps: failed for brand=%d prompt=%d platform=%s",
+                    brand_id, pid, plat,
                 )
-                return created
-            if "3 or more" in exc_str or "drafts already exist" in exc_str:
-                exhausted_combos.add((prompt.id, platform))
-            logger.warning(
-                "auto_draft_top_gaps: skipped brand=%d prompt=%d platform=%s: %s",
-                brand_id, prompt.id, platform, exc,
-            )
-        except Exception as exc:
-            if last_error is None:
-                last_error = exc
-            logger.exception(
-                "auto_draft_top_gaps: failed for brand=%d prompt=%d platform=%s",
-                brand_id, prompt.id, platform,
-            )
-
-        # Advance: after visiting every platform once for this prompt, move to next prompt
-        platform_idx += 1
-        if platform_idx % n_platforms == 0:
-            prompt_idx += 1
-        attempts += 1
 
     logger.info(
         "auto_draft_top_gaps: created %d drafts for brand_id=%d", len(created), brand_id,

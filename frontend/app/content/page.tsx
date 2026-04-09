@@ -16,6 +16,7 @@ import {
   Trash2,
   Edit2,
   AlertTriangle,
+  Info,
   RefreshCw,
   Sparkles,
   HelpCircle,
@@ -619,15 +620,15 @@ function WikipediaDraftCard({
     <>
       {/* COI banner — slim line above the card, only when draft mentions brand */}
       {showCOI && (
-        <div className="flex items-center gap-2 text-xs text-[var(--warning)] px-1 -mb-1">
-          <AlertTriangle size={11} className="shrink-0" />
+        <div className="flex items-center gap-2 text-xs text-[var(--text-secondary)] px-1 -mb-1">
+          <Info size={11} className="shrink-0 opacity-60" />
           <span>
             Conflict of interest disclosure may be required if this content references your brand.{' '}
             <a
               href="https://en.wikipedia.org/wiki/Wikipedia:Conflict_of_interest"
               target="_blank"
               rel="noopener noreferrer"
-              className="underline decoration-[var(--warning)]/50 hover:decoration-[var(--warning)]"
+              className="underline decoration-[var(--text-muted)]/50 hover:decoration-[var(--text-secondary)]"
             >
               See Wikipedia&apos;s COI guidelines.
             </a>
@@ -1628,6 +1629,11 @@ export default function ContentHubPage() {
   const [draftPlatformFilter, setDraftPlatformFilter] = useState<string>('all');
   const [oppPlatformFilter, setOppPlatformFilter] = useState<string>('all');
 
+  useEffect(() => {
+    setDraftPlatformFilter('all');
+    setOppPlatformFilter('all');
+  }, [activeTab]);
+
   // Tab counts (using filtered draft/scheduled counts)
   const tabCounts = {
     drafts: draftItems.filter((d) => !_disabledPlatforms.has(d.platform)).length,
@@ -2494,7 +2500,7 @@ export default function ContentHubPage() {
                           <button
                             onClick={handleScanNow}
                             disabled={scanning || generating || !selectedBrandId || reportRunning}
-                            className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40"
+                            className="w-full flex items-center justify-center gap-2 border border-[var(--border-default)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-secondary)] rounded-lg px-5 py-2.5 text-sm font-medium transition-colors duration-150"
                           >
                             {scanning ? (
                               <>
@@ -2517,7 +2523,7 @@ export default function ContentHubPage() {
                           <button
                             onClick={handleGenerateNow}
                             disabled={generating || scanning || onCooldown || weeklyExhausted || reportRunning}
-                            className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40"
+                            className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-5 py-2.5 text-sm font-medium transition-colors duration-150"
                           >
                             {generating ? (
                               <>

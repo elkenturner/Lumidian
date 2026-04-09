@@ -1060,7 +1060,7 @@ export default function DashboardPage() {
       ) : (
         <>
           {/* ── EMPTY STATE: brand selected but no runs yet ──────────────── */}
-          {!loadingBrands && !loadingAnalytics && !isRunning && selectedBrandId && trends.length === 0 && overview?.latest_run == null && (
+          {!loadingBrands && !loadingAnalytics && !isRunning && selectedBrandId && trends.length === 0 && overview !== null && overview?.latest_run == null && (
             <div className="flex flex-col items-center justify-center py-16 text-center max-w-lg mx-auto">
               <div className="w-14 h-14 bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-2xl flex items-center justify-center mb-4">
                 <BarChart2 size={24} className="text-[var(--accent)]" />

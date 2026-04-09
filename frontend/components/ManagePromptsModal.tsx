@@ -7,12 +7,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 
 export function ManagePromptsModal({
   brandId,
+  brandName,
   prompts,
   promptLimit,
   onClose,
   onChanged,
 }: {
   brandId: number;
+  brandName?: string;
   prompts: Prompt[];
   promptLimit: number;
   onClose: () => void;
@@ -136,7 +138,7 @@ export function ManagePromptsModal({
               value={newText}
               onChange={(e) => setNewText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-              placeholder="e.g. What is the best tool for early cancer detection?"
+              placeholder={`e.g. What is the best ${brandName || 'product'} alternative?`}
               disabled={atLimit}
               className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-40"
             />

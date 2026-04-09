@@ -59,7 +59,6 @@ import {
 } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
 import PlatformIcon from '@/components/PlatformIcon';
-import ProgressBanner from '@/components/ProgressBanner';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -1578,6 +1577,15 @@ export default function ContentHubPage() {
   const [brandPrompts, setBrandPrompts] = useState<Prompt[]>([]);
   const [contentSettings, setContentSettings] = useState<BrandContentSettings[]>([]);
 
+  // Report-running guard (set by dashboard via localStorage)
+  const [reportRunning, setReportRunning] = useState(false);
+  useEffect(() => {
+    const check = () => setReportRunning(!!localStorage.getItem('clarity_report_running'));
+    check();
+    const interval = setInterval(check, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
   // Right panel
   const [generating, setGenerating] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -1795,7 +1803,7 @@ export default function ContentHubPage() {
   // ── Right panel actions ────────────────────────────────────────────────────
 
   async function handleGenerateNow() {
-    if (!selectedBrandId || scanning || generating) return;
+    if (!selectedBrandId || scanning || generating || reportRunning) return;
     setGenerating(true);
     setGenerateError(null);
 
@@ -1881,7 +1889,7 @@ export default function ContentHubPage() {
   }
 
   const handleScanNow = useCallback(async () => {
-    if (!selectedBrandId || scanning || generating) return;
+    if (!selectedBrandId || scanning || generating || reportRunning) return;
     setScanning(true);
 
     // Clear existing opportunities immediately so UI shows loading state
@@ -2019,32 +2027,7 @@ export default function ContentHubPage() {
         </div>
       )}
 
-      {/* Progress banner for regeneration actions */}
-      {generating && (
-        <ProgressBanner
-          title="Generating fresh drafts…"
-          subtitle="Creating up to 20 AI drafts. This takes about 30 seconds."
-          items={[
-            { key: 'reddit', label: 'Reddit', icon: <PlatformIcon platform="reddit" size={18} color="#FF4500" />, color: '#FF4500' },
-            { key: 'quora', label: 'Quora', icon: <PlatformIcon platform="quora" size={18} color="#B92B27" />, color: '#B92B27' },
-            { key: 'linkedin', label: 'LinkedIn', icon: <PlatformIcon platform="linkedin" size={18} color="#0A66C2" />, color: '#0A66C2' },
-            { key: 'x', label: 'X', icon: <PlatformIcon platform="x" size={18} color="var(--text-secondary)" />, color: 'var(--text-secondary)' },
-            { key: 'medium', label: 'Medium', icon: <PlatformIcon platform="medium" size={18} color="var(--text-secondary)" />, color: 'var(--text-secondary)' },
-          ]}
-        />
-      )}
-      {scanning && (
-        <ProgressBanner
-          title="Scanning for new opportunities…"
-          subtitle="Finding new content opportunities. This takes about 15 seconds."
-          items={[
-            { key: 'reddit', label: 'Reddit', icon: <PlatformIcon platform="reddit" size={18} color="#FF4500" />, color: '#FF4500' },
-            { key: 'quora', label: 'Quora', icon: <PlatformIcon platform="quora" size={18} color="#B92B27" />, color: '#B92B27' },
-            { key: 'linkedin', label: 'LinkedIn', icon: <PlatformIcon platform="linkedin" size={18} color="#0A66C2" />, color: '#0A66C2' },
-            { key: 'x', label: 'X', icon: <PlatformIcon platform="x" size={18} color="var(--text-secondary)" />, color: 'var(--text-secondary)' },
-          ]}
-        />
-      )}
+      {/* Progress banners removed — AppShell shows global status banners for generating/scanning */}
 
       {/* Request Draft modal */}
       {requestDraftOpen && selectedBrandId && (
@@ -2456,6 +2439,7 @@ export default function ContentHubPage() {
               _disabledPlatforms={_disabledPlatforms}
               draftStatus={draftStatus}
               generating={generating}
+              reportRunning={reportRunning}
               pinnedDraftId={pinnedDraftId}
               handleGenerateNow={handleGenerateNow}
               handleApprove={handleApprove}
@@ -2509,7 +2493,7 @@ export default function ContentHubPage() {
                         <>
                           <button
                             onClick={handleScanNow}
-                            disabled={scanning || generating || !selectedBrandId}
+                            disabled={scanning || generating || !selectedBrandId || reportRunning}
                             className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40"
                           >
                             {scanning ? (
@@ -2532,7 +2516,7 @@ export default function ContentHubPage() {
                         <>
                           <button
                             onClick={handleGenerateNow}
-                            disabled={generating || scanning || onCooldown || weeklyExhausted}
+                            disabled={generating || scanning || onCooldown || weeklyExhausted || reportRunning}
                             className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40"
                           >
                             {generating ? (

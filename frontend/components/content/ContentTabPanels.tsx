@@ -73,6 +73,7 @@ export interface ContentTabPanelsProps {
   // Status
   draftStatus: DraftQueueStatus | null;
   generating: boolean;
+  reportRunning: boolean;
   pinnedDraftId: number | null;
   // Handlers
   handleGenerateNow: () => void;
@@ -507,6 +508,7 @@ function DraftCard({
   postedItems,
   prompts,
   brandId,
+  reportRunning,
   onApprove,
   onDelete,
   onSaved,
@@ -518,6 +520,7 @@ function DraftCard({
   postedItems: ContentDraft[];
   prompts: Prompt[];
   brandId: number;
+  reportRunning: boolean;
   onApprove: (id: number) => Promise<void>;
   onDelete: (id: number) => void;
   onSaved: (d: ContentDraft) => void;
@@ -555,6 +558,7 @@ function DraftCard({
   }
 
   async function handleRegenerate(question?: QuoraQuestion) {
+    if (reportRunning) return;
     setRegenerating(true);
     setShowQuoraPicker(false);
     try {
@@ -664,7 +668,7 @@ function DraftCard({
               <div className="flex items-center gap-2 mt-3">
                 <button
                   onClick={() => pendingQuestion && handleRegenerate(pendingQuestion)}
-                  disabled={!pendingQuestion || regenerating}
+                  disabled={!pendingQuestion || regenerating || reportRunning}
                   className="flex items-center gap-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 text-white rounded-lg px-3 py-1.5 transition-colors"
                 >
                   {regenerating ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
@@ -1769,7 +1773,7 @@ function DraftsPanel(props: ContentTabPanelsProps) {
   const {
     brands, selectedBrandId, draftItems, _disabledPlatforms, draftPlatformFilter,
     setDraftPlatformFilter, visibleDraftItems, pinnedDraftId, brandProfile, brandPrompts,
-    postedItems, draftStatus, generating, handleGenerateNow, handleApprove,
+    postedItems, draftStatus, generating, reportRunning, handleGenerateNow, handleApprove,
     handleDelete, handleSaved, setDraftItems, user, onRequestDraft,
   } = props;
 
@@ -1881,6 +1885,7 @@ function DraftsPanel(props: ContentTabPanelsProps) {
             postedItems={postedItems}
             prompts={brandPrompts}
             brandId={selectedBrandId!}
+            reportRunning={reportRunning}
             onApprove={handleApprove}
             onDelete={handleDelete}
             onSaved={handleSaved}

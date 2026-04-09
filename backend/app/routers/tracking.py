@@ -278,6 +278,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     brand_name: str = ""
     brand_tier: str = "basic"
     prompt_data: list[tuple[int, str]] = []  # (prompt_id, prompt_text)
+    is_pro: bool = False
 
     async with AsyncSessionLocal() as db:
         brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
@@ -294,6 +295,11 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
         brand_name = str(brand.name)
         brand_tier = str(brand.tier)
+
+        from app.models import User
+        user_result = await db.execute(select(User).where(User.id == brand.user_id))
+        user_obj = user_result.scalar_one_or_none()
+        is_pro = user_obj is not None and user_obj.subscription_tier == "pro"
 
         prompts_result = await db.execute(
             select(Prompt).where(Prompt.brand_id == brand_id)
@@ -320,7 +326,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
     async def _bounded_query(prompt_id: int, prompt_text: str, model: str, run_number: int):
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name)
+            result = await query_model(model, prompt_text, brand_name, pro=is_pro)
         return QueryResult(
             tracking_run_id=run_id,
             prompt_id=prompt_id,
@@ -572,8 +578,9 @@ async def trigger_prompt_run(
     await db.refresh(tracking_run)
     run_id = tracking_run.id
 
+    is_pro = user.subscription_tier == "pro"
     asyncio.create_task(
-        _background_prompt_run(run_id, brand_id, prompt_id, str(prompt.text), str(brand.name), str(brand.tier)),
+        _background_prompt_run(run_id, brand_id, prompt_id, str(prompt.text), str(brand.name), str(brand.tier), is_pro=is_pro),
         name=f"prompt-tracking-{brand_id}-{prompt_id}-{run_id}",
     )
 
@@ -592,6 +599,7 @@ async def _background_prompt_run(
     prompt_text: str,
     brand_name: str,
     brand_tier: str,
+    is_pro: bool = False,
 ) -> None:
     """Execute a single-prompt tracking run independently of full runs."""
     import asyncio as _asyncio
@@ -618,7 +626,7 @@ async def _background_prompt_run(
 
     async def _bounded_query(model: str, run_number: int):
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name)
+            result = await query_model(model, prompt_text, brand_name, pro=is_pro)
         return QueryResult(
             tracking_run_id=run_id,
             prompt_id=prompt_id,

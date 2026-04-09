@@ -156,8 +156,9 @@ def _build_search_query(prompt_text: str) -> str:
         if w not in _STOP and w not in QUERY_STOP and len(w) > 3 and w not in consumed_words
     ]
 
-    # Compose: up to 2 quoted phrases + enough single words to reach 3 terms total
-    parts = quoted[:2] + words[:max(0, 3 - len(quoted[:2]))]
+    # Compose: up to 2 quoted phrases + enough single words to reach 5 terms total
+    # (raised from 3 — without site:reddit.com, more terms help Serper return relevant results)
+    parts = quoted[:2] + words[:max(0, 5 - len(quoted[:2]))]
 
     return " ".join(parts) if parts else prompt_text
 
@@ -357,15 +358,25 @@ def _score_thread(
     if not prompt_words:
         return 0.0
 
-    # Whole-word matching to avoid false substring hits (e.g. "can" in "scanner")
-    matches = sum(
-        1 for w in prompt_words
-        if re.search(r"\b" + re.escape(w) + r"\b", combined)
-    )
+    # Word matching: exact whole-word first, then prefix/stem for longer words
+    # (e.g. "detected" matches "detect", "screening" matches "screen")
+    def _word_matches(word: str, text: str) -> bool:
+        if re.search(r"\b" + re.escape(word) + r"\b", text):
+            return True
+        # Prefix match for words > 5 chars: check if first N-2 chars appear as word start
+        if len(word) > 5:
+            stem = word[:len(word) - 2]
+            if re.search(r"\b" + re.escape(stem) + r"\w*\b", text):
+                return True
+        return False
+
+    matches = sum(1 for w in prompt_words if _word_matches(w, combined))
     relevance = min(1.0, matches / len(prompt_words))
 
-    # Hard minimum: at least 45% keyword overlap AND at least 3 matches
-    if relevance < 0.45 or matches < 3:
+    # Hard minimum: at least 40% keyword overlap AND at least 2 matches
+    # (relaxed from 45%/3 — without site:reddit.com, Serper relevance ranking
+    # and the Haiku gate provide additional quality filtering)
+    if relevance < 0.40 or matches < 2:
         return 0.0
 
     # Recency — graduated, no hard cutoff (old evergreen threads still score)
@@ -480,7 +491,7 @@ def _search_reddit_posts(
             resp = client.post(
                 _SERPER_URL,
                 headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
-                json={"q": f"site:reddit.com {query}", "num": 25},
+                json={"q": f"{query} reddit", "num": 25},
             )
             resp.raise_for_status()
             data = resp.json()
@@ -741,7 +752,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 brand_name=brand.name,
                 subreddit=subreddit_name,
             )
-            if score < 60.0:
+            if score < 40.0:
                 continue
 
             scored.append({

@@ -17,12 +17,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import select
+from sqlalchemy import func as sqlfunc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
-from app.models import Competitor, Prompt, QueryResult, TrackingRun
+from app.models import Competitor, Prompt, QueryResult, RunModelScore, TrackingRun
 from app.schemas import (
     CitationGap,
     CompetitorStat,
@@ -232,20 +232,43 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
 
     run_ids = [r.id for r in runs]
 
-    # 4. Load query results (skip placeholders), joined with prompt text.
-    # Capped to _MAX_QUERY_ROWS newest rows — enough for representative analytics
-    # across all metrics (sentiment, SOV, position, domains, conversations).
-    qr_result = await db.execute(
-        select(QueryResult, Prompt.text.label("prompt_text"))
-        .join(Prompt, QueryResult.prompt_id == Prompt.id)
-        .where(
-            QueryResult.tracking_run_id.in_(run_ids),
-            QueryResult.response_text.isnot(None),
+    # 4a. Model breakdown from pre-computed RunModelScore — accurate totals
+    # without any row cap, since RunModelScore stores one row per model per run.
+    model_agg_result = await db.execute(
+        select(
+            RunModelScore.model,
+            sqlfunc.sum(RunModelScore.total_queries).label("total_queries"),
+            sqlfunc.sum(RunModelScore.total_mentions).label("total_mentions"),
         )
-        .order_by(QueryResult.created_at.desc())
-        .limit(_MAX_QUERY_ROWS)
+        .where(RunModelScore.tracking_run_id.in_(run_ids))
+        .group_by(RunModelScore.model)
     )
-    rows = qr_result.all()  # list of (QueryResult, str)
+    model_agg: dict[str, dict[str, int]] = {}
+    for r in model_agg_result.all():
+        key = _model_key(r.model)
+        model_agg[key] = {"total": int(r.total_queries), "mentions": int(r.total_mentions)}
+    total_analyzed = sum(v["total"] for v in model_agg.values())
+
+    # 4b. Load query results for text-heavy analysis (SOV competitors,
+    # position, domains, conversations, citation gaps).
+    # - Filter errors so placeholder rows don't inflate denominators
+    # - Sample evenly per model so the row cap doesn't bias toward
+    #   whichever model's queries completed last
+    per_model_limit = max(_MAX_QUERY_ROWS // len(_MODEL_LABELS), 1)
+    rows: list[tuple] = []
+    for model_name in _MODEL_LABELS:
+        model_qr = await db.execute(
+            select(QueryResult, Prompt.text.label("prompt_text"))
+            .join(Prompt, QueryResult.prompt_id == Prompt.id)
+            .where(
+                QueryResult.tracking_run_id.in_(run_ids),
+                QueryResult.error.is_(None),
+                QueryResult.model == model_name,
+            )
+            .order_by(QueryResult.created_at.desc())
+            .limit(per_model_limit)
+        )
+        rows.extend(model_qr.all())
 
     total = len(rows)
 
@@ -324,10 +347,17 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         for dom, cnt in top_domains_raw
     ]
 
-    # 9. Recent conversations — deduplicated by (prompt_id, model), most recent first
+    # 9. Recent conversations — deduplicated by (prompt_id, model).
+    # Sort mentioned results first so the dedup keeps the mentioned row
+    # when multiple run_numbers exist for the same (prompt, model) pair.
+    sorted_for_conv = sorted(
+        rows,
+        key=lambda r: (bool(r[0].mentioned), r[0].created_at or datetime.min),
+        reverse=True,
+    )
     seen_keys: set[tuple[int, str]] = set()
     unique_conv_rows: list[tuple[QueryResult, str]] = []
-    for qr, prompt_text in rows:
+    for qr, prompt_text in sorted_for_conv:
         key = (qr.prompt_id, qr.model)
         if key not in seen_keys:
             seen_keys.add(key)
@@ -367,25 +397,18 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         for comp in competitors
     ]
 
-    # 11. Model breakdown — mention rate per AI model
-    model_totals: dict[str, int] = defaultdict(int)
-    model_mentions: dict[str, int] = defaultdict(int)
-    for qr, _ in rows:
-        key = _model_key(qr.model)
-        model_totals[key] += 1
-        if qr.mentioned:
-            model_mentions[key] += 1
-
+    # 11. Model breakdown from pre-computed RunModelScore — uses accurate
+    # totals across all runs without any row-cap sampling bias.
     model_breakdown = sorted(
         [
             ModelStat(
                 model=key,
                 label=_model_label(key),
-                mention_count=model_mentions[key],
-                total=model_totals[key],
-                mention_rate=round(model_mentions[key] / model_totals[key], 4) if model_totals[key] else 0.0,
+                mention_count=data["mentions"],
+                total=data["total"],
+                mention_rate=round(data["mentions"] / data["total"], 4) if data["total"] else 0.0,
             )
-            for key in model_totals
+            for key, data in model_agg.items()
         ],
         key=lambda s: s.mention_rate,
         reverse=True,
@@ -431,5 +454,5 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         competitor_comparison=competitor_comparison,
         model_breakdown=model_breakdown,
         citation_gaps=citation_gaps,
-        total_responses_analyzed=total,
+        total_responses_analyzed=total_analyzed if total_analyzed > 0 else total,
     )

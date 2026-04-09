@@ -538,3 +538,32 @@ body {
     font-size: 16px !important;
   }
 }
+
+/* ── Stagger row animation (CSS, off main thread) ────────────────────────── */
+.stagger-row {
+  opacity: 0;
+  transform: translateY(4px);
+  animation: fadeInRow 300ms var(--ease-out) forwards;
+}
+.stagger-row:nth-child(1)  { animation-delay: 0ms; }
+.stagger-row:nth-child(2)  { animation-delay: 30ms; }
+.stagger-row:nth-child(3)  { animation-delay: 60ms; }
+.stagger-row:nth-child(4)  { animation-delay: 90ms; }
+.stagger-row:nth-child(5)  { animation-delay: 120ms; }
+.stagger-row:nth-child(6)  { animation-delay: 150ms; }
+.stagger-row:nth-child(7)  { animation-delay: 180ms; }
+.stagger-row:nth-child(8)  { animation-delay: 210ms; }
+.stagger-row:nth-child(9)  { animation-delay: 240ms; }
+.stagger-row:nth-child(10) { animation-delay: 270ms; }
+
+@keyframes fadeInRow {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger-row {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -1071,19 +1071,6 @@ export async function getDraftAttributions(brandId: number): Promise<DraftAttrib
 
 // ── Case Study ────────────────────────────────────────────────────────────────
 
-export interface CaseStudyEligibility {
-  eligible: boolean;
-  total_runs: number;
-  runs_before_90d: number;
-  runs_last_90d: number;
-  brand_name: string;
-}
-
-export async function getCaseStudyEligibility(brandId: number): Promise<CaseStudyEligibility> {
-  const res = await api.get<CaseStudyEligibility>(`/reports/${brandId}/case-study-eligible`);
-  return res.data;
-}
-
 export async function exportCaseStudyPDF(brandId: number): Promise<void> {
   const res = await api.get(`/reports/${brandId}/case-study-export`, { responseType: 'blob' });
   const blob = new Blob([res.data], { type: 'application/pdf' });

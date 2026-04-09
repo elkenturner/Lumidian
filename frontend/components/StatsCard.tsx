@@ -121,7 +121,7 @@ export default function StatsCard({
           )}
         </div>
         {icon && (
-          <div className="ml-4 w-10 h-10 rounded-xl bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] flex items-center justify-center text-[var(--accent-light)] flex-shrink-0">
+          <div className="ml-4 w-10 h-10 rounded-xl bg-[rgba(167,139,250,0.08)] border border-[rgba(167,139,250,0.15)] flex items-center justify-center text-[var(--accent-light)] flex-shrink-0">
             {icon}
           </div>
         )}

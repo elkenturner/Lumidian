@@ -34,8 +34,8 @@ function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ m
       style={{
         position: 'relative',
         overflow: 'hidden',
-        background: 'radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.08) 0%, rgba(99,102,241,0.02) 70%, transparent 100%)',
-        borderBottom: '1px solid rgba(99,102,241,0.18)',
+        background: 'radial-gradient(ellipse at 20% 50%, rgba(167,139,250,0.08) 0%, rgba(167,139,250,0.02) 70%, transparent 100%)',
+        borderBottom: '1px solid rgba(167,139,250,0.18)',
       }}
     >
       <div style={{
@@ -135,7 +135,7 @@ function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ m
         style={{
           height: 2,
           width: '100%',
-          background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.5), rgba(168,85,247,0.5), transparent)',
+          background: 'linear-gradient(90deg, transparent, rgba(167,139,250,0.5), rgba(168,85,247,0.5), transparent)',
           backgroundSize: '200% 100%',
           animation: 'shimmer 2s linear infinite',
         }}

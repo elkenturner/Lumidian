@@ -44,7 +44,7 @@ function StatusPill({ status }: { status: string | null }) {
 function InitialsAvatar({ name, email }: { name?: string | null; email?: string | null }) {
   const letter = (name || email || 'U').charAt(0).toUpperCase();
   return (
-    <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-[rgba(99,102,241,0.35)] to-[rgba(139,92,246,0.25)] border border-[rgba(99,102,241,0.4)] shadow-[0_0_0_3px_rgba(99,102,241,0.08)]">
+    <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-[rgba(167,139,250,0.35)] to-[rgba(139,92,246,0.25)] border border-[rgba(167,139,250,0.4)] shadow-[0_0_0_3px_rgba(167,139,250,0.08)]">
       <span className="text-base font-bold text-[var(--accent-foreground)] leading-none select-none">{letter}</span>
     </div>
   );
@@ -121,7 +121,7 @@ export default function AccountPage() {
             <div className="flex items-center gap-2">
               {billingLoading && <Loader2 size={13} className="animate-spin text-[var(--accent)]" />}
               {!billingLoading && isAdmin && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border bg-[rgba(99,102,241,0.14)] text-[var(--accent-foreground)] border-[rgba(99,102,241,0.28)]">Admin</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border bg-[rgba(167,139,250,0.14)] text-[var(--accent-foreground)] border-[rgba(167,139,250,0.28)]">Admin</span>
               )}
               {!billingLoading && !isAdmin && <StatusPill status={subStatus} />}
             </div>
@@ -160,7 +160,7 @@ export default function AccountPage() {
           <section className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl shadow-[0_4px_28px_rgba(0,0,0,0.28)] overflow-hidden">
             {/* Avatar + name/email */}
             <div className="px-5 pt-5 pb-4 flex items-center gap-3.5 border-b border-[var(--border-subtle)]">
-              <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-[rgba(99,102,241,0.35)] to-[rgba(139,92,246,0.22)] border border-[rgba(99,102,241,0.38)] shadow-[0_0_0_3px_rgba(99,102,241,0.07)]">
+              <div className="w-11 h-11 rounded-full flex items-center justify-center shrink-0 bg-gradient-to-br from-[rgba(167,139,250,0.35)] to-[rgba(139,92,246,0.22)] border border-[rgba(167,139,250,0.38)] shadow-[0_0_0_3px_rgba(167,139,250,0.07)]">
                 <span className="text-base font-bold text-[var(--accent-foreground)] leading-none select-none">
                   {(user?.name || user?.email || 'U').charAt(0).toUpperCase()}
                 </span>

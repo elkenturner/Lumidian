@@ -307,7 +307,7 @@ export default function ReportsPage() {
               <button
                 onClick={downloadPDF}
                 disabled={exportingPDF}
-                className={`flex items-center gap-2 bg-[rgba(99,102,241,0.10)] hover:bg-[rgba(99,102,241,0.16)] border border-[rgba(99,102,241,0.25)] text-[var(--accent-light)] hover:text-[var(--accent-light)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
+                className={`flex items-center gap-2 bg-[rgba(167,139,250,0.10)] hover:bg-[rgba(167,139,250,0.16)] border border-[rgba(167,139,250,0.25)] text-[var(--accent-light)] hover:text-[var(--accent-light)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
                 title="Export as PDF"
               >
                 {exportingPDF
@@ -334,7 +334,7 @@ export default function ReportsPage() {
         </div>
       ) : brands.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-14 h-14 bg-[var(--accent-muted)] border border-[rgba(99,102,241,0.22)] rounded-2xl flex items-center justify-center mb-4">
+          <div className="w-14 h-14 bg-[var(--accent-muted)] border border-[rgba(167,139,250,0.22)] rounded-2xl flex items-center justify-center mb-4">
             <BarChart2 size={24} className="text-[var(--accent)]" />
           </div>
           <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2">No brands tracked yet</h3>
@@ -371,16 +371,16 @@ export default function ReportsPage() {
 
           {/* Tabs for Prompt Breakdown and Competitor Analysis */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'prompts' | 'competitors')} className="mt-4">
-            <TabsList className="bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 h-auto gap-0 mb-4">
+            <TabsList className="bg-[rgba(255,255,255,0.04)] border border-[rgba(167,139,250,0.12)] rounded-lg p-0.5 h-auto gap-0 mb-4">
               <TabsTrigger
                 value="prompts"
-                className="px-4 py-2 rounded-md text-sm font-medium h-auto data-[state=active]:bg-[rgba(99,102,241,0.25)] data-[state=active]:text-[var(--accent-light)] data-[state=inactive]:text-[var(--text-faint)]"
+                className="px-4 py-2 rounded-md text-sm font-medium h-auto data-[state=active]:bg-[rgba(167,139,250,0.25)] data-[state=active]:text-[var(--accent-light)] data-[state=inactive]:text-[var(--text-faint)]"
               >
                 Prompt Breakdown
               </TabsTrigger>
               <TabsTrigger
                 value="competitors"
-                className="px-4 py-2 rounded-md text-sm font-medium h-auto data-[state=active]:bg-[rgba(99,102,241,0.25)] data-[state=active]:text-[var(--accent-light)] data-[state=inactive]:text-[var(--text-faint)]"
+                className="px-4 py-2 rounded-md text-sm font-medium h-auto data-[state=active]:bg-[rgba(167,139,250,0.25)] data-[state=active]:text-[var(--accent-light)] data-[state=inactive]:text-[var(--text-faint)]"
               >
                 Competitor Analysis
               </TabsTrigger>
@@ -408,7 +408,7 @@ export default function ReportsPage() {
                   <button
                     key={s}
                     onClick={() => setSortBy(s)}
-                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all capitalize ${sortBy === s ? 'bg-[rgba(99,102,241,0.25)] text-[var(--accent-light)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all capitalize ${sortBy === s ? 'bg-[rgba(167,139,250,0.25)] text-[var(--accent-light)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
                   >
                     {s === 'visibility' ? 'Visibility %' : s === 'alpha' ? 'A–Z' : 'Biggest Δ'}
                   </button>
@@ -491,7 +491,7 @@ export default function ReportsPage() {
               </div>
             ) : promptGroups.length === 0 && untrackedPrompts.length === 0 ? (
               <div className="px-5 py-12 text-center">
-                <div className="w-10 h-10 rounded-xl bg-[var(--accent-muted)] border border-[rgba(99,102,241,0.22)] flex items-center justify-center mx-auto mb-3">
+                <div className="w-10 h-10 rounded-xl bg-[var(--accent-muted)] border border-[rgba(167,139,250,0.22)] flex items-center justify-center mx-auto mb-3">
                   <BarChart2 size={18} className="text-[var(--text-faint)]" />
                 </div>
                 <p className="text-sm font-medium text-[var(--text-secondary)] mb-1">No report data yet</p>
@@ -665,7 +665,7 @@ export default function ReportsPage() {
           {/* Competitors section */}
           {!loading && (!competitorAnalysis || !competitorAnalysis.has_data) && (
             <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-8 text-center shadow-[0_4px_24px_rgba(0,0,0,0.30)]">
-              <div className="w-10 h-10 bg-[rgba(99,102,241,0.10)] border border-[rgba(99,102,241,0.20)] rounded-xl flex items-center justify-center mb-3 mx-auto">
+              <div className="w-10 h-10 bg-[rgba(167,139,250,0.10)] border border-[rgba(167,139,250,0.20)] rounded-xl flex items-center justify-center mb-3 mx-auto">
                 <BarChart2 size={18} className="text-[var(--accent)]" />
               </div>
               <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">No competitor data yet</p>
@@ -692,7 +692,7 @@ export default function ReportsPage() {
                         onClick={() => setCompetitorModelFilter(mk)}
                         className={`text-[10px] font-medium px-2 py-1 rounded transition-colors ${
                           competitorModelFilter === mk
-                            ? 'bg-[rgba(99,102,241,0.25)] text-[var(--accent-light)]'
+                            ? 'bg-[rgba(167,139,250,0.25)] text-[var(--accent-light)]'
                             : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'
                         }`}
                         style={cfg && competitorModelFilter === mk ? { color: cfg.text } : {}}

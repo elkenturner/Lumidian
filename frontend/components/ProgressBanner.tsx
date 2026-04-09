@@ -27,8 +27,8 @@ const ProgressBanner = memo(function ProgressBanner({ title, subtitle, items }: 
   }, [items.length]);
 
   return (
-    <div className="mb-6 relative overflow-hidden rounded-xl border border-[rgba(99,102,241,0.3)] animate-[glow-pulse_2s_ease-in-out_infinite]"
-      style={{ background: 'radial-gradient(ellipse at 30% 50%, rgba(99,102,241,0.10) 0%, rgba(99,102,241,0.03) 70%, transparent 100%)' }}
+    <div className="mb-6 relative overflow-hidden rounded-xl border border-[rgba(167,139,250,0.3)] animate-[glow-pulse_2s_ease-in-out_infinite]"
+      style={{ background: 'radial-gradient(ellipse at 30% 50%, rgba(167,139,250,0.10) 0%, rgba(167,139,250,0.03) 70%, transparent 100%)' }}
     >
       <div className="px-5 py-4 flex items-center gap-4">
         {/* Rotating logo area */}
@@ -64,7 +64,7 @@ const ProgressBanner = memo(function ProgressBanner({ title, subtitle, items }: 
       <div
         className="h-[3px] w-full animate-[shimmer_2s_linear_infinite]"
         style={{
-          background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.5), rgba(168,85,247,0.5), transparent)',
+          background: 'linear-gradient(90deg, transparent, rgba(167,139,250,0.5), rgba(168,85,247,0.5), transparent)',
           backgroundSize: '200% 100%',
         }}
       />

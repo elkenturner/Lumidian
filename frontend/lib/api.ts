@@ -18,6 +18,7 @@ export function parseApiError(err: unknown, fallback = 'Something went wrong. Pl
   if (detail) return detail;
   const status = e?.response?.status;
   if (status === 402) return 'Upgrade your plan to use this feature.';
+  if (status === 409) return 'This action is already in progress. Please wait for it to finish.';
   if (status === 429) return 'You\'ve hit a usage limit. Please wait or upgrade your plan.';
   if (status === 403) return 'You don\'t have permission to do that.';
   if (status === 404) return 'Not found.';

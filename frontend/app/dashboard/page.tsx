@@ -692,7 +692,10 @@ export default function DashboardPage() {
   }, [toast]);
 
   async function handleRunReport() {
-    if (!selectedBrandId) return;
+    if (!selectedBrandId || triggering) return;
+    // Guard: don't trigger if a run is already active (defense-in-depth behind disabled buttons)
+    const runStatus = overview?.latest_run?.status;
+    if (activeRunId !== null || runStatus === 'running' || runStatus === 'pending') return;
     setTriggering(true);
     try {
       const result = await triggerRun(selectedBrandId);
@@ -703,7 +706,10 @@ export default function DashboardPage() {
       const e = err as { response?: { status?: number; data?: { detail?: string } } };
       const httpStatus = e?.response?.status;
       const detail = parseApiError(err);
-      if (httpStatus === 429 || httpStatus === 402) {
+      if (httpStatus === 409) {
+        // Already running — show as info toast, not an error
+        setToast({ message: 'A report is already running. Please wait for it to finish.', type: 'info' });
+      } else if (httpStatus === 429 || httpStatus === 402) {
         setUpgradeModalReason(detail);
         setUpgradeModalOpen(true);
       } else {
@@ -1065,11 +1071,11 @@ export default function DashboardPage() {
               </p>
               <button
                 onClick={handleRunReport}
-                disabled={triggering}
+                disabled={triggering || isRunning}
                 className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-6 py-3 text-sm font-semibold transition-colors shadow-lg shadow-[var(--accent)]/25"
               >
-                {triggering ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                Run First Report
+                {triggering || isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                {isRunning ? 'Running...' : 'Run First Report'}
               </button>
             </div>
           )}

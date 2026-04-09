@@ -191,7 +191,7 @@ async def run_tracking(
         from app.models import User
         user_result = await db.execute(select(User).where(User.id == brand.user_id))
         user = user_result.scalar_one_or_none()
-        is_pro = user is not None and user.subscription_tier == "pro"
+        is_pro = user is not None and user.subscription_tier in ("starter", "pro")
 
         prompts_result = await db.execute(
             select(Prompt).where(Prompt.brand_id == brand_id)

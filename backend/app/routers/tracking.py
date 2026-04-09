@@ -312,7 +312,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
         from app.models import User
         user_result = await db.execute(select(User).where(User.id == brand.user_id))
         user_obj = user_result.scalar_one_or_none()
-        is_pro = user_obj is not None and user_obj.subscription_tier == "pro"
+        is_pro = user_obj is not None and user_obj.subscription_tier in ("starter", "pro")
 
         prompts_result = await db.execute(
             select(Prompt).where(Prompt.brand_id == brand_id)
@@ -605,7 +605,7 @@ async def trigger_prompt_run(
     await db.refresh(tracking_run)
     run_id = tracking_run.id
 
-    is_pro = user.subscription_tier == "pro"
+    is_pro = user.subscription_tier in ("starter", "pro")
     asyncio.create_task(
         _background_prompt_run(run_id, brand_id, prompt_id, str(prompt.text), str(brand.name), str(brand.tier), is_pro=is_pro),
         name=f"prompt-tracking-{brand_id}-{prompt_id}-{run_id}",

@@ -885,7 +885,13 @@ const PLATFORM_DISPLAY: Record<string, string> = {
   medium: 'Medium',
   wikipedia: 'Wikipedia',
   linkedin: 'LinkedIn',
+  linkedin_article: 'LinkedIn',
+  linkedin_post: 'LinkedIn',
+  linkedin_reply: 'LinkedIn',
   x: 'X',
+  x_thread: 'X',
+  x_post: 'X',
+  x_reply: 'X',
 };
 
 function RequestDraftModal({

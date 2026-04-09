@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { TrendPoint } from '@/lib/api';
+import { useCountUp } from '@/lib/motion';
 import HelpTooltip from './HelpTooltip';
 import SparklineTooltip from './SparklineTooltip';
 
@@ -34,6 +35,10 @@ export default function VisibilityChart({
   liveScore,
   indexScore,
 }: VisibilityChartProps) {
+  const animatedScore = useCountUp(score ?? 0);
+  const animatedLive = useCountUp(liveScore ?? 0);
+  const animatedIndex = useCountUp(indexScore ?? 0);
+
   return (
     <div className="card border-t-2 border-t-[var(--accent)] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.25),0_0_40px_var(--accent-muted),inset_0_1px_0_rgba(255,255,255,0.07)]">
       <div className="flex items-start justify-between mb-3">
@@ -47,7 +52,7 @@ export default function VisibilityChart({
           ) : (
             <>
               <p className="text-5xl md:text-6xl font-bold text-[var(--text-primary)] mt-1 leading-none">
-                {score != null ? `${Math.round(score)}%` : 'N/A'}
+                {score != null ? `${animatedScore}%` : 'N/A'}
               </p>
               {scoreDelta !== null && (
                 <p className={`text-xs font-medium mt-2 ${scoreDelta > 0 ? 'text-[var(--success)]' : scoreDelta < 0 ? 'text-[var(--danger-text)]' : 'text-[var(--text-muted)]'}`}>
@@ -89,9 +94,9 @@ export default function VisibilityChart({
       {!loadingAnalytics && score !== null && (liveScore !== null || indexScore !== null) && (
         <div className="mt-3 space-y-2 border-t border-[rgba(255,255,255,0.06)] pt-3">
           {([
-            { label: 'Live Search', s: liveScore,  models: 'Perplexity \u00b7 Gemini',  color: 'var(--success)' },
-            { label: 'AI Index',    s: indexScore, models: 'GPT-4o-mini \u00b7 Claude', color: 'var(--accent-light)' },
-          ] as Array<{ label: string; s: number | null; models: string; color: string }>).map(({ label, s, models, color }) => (
+            { label: 'Live Search', s: liveScore,  animated: animatedLive,  models: 'Perplexity \u00b7 Gemini',  color: 'var(--success)' },
+            { label: 'AI Index',    s: indexScore, animated: animatedIndex, models: 'GPT-4o-mini \u00b7 Claude', color: 'var(--accent-light)' },
+          ] as Array<{ label: string; s: number | null; animated: string; models: string; color: string }>).map(({ label, s, animated, models, color }) => (
             <div key={label}>
               <div className="flex items-center gap-3 mb-0.5">
                 <div className="flex items-center gap-1.5 w-20 md:w-24 flex-shrink-0">
@@ -102,7 +107,7 @@ export default function VisibilityChart({
                   <div className="h-full rounded-full transition-all duration-500" style={{ width: `${s ?? 0}%`, background: color }} />
                 </div>
                 <span className="text-xs font-bold tabular-nums w-9 text-right flex-shrink-0" style={{ color }}>
-                  {s !== null ? `${s}%` : '\u2014'}
+                  {s !== null ? `${animated}%` : '\u2014'}
                 </span>
               </div>
               <p className="text-[9px] text-[var(--text-faint)] pl-[88px] md:pl-[108px] truncate">{models}</p>

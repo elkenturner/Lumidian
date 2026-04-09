@@ -290,7 +290,7 @@ export default function ReportsPage() {
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl"
+      className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl"
     >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">

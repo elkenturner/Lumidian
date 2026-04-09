@@ -879,6 +879,15 @@ function QuoraQuestionPicker({
 
 const DRAFT_PLATFORMS = ['reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'] as const;
 
+const PLATFORM_DISPLAY: Record<string, string> = {
+  reddit: 'Reddit',
+  quora: 'Quora',
+  medium: 'Medium',
+  wikipedia: 'Wikipedia',
+  linkedin: 'LinkedIn',
+  x: 'X',
+};
+
 function RequestDraftModal({
   brandId,
   prompts,
@@ -959,7 +968,7 @@ function RequestDraftModal({
               {DRAFT_PLATFORMS.map((p) => {
                 const isPro = p === 'linkedin' || p === 'x';
                 const isLocked = isPro && user?.subscription_tier !== 'pro' && !user?.is_admin;
-                const label = p === 'linkedin' ? 'LinkedIn' : p === 'x' ? 'X' : p;
+                const label = PLATFORM_DISPLAY[p] ?? p;
 
                 if (isLocked) {
                   return (
@@ -1367,7 +1376,7 @@ function ScheduledCard({
           >
             <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-medium">
               <BookOpen size={11} />
-              How to Post on {draft.platform.charAt(0).toUpperCase() + draft.platform.slice(1)}
+              How to Post on {PLATFORM_DISPLAY[draft.platform] ?? draft.platform.charAt(0).toUpperCase() + draft.platform.slice(1)}
             </span>
             <ChevronDown size={11} className={`text-[var(--text-faint)] transition-transform ${guideOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -1384,7 +1393,7 @@ function ScheduledCard({
         <HelpCircle size={11} className="text-[var(--success)] mt-0.5 shrink-0" />
         <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
           <span className="text-[var(--text-muted)] font-medium">This draft needs to be posted manually.</span>
-          {' '}Use the View Draft button to copy the content, post it on {draft.platform.charAt(0).toUpperCase() + draft.platform.slice(1)}, then click{' '}
+          {' '}Use the View Draft button to copy the content, post it on {PLATFORM_DISPLAY[draft.platform] ?? draft.platform.charAt(0).toUpperCase() + draft.platform.slice(1)}, then click{' '}
           <span className="text-[var(--success)]">Mark as Posted</span> to record it and start tracking visibility changes.
         </p>
       </div>
@@ -2548,7 +2557,7 @@ export default function ContentHubPage() {
                             </p>
                           ) : (
                             <p className="text-xs text-[var(--text-faint)] mt-2 text-center">
-                              {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : draftStatus?.weekly_drafts_limit != null ? `Replaces all existing drafts · ${draftStatus.weekly_drafts_remaining}/${draftStatus.weekly_drafts_limit} weekly` : 'Replaces all existing drafts with a fresh set of up to 20'}
+                              {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : draftStatus?.weekly_drafts_limit != null ? `Replaces all existing drafts · ${draftStatus.weekly_drafts_remaining}/${draftStatus.weekly_drafts_limit} weekly` : draftStatus?.draft_cap != null ? `Replaces all existing drafts with a fresh set of up to ${draftStatus.draft_cap}` : 'Replaces all existing drafts with a fresh set'}
                             </p>
                           )}
                         </>
@@ -2631,7 +2640,7 @@ export default function ContentHubPage() {
                       key={key}
                       onClick={() => {
                         if (isLocked) {
-                          setUpgradeModalReason(`${key === 'linkedin' ? 'LinkedIn' : 'X'} scanning and drafting requires a Pro subscription.`);
+                          setUpgradeModalReason(`${PLATFORM_DISPLAY[key] ?? key} scanning and drafting requires a Pro subscription.`);
                           setUpgradeModalOpen(true);
                           return;
                         }
@@ -2640,8 +2649,8 @@ export default function ContentHubPage() {
                       className={`w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg transition-all duration-200 group ${
                         isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[rgba(255,255,255,0.03)]'
                       }`}
-                      title={isLocked ? `${key} requires Pro plan` : enabled ? `Disable ${key}` : `Enable ${key}`}
-                      aria-label={isLocked ? `${key} requires Pro plan` : enabled ? `Disable ${key}` : `Enable ${key}`}
+                      title={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires Pro plan` : enabled ? `Disable ${PLATFORM_DISPLAY[key] ?? key}` : `Enable ${PLATFORM_DISPLAY[key] ?? key}`}
+                      aria-label={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires Pro plan` : enabled ? `Disable ${PLATFORM_DISPLAY[key] ?? key}` : `Enable ${PLATFORM_DISPLAY[key] ?? key}`}
                     >
                       <div className="flex items-center gap-2.5">
                         <div
@@ -2653,8 +2662,8 @@ export default function ContentHubPage() {
                         >
                           <PlatformIcon platform={key} size={12} color={enabled && !isLocked ? color : 'var(--text-faint)'} />
                         </div>
-                        <span className={`text-[13px] font-medium capitalize transition-colors duration-200 ${enabled && !isLocked ? 'text-[var(--text-secondary)]' : 'text-[var(--text-faint)]'}`}>
-                          {key === 'linkedin' ? 'LinkedIn' : key === 'x' ? 'X' : key}
+                        <span className={`text-[13px] font-medium transition-colors duration-200 ${enabled && !isLocked ? 'text-[var(--text-secondary)]' : 'text-[var(--text-faint)]'}`}>
+                          {PLATFORM_DISPLAY[key] ?? key}
                         </span>
                         {isLocked && (
                           <span className="text-[9px] bg-[rgba(99,102,241,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>

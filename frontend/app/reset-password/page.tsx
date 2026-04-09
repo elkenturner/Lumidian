@@ -125,7 +125,7 @@ export default function ResetPasswordPage() {
                       required
                       placeholder="Min. 8 characters"
                       minLength={8}
-                      className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 pr-10 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#a78bfa] focus:ring-2 focus:ring-[rgba(167,139,250,0.2)] transition-all"
+                      className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 pr-10 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#a78bfa] focus:ring-2 focus:ring-[rgba(167,139,250,0.2)] transition-[border-color,box-shadow]"
                     />
                     <button
                       type="button"
@@ -159,7 +159,7 @@ export default function ResetPasswordPage() {
                     onChange={(e) => setConfirm(e.target.value)}
                     required
                     placeholder="Re-enter password"
-                    className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#a78bfa] focus:ring-2 focus:ring-[rgba(167,139,250,0.2)] transition-all"
+                    className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#a78bfa] focus:ring-2 focus:ring-[rgba(167,139,250,0.2)] transition-[border-color,box-shadow]"
                   />
                 </div>
                 <button

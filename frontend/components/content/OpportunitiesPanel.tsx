@@ -37,7 +37,7 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
     <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 mb-4 self-start">
       <button
         onClick={() => setOppPlatformFilter('all')}
-        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${oppPlatformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${oppPlatformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
       >
         All
       </button>
@@ -45,7 +45,7 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
         <button
           key={p}
           onClick={() => setOppPlatformFilter(oppPlatformFilter === p ? 'all' : p)}
-          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${oppPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${oppPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
         >
           {PLATFORM_DISPLAY[p] ?? p}
         </button>

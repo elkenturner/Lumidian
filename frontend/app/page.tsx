@@ -270,7 +270,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-[background-color,backdrop-filter,border-color] duration-300 ${
         scrolled
           ? 'bg-[rgba(2,6,23,0.85)] backdrop-blur-lg border-b border-[rgba(51,65,85,0.5)]'
           : 'max-md:bg-[rgba(2,6,23,0.85)] max-md:backdrop-blur-lg bg-transparent'
@@ -306,7 +306,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
             </Link>
             <Link
               href="/register"
-              className="text-sm font-semibold text-white px-5 py-2.5 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-all shadow-lg"
+              className="text-sm font-semibold text-white px-5 py-2.5 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-colors shadow-lg"
             >
               Get Started
             </Link>
@@ -373,7 +373,7 @@ function HeroSection() {
           >
             Track Your Brand&apos;s
             <br />
-            <span className="bg-gradient-to-r from-[#a78bfa] to-[#a855f7] bg-clip-text text-transparent">
+            <span className="text-[#a78bfa]">
               Visibility in AI
             </span>
             {' — Then Fix It'}
@@ -393,14 +393,14 @@ function HeroSection() {
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/register"
-              className="flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-all shadow-lg hover:shadow-xl"
+              className="flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-[background-color,box-shadow] shadow-lg hover:shadow-xl"
             >
               <Play size={18} fill="white" />
               Start Free
             </Link>
             <Link
               href="/login"
-              className="text-lg font-medium text-white px-6 py-4 rounded-full border border-[rgba(255,255,255,0.25)] hover:border-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
+              className="text-lg font-medium text-white px-6 py-4 rounded-full border border-[rgba(255,255,255,0.25)] hover:border-white hover:bg-[rgba(255,255,255,0.05)] transition-[border-color,background-color]"
             >
               Log in
             </Link>
@@ -427,7 +427,7 @@ function ModelsBar() {
           {AI_MODELS.map((model, i) => (
             <FadeUp key={model.name} delay={i * 60}>
               <div
-                className="flex items-center gap-2 bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-full px-4 py-2 transition-all hover:border-opacity-100"
+                className="flex items-center gap-2 bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-full px-4 py-2 transition-[border-color] hover:border-opacity-100"
                 style={{
                   ['--model-color' as string]: model.color,
                 }}
@@ -475,7 +475,7 @@ function FeaturesSection() {
             const Icon = feature.icon;
             return (
               <FadeUp key={feature.title} delay={i * 80}>
-                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-5 md:p-7 h-full transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(167,139,250,0.3)] hover:shadow-[0_0_24px_rgba(167,139,250,0.15),0_8px_32px_rgba(0,0,0,0.3)]">
+                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-5 md:p-7 h-full transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 hover:border-[rgba(167,139,250,0.3)] hover:shadow-[0_0_24px_rgba(167,139,250,0.15),0_8px_32px_rgba(0,0,0,0.3)]">
                   <div className="w-11 h-11 rounded-xl bg-[rgba(167,139,250,0.15)] flex items-center justify-center mb-4">
                     <Icon size={20} className="text-[#a78bfa]" />
                   </div>
@@ -518,7 +518,7 @@ function HowItWorksSection() {
                 {/* Number */}
                 <div className="flex-shrink-0">
                   <span
-                    className="text-6xl sm:text-7xl font-extrabold bg-gradient-to-br from-[#a78bfa] to-[#a855f7] bg-clip-text text-transparent"
+                    className="text-6xl sm:text-7xl font-extrabold text-[#a78bfa]"
                     style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif', lineHeight: 1 }}
                   >
                     {step.n}
@@ -654,7 +654,7 @@ function DashboardMockup() {
                 </div>
                 <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#22c55e] rounded-full transition-all duration-700"
+                    className="h-full bg-[#22c55e] rounded-full transition-[width] duration-700"
                     style={{ width: `${liveVal}%` }}
                   />
                 </div>
@@ -669,7 +669,7 @@ function DashboardMockup() {
                 </div>
                 <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#c4b5fd] rounded-full transition-all duration-700"
+                    className="h-full bg-[#c4b5fd] rounded-full transition-[width] duration-700"
                     style={{ width: `${indexVal}%` }}
                   />
                 </div>
@@ -686,7 +686,7 @@ function DashboardMockup() {
                   <span className="text-xs font-medium text-[#94a3b8] w-20 flex-shrink-0">{m.name}</span>
                   <div className="flex-1 h-2 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-700"
+                      className="h-full rounded-full transition-[width] duration-700"
                       style={{
                         width: `${barWidths[i]}%`,
                         backgroundColor: m.color,
@@ -726,7 +726,7 @@ function DashboardMockup() {
                 <span className="text-xs font-medium text-[#94a3b8] w-24 flex-shrink-0">Your Brand</span>
                 <div className="flex-1 h-2 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-700"
+                    className="h-full rounded-full transition-[width] duration-700"
                     style={{ width: `${compWidths[0]}%`, backgroundColor: '#a78bfa' }}
                   />
                 </div>
@@ -736,7 +736,7 @@ function DashboardMockup() {
                 <span className="text-xs font-medium text-[#94a3b8] w-24 flex-shrink-0">Competitor A</span>
                 <div className="flex-1 h-2 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-700"
+                    className="h-full rounded-full transition-[width] duration-700"
                     style={{ width: `${compWidths[1]}%`, backgroundColor: '#64748b', transitionDelay: '100ms' }}
                   />
                 </div>
@@ -824,7 +824,7 @@ function PricingSection() {
                 <button
                   key={tier}
                   onClick={() => setMobileTier(tier)}
-                  className={`flex-1 py-2.5 text-sm font-semibold rounded-full transition-all ${
+                  className={`flex-1 py-2.5 text-sm font-semibold rounded-full transition-[background-color,color,box-shadow] ${
                     mobileTier === tier
                       ? 'bg-[#a78bfa] text-white shadow-[0_0_12px_rgba(167,139,250,0.4)]'
                       : 'text-[#94a3b8] hover:text-white'
@@ -871,7 +871,7 @@ function PricingSection() {
 
               <Link
                 href="/register"
-                className="mt-6 w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white py-3 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-all shadow-[0_0_24px_rgba(167,139,250,0.4)]"
+                className="mt-6 w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white py-3 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-colors shadow-[0_0_24px_rgba(167,139,250,0.4)]"
               >
                 Get started free
                 <ArrowRight size={16} />
@@ -884,7 +884,7 @@ function PricingSection() {
           <div className="mt-8 text-center hidden md:block">
             <Link
               href="/register"
-              className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-all shadow-[0_0_24px_rgba(167,139,250,0.4)]"
+              className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-colors shadow-[0_0_24px_rgba(167,139,250,0.4)]"
             >
               Get started free
               <ArrowRight size={16} />
@@ -910,7 +910,7 @@ function FAQItem({
   return (
     <FadeUp delay={delay}>
       <div
-        className={`border-b border-[rgba(51,65,85,0.5)] transition-all ${isOpen ? 'border-l-2 border-l-[#a78bfa] pl-4' : ''}`}
+        className={`border-b border-[rgba(51,65,85,0.5)] transition-[border-color,padding] ${isOpen ? 'border-l-2 border-l-[#a78bfa] pl-4' : ''}`}
       >
         <button
           onClick={onToggle}
@@ -923,7 +923,7 @@ function FAQItem({
           />
         </button>
         <div
-          className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-96 pb-5' : 'max-h-0'}`}
+          className={`overflow-hidden transition-[max-height] duration-300 ${isOpen ? 'max-h-96 pb-5' : 'max-h-0'}`}
         >
           <p className="text-sm text-[#94a3b8] leading-relaxed">{item.a}</p>
         </div>
@@ -1010,7 +1010,7 @@ function CTASection() {
         <FadeUp delay={200}>
           <Link
             href="/register"
-            className="inline-flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-all shadow-lg hover:shadow-xl"
+            className="inline-flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-[background-color,box-shadow] shadow-lg hover:shadow-xl"
           >
             Get Started Free
             <ArrowRight size={18} />

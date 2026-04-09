@@ -200,7 +200,7 @@ export default function TrackerPage() {
               <motion.div
                 key={brand.id}
                 variants={staggerChild}
-                className="bg-[rgba(167,139,250,0.06)] border border-[var(--border-default)] rounded-xl p-6 hover:border-[rgba(167,139,250,0.35)] transition-all duration-200 flex flex-col"
+                className="bg-[rgba(167,139,250,0.06)] border border-[var(--border-default)] rounded-xl p-6 hover:border-[rgba(167,139,250,0.35)] transition-[border-color] duration-200 flex flex-col"
               >
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -240,14 +240,14 @@ export default function TrackerPage() {
                 <div className="flex gap-2 mt-auto">
                   <Link
                     href={`/tracker/${brand.id}`}
-                    className="flex items-center justify-center gap-1.5 flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.10)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 text-xs font-medium transition-all"
+                    className="flex items-center justify-center gap-1.5 flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.10)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 text-xs font-medium transition-[color,background-color]"
                   >
                     <Settings size={12} />
                     Settings
                   </Link>
                   <Link
                     href="/dashboard"
-                    className="flex items-center justify-center gap-1.5 flex-1 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/30 text-[var(--accent-foreground)] rounded-lg px-3 py-2 text-xs font-medium transition-all"
+                    className="flex items-center justify-center gap-1.5 flex-1 bg-[var(--accent)]/10 hover:bg-[var(--accent)]/20 border border-[var(--accent)]/30 text-[var(--accent-foreground)] rounded-lg px-3 py-2 text-xs font-medium transition-colors"
                   >
                     <ExternalLink size={12} />
                     View Results
@@ -310,7 +310,7 @@ export default function TrackerPage() {
                       onClick={() => setFormTier(tier.value)}
                       disabled={creating}
                       className={clsx(
-                        'border rounded-xl p-3 text-left transition-all duration-150',
+                        'border rounded-xl p-3 text-left transition-[border-color,background-color] duration-150',
                         formTier === tier.value
                           ? 'border-[var(--accent)] bg-[var(--accent)]/10'
                           : 'border-[var(--border-subtle)] bg-[rgba(167,139,250,0.05)] hover:border-[rgba(167,139,250,0.35)]'

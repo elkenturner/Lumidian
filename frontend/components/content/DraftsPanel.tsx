@@ -41,7 +41,7 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
         <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 self-start">
           <button
             onClick={() => setDraftPlatformFilter('all')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${draftPlatformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${draftPlatformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
           >
             All
           </button>
@@ -49,7 +49,7 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
             <button
               key={p}
               onClick={() => setDraftPlatformFilter(draftPlatformFilter === p ? 'all' : p)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${draftPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${draftPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
             >
               {PLATFORM_DISPLAY[p] ?? p}
             </button>
@@ -84,7 +84,7 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
                 <button
                   onClick={handleGenerateNow}
                   disabled={generating || !!draftStatus?.draft_queue_full || onCooldown}
-                  className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 text-sm font-semibold transition-all duration-200 shadow-lg shadow-[var(--accent)]/30 hover:shadow-[var(--accent)]/45"
+                  className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 text-sm font-semibold transition-[background-color,box-shadow] duration-200 shadow-lg shadow-[var(--accent)]/30 hover:shadow-[var(--accent)]/45"
                 >
                   {generating ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
                   {generating ? 'Generating…' : 'Regenerate Drafts'}

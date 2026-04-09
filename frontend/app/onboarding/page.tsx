@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ChevronRight, Plus, Loader2, CheckCircle } from 'lucide-react';
 import LumidianLogo from '@/components/LumidianLogo';
 import {
@@ -67,6 +68,11 @@ export default function OnboardingPage() {
     } finally {
       setFetching(false);
     }
+  }
+
+  function handleSkipFetch() {
+    setError('');
+    setStep(2);
   }
 
   async function handleStep2() {
@@ -239,6 +245,14 @@ export default function OnboardingPage() {
                 {fetching ? <Loader2 size={14} className="animate-spin" /> : null}
                 {fetching ? 'Fetching website...' : 'Fetch & Continue'}
               </button>
+              {error && (
+                <button
+                  onClick={handleSkipFetch}
+                  className="w-full text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] py-2 transition-colors"
+                >
+                  Skip — continue without website data
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -348,6 +362,13 @@ export default function OnboardingPage() {
           </div>
         )}
       </div>
+
+      <Link
+        href="/dashboard"
+        className="text-xs text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors mt-4 inline-block"
+      >
+        ← Back to dashboard
+      </Link>
     </div>
   );
 }

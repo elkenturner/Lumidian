@@ -143,3 +143,26 @@ class TestMentionDetectionEdgeCases:
     def test_very_long_response(self):
         long_text = "word " * 10000 + "TestBrand"
         assert _detect_mention("TestBrand", long_text, None, "chatgpt") is True
+
+
+class TestModelVersionSelection:
+    """Test that Pro users get upgraded model versions."""
+
+    def test_default_model_versions(self):
+        from app.services.llm_service import _get_model_version
+        assert _get_model_version("chatgpt", pro=False) == "gpt-4.1-mini"
+        assert _get_model_version("claude", pro=False) == "claude-haiku-4-5-20251001"
+        assert _get_model_version("perplexity", pro=False) == "sonar"
+        assert _get_model_version("gemini", pro=False) == "gemini-2.5-flash"
+
+    def test_pro_model_versions(self):
+        from app.services.llm_service import _get_model_version
+        assert _get_model_version("chatgpt", pro=True) == "gpt-4.1"
+        assert _get_model_version("claude", pro=True) == "claude-sonnet-4-5-20241022"
+        assert _get_model_version("perplexity", pro=True) == "sonar-pro"
+        assert _get_model_version("gemini", pro=True) == "gemini-2.5-pro"
+
+    def test_unknown_model_returns_key(self):
+        from app.services.llm_service import _get_model_version
+        assert _get_model_version("unknown", pro=False) == "unknown"
+        assert _get_model_version("unknown", pro=True) == "unknown"

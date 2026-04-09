@@ -1,9 +1,9 @@
 """
 Reddit Scanner Service — Phase 2
 
-Scans Reddit's public JSON API (no auth required) for threads related to each
-brand's tracked prompts, scores them for relevance and recency, and stores the
-best ones as ContentOpportunity records.
+Scans Reddit for threads related to each brand's tracked prompts via
+Serper.dev (site:reddit.com), scores them for relevance and recency,
+and stores the best ones as ContentOpportunity records.
 
 Public API
 ----------
@@ -12,13 +12,14 @@ scan_all_brands()                  -> None  (runs for every brand)
 """
 from __future__ import annotations
 
-import asyncio
-import json
 import logging
 import math
+import os
 import re
-import urllib.parse
+import time
 from datetime import UTC, datetime, timedelta
+
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +63,15 @@ def _is_blocked_subreddit(subreddit: str) -> bool:
     return any(sig in lower for sig in _BLOCKED_SUB_SIGNALS)
 
 
-_REDDIT_BASE = "https://www.reddit.com"
-_HEADERS = {"User-Agent": "Lumidian/2.0 (opportunity scanner; contact@lumidian.ai)"}
+_SERPER_URL = "https://google.serper.dev/search"
+
+_cache: dict[int, tuple[float, list[dict]]] = {}
+_CACHE_TTL = 86_400.0  # 24 hours
+
+
+def invalidate_cache(key: int) -> None:
+    """Remove a cached result so the next call fetches fresh data from Serper."""
+    _cache.pop(key, None)
 
 # ── Relevance scoring ─────────────────────────────────────────────────────────
 
@@ -384,49 +392,146 @@ def _score_thread(
     return round(min(score, 100.0), 1)
 
 
-# ── HTTP fetching (httpx with urllib fallback) ─────────────────────────────────
+# ── Serper search + helpers ──────────────────────────────────────────────────
 
-async def _fetch(url: str) -> dict | None:
-    try:
-        import httpx
-        async with httpx.AsyncClient(headers=_HEADERS, timeout=12.0) as client:
-            resp = await client.get(url, follow_redirects=True)
-            if resp.status_code == 200:
-                return resp.json()
-            logger.debug("Reddit API %d for %s", resp.status_code, url)
-            return None
-    except ImportError:
-        pass
-    except Exception as exc:
-        logger.debug("httpx fetch failed: %s", exc)
+_RELATIVE_RE = re.compile(
+    r"(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago",
+    re.IGNORECASE,
+)
+_MONTHS_MAP = {
+    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
+}
+
+
+def _parse_serper_date(date_str: str | None) -> datetime | None:
+    """Parse Serper.dev date field into a UTC-naive datetime."""
+    if not date_str:
         return None
+    now = datetime.now(UTC)
 
-    # urllib fallback (stdlib)
-    import urllib.request
-    try:
-        req = urllib.request.Request(url, headers=_HEADERS)
-        loop = asyncio.get_event_loop()
+    m = _RELATIVE_RE.match(date_str.strip())
+    if m:
+        n, unit = int(m.group(1)), m.group(2).lower()
+        delta_map = {
+            "second": timedelta(seconds=n), "minute": timedelta(minutes=n),
+            "hour": timedelta(hours=n), "day": timedelta(days=n),
+            "week": timedelta(weeks=n), "month": timedelta(days=30 * n),
+            "year": timedelta(days=365 * n),
+        }
+        return (now - delta_map.get(unit, timedelta(0))).replace(tzinfo=None)
 
-        def _blocking_fetch() -> dict | None:
+    abs_m = re.match(r"([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})", date_str.strip())
+    if abs_m:
+        month = _MONTHS_MAP.get(abs_m.group(1)[:3].lower())
+        if month:
             try:
-                with urllib.request.urlopen(req, timeout=12) as r:
-                    return json.loads(r.read().decode())
-            except Exception:
-                return None
-
-        return await loop.run_in_executor(None, _blocking_fetch)
-    except Exception as exc:
-        logger.debug("urllib fetch failed: %s", exc)
-        return None
+                return datetime(int(abs_m.group(3)), month, int(abs_m.group(2)))
+            except ValueError:
+                pass
+    return None
 
 
-def _extract_posts(data: dict | None) -> list[dict]:
-    if not data:
+def _extract_subreddit(url: str) -> str:
+    """Extract subreddit name from a Reddit URL."""
+    m = re.search(r"reddit\.com/r/([^/]+)", url)
+    return m.group(1) if m else ""
+
+
+def _clean_title(title: str) -> str:
+    """Strip trailing Reddit/subreddit branding from a Serper result title."""
+    for suffix in (" - Reddit", " — Reddit", " – Reddit", " | Reddit"):
+        if title.endswith(suffix):
+            title = title[: -len(suffix)].strip()
+            break
+    idx = title.rfind(" : r/")
+    if idx > 0:
+        title = title[:idx].strip()
+    return title
+
+
+def _search_reddit_posts(
+    query: str,
+    num_results: int = 10,
+    cache_key: int | None = None,
+) -> list[dict]:
+    """
+    Search for Reddit posts matching *query* via Serper.dev (site:reddit.com).
+
+    Returns a list of dicts: {title, url, snippet, date, subreddit}
+    Returns [] gracefully on missing credentials, API errors, or no matches.
+    """
+    if cache_key is not None:
+        entry = _cache.get(cache_key)
+        if entry and time.monotonic() < entry[0]:
+            logger.debug("reddit_search: cache hit for key=%s", cache_key)
+            return entry[1]
+
+    api_key = os.getenv("SERPER_API_KEY", "").strip()
+    if not api_key:
+        logger.warning(
+            "reddit_search: SERPER_API_KEY not configured — "
+            "Reddit post finder disabled, returning empty list"
+        )
         return []
+
     try:
-        return [child["data"] for child in data["data"]["children"]]
-    except (KeyError, TypeError):
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.post(
+                _SERPER_URL,
+                headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
+                json={"q": f"site:reddit.com {query}", "num": 25},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except httpx.HTTPStatusError as exc:
+        try:
+            error_body = exc.response.json()
+        except Exception:
+            error_body = exc.response.text
+        logger.error(
+            "reddit_search: HTTP %s from Serper — %s",
+            exc.response.status_code, error_body,
+        )
         return []
+    except Exception as exc:
+        logger.error("reddit_search: request failed — %s", exc)
+        return []
+
+    items = data.get("organic", [])
+    results: list[dict] = []
+
+    for item in items:
+        url: str = item.get("link", "")
+        title: str = item.get("title", "")
+        snippet: str = item.get("snippet", "")
+
+        # Must be an actual Reddit post, not a subreddit/wiki/user page
+        if not url or "/comments/" not in url:
+            continue
+
+        subreddit = _extract_subreddit(url)
+
+        results.append({
+            "title": _clean_title(title),
+            "url": url,
+            "snippet": snippet,
+            "date": item.get("date", ""),
+            "subreddit": subreddit,
+        })
+
+        if len(results) >= num_results:
+            break
+
+    logger.info(
+        "reddit_search: %d posts found for query=%r (%d raw Serper results)",
+        len(results), query, len(items),
+    )
+
+    if cache_key is not None:
+        _cache[cache_key] = (time.monotonic() + _CACHE_TTL, results)
+
+    return results
 
 
 # ── Subreddit suggestion ─────────────────────────────────────────────────────
@@ -522,6 +627,9 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
         logger.info("Reddit scanner: brand=%r | %d prompts", brand.name, len(prompts))
 
         if clear_existing:
+            # Bust Serper in-process cache so fresh scan fetches new results
+            for p in prompts:
+                invalidate_cache(p.id)
             # Delete only Reddit opportunities so parallel Quora scan rows aren't wiped
             await db.execute(
                 sql_delete(ContentOpportunity).where(
@@ -535,11 +643,12 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             )
             existing_urls: set[str] = set()
         else:
-            # Prune only opportunities older than 14 days (status=new)
+            # Prune only Reddit opportunities older than 14 days (status=new)
             cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=14)
             old_row = await db.execute(
                 select(ContentOpportunity).where(
                     ContentOpportunity.brand_id == brand_id,
+                    ContentOpportunity.platform == "reddit",
                     ContentOpportunity.created_at < cutoff,
                     ContentOpportunity.status == "new",
                 )
@@ -549,40 +658,38 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
             existing_row = await db.execute(
                 select(ContentOpportunity.thread_url).where(
-                    ContentOpportunity.brand_id == brand_id
+                    ContentOpportunity.brand_id == brand_id,
+                    ContentOpportunity.platform == "reddit",
                 )
             )
             existing_urls = {r[0] for r in existing_row.all()}
 
         new_count = 0
 
-        # Build search queries: one per prompt (up to 6) + one for the brand name
-        queries: list[tuple[str, int | None]] = [
-            (_build_search_query(prompt.text), prompt.id) for prompt in prompts[:6]
-        ]
-        queries.append((brand.name, None))  # brand-name query: already specific, no extraction
+        # Select prompts with weakest visibility (up to 10)
+        from app.services.prompt_selection import get_priority_prompts
+        priority = await get_priority_prompts(brand_id, prompts, limit=10)
 
-        all_candidates: list[tuple[dict, int | None]] = []  # (post_data, prompt_id)
+        all_candidates: list[tuple[dict, int | None]] = []
 
-        for query_text, prompt_id in queries:
-            q = urllib.parse.quote(query_text)
-            url = (
-                f"{_REDDIT_BASE}/search.json"
-                f"?q={q}&sort=relevance&t=month&limit=25"
-            )
-            data = await _fetch(url)
-            for post in _extract_posts(data):
-                all_candidates.append((post, prompt_id))
-            await asyncio.sleep(1.0)
+        for prompt in priority:
+            query = _build_search_query(prompt.text)
+            results = _search_reddit_posts(query, num_results=10, cache_key=prompt.id)
+            for r in results:
+                all_candidates.append((r, prompt.id))
 
-        # Deduplicate by permalink across all queries
-        seen_permalinks: set[str] = set()
+        # Brand-name search (no cache)
+        for r in _search_reddit_posts(brand.name, num_results=10):
+            all_candidates.append((r, None))
+
+        # Deduplicate by URL across all queries
+        seen_urls: set[str] = set()
         deduped: list[tuple[dict, int | None]] = []
-        for post, prompt_id in all_candidates:
-            pl = post.get("permalink", "")
-            if pl and pl not in seen_permalinks:
-                seen_permalinks.add(pl)
-                deduped.append((post, prompt_id))
+        for result, prompt_id in all_candidates:
+            url = result.get("url", "")
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                deduped.append((result, prompt_id))
 
         # ── Phase 1: score all candidates ─────────────────────────────────────
         default_prompt_text = prompts[0].text if prompts else ""
@@ -601,25 +708,27 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
         scored: list[dict] = []  # candidates that pass keyword scoring
 
-        for post, prompt_id in deduped:
-            permalink = post.get("permalink", "")
-            if not permalink:
-                continue
-            thread_url = f"https://www.reddit.com{permalink}"
-            if thread_url in existing_urls:
+        for result, prompt_id in deduped:
+            result_url = result.get("url", "")
+            if not result_url or result_url in existing_urls:
                 continue
 
-            title = post.get("title", "")
+            title = result.get("title", "")
             if not title:
                 continue
 
-            subreddit_name = post.get("subreddit", "")
+            subreddit_name = result.get("subreddit", "")
             if _is_blocked_subreddit(subreddit_name):
                 continue
 
-            body = post.get("selftext", "")
-            created_utc = float(post.get("created_utc", 0))
-            num_comments = int(post.get("num_comments", 0))
+            snippet = result.get("snippet", "")
+            posted_at = _parse_serper_date(result.get("date"))
+            # Default to ~30 days ago when Serper provides no date
+            created_utc = (
+                posted_at.replace(tzinfo=UTC).timestamp()
+                if posted_at
+                else datetime.now(UTC).timestamp() - 30 * 86400
+            )
 
             scoring_prompt = next(
                 (p.text for p in prompts if p.id == prompt_id),
@@ -627,8 +736,8 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             )
 
             score = _score_thread(
-                title, body, scoring_prompt, created_utc,
-                num_comments=num_comments,
+                title, snippet, scoring_prompt, created_utc,
+                num_comments=0,
                 brand_name=brand.name,
                 subreddit=subreddit_name,
             )
@@ -638,13 +747,11 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             scored.append({
                 "title": title,
                 "subreddit": subreddit_name,
-                "body_preview": body[:300] if body else "",
-                "thread_url": thread_url,
+                "body_preview": snippet[:300] if snippet else "",
+                "thread_url": result_url,
                 "score": score,
                 "prompt_id": prompt_id,
-                "created_utc": created_utc,
-                "num_comments": num_comments,
-                "body": body,
+                "posted_at": posted_at,
             })
 
         # ── Phase 2: Haiku relevance gate ──────────────────────────────────────
@@ -661,11 +768,6 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 )
                 continue
 
-            posted_dt = (
-                datetime.fromtimestamp(cand["created_utc"], tz=UTC).replace(tzinfo=None)
-                if cand["created_utc"] else None
-            )
-
             opp = ContentOpportunity(
                 brand_id=brand_id,
                 platform="reddit",
@@ -673,7 +775,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
                 thread_title=cand["title"][:500],
                 subreddit=cand["subreddit"][:100],
                 body_preview=cand["body_preview"] if cand["body_preview"] else None,
-                posted_at=posted_dt,
+                posted_at=cand.get("posted_at"),
                 relevance_score=cand["score"],
                 prompt_id=cand["prompt_id"],
                 status="new",

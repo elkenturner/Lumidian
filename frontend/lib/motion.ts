@@ -1,5 +1,6 @@
 // frontend/lib/motion.ts
-import { type Variants } from 'framer-motion';
+import { useEffect, useRef, useState } from 'react';
+import { type Variants, useReducedMotion } from 'framer-motion';
 
 // ── Custom easing curves (Emil Kowalski) ─────────────────────────────────────
 // Never use ease-in (feels sluggish) or bounce/elastic (feels dated)
@@ -83,6 +84,49 @@ export const cssEasings = {
   inOut: 'cubic-bezier(0.77, 0, 0.175, 1)',
   drawer: 'cubic-bezier(0.32, 0.72, 0, 1)',
 } as const;
+
+// ── Count-up animation hook ──────────────────────────────────────────────────
+export function useCountUp(target: number, duration = 600): string {
+  const prefersReduced = useReducedMotion();
+  const [display, setDisplay] = useState('0');
+  const frameRef = useRef<number>(0);
+  const prevTargetRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (prefersReduced || target === 0) {
+      setDisplay(formatStatValue(target));
+      return;
+    }
+
+    const start = performance.now();
+    const startValue = prevTargetRef.current;
+    const animate = (now: number) => {
+      const elapsed = now - start;
+      const progress = Math.min(elapsed / duration, 1);
+      // ease-out cubic curve
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = startValue + (target - startValue) * eased;
+      setDisplay(formatStatValue(current));
+      if (progress < 1) {
+        frameRef.current = requestAnimationFrame(animate);
+      } else {
+        prevTargetRef.current = target;
+      }
+    };
+    frameRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    };
+  }, [target, duration, prefersReduced]);
+
+  return display;
+}
+
+function formatStatValue(n: number): string {
+  if (n >= 1000) return Math.round(n).toLocaleString();
+  if (n % 1 === 0) return Math.round(n).toString();
+  return n.toFixed(1);
+}
 
 // ── Reduced motion helper ────────────────────────────────────────────────────
 export function getReducedMotionVariants(variants: Variants): Variants {

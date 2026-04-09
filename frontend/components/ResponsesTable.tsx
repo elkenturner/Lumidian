@@ -118,7 +118,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
             const overallColor = overallPct >= 60 ? 'var(--success)' : overallPct >= 30 ? 'var(--warning)' : 'var(--danger)';
 
             return (
-              <div key={g.promptId} className="px-5 py-4 hover:bg-[rgba(167,139,250,0.04)] transition-colors">
+              <div key={g.promptId} className="stagger-row px-5 py-4 hover:bg-[rgba(167,139,250,0.04)] transition-colors">
                 {/* Prompt text */}
                 <p className="text-sm text-[var(--text-secondary)] mb-3 leading-snug font-medium">
                   {g.promptText}

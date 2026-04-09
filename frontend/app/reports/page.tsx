@@ -394,8 +394,8 @@ export default function ReportsPage() {
             </TabsList>
 
             <AnimatePresence mode="wait">
-            <TabsContent value="prompts" className="mt-0">
-              <motion.div key="prompts" variants={slideIn} initial="hidden" animate="visible" exit="exit">
+            <TabsContent key="prompts" value="prompts" className="mt-0">
+              <motion.div variants={slideIn} initial="hidden" animate="visible" exit="exit">
           {/* Search + sort controls */}
           {!loading && responses.length > 0 && (
             <div className={`flex ${isMobile ? 'flex-col' : 'flex-wrap items-center'} gap-2 mb-3`}>
@@ -671,8 +671,8 @@ export default function ReportsPage() {
               </motion.div>
             </TabsContent>
 
-            <TabsContent value="competitors" className="mt-0">
-              <motion.div key="competitors" variants={slideIn} initial="hidden" animate="visible" exit="exit">
+            <TabsContent key="competitors" value="competitors" className="mt-0">
+              <motion.div variants={slideIn} initial="hidden" animate="visible" exit="exit">
           {/* Competitors section */}
           {!loading && (!competitorAnalysis || !competitorAnalysis.has_data) && (
             <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-8 text-center shadow-[0_4px_24px_rgba(0,0,0,0.30)]">

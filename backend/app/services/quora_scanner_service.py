@@ -198,7 +198,10 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
         new_count = 0
 
-        for prompt in prompts[:5]:
+        from app.services.prompt_selection import get_priority_prompts
+        priority = await get_priority_prompts(brand_id, prompts, limit=10)
+
+        for prompt in priority:
             query = extract_keywords(prompt.text, max_words=5)
             if not query:
                 continue

@@ -37,7 +37,7 @@ interface BrandAvatarProps {
   textStyle?: React.CSSProperties;
 }
 
-type ImgState = 'clearbit' | 'google' | 'initial';
+type ImgState = 'favicon' | 'initial';
 
 export default function BrandAvatar({
   name,
@@ -49,12 +49,10 @@ export default function BrandAvatar({
   textStyle,
 }: BrandAvatarProps) {
   const domain = getDomain(websiteUrl);
-  const [imgState, setImgState] = useState<ImgState>(domain ? 'clearbit' : 'initial');
+  const [imgState, setImgState] = useState<ImgState>(domain ? 'favicon' : 'initial');
 
   const logoUrl = domain && imgState !== 'initial'
-    ? imgState === 'clearbit'
-      ? `https://logo.clearbit.com/${domain}`
-      : `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+    ? `https://www.google.com/s2/favicons?domain=${domain}&sz=${Math.min(size * 2, 128)}`
     : null;
 
   const initial = name.charAt(0).toUpperCase();
@@ -73,7 +71,7 @@ export default function BrandAvatar({
           height={size}
           onError={(e) => {
             e.nativeEvent.stopImmediatePropagation();
-            setImgState((s) => s === 'clearbit' ? 'google' : 'initial');
+            setImgState('initial');
           }}
           style={{ width: size, height: size, objectFit: 'contain', background: '#fff', borderRadius: 4 }}
         />

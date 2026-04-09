@@ -1559,6 +1559,7 @@ export default function DashboardPage() {
       {promptModalOpen && selectedBrandId && brandDetail && (
         <ManagePromptsModal
           brandId={selectedBrandId}
+          brandName={brandDetail.name}
           prompts={brandDetail.prompts}
           promptLimit={brandDetail.brand_type === 'pitch' ? 10 : (user?.prompt_limit ?? 10)}
           onClose={() => setPromptModalOpen(false)}

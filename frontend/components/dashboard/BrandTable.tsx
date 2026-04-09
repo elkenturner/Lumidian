@@ -53,7 +53,7 @@ export default function BrandTable({
             <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[var(--accent-border)] rounded-lg p-0.5">
               <button
                 onClick={() => setConvModelFilter('all')}
-                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${convModelFilter === 'all' ? 'bg-[var(--accent-muted)] text-[var(--accent-light)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${convModelFilter === 'all' ? 'bg-[var(--accent-muted)] text-[var(--accent-light)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
               >
                 All
               </button>
@@ -63,7 +63,7 @@ export default function BrandTable({
                   <button
                     key={mk}
                     onClick={() => setConvModelFilter(convModelFilter === mk ? 'all' : mk)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${convModelFilter === mk ? 'bg-[var(--accent-muted)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${convModelFilter === mk ? 'bg-[var(--accent-muted)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
                     style={convModelFilter === mk ? { color: cfg.text } : {}}
                   >
                     {cfg.label}

@@ -67,7 +67,7 @@ export default function DashboardHeader({
         <button
           onClick={onOpenPromptModal}
           disabled={!selectedBrandId}
-          className={`flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 text-xs transition-all duration-150 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
+          className={`flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 text-xs transition-[color,border-color] duration-150 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
         >
           <MessageSquare size={14} />
           Prompts
@@ -75,7 +75,7 @@ export default function DashboardHeader({
         <button
           onClick={onRefresh}
           aria-label="Refresh dashboard"
-          className={`flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-all duration-150 ${isMobile ? 'min-h-[44px]' : ''}`}
+          className={`flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-[color,border-color] duration-150 ${isMobile ? 'min-h-[44px]' : ''}`}
         >
           <RefreshCw size={14} />
         </button>
@@ -85,7 +85,7 @@ export default function DashboardHeader({
             onClick={isAtRunLimit ? onUpgradeClick : onRunReport}
             disabled={triggering || isRunning || !selectedBrandId}
             title={isAtRunLimit ? 'Daily run limit reached — resets at midnight UTC' : undefined}
-            className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-all duration-200 ${isMobile ? 'w-full justify-center' : ''} ${
+            className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-[background-color,box-shadow] duration-200 ${isMobile ? 'w-full justify-center' : ''} ${
               isAtRunLimit
                 ? 'bg-[var(--accent-muted)] border border-[var(--accent-border)] text-[var(--text-faint)] cursor-default'
                 : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40 hover:shadow-xl'

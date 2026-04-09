@@ -84,7 +84,7 @@ export default function ModelBreakdown({ modelScores }: ModelBreakdownProps) {
                 <>
                   <div className="h-1 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden mb-2">
                     <div
-                      className="h-full rounded-full transition-all duration-700"
+                      className="h-full rounded-full transition-[width] duration-700"
                       style={{
                         width: `${pct}%`,
                         background: config.color,

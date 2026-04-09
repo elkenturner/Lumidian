@@ -417,7 +417,7 @@ export default function ReportsPage() {
                   <button
                     key={s}
                     onClick={() => setSortBy(s)}
-                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all capitalize ${sortBy === s ? 'bg-[rgba(167,139,250,0.25)] text-[var(--accent-light)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-[color,background-color] capitalize ${sortBy === s ? 'bg-[rgba(167,139,250,0.25)] text-[var(--accent-light)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
                   >
                     {s === 'visibility' ? 'Visibility %' : s === 'alpha' ? 'A–Z' : 'Biggest Δ'}
                   </button>
@@ -452,7 +452,7 @@ export default function ReportsPage() {
                         </span>
                       </div>
                       <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-all" style={{ width: `${s ?? 0}%`, background: color }} />
+                        <div className="h-full rounded-full transition-[width]" style={{ width: `${s ?? 0}%`, background: color }} />
                       </div>
                       <p className="text-[10px] text-[var(--text-faint)] mt-1">{models}</p>
                     </div>

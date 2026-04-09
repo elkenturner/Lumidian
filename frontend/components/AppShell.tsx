@@ -9,13 +9,140 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import { BrandProvider } from '@/contexts/BrandContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { getBackgroundStatus } from '@/lib/api';
-import { MODEL_CONFIG as MODEL_CONFIG_SHARED } from '@/lib/constants/models';
+import { MODEL_ORDER, MODEL_CONFIG as MODEL_CONFIG_SHARED } from '@/lib/constants/models';
+import ModelIcon from '@/components/ModelIcon';
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.bgColor, text: v.color }])
 );
 
 const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email'];
+
+/* ── Premium animated report-running banner ─────────────────────────────────── */
+function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ model: string; score: number }>; isMobile: boolean }) {
+  const [activeIdx, setActiveIdx] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setActiveIdx((i) => (i + 1) % MODEL_ORDER.length), 2200);
+    return () => clearInterval(t);
+  }, []);
+
+  // Build a set of completed models from scores
+  const completedModels = new Set(modelScores.map((ms) => ms.model));
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.08) 0%, rgba(99,102,241,0.02) 70%, transparent 100%)',
+        borderBottom: '1px solid rgba(99,102,241,0.18)',
+      }}
+    >
+      <div style={{
+        padding: isMobile ? '8px 12px' : '10px 28px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: isMobile ? 10 : 14,
+        flexWrap: 'wrap',
+      }}>
+        {/* Rotating LLM logo */}
+        <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
+          {MODEL_ORDER.map((key, i) => {
+            const cfg = MODEL_CONFIG[key] || { label: key, bg: 'rgba(100,116,139,0.15)', text: 'var(--text-muted)' };
+            return (
+              <div
+                key={key}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: 8,
+                  background: cfg.bg,
+                  border: `1px solid ${cfg.text}25`,
+                  opacity: i === activeIdx ? 1 : 0,
+                  transition: 'opacity 0.4s ease-in-out',
+                }}
+              >
+                <ModelIcon model={key} size={15} color={cfg.text} />
+                <span style={{ fontSize: 7, fontWeight: 700, color: cfg.text, lineHeight: 1, marginTop: 1 }}>
+                  {cfg.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Text */}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600 }}>
+            Report in progress
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>
+            — querying AI models with your prompts
+          </span>
+        </div>
+
+        {/* Model score pills */}
+        {!isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {MODEL_ORDER.map((key) => {
+              const cfg = MODEL_CONFIG[key] || { label: key, bg: 'rgba(100,116,139,0.15)', text: 'var(--text-muted)' };
+              const ms = modelScores.find((s) => s.model === key);
+              const done = completedModels.has(key);
+              return (
+                <span
+                  key={key}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: '3px 8px',
+                    borderRadius: 9999,
+                    background: done ? cfg.bg : 'rgba(100,116,139,0.08)',
+                    color: done ? cfg.text : 'var(--text-faint)',
+                    transition: 'all 0.4s ease',
+                  }}
+                >
+                  <ModelIcon model={key} size={11} color={done ? cfg.text : 'var(--text-faint)'} />
+                  {done ? (
+                    <>
+                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      {ms!.score}%
+                    </>
+                  ) : (
+                    <span style={{ display: 'inline-flex', gap: 2 }}>
+                      <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', animation: 'pulse 1.4s ease-in-out infinite', animationDelay: '0s' }} />
+                      <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', animation: 'pulse 1.4s ease-in-out infinite', animationDelay: '0.2s' }} />
+                      <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', animation: 'pulse 1.4s ease-in-out infinite', animationDelay: '0.4s' }} />
+                    </span>
+                  )}
+                </span>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Shimmer bar */}
+      <div
+        style={{
+          height: 2,
+          width: '100%',
+          background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.5), rgba(168,85,247,0.5), transparent)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 2s linear infinite',
+        }}
+      />
+    </div>
+  );
+}
 
 const MOBILE_NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -149,49 +276,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         }}
       >
         {/* Global status banners — written by dashboard/content pages via localStorage */}
-        {reportRunning && (
-          <div style={{
-            background: 'rgba(99,102,241,0.06)',
-            borderBottom: '1px solid rgba(99,102,241,0.18)',
-            padding: isMobile ? '6px 12px' : '8px 28px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            flexWrap: 'wrap',
-          }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
-            <span style={{ fontSize: 12, color: 'var(--accent-light)', fontWeight: 600 }}>Report in progress</span>
-            <span style={{ fontSize: 12, color: 'var(--accent)' }}>— querying AI models with your prompts.</span>
-            {!isMobile && modelScores.length > 0 && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 8 }}>
-                {modelScores.map((ms) => {
-                  const cfg = MODEL_CONFIG[ms.model] || { label: ms.model, bg: 'rgba(100,116,139,0.15)', text: 'var(--text-muted)' };
-                  return (
-                    <span
-                      key={ms.model}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 4,
-                        fontSize: 10,
-                        fontWeight: 600,
-                        padding: '2px 8px',
-                        borderRadius: 9999,
-                        background: cfg.bg,
-                        color: cfg.text,
-                      }}
-                    >
-                      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                      {cfg.label}: {ms.score}%
-                    </span>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
+        {reportRunning && <ReportRunningBanner modelScores={modelScores} isMobile={isMobile} />}
         {draftsGenerating && (
           <div style={{
             background: 'rgba(16,185,129,0.06)',

@@ -75,6 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if ('requires_2fa' in result && result.requires_2fa) {
       throw Object.assign(new Error('2fa_required'), { challenge_token: result.challenge_token });
     }
+    // If email not yet verified, propagate so login page can redirect to /verify-email.
+    if ('needs_verification' in result && result.needs_verification) {
+      throw Object.assign(new Error('needs_verification'), { email: result.email });
+    }
     setUser(result as import('@/lib/api').AuthUser);
     setSessionCookie();
   }

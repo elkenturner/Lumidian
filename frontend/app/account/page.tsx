@@ -13,7 +13,6 @@ import {
   ShieldCheck,
   Shield,
   CheckCircle2,
-  Pencil,
 } from 'lucide-react';
 import {
   getBillingStatus,
@@ -59,8 +58,6 @@ export default function AccountPage() {
   const [billingLoading, setBillingLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
-  const [editingName, setEditingName] = useState(false);
-  const [nameValue, setNameValue] = useState('');
 
   useEffect(() => { document.title = 'Account \u2014 Lumidian'; }, []);
 
@@ -169,25 +166,9 @@ export default function AccountPage() {
                 </span>
               </div>
               <div className="min-w-0">
-                {editingName ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      value={nameValue}
-                      onChange={(e) => setNameValue(e.target.value)}
-                      className="bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] rounded px-2 py-1 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)]"
-                      autoFocus
-                      onKeyDown={(e) => e.key === 'Escape' && setEditingName(false)}
-                    />
-                    {/* TODO: wire up to a backend PATCH /api/auth/me endpoint once available */}
-                    <button onClick={() => setEditingName(false)} className="text-xs text-[var(--accent)]">Save</button>
-                    <button onClick={() => setEditingName(false)} className="text-xs text-[var(--text-muted)]">Cancel</button>
-                  </div>
-                ) : (
-                  <p className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2 cursor-pointer group leading-tight" onClick={() => { setNameValue(user?.name || ''); setEditingName(true); }}>
-                    {user?.name}
-                    <Pencil size={12} className="text-[var(--text-faint)] opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </p>
-                )}
+                <p className="text-sm font-semibold text-[var(--text-primary)] leading-tight">
+                  {user?.name || user?.email?.split('@')[0]}
+                </p>
                 <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">{user?.email}</p>
               </div>
             </div>

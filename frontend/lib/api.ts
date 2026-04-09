@@ -837,10 +837,17 @@ export async function authRegister(data: {
   return res.data;
 }
 
-export interface LoginResult {
+export interface Login2FAResult {
   requires_2fa: true;
   challenge_token: string;
 }
+
+export interface LoginNeedsVerificationResult {
+  needs_verification: true;
+  email: string;
+}
+
+export type LoginResult = Login2FAResult | LoginNeedsVerificationResult;
 
 export async function authLogin(email: string, password: string): Promise<AuthUser | LoginResult> {
   const res = await api.post<AuthUser | LoginResult>('/auth/login', { email, password });
@@ -1067,21 +1074,6 @@ export interface DraftAttribution {
 export async function getDraftAttributions(brandId: number): Promise<DraftAttribution[]> {
   const res = await api.get<DraftAttribution[]>(`/brands/${brandId}/content-attribution`);
   return res.data;
-}
-
-// ── Case Study ────────────────────────────────────────────────────────────────
-
-export async function exportCaseStudyPDF(brandId: number): Promise<void> {
-  const res = await api.get(`/reports/${brandId}/case-study-export`, { responseType: 'blob' });
-  const blob = new Blob([res.data], { type: 'application/pdf' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const disp: string = res.headers['content-disposition'] ?? '';
-  const match = disp.match(/filename="?([^"]+)"?/);
-  a.download = match ? match[1] : `case-study-${brandId}.pdf`;
-  a.click();
-  URL.revokeObjectURL(url);
 }
 
 // ── Team Members ──────────────────────────────────────────────────────────────

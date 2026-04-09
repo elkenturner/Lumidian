@@ -173,6 +173,7 @@ async def run_tracking(
     # never access SQLAlchemy-managed attributes on detached objects later.
     brand_name: str = ""
     brand_tier: str = "basic"
+    is_pro: bool = False
     prompt_data: list[tuple[int, str]] = []  # (prompt_id, prompt_text)
     run_id: int = 0
 
@@ -185,6 +186,12 @@ async def run_tracking(
 
         brand_name = str(brand.name)
         brand_tier = str(brand.tier)
+
+        # Load user subscription tier for model version selection
+        from app.models import User
+        user_result = await db.execute(select(User).where(User.id == brand.user_id))
+        user = user_result.scalar_one_or_none()
+        is_pro = user is not None and user.subscription_tier == "pro"
 
         prompts_result = await db.execute(
             select(Prompt).where(Prompt.brand_id == brand_id)
@@ -223,7 +230,7 @@ async def run_tracking(
         run_number: int,
     ) -> QueryResult:
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name)
+            result = await query_model(model, prompt_text, brand_name, pro=is_pro)
         response_text = result.get("response_text")
         error = result.get("error")
 

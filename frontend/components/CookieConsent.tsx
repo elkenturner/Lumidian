@@ -25,7 +25,7 @@ export default function CookieConsent() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl border border-[var(--bg-card)] bg-[var(--bg-base)] p-4 shadow-lg">
+    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:w-80 z-50 rounded-xl border border-[var(--bg-card)] bg-[var(--bg-base)] p-4 shadow-lg">
       <p className="text-sm text-[var(--text-secondary)] mb-3">
         We use cookies to keep you signed in and the app running.{' '}
         <a href="/privacy" className="underline hover:text-[var(--text-primary)] transition-colors">

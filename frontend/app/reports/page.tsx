@@ -22,8 +22,6 @@ import {
   getResponses,
   getRecentRuns,
   exportReportPDF,
-  getCaseStudyEligibility,
-  exportCaseStudyPDF,
   getCompetitorAnalysis,
   Brand,
   BrandDetail,
@@ -32,7 +30,6 @@ import {
   TrackingRun,
   Prompt,
   CompetitorAnalysis,
-  CaseStudyEligibility,
 } from '@/lib/api';
 import TrendChart from '@/components/TrendChart';
 import { useBrand } from '@/contexts/BrandContext';
@@ -130,8 +127,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(false);
   const [expandedPromptId, setExpandedPromptId] = useState<number | null>(null);
   const [exportingPDF, setExportingPDF] = useState(false);
-  const [caseStudyEligibility, setCaseStudyEligibility] = useState<CaseStudyEligibility | null>(null);
-  const [exportingCaseStudy, setExportingCaseStudy] = useState(false);
+  const [latestRun, setLatestRun] = useState<TrackingRun | null>(null);
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysis | null>(null);
   const [competitorModelFilter, setCompetitorModelFilter] = useState<string>('all');
   const [activeTab, setActiveTab] = useState<'prompts' | 'competitors'>('prompts');
@@ -148,6 +144,7 @@ export default function ReportsPage() {
     setExpandedPromptId(null);
     setBrandDetail(null);
     setCompetitorAnalysis(null);
+    setLatestRun(null);
     setSearchQuery('');
     try {
       const runsPromise = getRecentRuns(brandId);
@@ -165,7 +162,7 @@ export default function ReportsPage() {
         ]).then(([resps, prevResps, compAnalysis]) => ({ resps, prevResps, compAnalysis }));
       });
 
-      const [tr, , detail, runData] = await Promise.all([
+      const [tr, allRuns, detail, runData] = await Promise.all([
         getTrends(brandId),
         runsPromise,
         getBrand(brandId).catch((err) => { logError(err, 'Reports: fetch brand detail'); return null; }),
@@ -173,6 +170,11 @@ export default function ReportsPage() {
       ]);
 
       if (signal?.aborted) return;
+
+      const sortedRuns = [...(Array.isArray(allRuns) ? allRuns : [])].sort(
+        (a: TrackingRun, b: TrackingRun) => b.id - a.id
+      );
+      setLatestRun(sortedRuns[0] ?? null);
 
       setTrends(
         (Array.isArray(tr) ? tr : []).map((p) => ({
@@ -190,8 +192,6 @@ export default function ReportsPage() {
       setResponses(Array.isArray(resps) ? resps.filter((r: QueryResult) => r.response_text) : []);
       setPrevResponses(Array.isArray(prevResps) ? prevResps.filter((r: QueryResult) => r.response_text) : []);
       if (compAnalysis?.has_data) setCompetitorAnalysis(compAnalysis);
-      // Check case study eligibility (endpoint not yet implemented — silently ignore)
-      getCaseStudyEligibility(brandId).then(setCaseStudyEligibility).catch(() => {});
     } catch { /* ignore */ } finally {
       if (!signal?.aborted) setLoading(false);
     }
@@ -315,23 +315,6 @@ export default function ReportsPage() {
                   : <Download size={14} />}
                 PDF
               </button>
-              {caseStudyEligibility?.eligible && (
-                <button
-                  onClick={async () => {
-                    if (!selectedBrandId) return;
-                    setExportingCaseStudy(true);
-                    try { await exportCaseStudyPDF(selectedBrandId); }
-                    catch { alert('Failed to generate case study. Please try again.'); }
-                    finally { setExportingCaseStudy(false); }
-                  }}
-                  disabled={exportingCaseStudy}
-                  className={`flex items-center gap-2 bg-[rgba(16,185,129,0.10)] hover:bg-[rgba(16,185,129,0.16)] border border-[rgba(16,185,129,0.25)] text-[var(--success-text)] hover:text-[var(--success-text)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
-                  title="Export 90-day case study PDF"
-                >
-                  {exportingCaseStudy ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                  Case Study
-                </button>
-              )}
             </div>
           )}
           <button
@@ -663,10 +646,14 @@ export default function ReportsPage() {
                     <div className="flex items-start gap-3 mb-2">
                       <p className="text-sm text-[var(--text-muted)] leading-snug font-medium flex-1">{p.text}</p>
                       <Badge variant="secondary" className="flex-shrink-0">
-                        Not yet tracked
+                        {latestRun?.status === 'running' || latestRun?.status === 'pending' ? 'Tracking now...' : 'Not yet tracked'}
                       </Badge>
                     </div>
-                    <p className="text-xs text-[var(--text-faint)]">Will be included in your next report run.</p>
+                    <p className="text-xs text-[var(--text-faint)]">
+                      {latestRun?.status === 'running' || latestRun?.status === 'pending'
+                        ? 'Currently being queried across AI models.'
+                        : 'Will be included in your next report run.'}
+                    </p>
                   </div>
                 ))}
               </div>

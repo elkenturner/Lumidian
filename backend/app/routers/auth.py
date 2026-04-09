@@ -264,9 +264,9 @@ async def login(body: LoginRequest, http_req: Request, response: Response, db: D
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     if not getattr(user, "email_verified", True):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Please verify your email before signing in. Check your inbox for a verification code.",
+        return JSONResponse(
+            status_code=status.HTTP_200_OK,
+            content={"email": user.email, "needs_verification": True},
         )
 
     # If 2FA is enabled, issue a short-lived challenge token instead of a session

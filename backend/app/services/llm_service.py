@@ -71,6 +71,23 @@ TIER_RUNS = {
 LIVE_MODELS: frozenset = frozenset({"perplexity", "gemini"})
 INDEX_MODELS: frozenset = frozenset({"chatgpt", "claude"})
 
+# Model versions per subscription tier.
+# Default = Starter/free users; Pro = paid Pro subscribers.
+_MODEL_VERSIONS: dict[str, dict[str, str]] = {
+    "chatgpt":    {"default": "gpt-4.1-mini",              "pro": "gpt-4.1"},
+    "claude":     {"default": "claude-haiku-4-5-20251001",  "pro": "claude-sonnet-4-5-20241022"},
+    "perplexity": {"default": "sonar",                      "pro": "sonar-pro"},
+    "gemini":     {"default": "gemini-2.5-flash",           "pro": "gemini-2.5-pro"},
+}
+
+
+def _get_model_version(model_key: str, pro: bool = False) -> str:
+    """Return the API model ID for the given model key and subscription tier."""
+    versions = _MODEL_VERSIONS.get(model_key)
+    if versions is None:
+        return model_key
+    return versions["pro"] if pro else versions["default"]
+
 
 def _mentioned(brand_name: str, text: str) -> bool:
     """Case-insensitive substring check."""

@@ -39,6 +39,10 @@ const PLATFORM_LABELS: Record<string, string> = {
   x_reply: 'X',
 };
 
+// Platforms with distinctive non-letter icons — show icon + label.
+// All others use letter-based icons that duplicate the label (e.g. "Q Quora"), so hide the icon.
+const SHOW_ICON = new Set(['reddit', 'linkedin', 'linkedin_article', 'linkedin_post', 'linkedin_reply']);
+
 const PlatformBadge = memo(function PlatformBadge({ platform, size = 'md' }: PlatformBadgeProps) {
   const key = platform.toLowerCase();
   const styles = PLATFORM_STYLES[key] ?? {
@@ -49,6 +53,7 @@ const PlatformBadge = memo(function PlatformBadge({ platform, size = 'md' }: Pla
   const label = PLATFORM_LABELS[key] ?? platform;
   const padding = size === 'sm' ? '2px 7px' : '3px 9px';
   const fontSize = '0.6875rem';
+  const showIcon = SHOW_ICON.has(key);
 
   return (
     <span
@@ -68,7 +73,7 @@ const PlatformBadge = memo(function PlatformBadge({ platform, size = 'md' }: Pla
         whiteSpace: 'nowrap',
       }}
     >
-      <PlatformIcon platform={key} size={size === 'sm' ? 10 : 12} color={styles.text} />
+      {showIcon && <PlatformIcon platform={key} size={size === 'sm' ? 10 : 12} color={styles.text} />}
       {label}
     </span>
   );

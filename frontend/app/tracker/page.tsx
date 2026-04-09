@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { fadeIn } from '@/lib/motion';
+import { fadeIn, staggerContainer, staggerChild } from '@/lib/motion';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -187,13 +187,19 @@ export default function TrackerPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+        >
           {brandCards.map(({ brand, overview }) => {
             const latestRun = overview?.latest_run;
             const score = latestRun?.overall_score;
             return (
-              <div
+              <motion.div
                 key={brand.id}
+                variants={staggerChild}
                 className="bg-[rgba(167,139,250,0.06)] border border-[var(--border-default)] rounded-xl p-6 hover:border-[rgba(167,139,250,0.35)] transition-all duration-200 flex flex-col"
               >
                 <div className="flex items-start justify-between mb-4">
@@ -247,10 +253,10 @@ export default function TrackerPage() {
                     View Results
                   </Link>
                 </div>
-              </div>
+              </motion.div>
             );
           })}
-        </div>
+        </motion.div>
       )}
 
       {/* Create Brand Modal */}

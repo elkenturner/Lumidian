@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { staggerContainer, staggerChild } from '@/lib/motion';
 import {
   FileText,
   Loader2,
@@ -113,33 +115,42 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
           Unreviewed drafts are replaced when new drafts are generated. Move anything you want to keep to <span className="text-[var(--text-secondary)]">Scheduled</span> first.
         </p>
       </div>
-      {sorted.map((d) =>
-        d.platform === 'wikipedia' ? (
-          <WikipediaDraftCard
-            key={d.id}
-            draft={d}
-            brandName={brandName}
-            profile={brandProfile}
-            onDelete={handleDelete}
-            onSaved={handleSaved}
-          />
-        ) : (
-          <DraftCard
-            key={d.id}
-            draft={d}
-            profile={brandProfile}
-            brandName={brandName}
-            postedItems={postedItems}
-            prompts={brandPrompts}
-            brandId={selectedBrandId!}
-            reportRunning={reportRunning}
-            onApprove={handleApprove}
-            onDelete={handleDelete}
-            onSaved={handleSaved}
-            onRegenerated={(fresh) => setDraftItems((prev) => [fresh, ...prev])}
-          />
-        )
-      )}
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="flex flex-col gap-3"
+      >
+        {sorted.map((d) =>
+          d.platform === 'wikipedia' ? (
+            <motion.div key={d.id} variants={staggerChild}>
+              <WikipediaDraftCard
+                draft={d}
+                brandName={brandName}
+                profile={brandProfile}
+                onDelete={handleDelete}
+                onSaved={handleSaved}
+              />
+            </motion.div>
+          ) : (
+            <motion.div key={d.id} variants={staggerChild}>
+              <DraftCard
+                draft={d}
+                profile={brandProfile}
+                brandName={brandName}
+                postedItems={postedItems}
+                prompts={brandPrompts}
+                brandId={selectedBrandId!}
+                reportRunning={reportRunning}
+                onApprove={handleApprove}
+                onDelete={handleDelete}
+                onSaved={handleSaved}
+                onRegenerated={(fresh) => setDraftItems((prev) => [fresh, ...prev])}
+              />
+            </motion.div>
+          )
+        )}
+      </motion.div>
     </div>
   );
 }

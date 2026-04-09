@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { motion } from 'framer-motion';
+import { staggerContainer, staggerChild } from '@/lib/motion';
 import {
   MessageSquare,
   TrendingUp,
@@ -29,10 +31,16 @@ export default function StatsGrid({ totalPrompts, daysSinceFirst, publishedCount
   ];
 
   return (
-    <div className={isMobile ? 'snap-scroll-x gap-3 mb-4 -mx-4 px-4' : 'grid grid-cols-3 gap-3 mb-4'}>
+    <motion.div
+      variants={staggerContainer}
+      initial="hidden"
+      animate="visible"
+      className={isMobile ? 'snap-scroll-x gap-3 mb-4 -mx-4 px-4' : 'grid grid-cols-3 gap-3 mb-4'}
+    >
       {items.map(({ label, value, icon: Icon, accent, iconBg, borderTop }) => (
-        <div
+        <motion.div
           key={label}
+          variants={staggerChild}
           className={`bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-xl px-4 py-4 flex items-center gap-3 ${isMobile ? 'min-w-[160px]' : ''}`}
           style={{ borderTopColor: borderTop, borderTopWidth: 2 }}
         >
@@ -46,8 +54,8 @@ export default function StatsGrid({ totalPrompts, daysSinceFirst, publishedCount
             <p className="text-xl font-bold text-[var(--text-primary)] leading-tight tabular-nums">{value}</p>
             <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{label}</p>
           </div>
-        </div>
+        </motion.div>
       ))}
-    </div>
+    </motion.div>
   );
 }

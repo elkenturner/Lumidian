@@ -805,7 +805,7 @@ export default function DashboardPage() {
                                 </div>
                                 <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
                                   <div
-                                    className="h-full rounded-full transition-all duration-500"
+                                    className="h-full rounded-full transition-[width] duration-500"
                                     style={{ width: `${pct}%`, background: barColor }}
                                   />
                                 </div>

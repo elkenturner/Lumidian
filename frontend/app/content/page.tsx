@@ -1417,7 +1417,7 @@ function ScheduledCard({
         </button>
         <button
           onClick={() => onMarkPosted(draft.id)}
-          className="flex items-center gap-1.5 text-xs bg-[#064e3b]/20 hover:bg-[#064e3b]/30 border border-[#065f46]/25 text-[var(--success)] rounded-lg px-3 py-1.5 transition-all duration-150"
+          className="flex items-center gap-1.5 text-xs bg-[#064e3b]/20 hover:bg-[#064e3b]/30 border border-[#065f46]/25 text-[var(--success)] rounded-lg px-3 py-1.5 transition-colors duration-150"
         >
           <CheckCircle2 size={11} />
           Mark as Posted
@@ -2198,7 +2198,7 @@ export default function ContentHubPage() {
                   <button
                     onClick={() => setPostingGuideOpen(false)}
                     aria-label="Close"
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] transition-all"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] transition-[color,background-color]"
                   >
                     <X size={14} />
                   </button>
@@ -2214,7 +2214,7 @@ export default function ContentHubPage() {
                         <button
                           key={key}
                           onClick={() => setPostingPlatform(key)}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-all duration-200"
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-medium transition-[color,background-color] duration-200"
                           style={{
                             background: active ? pl.colorMuted : 'transparent',
                             color: active ? pl.color : 'var(--text-faint)',
@@ -2250,7 +2250,7 @@ export default function ContentHubPage() {
                       href="https://medium.com/new-story"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 hover:bg-[rgba(148,163,184,0.14)] border border-[rgba(148,163,184,0.18)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 text-xs font-medium transition-all shrink-0"
+                      className="flex items-center gap-1.5 hover:bg-[rgba(148,163,184,0.14)] border border-[rgba(148,163,184,0.18)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 text-xs font-medium transition-[color,background-color] shrink-0"
                     >
                       Open Medium
                       <ExternalLink size={11} />
@@ -2272,12 +2272,12 @@ export default function ContentHubPage() {
                   {p.steps.map((step, i) => (
                     <div
                       key={step.title}
-                      className="group relative flex gap-4 p-3.5 pl-0 rounded-xl transition-all cursor-default"
+                      className="group relative flex gap-4 p-3.5 pl-0 rounded-xl cursor-default"
                     >
                       {/* Step number */}
                       <div className="relative z-10 shrink-0 ml-1">
                         <div
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ring-[3px] ring-[rgba(8,12,20,0.98)] transition-all group-hover:scale-110"
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold ring-[3px] ring-[rgba(8,12,20,0.98)] transition-transform group-hover:scale-110"
                           style={{
                             background: p.colorMuted,
                             border: `1.5px solid ${p.colorBorder}`,
@@ -2384,7 +2384,7 @@ export default function ContentHubPage() {
           {/* Posting Guide button */}
           <button
             onClick={() => setPostingGuideOpen(true)}
-            className="flex items-center gap-1.5 text-sm bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-2 transition-all duration-150"
+            className="flex items-center gap-1.5 text-sm bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-2 transition-[color,background-color] duration-150"
           >
             <BookOpen size={14} />
             Posting Guide
@@ -2424,7 +2424,7 @@ export default function ContentHubPage() {
                 <button
                   key={tab.key}
                   onClick={() => setActiveTab(tab.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-[color,background-color,border-color] ${
                     activeTab === tab.key
                       ? 'bg-[rgba(167,139,250,0.18)] text-[var(--accent-foreground)] border border-[rgba(167,139,250,0.30)] shadow-[0_0_14px_rgba(167,139,250,0.14)]'
                       : 'text-[var(--text-faint)] bg-transparent border border-transparent hover:text-[var(--text-muted)]'
@@ -2498,7 +2498,7 @@ export default function ContentHubPage() {
                   </div>
                   <Link
                     href="/settings/billing"
-                    className="w-full flex items-center justify-center gap-2 bg-[rgba(167,139,250,0.10)] hover:bg-[rgba(167,139,250,0.16)] border border-[rgba(167,139,250,0.25)] text-[var(--accent-foreground)] hover:text-[var(--accent-foreground)] rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150"
+                    className="w-full flex items-center justify-center gap-2 bg-[rgba(167,139,250,0.10)] hover:bg-[rgba(167,139,250,0.16)] border border-[rgba(167,139,250,0.25)] text-[var(--accent-foreground)] hover:text-[var(--accent-foreground)] rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-150"
                   >
                     Upgrade to unlock
                   </Link>
@@ -2609,7 +2609,7 @@ export default function ContentHubPage() {
                           </div>
                           <div className="h-1 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
                             <div
-                              className="h-full rounded-full transition-all duration-500"
+                              className="h-full rounded-full transition-[width] duration-500"
                               style={{ width: `${Math.min(pct * 100, 100)}%`, backgroundColor: barColor }}
                             />
                           </div>
@@ -2659,7 +2659,7 @@ export default function ContentHubPage() {
                         }
                         handleTogglePlatform(key, !enabled);
                       }}
-                      className={`w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg transition-all duration-200 group ${
+                      className={`w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg transition-colors duration-200 group ${
                         isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[rgba(255,255,255,0.03)]'
                       }`}
                       title={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires Pro plan` : enabled ? `Disable ${PLATFORM_DISPLAY[key] ?? key}` : `Enable ${PLATFORM_DISPLAY[key] ?? key}`}
@@ -2667,7 +2667,7 @@ export default function ContentHubPage() {
                     >
                       <div className="flex items-center gap-2.5">
                         <div
-                          className="w-6 h-6 rounded-md flex items-center justify-center transition-all duration-200"
+                          className="w-6 h-6 rounded-md flex items-center justify-center transition-[background-color,border-color] duration-200"
                           style={{
                             background: enabled && !isLocked ? `${color}15` : 'rgba(255,255,255,0.04)',
                             border: `1px solid ${enabled && !isLocked ? `${color}30` : 'rgba(255,255,255,0.06)'}`,
@@ -2687,14 +2687,14 @@ export default function ContentHubPage() {
                       </div>
                       {/* Custom toggle switch */}
                       <div
-                        className="relative w-8 h-[18px] rounded-full transition-all duration-200 shrink-0"
+                        className="relative w-8 h-[18px] rounded-full transition-[background-color,box-shadow] duration-200 shrink-0"
                         style={{
                           background: enabled && !isLocked ? 'var(--accent)' : 'rgba(255,255,255,0.10)',
                           boxShadow: enabled && !isLocked ? '0 0 8px rgba(167,139,250,0.3)' : 'none',
                         }}
                       >
                         <div
-                          className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-all duration-200"
+                          className="absolute top-[2px] w-[14px] h-[14px] rounded-full bg-white shadow-sm transition-[left] duration-200"
                           style={{ left: enabled && !isLocked ? '14px' : '2px' }}
                         />
                       </div>

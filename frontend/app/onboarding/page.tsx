@@ -223,7 +223,7 @@ export default function OnboardingPage() {
                   onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
                   placeholder="Your brand name"
                   autoFocus
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
               </div>
               <div>
@@ -233,7 +233,7 @@ export default function OnboardingPage() {
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
                   placeholder="https://yourcompany.com"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
                 <p className="text-xs text-[var(--text-faint)] mt-1">We&apos;ll use this to improve content draft quality.</p>
               </div>
@@ -284,7 +284,7 @@ export default function OnboardingPage() {
                   value={p}
                   onChange={(e) => updatePrompt(i, e.target.value)}
                   placeholder={i === 0 ? `What is ${brandName}?` : 'Add another prompt…'}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
               ))}
               <div className="flex items-center justify-between px-1 pt-1">
@@ -334,7 +334,7 @@ export default function OnboardingPage() {
                   onChange={(e) => setCompanyDescription(e.target.value)}
                   rows={3}
                   placeholder="Brief description of what your company does…"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] resize-none transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] resize-none transition-[border-color,box-shadow]"
                 />
               </div>
             </div>

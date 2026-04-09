@@ -270,7 +270,7 @@ export default function NewBrandPage() {
                 return (
                   <button
                     onClick={() => locked ? router.push('/settings/billing') : handleSelectType('starter')}
-                    className={`w-full text-left rounded-xl p-4 border transition-all cursor-pointer ${
+                    className={`w-full text-left rounded-xl p-4 border transition-[border-color,background-color] cursor-pointer ${
                       locked
                         ? 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--accent-muted)] hover:bg-[rgba(255,255,255,0.05)]'
                         : 'border-[var(--accent-muted)] bg-[var(--accent-muted)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)]'
@@ -312,7 +312,7 @@ export default function NewBrandPage() {
                 return (
                   <button
                     onClick={() => locked ? router.push('/settings/billing') : handleSelectType('pro')}
-                    className={`w-full text-left rounded-xl p-4 border transition-all cursor-pointer ${
+                    className={`w-full text-left rounded-xl p-4 border transition-[border-color,background-color] cursor-pointer ${
                       locked
                         ? 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--color-perplexity)]/28 hover:bg-[rgba(255,255,255,0.05)]'
                         : 'border-[var(--color-perplexity)]/28 bg-[var(--color-perplexity)]/6 hover:border-[var(--accent)] hover:bg-[var(--color-perplexity)]/12'
@@ -360,7 +360,7 @@ export default function NewBrandPage() {
                   <button
                     onClick={() => !locked && handleSelectType('pitch')}
                     disabled={locked}
-                    className={`w-full text-left rounded-xl p-4 border transition-all ${
+                    className={`w-full text-left rounded-xl p-4 border transition-[border-color,background-color] ${
                       locked
                         ? 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] opacity-50 cursor-not-allowed'
                         : 'border-[var(--warning)]/22 bg-[var(--warning)]/4 hover:border-[var(--warning)] hover:bg-[var(--warning)]/10 cursor-pointer'
@@ -434,7 +434,7 @@ export default function NewBrandPage() {
                   onKeyDown={(e) => e.key === 'Enter' && handleDetails()}
                   placeholder="Your brand name"
                   autoFocus
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
               </div>
               <div>
@@ -446,7 +446,7 @@ export default function NewBrandPage() {
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
                   placeholder="https://yourcompany.com"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
                 <p className="text-xs text-[var(--text-faint)] mt-1">Used to improve content draft quality.</p>
               </div>
@@ -495,7 +495,7 @@ export default function NewBrandPage() {
                   value={p}
                   onChange={(e) => updatePrompt(i, e.target.value)}
                   placeholder={i === 0 ? `What is ${brandName}?` : 'Add another prompt…'}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
               ))}
               <div className="flex items-center justify-between px-1 pt-1">
@@ -538,7 +538,7 @@ export default function NewBrandPage() {
                   onChange={(e) => setCompanyDescription(e.target.value)}
                   rows={3}
                   placeholder="Brief description of what your company does…"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] resize-none transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] resize-none transition-[border-color,box-shadow]"
                 />
               </div>
             </div>

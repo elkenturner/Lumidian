@@ -84,7 +84,7 @@ export default function DonutDomains({ domains }: DonutDomainsProps) {
               href={getDomainUrl(d.domain)}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2.5 min-w-0 group rounded-lg px-2 py-1.5 -mx-2 transition-all duration-200"
+              className="flex items-center gap-2.5 min-w-0 group rounded-lg px-2 py-1.5 -mx-2 transition-[background-color,opacity] duration-200"
               onMouseEnter={() => setActiveIndex(i)}
               onMouseLeave={() => setActiveIndex(null)}
               style={{
@@ -93,7 +93,7 @@ export default function DonutDomains({ domains }: DonutDomainsProps) {
               }}
             >
               <span
-                className="w-2 h-2 rounded-full flex-shrink-0 transition-all duration-200"
+                className="w-2 h-2 rounded-full flex-shrink-0 transition-[transform,box-shadow] duration-200"
                 style={{
                   background: color,
                   boxShadow: isActive ? `0 0 10px ${glow}, 0 0 4px ${color}` : 'none',

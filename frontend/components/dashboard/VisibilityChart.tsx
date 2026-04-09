@@ -104,7 +104,7 @@ export default function VisibilityChart({
                   <span className="text-[11px] font-medium text-[var(--text-muted)] truncate">{label}</span>
                 </div>
                 <div className="flex-1 h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-500" style={{ width: `${s ?? 0}%`, background: color }} />
+                  <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${s ?? 0}%`, background: color }} />
                 </div>
                 <span className="text-xs font-bold tabular-nums w-9 text-right flex-shrink-0" style={{ color }}>
                   {s !== null ? `${animated}%` : '\u2014'}

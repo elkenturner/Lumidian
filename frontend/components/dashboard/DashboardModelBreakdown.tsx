@@ -31,7 +31,7 @@ export default function DashboardModelBreakdown({ models, deltas }: DashboardMod
               </span>
             </div>
             <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
-              <div className="h-full rounded-full transition-all duration-500" style={{ width: barWidth, background: barColor }} />
+              <div className="h-full rounded-full transition-[width] duration-500" style={{ width: barWidth, background: barColor }} />
             </div>
           </div>
         );

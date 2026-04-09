@@ -259,7 +259,7 @@ export default function PromptImpactTimeline({
             <button
               key={tf}
               onClick={() => setTimeframe(tf)}
-              className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${
+              className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-[color,background-color] ${
                 timeframe === tf
                   ? 'bg-[rgba(167,139,250,0.25)] text-[var(--accent-light)]'
                   : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'

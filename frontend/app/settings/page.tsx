@@ -142,7 +142,7 @@ function EditableList({
         />
         <button
           onClick={addItem}
-          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent-muted)] transition-all duration-150"
+          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent-muted)] transition-[color,border-color,background-color] duration-150"
         >
           <Plus size={16} />
         </button>
@@ -159,7 +159,7 @@ function CompletionBar({ pct }: { pct: number }) {
     <div className="flex items-center gap-3">
       <div className="flex-1 bg-[var(--accent-muted)] rounded-full h-2">
         <div
-          className="h-2 rounded-full transition-all duration-500"
+          className="h-2 rounded-full transition-[width] duration-500"
           style={{ width: `${pct}%`, backgroundColor: color }}
         />
       </div>
@@ -748,7 +748,7 @@ export default function SettingsPage() {
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={clsx(
-              'px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-[3px] -mb-px transition-all',
+              'px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-[3px] -mb-px transition-[color,background-color,border-color]',
               activeTab === tab
                 ? 'text-[var(--accent-foreground)] border-[var(--accent)] bg-[var(--accent-muted)]'
                 : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)]'
@@ -898,7 +898,7 @@ export default function SettingsPage() {
                       onClick={() => handleDeletePrompt(prompt.id)}
                       disabled={deletingPromptId === prompt.id}
                       aria-label="Delete prompt"
-                      className="text-[rgba(255,255,255,0.15)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                      className="text-[rgba(255,255,255,0.15)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-[opacity,color] flex-shrink-0"
                     >
                       {deletingPromptId === prompt.id ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -994,7 +994,7 @@ export default function SettingsPage() {
                       onClick={() => handleRemoveCompetitor(comp.id)}
                       disabled={deletingCompetitorId === comp.id}
                       aria-label="Remove competitor"
-                      className="text-[rgba(255,255,255,0.15)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                      className="text-[rgba(255,255,255,0.15)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-[opacity,color] flex-shrink-0"
                     >
                       {deletingCompetitorId === comp.id ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -1045,7 +1045,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleAiFill}
                 disabled={aiFilling || profileSaving}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] text-[var(--accent-foreground)] disabled:opacity-50 transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] text-[var(--accent-foreground)] disabled:opacity-50 transition-opacity"
                 title="Scan website and auto-fill profile fields"
               >
                 {aiFilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
@@ -1159,7 +1159,7 @@ export default function SettingsPage() {
               onClick={handleProfileSave}
               disabled={profileSaving}
               className={clsx(
-                'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all',
+                'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                 profileSaved
                   ? 'bg-[var(--success)]/15 text-[var(--success)] border border-[var(--success)]/25'
                   : 'bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] hover:border-[var(--accent-muted)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_var(--accent-muted)] disabled:opacity-50'

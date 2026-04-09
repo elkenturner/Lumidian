@@ -298,10 +298,17 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
                 detail=f"Pitch brands are limited to {WEEKLY_SCAN_LIMITS_PITCH} manual scan per week. Try again next week.",
             )
 
+    from app import state as _state
+
+    # Block concurrent scans for this brand
+    if brand_id in _state.scanning_brands:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A scan is already running for this brand. Please wait for it to finish.",
+        )
+
     # Log before firing so the event counts immediately on the next quota check
     await log_event("manual_scan_triggered", {"brand_id": brand_id}, brand_id=brand_id)
-
-    from app import state as _state
 
     # Add to scanning state before starting so the banner appears immediately
     _state.scanning_brands.add(brand_id)

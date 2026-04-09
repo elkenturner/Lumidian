@@ -1795,7 +1795,7 @@ export default function ContentHubPage() {
   // ── Right panel actions ────────────────────────────────────────────────────
 
   async function handleGenerateNow() {
-    if (!selectedBrandId || scanning) return;
+    if (!selectedBrandId || scanning || generating) return;
     setGenerating(true);
     setGenerateError(null);
 
@@ -1859,16 +1859,21 @@ export default function ContentHubPage() {
       }
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string | Array<{ msg?: string }> }; status?: number }; message?: string };
+      const httpStatus = err?.response?.status;
       const rawDetail = err?.response?.data?.detail;
       const raw = typeof rawDetail === 'string'
         ? rawDetail
         : (Array.isArray(rawDetail) && rawDetail[0]?.msg)
           ? rawDetail[0].msg
           : (err?.message ?? 'Generation failed. Check that API keys are configured in Settings.');
-      const detail = raw.toLowerCase().includes('no content gaps')
-        ? 'No content gaps found yet. Run a tracking scan first to identify gaps, then try again.'
-        : raw;
-      setGenerateError(detail);
+      if (httpStatus === 409) {
+        setToast({ message: 'Draft generation is already in progress. Please wait.', type: 'info' });
+      } else {
+        const detail = raw.toLowerCase().includes('no content gaps')
+          ? 'No content gaps found yet. Run a tracking scan first to identify gaps, then try again.'
+          : raw;
+        setGenerateError(detail);
+      }
       setGenerating(false);
       getDraftStatus(brandId).then(setDraftStatus).catch((err) => logError(err, 'Content: refresh draft status after generation error'));
       loadAll(brandId).catch((err) => logError(err, 'Content: reload after generation error'));
@@ -1968,7 +1973,12 @@ export default function ContentHubPage() {
     } catch (err: unknown) {
       console.error('Scan trigger failed:', err);
       setScanning(false);
-      setToast({ message: 'Scan failed. Please try again.', type: 'error' });
+      const e = err as { response?: { status?: number } };
+      if (e?.response?.status === 409) {
+        setToast({ message: 'A scan is already running. Please wait for it to finish.', type: 'info' });
+      } else {
+        setToast({ message: 'Scan failed. Please try again.', type: 'error' });
+      }
     }
   }, [selectedBrandId, scanning, brandPrompts.length]);
 

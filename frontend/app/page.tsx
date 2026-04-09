@@ -203,10 +203,10 @@ const HOW_STEPS = [
 ];
 
 const COMPARISON_FEATURES = [
-  { label: 'Standard brands', free: '0', starter: '2', pro: '2' },
+  { label: 'Standard brands', free: '0', starter: '1', pro: '2' },
   { label: 'Pitch decks', free: '1', starter: '1', pro: '3' },
   { label: 'Prompts per brand', free: '10', starter: '25', pro: '100' },
-  { label: 'Manual runs per day', free: '1', starter: 'Unlimited', pro: 'Unlimited' },
+  { label: 'Manual runs per day', free: '1', starter: '3', pro: 'Unlimited' },
   { label: 'AI models monitored', free: '4', starter: '4', pro: '4' },
   { label: 'Daily tracking', free: true, starter: true, pro: true },
   { label: 'Visibility score & report', free: true, starter: true, pro: true },
@@ -217,7 +217,7 @@ const COMPARISON_FEATURES = [
   { label: 'Reddit scanner', free: false, starter: true, pro: true },
   { label: 'Trend charts', free: false, starter: true, pro: true },
   { label: 'Email alerts', free: false, starter: true, pro: true },
-  { label: 'Team members', free: '—', starter: '2', pro: 'Unlimited' },
+  { label: 'Team members', free: '—', starter: '1', pro: '3' },
   { label: 'Support', free: 'Community', starter: 'Email', pro: 'Priority' },
 ];
 
@@ -454,7 +454,7 @@ function ModelsBar() {
 
 function FeaturesSection() {
   return (
-    <section id="features" className="py-24 scroll-mt-20">
+    <section id="features" className="py-16 scroll-mt-20">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeUp>
           <h2
@@ -500,7 +500,7 @@ function FeaturesSection() {
 
 function HowItWorksSection() {
   return (
-    <section className="py-24 border-y border-[rgba(51,65,85,0.5)]">
+    <section className="py-16 border-y border-[rgba(51,65,85,0.5)]">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeUp>
           <h2
@@ -550,8 +550,8 @@ function HowItWorksSection() {
 
 function DashboardMockup() {
   const { ref: scoreRef, value: scoreVal } = useCountUp(67, 1600);
-  const { ref: liveRef, value: liveVal } = useCountUp(66, 1400);
-  const { ref: indexRef, value: indexVal } = useCountUp(67, 1400);
+  const { ref: liveRef, value: liveVal } = useCountUp(72, 1400);
+  const { ref: indexRef, value: indexVal } = useCountUp(61, 1400);
   const [barWidths, setBarWidths] = useState([0, 0, 0, 0]);
   const [compWidths, setCompWidths] = useState([0, 0]);
   const barTriggered = useRef(false);
@@ -766,7 +766,7 @@ function PricingSection() {
   };
 
   return (
-    <section id="pricing" className="py-24 scroll-mt-20">
+    <section id="pricing" className="py-16 scroll-mt-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeUp>
           <h2
@@ -936,7 +936,7 @@ function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="py-24 border-t border-[rgba(51,65,85,0.5)] scroll-mt-20">
+    <section id="faq" className="py-16 border-t border-[rgba(51,65,85,0.5)] scroll-mt-20">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeUp>
           <h2

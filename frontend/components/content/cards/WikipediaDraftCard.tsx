@@ -110,7 +110,7 @@ export function WikipediaDraftCard({
         </div>
       )}
 
-      <div className="card p-5 flex flex-col gap-3 transition-colors">
+      <div className="card card-hover p-5 flex flex-col gap-3 transition-colors">
         <div className="flex items-start gap-2 flex-wrap">
           <PlatformBadge platform="wikipedia" />
           <div className="flex-1 min-w-0">

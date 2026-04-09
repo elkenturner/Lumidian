@@ -76,7 +76,7 @@ export default function VisibilityChart({
               </linearGradient>
             </defs>
             <Tooltip content={<SparklineTooltip />} />
-            <Area type="monotone" dataKey="score" stroke="var(--accent)" strokeWidth={2.5} fill="url(#sparkGrad)" dot={false} />
+            <Area type="monotone" dataKey="score" stroke="var(--accent)" strokeWidth={2.5} fill="url(#sparkGrad)" dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" />
           </AreaChart>
         </ResponsiveContainer>
       ) : (

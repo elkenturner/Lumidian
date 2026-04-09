@@ -1,5 +1,7 @@
 'use client';
 
+import { motion } from 'framer-motion';
+import { fadeIn } from '@/lib/motion';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -75,7 +77,12 @@ export default function AccountPage() {
   const tierLabel = currentTier === 'starter' ? 'Starter \u2014 $300/mo' : currentTier === 'pro' ? 'Pro \u2014 $500/mo' : 'Free';
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
+    <motion.div
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
+      className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl"
+    >
       <div className="mb-7">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Account</h1>
         <p className="text-[13px] text-[var(--text-muted)] mt-1">Manage your subscription and account settings</p>
@@ -251,6 +258,6 @@ export default function AccountPage() {
 
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

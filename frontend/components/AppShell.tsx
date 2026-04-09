@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, LineChart, PenLine, Settings, Building2, ChevronUp } from 'lucide-react';
+import { LayoutDashboard, LineChart, PenLine, Settings, User, ChevronUp } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { BrandProvider } from '@/contexts/BrandContext';
@@ -146,10 +146,10 @@ function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ m
 
 const MOBILE_NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Brands',    href: '/settings',  icon: Building2 },
+  { label: 'Settings',  href: '/settings',  icon: Settings },
   { label: 'Reports',   href: '/reports',   icon: LineChart },
   { label: 'Content',   href: '/content',   icon: PenLine },
-  { label: 'Settings',  href: '/account',   icon: Settings },
+  { label: 'Account',   href: '/account',   icon: User },
 ];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {

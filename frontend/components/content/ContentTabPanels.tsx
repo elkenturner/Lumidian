@@ -1818,7 +1818,7 @@ function DraftsPanel(props: ContentTabPanelsProps) {
           onClick={onRequestDraft}
           className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--accent-foreground)] transition-colors"
         >
-          <span className="w-5 h-5 rounded-md bg-[rgba(99,102,241,0.08)] border border-[rgba(99,102,241,0.15)] flex items-center justify-center text-[var(--accent-foreground)]">+</span>
+          <span className="w-5 h-5 rounded-md bg-[rgba(167,139,250,0.08)] border border-[rgba(167,139,250,0.15)] flex items-center justify-center text-[var(--accent-foreground)]">+</span>
           New draft
         </button>
       )}

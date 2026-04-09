@@ -41,7 +41,7 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
         background: 'rgba(10,14,24,0.97)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(99,102,241,0.20)',
+        border: '1px solid rgba(167,139,250,0.20)',
         borderRadius: 16,
         boxShadow: '0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset',
       }}
@@ -92,7 +92,7 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
                   required
                   className="w-full px-3 py-2.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] rounded-lg outline-none transition-colors"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.50)'; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(167,139,250,0.50)'; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; }}
                 />
               </div>
@@ -107,7 +107,7 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
                   rows={5}
                   className="w-full px-3 py-2.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] rounded-lg outline-none transition-colors resize-none"
                   style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(99,102,241,0.50)'; }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(167,139,250,0.50)'; }}
                   onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; }}
                 />
               </div>
@@ -116,9 +116,9 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
                 type="submit"
                 disabled={sending || !subject.trim() || !message.trim()}
                 className="flex items-center justify-center gap-2 py-2.5 rounded-lg text-xs font-semibold transition-all duration-150 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: 'rgba(99,102,241,0.85)', color: '#fff' }}
-                onMouseEnter={(e) => { if (!sending) (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,1)'; }}
-                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.85)'; }}
+                style={{ background: 'rgba(167,139,250,0.85)', color: '#fff' }}
+                onMouseEnter={(e) => { if (!sending) (e.currentTarget as HTMLElement).style.background = 'rgba(167,139,250,1)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(167,139,250,0.85)'; }}
               >
                 <Send size={11} />
                 {sending ? 'Sending…' : 'Send message'}

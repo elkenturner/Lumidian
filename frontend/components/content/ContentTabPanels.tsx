@@ -40,6 +40,12 @@ import PlatformBadge from '@/components/PlatformBadge';
 import { formatDistanceToNow, parseISO } from 'date-fns';
 import { logError } from '@/lib/utils/errors';
 
+const PLATFORM_DISPLAY: Record<string, string> = {
+  reddit: 'Reddit', quora: 'Quora', medium: 'Medium', wikipedia: 'Wikipedia',
+  linkedin: 'LinkedIn', linkedin_article: 'LinkedIn', linkedin_post: 'LinkedIn', linkedin_reply: 'LinkedIn',
+  x: 'X', x_thread: 'X', x_post: 'X', x_reply: 'X',
+};
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted';
@@ -1462,7 +1468,7 @@ function ScheduledCard({
           >
             <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-medium">
               <BookOpen size={11} />
-              How to Post on {draft.platform.charAt(0).toUpperCase() + draft.platform.slice(1)}
+              How to Post on {PLATFORM_DISPLAY[draft.platform] ?? draft.platform}
             </span>
             <ChevronDown size={11} className={`text-[var(--text-faint)] transition-transform ${guideOpen ? 'rotate-180' : ''}`} />
           </button>
@@ -1478,7 +1484,7 @@ function ScheduledCard({
         <HelpCircle size={11} className="text-[var(--success)] mt-0.5 shrink-0" />
         <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
           <span className="text-[var(--text-muted)] font-medium">This draft needs to be posted manually.</span>
-          {' '}Use the View Draft button to copy the content, post it on {draft.platform.charAt(0).toUpperCase() + draft.platform.slice(1)}, then click{' '}
+          {' '}Use the View Draft button to copy the content, post it on {PLATFORM_DISPLAY[draft.platform] ?? draft.platform}, then click{' '}
           <span className="text-[var(--success)]">Mark as Posted</span> to record it and start tracking visibility changes.
         </p>
       </div>
@@ -1800,9 +1806,9 @@ function DraftsPanel(props: ContentTabPanelsProps) {
             <button
               key={p}
               onClick={() => setDraftPlatformFilter(draftPlatformFilter === p ? 'all' : p)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${draftPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${draftPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
             >
-              {p}
+              {PLATFORM_DISPLAY[p] ?? p}
             </button>
           ))}
         </div>
@@ -1959,9 +1965,9 @@ function OpportunitiesPanel(props: ContentTabPanelsProps) {
         <button
           key={p}
           onClick={() => setOppPlatformFilter(oppPlatformFilter === p ? 'all' : p)}
-          className={`px-2.5 py-1 rounded-md text-xs font-medium capitalize transition-all ${oppPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+          className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${oppPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
         >
-          {p}
+          {PLATFORM_DISPLAY[p] ?? p}
         </button>
       ))}
     </div>

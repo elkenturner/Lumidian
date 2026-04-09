@@ -2,12 +2,18 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { staggerContainer, staggerChild } from '@/lib/motion';
+import { staggerContainer, staggerChild, useCountUp } from '@/lib/motion';
 import {
   MessageSquare,
   TrendingUp,
   CheckCircle2,
 } from 'lucide-react';
+
+function AnimatedStatValue({ value }: { value: number | string }) {
+  const display = useCountUp(typeof value === 'number' ? value : 0);
+  if (typeof value !== 'number') return <>{value}</>;
+  return <>{display}</>;
+}
 
 interface StatsGridProps {
   totalPrompts: number;
@@ -51,7 +57,9 @@ export default function StatsGrid({ totalPrompts, daysSinceFirst, publishedCount
             <Icon size={15} style={{ color: accent }} />
           </div>
           <div className="min-w-0">
-            <p className="text-xl font-bold text-[var(--text-primary)] leading-tight tabular-nums">{value}</p>
+            <p className="text-xl font-bold text-[var(--text-primary)] leading-tight tabular-nums">
+              <AnimatedStatValue value={value} />
+            </p>
             <p className="text-[11px] text-[var(--text-muted)] mt-0.5 truncate">{label}</p>
           </div>
         </motion.div>

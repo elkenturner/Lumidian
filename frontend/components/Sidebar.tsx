@@ -49,15 +49,16 @@ const NavLink = memo(function NavLink({
       aria-label={item.label}
       title={!expanded ? item.label : undefined}
       className={[
-        'flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 relative overflow-hidden',
+        'flex items-center gap-3 py-2.5 rounded-xl text-sm font-medium relative overflow-hidden',
         expanded ? 'px-3.5' : 'px-0 justify-center',
         isActive
           ? 'text-[var(--accent-light)]'
           : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]',
       ].join(' ')}
-      style={isActive ? {
-        background: 'rgba(167,139,250,0.12)',
-      } : undefined}
+      style={{
+        transition: 'background-color 200ms var(--ease-out), border-color 200ms var(--ease-out)',
+        ...(isActive ? { background: 'rgba(167,139,250,0.12)' } : {}),
+      }}
       onMouseEnter={(e) => {
         if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
       }}
@@ -177,8 +178,9 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
               onClick={(e) => { e.stopPropagation(); if (brands.length > 0) setBrandOpen((v) => !v); }}
               title={expanded ? undefined : (activeBrand?.name ?? 'Switch brand')}
               aria-label="Switch brand"
-              className="w-full flex items-center gap-2.5 rounded-lg transition-all duration-150"
+              className="w-full flex items-center gap-2.5 rounded-lg"
               style={{
+                transition: 'background-color 150ms var(--ease-out), border-color 150ms var(--ease-out)',
                 padding: expanded ? '8px 10px' : '8px 0',
                 justifyContent: expanded ? 'flex-start' : 'center',
                 background: brandOpen ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)',

@@ -65,17 +65,22 @@
   --danger-text: #f87171;
 
   /* Accent */
-  --accent: #6366f1;
-  --accent-hover: #4f46e5;
-  --accent-light: #818cf8;
-  --accent-muted: rgba(99, 102, 241, 0.15);
-  --accent-border: rgba(99, 102, 241, 0.20);
+  --accent: oklch(0.746 0.16 293);
+  --accent-hover: oklch(0.655 0.19 293);
+  --accent-light: oklch(0.84 0.1 293);
+  --accent-muted: oklch(0.746 0.16 293 / 0.15);
+  --accent-border: oklch(0.746 0.16 293 / 0.20);
 
   /* Radius */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
+
+  /* Animation easing (Emil Kowalski) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
@@ -124,19 +129,30 @@ body {
   box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
-/* ── Model card with left-border accent ────────────────────────────────────── */
+/* ── Interactive card hover (pointer devices only) ────────────────────────── */
+@media (hover: hover) and (pointer: fine) {
+  .card-hover:hover {
+    transform: translateY(-1px);
+    background: var(--bg-card);
+    border-color: var(--border-default);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .card-hover {
+    transition: transform 200ms var(--ease-out), background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+}
+
+/* ── Model card with background tint (no side-stripe borders) ─────────────── */
 .model-card {
   background: rgba(15,23,42,0.4);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 14px 16px;
-  border-left-width: 3px;
-  border-left-style: solid;
 }
-.model-card-chatgpt { border-left-color: var(--color-chatgpt); }
-.model-card-claude { border-left-color: var(--color-claude); }
-.model-card-perplexity { border-left-color: var(--color-perplexity); }
-.model-card-gemini { border-left-color: var(--color-gemini); }
+.model-card-chatgpt { background: oklch(0.72 0.19 142 / 0.03); }
+.model-card-claude { background: oklch(0.72 0.19 55 / 0.03); }
+.model-card-perplexity { background: oklch(0.65 0.19 293 / 0.03); }
+.model-card-gemini { background: oklch(0.65 0.19 250 / 0.03); }
 
 /* ── Input utility ─────────────────────────────────────────────────────────── */
 .input {
@@ -153,7 +169,7 @@ body {
 .input::placeholder { color: var(--text-faint); }
 .input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+  box-shadow: 0 0 0 3px oklch(0.746 0.16 293 / 0.15);
 }
 
 /* ── Button utilities ──────────────────────────────────────────────────────── */
@@ -165,10 +181,13 @@ body {
   font-weight: 500;
   padding: 10px 16px;
   border-radius: var(--radius-md);
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 160ms var(--ease-out);
   cursor: pointer;
   white-space: nowrap;
   border: 1px solid transparent;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
 }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -176,11 +195,11 @@ body {
   background: var(--accent);
   color: white;
   border-color: transparent;
-  box-shadow: 0 1px 3px rgba(99,102,241,0.25);
+  box-shadow: 0 1px 3px oklch(0.746 0.16 293 / 0.25);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
-  box-shadow: 0 2px 8px rgba(99,102,241,0.35);
+  box-shadow: 0 2px 8px oklch(0.746 0.16 293 / 0.35);
 }
 
 .btn-secondary {
@@ -249,9 +268,9 @@ body {
   width: 52px;
   height: 52px;
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(124,58,237,0.08));
-  border: 1px solid rgba(99,102,241,0.22);
-  box-shadow: 0 0 24px rgba(99,102,241,0.08);
+  background: linear-gradient(135deg, oklch(0.746 0.16 293 / 0.12), oklch(0.58 0.22 293 / 0.08));
+  border: 1px solid oklch(0.746 0.16 293 / 0.22);
+  box-shadow: 0 0 24px oklch(0.746 0.16 293 / 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -273,7 +292,7 @@ body {
 
 /* ── Focus-visible ring (accessibility) ────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid rgba(99,102,241,0.6);
+  outline: 2px solid oklch(0.746 0.16 293 / 0.6);
   outline-offset: 2px;
 }
 
@@ -311,16 +330,16 @@ body {
 .skeleton {
   background: linear-gradient(
     90deg,
-    rgba(99,102,241,0.06) 25%,
-    rgba(99,102,241,0.14) 50%,
-    rgba(99,102,241,0.06) 75%
+    oklch(0.746 0.16 293 / 0.06) 25%,
+    oklch(0.746 0.16 293 / 0.14) 50%,
+    oklch(0.746 0.16 293 / 0.06) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.8s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; background: rgba(99,102,241,0.07); }
+  .skeleton { animation: none; background: oklch(0.746 0.16 293 / 0.07); }
   .orb-1, .orb-2, .orb-3, .orb-4 { animation: none; }
 }
 
@@ -354,7 +373,7 @@ body {
 
 /* ── Selection ────────────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(99,102,241,0.30);
+  background: oklch(0.746 0.16 293 / 0.30);
   color: var(--text-primary);
 }
 
@@ -396,12 +415,8 @@ body {
 }
 
 @keyframes glowPulse {
-  0%, 100% {
-    box-shadow: 0 0 24px rgba(99, 102, 241, 0.4);
-  }
-  50% {
-    box-shadow: 0 0 32px rgba(99, 102, 241, 0.6);
-  }
+  0%, 100% { box-shadow: 0 0 24px oklch(0.746 0.16 293 / 0.4); }
+  50% { box-shadow: 0 0 32px oklch(0.746 0.16 293 / 0.6); }
 }
 
 @keyframes drawLine {
@@ -425,8 +440,8 @@ body {
 }
 
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 20px rgba(99,102,241,0.12), 0 0 6px rgba(99,102,241,0.06); }
-  50% { box-shadow: 0 0 30px rgba(99,102,241,0.22), 0 0 12px rgba(99,102,241,0.10); }
+  0%, 100% { box-shadow: 0 0 20px oklch(0.746 0.16 293 / 0.12), 0 0 6px oklch(0.746 0.16 293 / 0.06); }
+  50% { box-shadow: 0 0 30px oklch(0.746 0.16 293 / 0.22), 0 0 12px oklch(0.746 0.16 293 / 0.10); }
 }
 
 @keyframes slideInRight {

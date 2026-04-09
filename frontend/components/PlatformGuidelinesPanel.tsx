@@ -16,9 +16,9 @@ export default function PlatformGuidelinesPanel({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="bg-[rgba(99,102,241,0.06)] border border-[rgba(99,102,241,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+    <div className="bg-[rgba(167,139,250,0.06)] border border-[rgba(167,139,250,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       <button
-        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[rgba(99,102,241,0.06)] transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-[rgba(167,139,250,0.06)] transition-colors"
         onClick={() => setOpen(!open)}
       >
         <div>
@@ -34,7 +34,7 @@ export default function PlatformGuidelinesPanel({
       </button>
 
       {open && (
-        <div className="px-5 pb-5 border-t border-[rgba(99,102,241,0.15)] pt-4 space-y-4">
+        <div className="px-5 pb-5 border-t border-[rgba(167,139,250,0.15)] pt-4 space-y-4">
           {/* Tone */}
           <div>
             <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-1">

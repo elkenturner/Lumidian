@@ -69,7 +69,7 @@ export default function RegisterPage() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(167,139,250,0.15) 0%, transparent 60%)',
         }}
       />
 
@@ -98,7 +98,7 @@ export default function RegisterPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Your name"
-                className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
+                className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#a78bfa] focus:ring-2 focus:ring-[rgba(167,139,250,0.2)] transition-all"
               />
             </div>
             <div>
@@ -109,7 +109,7 @@ export default function RegisterPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 placeholder="you@example.com"
-                className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
+                className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#a78bfa] focus:ring-2 focus:ring-[rgba(167,139,250,0.2)] transition-all"
               />
             </div>
             <div>
@@ -121,7 +121,7 @@ export default function RegisterPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   placeholder="Min. 8 characters"
-                  className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 pr-10 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
+                  className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 pr-10 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#a78bfa] focus:ring-2 focus:ring-[rgba(167,139,250,0.2)] transition-all"
                 />
                 <button
                   type="button"
@@ -151,7 +151,7 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 mt-1 transition-colors min-h-[48px]"
+              className="w-full flex items-center justify-center gap-2 bg-[#a78bfa] hover:bg-[#8b5cf6] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 mt-1 transition-colors min-h-[48px]"
             >
               {loading && <Loader2 size={15} className="animate-spin" />}
               {loading ? 'Creating account…' : 'Create account'}
@@ -199,7 +199,7 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-[#94a3b8] mt-6">
           Already have an account?{' '}
-          <Link href="/login" className="text-[#6366f1] hover:text-[#818cf8] font-semibold transition-colors">
+          <Link href="/login" className="text-[#a78bfa] hover:text-[#c4b5fd] font-semibold transition-colors">
             Sign in
           </Link>
         </p>

@@ -184,7 +184,7 @@ export default function OnboardingPage() {
             <div key={label} className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                  done ? 'bg-[var(--success)] text-white' : active ? 'bg-[var(--accent)] text-white shadow-[0_0_12px_rgba(99,102,241,0.40)]' : 'bg-[rgba(99,102,241,0.08)] border border-[var(--border-default)] text-[var(--text-faint)]'
+                  done ? 'bg-[var(--success)] text-white' : active ? 'bg-[var(--accent)] text-white shadow-[0_0_12px_rgba(167,139,250,0.40)]' : 'bg-[rgba(167,139,250,0.08)] border border-[var(--border-default)] text-[var(--text-faint)]'
                 }`}>
                   {done ? <CheckCircle size={14} /> : s}
                 </div>
@@ -193,7 +193,7 @@ export default function OnboardingPage() {
                 </span>
               </div>
               {i < stepLabels.length - 1 && (
-                <ChevronRight size={14} className="text-[rgba(99,102,241,0.30)]" />
+                <ChevronRight size={14} className="text-[rgba(167,139,250,0.30)]" />
               )}
             </div>
           );
@@ -240,7 +240,7 @@ export default function OnboardingPage() {
               <button
                 onClick={handleStep1}
                 disabled={fetching || !brandName.trim() || !websiteUrl.trim()}
-                className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-[0_0_20px_rgba(99,102,241,0.25)]"
+                className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-[0_0_20px_rgba(167,139,250,0.25)]"
               >
                 {fetching ? <Loader2 size={14} className="animate-spin" /> : null}
                 {fetching ? 'Fetching website...' : 'Fetch & Continue'}

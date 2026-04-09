@@ -64,10 +64,10 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
       background: 'rgba(8,12,20,0.96)',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
-      border: '1px solid rgba(99,102,241,0.22)',
+      border: '1px solid rgba(167,139,250,0.22)',
       borderRadius: 10,
       padding: '10px 14px',
-      boxShadow: '0 8px 32px rgba(0,0,0,0.50), 0 0 0 1px rgba(99,102,241,0.06)',
+      boxShadow: '0 8px 32px rgba(0,0,0,0.50), 0 0 0 1px rgba(167,139,250,0.06)',
       minWidth: 155,
     }}>
       <p style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 8, fontWeight: 500 }}>{label}</p>
@@ -166,12 +166,12 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-semibold text-[var(--text-primary)]">Visibility Trend</h3>
         <Tabs value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}>
-          <TabsList className="bg-[rgba(255,255,255,0.04)] border border-[rgba(99,102,241,0.12)] rounded-lg p-0.5 h-auto gap-0 border-b-0">
+          <TabsList className="bg-[rgba(255,255,255,0.04)] border border-[rgba(167,139,250,0.12)] rounded-lg p-0.5 h-auto gap-0 border-b-0">
             {TIMEFRAME_OPTIONS.map(({ label, value }) => (
               <TabsTrigger
                 key={value}
                 value={value}
-                className="px-2.5 py-1 rounded-md text-xs font-medium h-auto border-b-0 data-[state=active]:bg-[rgba(99,102,241,0.25)] data-[state=active]:text-[var(--accent-light)] data-[state=active]:border-transparent data-[state=inactive]:text-[var(--text-faint)]"
+                className="px-2.5 py-1 rounded-md text-xs font-medium h-auto border-b-0 data-[state=active]:bg-[rgba(167,139,250,0.25)] data-[state=active]:text-[var(--accent-light)] data-[state=active]:border-transparent data-[state=inactive]:text-[var(--text-faint)]"
               >
                 {label}
               </TabsTrigger>
@@ -222,11 +222,11 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
               </filter>
             </defs>
 
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(99,102,241,0.07)" vertical={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(167,139,250,0.07)" vertical={false} />
             <XAxis
               dataKey="shortDate"
               tick={{ fill: 'var(--text-faint)', fontSize: 11 }}
-              axisLine={{ stroke: 'rgba(99,102,241,0.10)' }}
+              axisLine={{ stroke: 'rgba(167,139,250,0.10)' }}
               tickLine={false}
             />
             <YAxis
@@ -238,7 +238,7 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
             />
             <Tooltip
               content={<CustomTooltip />}
-              cursor={{ stroke: 'rgba(99,102,241,0.20)', strokeWidth: 1 }}
+              cursor={{ stroke: 'rgba(167,139,250,0.20)', strokeWidth: 1 }}
             />
 
             {/* Average line with gradient area fill */}

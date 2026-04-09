@@ -306,7 +306,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
             </Link>
             <Link
               href="/register"
-              className="text-sm font-semibold text-white px-5 py-2.5 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-lg"
+              className="text-sm font-semibold text-white px-5 py-2.5 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-all shadow-lg"
             >
               Get Started
             </Link>
@@ -332,7 +332,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
                 <Link href="/login" className="text-base font-medium text-white text-center py-3 rounded-full border border-[rgba(255,255,255,0.2)]">
                   Log in
                 </Link>
-                <Link href="/register" className="text-base font-semibold text-white text-center py-3.5 rounded-full bg-[#6366f1]">
+                <Link href="/register" className="text-base font-semibold text-white text-center py-3.5 rounded-full bg-[#a78bfa]">
                   Get Started
                 </Link>
               </div>
@@ -351,7 +351,7 @@ function HeroSection() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(167,139,250,0.15) 0%, transparent 60%)',
         }}
       />
 
@@ -359,7 +359,7 @@ function HeroSection() {
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {/* Badge */}
         <FadeUp>
-          <div className="inline-flex items-center gap-2 bg-[#0f172a] border border-[rgba(99,102,241,0.3)] rounded-full px-4 py-1.5 mb-8">
+          <div className="inline-flex items-center gap-2 bg-[#0f172a] border border-[rgba(167,139,250,0.3)] rounded-full px-4 py-1.5 mb-8">
             <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
             <span className="text-sm text-[#94a3b8]">Now tracking 4 AI models</span>
           </div>
@@ -373,7 +373,7 @@ function HeroSection() {
           >
             Track Your Brand&apos;s
             <br />
-            <span className="bg-gradient-to-r from-[#6366f1] to-[#a855f7] bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#a78bfa] to-[#a855f7] bg-clip-text text-transparent">
               Visibility in AI
             </span>
             {' — Then Fix It'}
@@ -393,7 +393,7 @@ function HeroSection() {
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/register"
-              className="flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-lg hover:shadow-xl"
+              className="flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-all shadow-lg hover:shadow-xl"
             >
               <Play size={18} fill="white" />
               Start Free
@@ -475,9 +475,9 @@ function FeaturesSection() {
             const Icon = feature.icon;
             return (
               <FadeUp key={feature.title} delay={i * 80}>
-                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-5 md:p-7 h-full transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(99,102,241,0.3)] hover:shadow-[0_0_24px_rgba(99,102,241,0.15),0_8px_32px_rgba(0,0,0,0.3)]">
-                  <div className="w-11 h-11 rounded-xl bg-[rgba(99,102,241,0.15)] flex items-center justify-center mb-4">
-                    <Icon size={20} className="text-[#6366f1]" />
+                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-5 md:p-7 h-full transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(167,139,250,0.3)] hover:shadow-[0_0_24px_rgba(167,139,250,0.15),0_8px_32px_rgba(0,0,0,0.3)]">
+                  <div className="w-11 h-11 rounded-xl bg-[rgba(167,139,250,0.15)] flex items-center justify-center mb-4">
+                    <Icon size={20} className="text-[#a78bfa]" />
                   </div>
                   <h3
                     className="text-lg font-semibold text-[#f8fafc] mb-2"
@@ -518,7 +518,7 @@ function HowItWorksSection() {
                 {/* Number */}
                 <div className="flex-shrink-0">
                   <span
-                    className="text-6xl sm:text-7xl font-extrabold bg-gradient-to-br from-[#6366f1] to-[#a855f7] bg-clip-text text-transparent"
+                    className="text-6xl sm:text-7xl font-extrabold bg-gradient-to-br from-[#a78bfa] to-[#a855f7] bg-clip-text text-transparent"
                     style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif', lineHeight: 1 }}
                   >
                     {step.n}
@@ -527,9 +527,9 @@ function HowItWorksSection() {
 
                 {/* Content */}
                 <div className="pt-2">
-                  <div className="inline-flex items-center gap-2 bg-[rgba(99,102,241,0.1)] border border-[rgba(99,102,241,0.2)] rounded-full px-3 py-1 mb-3">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1]" />
-                    <span className="text-xs font-semibold text-[#6366f1]">Step {step.n}</span>
+                  <div className="inline-flex items-center gap-2 bg-[rgba(167,139,250,0.1)] border border-[rgba(167,139,250,0.2)] rounded-full px-3 py-1 mb-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#a78bfa]" />
+                    <span className="text-xs font-semibold text-[#a78bfa]">Step {step.n}</span>
                   </div>
                   <h3
                     className="text-xl font-semibold text-[#f8fafc] mb-2"
@@ -588,7 +588,7 @@ function DashboardMockup() {
       }}
     >
       <div
-        className="bg-[#0f172a] border border-[rgba(99,102,241,0.2)] rounded-2xl overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.5),0_0_0_1px_rgba(99,102,241,0.1)]"
+        className="bg-[#0f172a] border border-[rgba(167,139,250,0.2)] rounded-2xl overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.5),0_0_0_1px_rgba(167,139,250,0.1)]"
         style={{
           transform: 'rotateX(2deg)',
         }}
@@ -610,7 +610,7 @@ function DashboardMockup() {
           <div
             ref={scoreRef}
             className="rounded-2xl p-5 text-white"
-            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
+            style={{ background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)' }}
           >
             <p className="text-xs font-semibold uppercase tracking-wider opacity-70">AI Visibility Score</p>
             <p
@@ -631,12 +631,12 @@ function DashboardMockup() {
             <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-12">
               <defs>
                 <linearGradient id="mockupSparkGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                  <stop offset="0%" stopColor="#a78bfa" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#a78bfa" stopOpacity="0" />
                 </linearGradient>
               </defs>
               <path d={areaD} fill="url(#mockupSparkGrad)" />
-              <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d={pathD} fill="none" stroke="#a78bfa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
 
@@ -662,14 +662,14 @@ function DashboardMockup() {
               <div ref={indexRef}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#818cf8]" />
+                    <span className="w-2 h-2 rounded-full bg-[#c4b5fd]" />
                     <span className="text-xs text-[#94a3b8]">AI Index</span>
                   </div>
-                  <span className="text-xs font-bold text-[#818cf8]">{indexVal}%</span>
+                  <span className="text-xs font-bold text-[#c4b5fd]">{indexVal}%</span>
                 </div>
                 <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#818cf8] rounded-full transition-all duration-700"
+                    className="h-full bg-[#c4b5fd] rounded-full transition-all duration-700"
                     style={{ width: `${indexVal}%` }}
                   />
                 </div>
@@ -727,7 +727,7 @@ function DashboardMockup() {
                 <div className="flex-1 h-2 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${compWidths[0]}%`, backgroundColor: '#6366f1' }}
+                    style={{ width: `${compWidths[0]}%`, backgroundColor: '#a78bfa' }}
                   />
                 </div>
                 <span className="text-xs font-bold text-[#f8fafc] w-10 text-right">72%</span>
@@ -791,7 +791,7 @@ function PricingSection() {
                   <th className="text-left text-sm font-semibold text-[#f8fafc] p-3 md:p-4 rounded-tl-xl sticky left-0 bg-[#1e293b] z-10">Feature</th>
                   <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Free</th>
                   <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Starter</th>
-                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4 rounded-tr-xl bg-[rgba(99,102,241,0.2)] border-b-2 border-[#6366f1]">
+                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4 rounded-tr-xl bg-[rgba(167,139,250,0.2)] border-b-2 border-[#a78bfa]">
                     Pro
                   </th>
                 </tr>
@@ -800,12 +800,12 @@ function PricingSection() {
                 {COMPARISON_FEATURES.map((row, i) => (
                   <tr
                     key={row.label}
-                    className={`${i % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#020617]'} hover:bg-[rgba(99,102,241,0.05)] transition-colors`}
+                    className={`${i % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#020617]'} hover:bg-[rgba(167,139,250,0.05)] transition-colors`}
                   >
                     <td className="text-sm text-[#f8fafc] p-3 md:p-4 sticky left-0 z-10" style={{ background: i % 2 === 0 ? '#0f172a' : '#020617' }}>{row.label}</td>
                     <td className="text-center p-4"><PricingCell value={row.free} /></td>
                     <td className="text-center p-4"><PricingCell value={row.starter} /></td>
-                    <td className="text-center p-4 bg-[rgba(99,102,241,0.05)] border-l border-r border-[rgba(99,102,241,0.2)]">
+                    <td className="text-center p-4 bg-[rgba(167,139,250,0.05)] border-l border-r border-[rgba(167,139,250,0.2)]">
                       <PricingCell value={row.pro} />
                     </td>
                   </tr>
@@ -826,7 +826,7 @@ function PricingSection() {
                   onClick={() => setMobileTier(tier)}
                   className={`flex-1 py-2.5 text-sm font-semibold rounded-full transition-all ${
                     mobileTier === tier
-                      ? 'bg-[#6366f1] text-white shadow-[0_0_12px_rgba(99,102,241,0.4)]'
+                      ? 'bg-[#a78bfa] text-white shadow-[0_0_12px_rgba(167,139,250,0.4)]'
                       : 'text-[#94a3b8] hover:text-white'
                   }`}
                 >
@@ -871,7 +871,7 @@ function PricingSection() {
 
               <Link
                 href="/register"
-                className="mt-6 w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white py-3 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)]"
+                className="mt-6 w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white py-3 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-all shadow-[0_0_24px_rgba(167,139,250,0.4)]"
               >
                 Get started free
                 <ArrowRight size={16} />
@@ -884,7 +884,7 @@ function PricingSection() {
           <div className="mt-8 text-center hidden md:block">
             <Link
               href="/register"
-              className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)]"
+              className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-all shadow-[0_0_24px_rgba(167,139,250,0.4)]"
             >
               Get started free
               <ArrowRight size={16} />
@@ -910,7 +910,7 @@ function FAQItem({
   return (
     <FadeUp delay={delay}>
       <div
-        className={`border-b border-[rgba(51,65,85,0.5)] transition-all ${isOpen ? 'border-l-2 border-l-[#6366f1] pl-4' : ''}`}
+        className={`border-b border-[rgba(51,65,85,0.5)] transition-all ${isOpen ? 'border-l-2 border-l-[#a78bfa] pl-4' : ''}`}
       >
         <button
           onClick={onToggle}
@@ -968,7 +968,7 @@ function CTASection() {
     <section
       className="py-32 text-center relative"
       style={{
-        background: 'radial-gradient(ellipse at 50% 100%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+        background: 'radial-gradient(ellipse at 50% 100%, rgba(167,139,250,0.15) 0%, transparent 60%)',
       }}
     >
       {/* Animated gradient orb */}
@@ -978,7 +978,7 @@ function CTASection() {
         <div
           className="absolute w-[600px] h-[600px] rounded-full opacity-20 blur-[120px]"
           style={{
-            background: 'radial-gradient(circle, #6366f1 0%, #a855f7 50%, transparent 70%)',
+            background: 'radial-gradient(circle, #a78bfa 0%, #a855f7 50%, transparent 70%)',
             left: '50%',
             top: '50%',
             transform: 'translate(-50%, -50%)',
@@ -1010,7 +1010,7 @@ function CTASection() {
         <FadeUp delay={200}>
           <Link
             href="/register"
-            className="inline-flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-lg hover:shadow-xl"
+            className="inline-flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#a78bfa] hover:bg-[#8b5cf6] transition-all shadow-lg hover:shadow-xl"
           >
             Get Started Free
             <ArrowRight size={18} />

@@ -43,6 +43,7 @@ import {
   BrandProfile,
   BillingStatus,
   BillingUsage,
+  ModelStat,
   parseApiError,
 } from '@/lib/api';
 import { AppToast, ToastData } from '@/components/AppToast';
@@ -327,17 +328,33 @@ export default function DashboardPage() {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [activeRunId, selectedBrandId, loadData, newBrandMode]);
 
+  // Sync global report-running flag (localStorage, set by AppShell via getBackgroundStatus)
+  const [globalReportRunning, setGlobalReportRunning] = useState(() => {
+    try { return !!localStorage.getItem('clarity_report_running'); } catch { return false; }
+  });
+
   // Broadcast report-running state to other pages via localStorage
   useEffect(() => {
     try {
       const status = overview?.latest_run?.status;
       if (activeRunId !== null || status === 'running' || status === 'pending') {
         localStorage.setItem('clarity_report_running', '1');
+        setGlobalReportRunning(true);
       } else {
         localStorage.removeItem('clarity_report_running');
       }
     } catch {}
   }, [activeRunId, overview?.latest_run?.status]);
+
+  // Listen for AppShell updating the flag (e.g., scheduler-triggered run)
+  useEffect(() => {
+    const sync = () => {
+      try { setGlobalReportRunning(!!localStorage.getItem('clarity_report_running')); } catch {}
+    };
+    window.addEventListener('storage', sync);
+    const t = setInterval(sync, 3000);
+    return () => { window.removeEventListener('storage', sync); clearInterval(t); };
+  }, []);
 
   // Auto-clear toast after 4 seconds
   useEffect(() => {
@@ -377,7 +394,7 @@ export default function DashboardPage() {
   const selectedBrand = brands.find((b) => b.id === selectedBrandId);
   const latestRun = overview?.latest_run;
   const score = latestRun?.overall_score ?? null;
-  const isRunning = activeRunId !== null || latestRun?.status === 'running' || latestRun?.status === 'pending' || (newBrandMode && newBrandStep !== 'done');
+  const isRunning = activeRunId !== null || latestRun?.status === 'running' || latestRun?.status === 'pending' || globalReportRunning || (newBrandMode && newBrandStep !== 'done');
   const isFirstRun = isRunning && !analytics?.total_responses_analyzed && trends.length === 0;
 
   const sparkData = trends.map((p) => ({
@@ -442,18 +459,31 @@ export default function DashboardPage() {
   const totalPrompts = (brandDetail?.prompts ?? []).length;
   const totalRuns = trends.length;
 
+  // Derive Live/Index and Performance by Model from the latest run's model
+  // breakdown (same data source as the headline score) so all numbers stay
+  // consistent. Historical context lives in the trend chart.
+  const latestModelBreakdown = overview?.model_breakdown ?? [];
+  const latestModelStats: ModelStat[] = latestModelBreakdown
+    .map(m => ({
+      model: m.model,
+      label: m.model === 'chatgpt' ? 'ChatGPT' : m.model === 'claude' ? 'Claude' : m.model === 'perplexity' ? 'Perplexity' : m.model === 'gemini' ? 'Gemini' : m.model,
+      mention_count: m.total_mentions,
+      total: m.total_queries,
+      mention_rate: m.total_queries > 0 ? m.total_mentions / m.total_queries : 0,
+    }))
+    .sort((a, b) => b.mention_rate - a.mention_rate);
   const liveScore = (() => {
-    const mods = (analytics?.model_breakdown ?? []).filter(m => m.model === 'perplexity' || m.model === 'gemini');
+    const mods = latestModelBreakdown.filter(m => m.model === 'perplexity' || m.model === 'gemini');
     if (!mods.length) return null;
-    const mentions = mods.reduce((s, m) => s + m.mention_count, 0);
-    const total = mods.reduce((s, m) => s + m.total, 0);
+    const mentions = mods.reduce((s, m) => s + m.total_mentions, 0);
+    const total = mods.reduce((s, m) => s + m.total_queries, 0);
     return total > 0 ? Math.round(mentions / total * 100) : null;
   })();
   const indexScore = (() => {
-    const mods = (analytics?.model_breakdown ?? []).filter(m => m.model === 'chatgpt' || m.model === 'claude');
+    const mods = latestModelBreakdown.filter(m => m.model === 'chatgpt' || m.model === 'claude');
     if (!mods.length) return null;
-    const mentions = mods.reduce((s, m) => s + m.mention_count, 0);
-    const total = mods.reduce((s, m) => s + m.total, 0);
+    const mentions = mods.reduce((s, m) => s + m.total_mentions, 0);
+    const total = mods.reduce((s, m) => s + m.total_queries, 0);
     return total > 0 ? Math.round(mentions / total * 100) : null;
   })();
   const daysSinceFirst = trends.length > 0 && trends[0].completed_at
@@ -892,7 +922,7 @@ export default function DashboardPage() {
                       {[1,2,3,4].map(i => <div key={i} className="h-6 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
                     </div>
                   ) : (
-                    <DashboardModelBreakdown models={analytics?.model_breakdown ?? []} deltas={modelDeltas} />
+                    <DashboardModelBreakdown models={latestModelStats} deltas={modelDeltas} />
                   )}
                 </div>
               </div>

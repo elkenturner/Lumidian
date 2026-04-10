@@ -439,6 +439,7 @@ async def generate_gap_draft(
     quora_question_title: str | None = None,
     quora_question_snippet: str | None = None,
     source: str | None = None,
+    max_per_combo: int = 3,
 ) -> ContentDraft:
     """
     Generate a draft targeting a specific prompt/platform gap.
@@ -469,15 +470,15 @@ async def generate_gap_draft(
             f"Approve or dismiss existing drafts before generating new ones."
         )
 
-    # Check for repetition: if 3+ pending "draft" items already exist for this
-    # prompt/platform, skip.  Approved drafts are committed content the user already
-    # acted on — they should not block new generation.  Posted drafts are fetched for
-    # deduplication context below so Claude takes a different angle.
+    # Check for repetition: if max_per_combo+ pending "draft" items already exist
+    # for this prompt/platform, skip.  Approved drafts are committed content the user
+    # already acted on — they should not block new generation.  Posted drafts are
+    # fetched for deduplication context below so Claude takes a different angle.
     existing_drafts = await _get_existing_drafts_for_prompt(db, brand_id, prompt_id, platform)
     pending_draft_count = sum(1 for d in existing_drafts if d.status == "draft")
-    if pending_draft_count >= 3:
+    if pending_draft_count >= max_per_combo:
         raise ValueError(
-            f"3 or more pending drafts already exist for this prompt on {platform}. "
+            f"{max_per_combo} or more pending drafts already exist for this prompt on {platform}. "
             f"Approve or dismiss existing drafts before generating another."
         )
 
@@ -996,10 +997,16 @@ async def auto_draft_top_gaps(
     if not enabled_platforms:
         enabled_platforms = ["reddit", "quora"]
 
+    # --- Compute per-combo cap so we can always fill max_gaps ---
+    # With few prompts/platforms the default cap of 3 per combo can't reach 20.
+    # Scale it up so total_combos × per_combo >= max_gaps, with a floor of 3.
+    n_combos = len(ordered_prompts) * len(enabled_platforms)
+    import math
+    per_combo_cap = max(3, math.ceil(max_gaps / n_combos)) if n_combos else max_gaps
+
     # --- Generate: round-robin across platforms for equal distribution ---
     # Cycles through all (prompt, platform) combinations repeatedly until
-    # max_gaps drafts are created or DRAFT_CAP is hit. This means 3 prompts ×
-    # 4 platforms = 12 unique combos, but we keep cycling to reach 20.
+    # max_gaps drafts are created or DRAFT_CAP is hit.
     created: list[ContentDraft] = []
     last_error: Exception | None = None  # track first hard failure for diagnostics
     n_platforms = len(enabled_platforms)
@@ -1042,6 +1049,7 @@ async def auto_draft_top_gaps(
                     quora_question_title=_quora_title,
                     quora_question_snippet=_quora_snippet,
                     source=_source,
+                    max_per_combo=per_combo_cap,
                 )
                 return ("ok", draft, _prompt.id, _platform)
             except ValueError as exc:
@@ -1141,7 +1149,7 @@ async def auto_draft_top_gaps(
                         brand_id, len(created),
                     )
                     return created
-                if "3 or more" in exc_str or "drafts already exist" in exc_str:
+                if "or more pending drafts" in exc_str or "drafts already exist" in exc_str:
                     exhausted_combos.add((pid, plat))
                 logger.warning(
                     "auto_draft_top_gaps: skipped brand=%d prompt=%d platform=%s: %s",

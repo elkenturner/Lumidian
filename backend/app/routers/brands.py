@@ -255,10 +255,11 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
     if not user.is_admin:
         # Per-user deduplication: prevent the same brand occupying multiple slots
         # (blocks cycling pitch brands or double-tracking via standard + pitch)
+        base_slug = _slugify(payload.name)
         dup_name_result = await db.execute(
             select(func.count(Brand.id)).where(
                 Brand.user_id == user.id,
-                Brand.slug.like(f"{_slugify(payload.name)}%"),
+                Brand.slug == base_slug,
             )
         )
         if (dup_name_result.scalar_one() or 0) > 0:
@@ -289,10 +290,15 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
     # Set prompt limit based on brand type
     prompt_limit = PROMPT_LIMITS.get(payload.brand_type, 25)
 
+    # Enforce tier based on brand_type — ignore user-supplied value to prevent
+    # free users from choosing "premium" tier (20 runs per prompt instead of 5).
+    BRAND_TYPE_TO_TIER = {"pitch": "basic", "standard": "standard", "pro": "premium"}
+    enforced_tier = BRAND_TYPE_TO_TIER.get(payload.brand_type, "basic")
+
     brand = Brand(
         name=payload.name,
         slug=slug,
-        tier=payload.tier,
+        tier=enforced_tier,
         brand_type=payload.brand_type,
         prompt_limit=prompt_limit,
         pitch_expires_at=pitch_expires_at,
@@ -338,12 +344,26 @@ async def update_brand(brand_id: int, payload: BrandUpdate, db: DbDep, user: Cur
     if payload.name is not None:
         new_slug = _slugify(payload.name)
         if new_slug != brand.slug:
+            # Global slug uniqueness
             existing = await db.execute(select(Brand).where(Brand.slug == new_slug))
             if existing.scalar_one_or_none():
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail=f"A brand with slug '{new_slug}' already exists",
                 )
+            # Per-user name dedup (same check as create_brand)
+            if not getattr(user, "is_admin", False):
+                dup_result = await db.execute(
+                    select(func.count(Brand.id)).where(
+                        Brand.user_id == user.id,
+                        Brand.slug == new_slug,
+                    )
+                )
+                if (dup_result.scalar_one() or 0) > 0:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Your account is already tracking a brand with this name.",
+                    )
             brand.slug = new_slug
         brand.name = payload.name
 
@@ -429,6 +449,20 @@ async def add_prompt(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Prompt limit reached ({limit}). Delete a prompt or upgrade your brand type.",
             )
+
+    # Check for duplicate prompt text (case-insensitive)
+    from sqlalchemy import func as sqlfunc_lower
+    existing = await db.execute(
+        select(Prompt.id).where(
+            Prompt.brand_id == brand_id,
+            sqlfunc_lower.lower(Prompt.text) == text.lower(),
+        ).limit(1)
+    )
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This prompt already exists for this brand.",
+        )
 
     # Infer prompt_type from brand_type
     prompt_type = "pitch" if brand_obj.brand_type == "pitch" else "standard"

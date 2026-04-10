@@ -39,6 +39,10 @@ def _is_brand_paused(brand) -> bool:
     from datetime import datetime
     now = datetime.now(UTC).replace(tzinfo=None)
 
+    # Skip orphaned brands (no owner)
+    if brand.user_id is None:
+        return True
+
     # Skip expired pitch brands
     if brand.brand_type == "pitch" and brand.pitch_expires_at and brand.pitch_expires_at <= now:
         return True
@@ -58,6 +62,17 @@ async def _is_scheduler_paused() -> bool:
         )
         setting = result.scalar_one_or_none()
         return setting is not None and setting.value == "true"
+
+
+async def _reap_stale_runs() -> None:
+    """Mark runs stuck in running/pending for >30 min as failed.
+
+    Runs on a periodic schedule to catch runs orphaned by mid-flight
+    crashes or deploys (the startup reaper only fires on boot).
+    """
+    from app.database import cleanup_stale_runs
+
+    await cleanup_stale_runs()
 
 
 async def _run_all_brands(schedule_slot: str) -> None:
@@ -719,6 +734,15 @@ def start_scheduler() -> None:
         name="Visibility drop alerts (21:00 UTC)",
         replace_existing=True,
         misfire_grace_time=600,
+    )
+
+    scheduler.add_job(
+        _reap_stale_runs,
+        trigger=CronTrigger(minute="*/15", timezone="UTC"),
+        id="stale_run_reaper",
+        name="Reap stuck tracking runs (every 15 min)",
+        replace_existing=True,
+        misfire_grace_time=300,
     )
 
     scheduler.start()

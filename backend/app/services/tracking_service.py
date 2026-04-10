@@ -287,9 +287,6 @@ async def run_tracking(
                 for m in SUPPORTED_MODELS
             }
             for qr in query_results:
-                # Exclude ALL error responses from scoring — errors (rate limits,
-                # timeouts, empty responses) should not count as "not mentioned"
-                # and should not inflate the denominator.
                 if qr.error:
                     continue
                 stats = model_stats[qr.model]

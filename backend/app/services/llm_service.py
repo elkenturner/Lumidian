@@ -37,6 +37,12 @@ _PERPLEXITY_SEM = asyncio.Semaphore(2)
 # Combined with the 65s retry backoff for 429s, this keeps us under the limit.
 _CLAUDE_SEM = asyncio.Semaphore(3)
 
+# Gemini rate-limit guard: Google returns 503 UNAVAILABLE when flooded.
+# 3 concurrent slots prevent us from overwhelming the API during tracking runs
+# (which fire 50+ queries per model). Pro models (gemini-2.5-pro) are
+# especially prone to 503s under burst traffic.
+_GEMINI_SEM = asyncio.Semaphore(3)
+
 
 # Human-readable display names for each model (used in placeholder messages)
 _MODEL_DISPLAY_NAMES = {
@@ -237,25 +243,35 @@ async def _query_perplexity(prompt: str, brand_name: str, model_version: str = "
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
 
+_gemini_client = None  # Module-level singleton — avoids per-request httpx lifecycle issues
+
+def _get_gemini_client():
+    global _gemini_client
+    if _gemini_client is None:
+        from google import genai
+        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    return _gemini_client
+
+
 async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemini-2.5-flash") -> dict:
     if not GEMINI_API_KEY:
         return _api_key_placeholder("gemini")
     start = time.monotonic()
     try:
-        from google import genai
         from google.genai import types
 
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        response = await asyncio.wait_for(
-            client.aio.models.generate_content(
-                model=model_version,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[types.Tool(google_search=types.GoogleSearch())],
+        client = _get_gemini_client()
+        async with _GEMINI_SEM:
+            response = await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model_version,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[types.Tool(google_search=types.GoogleSearch())],
+                    ),
                 ),
-            ),
-            timeout=30.0,
-        )
+                timeout=30.0,
+            )
         text = response.text  # Returns None on safety blocks (no ValueError)
         latency_ms = int((time.monotonic() - start) * 1000)
         if not text:
@@ -295,11 +311,25 @@ _DISPATCHERS = {
 SUPPORTED_MODELS = list(_DISPATCHERS.keys())
 
 
-async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 2, model_version: str = "") -> dict:
+def _classify_error(error: str) -> str:
+    """Classify an error string for retry strategy."""
+    e = error.lower()
+    if "429" in e or "rate_limit" in e or "rate limit" in e or "insufficient_quota" in e:
+        return "rate_limit"
+    if "503" in e or "unavailable" in e or "overloaded" in e or "timed out" in e:
+        return "overload"
+    return "other"
+
+
+async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 3, model_version: str = "") -> dict:
     """
-    Call handler(prompt, brand_name, model_version) and retry up to max_attempts
-    times if the response is empty or errored (but not due to a missing API key,
-    which is a permanent configuration issue).
+    Call handler(prompt, brand_name, model_version) and retry with backoff.
+
+    Retry strategy by error type:
+      - rate_limit (429, quota): 65s flat backoff (wait for quota reset)
+      - overload (503, timeout): exponential backoff 5s → 10s → 20s
+      - other: 3s flat backoff
+      - api_key_not_configured: no retry (permanent)
     """
     display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
     errors: list[str] = []
@@ -322,13 +352,17 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
 
         # Don't sleep after the last attempt
         if attempt < max_attempts:
-            # Rate-limit errors (429) need a much longer backoff
-            is_rate_limit = "429" in error or "rate_limit" in error.lower() or "rate limit" in error.lower()
-            retry_delay = 65 if is_rate_limit else 3
+            error_type = _classify_error(error)
+            if error_type == "rate_limit":
+                retry_delay = 65
+            elif error_type == "overload":
+                retry_delay = 5 * (2 ** (attempt - 1))  # 5s, 10s, 20s …
+            else:
+                retry_delay = 3
 
             logger.warning(
-                "[%s] Attempt %d/%d failed (error=%r) for prompt %r — retrying in %ds",
-                model_key, attempt, max_attempts, error, prompt[:100], retry_delay,
+                "[%s] Attempt %d/%d failed (%s, error=%r) for prompt %r — retrying in %ds",
+                model_key, attempt, max_attempts, error_type, error, prompt[:100], retry_delay,
             )
             await asyncio.sleep(retry_delay)
 

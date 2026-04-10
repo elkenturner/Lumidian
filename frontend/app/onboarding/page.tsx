@@ -184,7 +184,7 @@ export default function OnboardingPage() {
             <div key={label} className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                  done ? 'bg-[var(--success)] text-white' : active ? 'bg-[var(--accent)] text-white shadow-[0_0_12px_rgba(99,102,241,0.40)]' : 'bg-[rgba(99,102,241,0.08)] border border-[var(--border-default)] text-[var(--text-faint)]'
+                  done ? 'bg-[var(--success)] text-white' : active ? 'bg-[var(--accent)] text-white shadow-[0_0_12px_rgba(95,126,166,0.40)]' : 'bg-[rgba(95,126,166,0.08)] border border-[var(--border-default)] text-[var(--text-faint)]'
                 }`}>
                   {done ? <CheckCircle size={14} /> : s}
                 </div>
@@ -193,7 +193,7 @@ export default function OnboardingPage() {
                 </span>
               </div>
               {i < stepLabels.length - 1 && (
-                <ChevronRight size={14} className="text-[rgba(99,102,241,0.30)]" />
+                <ChevronRight size={14} className="text-[rgba(95,126,166,0.30)]" />
               )}
             </div>
           );
@@ -223,7 +223,7 @@ export default function OnboardingPage() {
                   onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
                   placeholder="Your brand name"
                   autoFocus
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
               </div>
               <div>
@@ -233,14 +233,14 @@ export default function OnboardingPage() {
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
                   placeholder="https://yourcompany.com"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
                 <p className="text-xs text-[var(--text-faint)] mt-1">We&apos;ll use this to improve content draft quality.</p>
               </div>
               <button
                 onClick={handleStep1}
                 disabled={fetching || !brandName.trim() || !websiteUrl.trim()}
-                className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-[0_0_20px_rgba(99,102,241,0.25)]"
+                className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors shadow-[0_0_20px_rgba(95,126,166,0.25)]"
               >
                 {fetching ? <Loader2 size={14} className="animate-spin" /> : null}
                 {fetching ? 'Fetching website...' : 'Fetch & Continue'}
@@ -284,7 +284,7 @@ export default function OnboardingPage() {
                   value={p}
                   onChange={(e) => updatePrompt(i, e.target.value)}
                   placeholder={i === 0 ? `What is ${brandName}?` : 'Add another prompt…'}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
               ))}
               <div className="flex items-center justify-between px-1 pt-1">
@@ -334,7 +334,7 @@ export default function OnboardingPage() {
                   onChange={(e) => setCompanyDescription(e.target.value)}
                   rows={3}
                   placeholder="Brief description of what your company does…"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] resize-none transition-all"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] resize-none transition-[border-color,box-shadow]"
                 />
               </div>
             </div>

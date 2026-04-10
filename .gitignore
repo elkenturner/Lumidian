@@ -36,3 +36,4 @@ backend/logs/
 *.png
 frontend/tsconfig.tsbuildinfo
 .github/workflows/
+.superpowers/

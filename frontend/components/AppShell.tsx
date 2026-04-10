@@ -34,8 +34,8 @@ function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ m
       style={{
         position: 'relative',
         overflow: 'hidden',
-        background: 'radial-gradient(ellipse at 20% 50%, rgba(99,102,241,0.08) 0%, rgba(99,102,241,0.02) 70%, transparent 100%)',
-        borderBottom: '1px solid rgba(99,102,241,0.18)',
+        background: 'radial-gradient(ellipse at 20% 50%, rgba(95,126,166,0.08) 0%, rgba(95,126,166,0.02) 70%, transparent 100%)',
+        borderBottom: '1px solid rgba(95,126,166,0.18)',
       }}
     >
       <div style={{
@@ -135,7 +135,7 @@ function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ m
         style={{
           height: 2,
           width: '100%',
-          background: 'linear-gradient(90deg, transparent, rgba(99,102,241,0.5), rgba(168,85,247,0.5), transparent)',
+          background: 'linear-gradient(90deg, transparent, rgba(95,126,166,0.5), rgba(168,85,247,0.5), transparent)',
           backgroundSize: '200% 100%',
           animation: 'shimmer 2s linear infinite',
         }}
@@ -208,8 +208,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           setModelScores(status.model_scores || []);
           active = status.report_running || status.drafts_generating || status.scanning;
           try {
-            if (!status.report_running) localStorage.removeItem('clarity_report_running');
-            if (!status.drafts_generating) localStorage.removeItem('clarity_drafts_generating');
+            if (status.report_running) localStorage.setItem('clarity_report_running', '1');
+            else localStorage.removeItem('clarity_report_running');
+            if (status.drafts_generating) localStorage.setItem('clarity_drafts_generating', '1');
+            else localStorage.removeItem('clarity_drafts_generating');
           } catch {}
         }
       } catch {

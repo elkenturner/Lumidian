@@ -91,7 +91,7 @@ export default function LoginPage() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(95,126,166,0.15) 0%, transparent 60%)',
         }}
       />
 
@@ -105,7 +105,7 @@ export default function LoginPage() {
         {challengeToken && (
           <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-6 md:p-8">
             <div className="flex items-center gap-2.5 mb-2">
-              <ShieldCheck size={20} className="text-[#6366f1]" />
+              <ShieldCheck size={20} className="text-[#5f7ea6]" />
               <h1 className="text-xl font-bold text-[#f8fafc]">Two-factor authentication</h1>
             </div>
             <p className="text-sm text-[#94a3b8] mb-6">
@@ -131,13 +131,13 @@ export default function LoginPage() {
                   autoFocus
                   autoComplete="one-time-code"
                   placeholder="000000"
-                  className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 text-3xl md:text-2xl text-center font-mono tracking-[0.3em] text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
+                  className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 text-3xl md:text-2xl text-center font-mono tracking-[0.3em] text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#5f7ea6] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || totpCode.length !== 6}
-                className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 transition-colors min-h-[48px]"
+                className="w-full flex items-center justify-center gap-2 bg-[#5f7ea6] hover:bg-[#4a6a90] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 transition-colors min-h-[48px]"
               >
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Verifying…' : 'Verify'}
@@ -175,7 +175,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="you@example.com"
-                  className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
+                  className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#5f7ea6] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
                 />
               </div>
               <div>
@@ -187,7 +187,7 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     placeholder="Enter your password"
-                    className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 pr-10 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
+                    className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 pr-10 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#5f7ea6] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
                   />
                   <button
                     type="button"
@@ -201,7 +201,7 @@ export default function LoginPage() {
               </div>
 
               <div className="text-right -mt-1">
-                <Link href="/forgot-password" className="text-xs text-[#64748b] hover:text-[#6366f1] transition-colors">
+                <Link href="/forgot-password" className="text-xs text-[#64748b] hover:text-[#5f7ea6] transition-colors">
                   Forgot password?
                 </Link>
               </div>
@@ -209,7 +209,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 mt-1 transition-colors min-h-[48px]"
+                className="w-full flex items-center justify-center gap-2 bg-[#5f7ea6] hover:bg-[#4a6a90] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 mt-1 transition-colors min-h-[48px]"
               >
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Signing in…' : 'Sign in'}
@@ -252,7 +252,7 @@ export default function LoginPage() {
         {!challengeToken && (
           <p className="text-center text-sm text-[#94a3b8] mt-6">
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-[#6366f1] hover:text-[#818cf8] font-semibold transition-colors">
+            <Link href="/register" className="text-[#5f7ea6] hover:text-[#8ba8cc] font-semibold transition-colors">
               Create one
             </Link>
           </p>

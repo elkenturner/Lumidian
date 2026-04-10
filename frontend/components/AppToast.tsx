@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
 export type ToastType = 'success' | 'error' | 'info';
@@ -23,18 +24,42 @@ const styles: Record<ToastType, { wrapper: string; icon: JSX.Element }> = {
     icon: <AlertCircle size={15} className="text-[var(--danger)] shrink-0" />,
   },
   info: {
-    wrapper: 'bg-[rgba(10,14,24,0.95)] border-[rgba(99,102,241,0.25)] text-[var(--text-secondary)]',
+    wrapper: 'bg-[rgba(10,14,24,0.95)] border-[rgba(95,126,166,0.25)] text-[var(--text-secondary)]',
     icon: <Info size={15} className="text-[var(--accent)] shrink-0" />,
   },
 };
 
 export function AppToast({ message, type, onDismiss }: AppToastProps) {
   const { wrapper, icon } = styles[type];
+  const [phase, setPhase] = useState<'enter' | 'visible' | 'exit'>('enter');
+
+  // Trigger enter → visible on mount (one rAF ensures the enter class paints first)
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setPhase('visible'));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  function handleDismiss() {
+    setPhase('exit');
+    // Wait for exit transition (200ms) before unmounting
+    setTimeout(onDismiss, 220);
+  }
+
+  const phaseClass =
+    phase === 'enter' ? 'toast-enter' :
+    phase === 'visible' ? 'toast-visible' :
+    'toast-exit';
+
   return (
-    <div role="alert" aria-live="assertive" aria-atomic="true" className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium max-w-sm ${wrapper}`}>
+    <div
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
+      className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium max-w-sm ${wrapper} ${phaseClass}`}
+    >
       {icon}
       <span className="flex-1">{message}</span>
-      <button onClick={onDismiss} aria-label="Dismiss" className="ml-1 opacity-50 hover:opacity-100 transition-opacity">
+      <button onClick={handleDismiss} aria-label="Dismiss" className="ml-1 opacity-50 hover:opacity-100 transition-opacity">
         <X size={13} />
       </button>
     </div>

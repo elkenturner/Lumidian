@@ -45,7 +45,7 @@ export default function PromptDetailPage() {
 
   if (loading) {
     return (
-      <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
+      <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl">
         <div className="flex items-center justify-center py-24">
           <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
         </div>
@@ -55,7 +55,7 @@ export default function PromptDetailPage() {
 
   if (!data) {
     return (
-      <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
+      <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl">
         <p className="text-sm text-[var(--text-muted)]">Prompt not found.</p>
       </div>
     );
@@ -68,7 +68,7 @@ export default function PromptDetailPage() {
     : 0;
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl">
       {/* Back link */}
       <button
         onClick={() => router.back()}

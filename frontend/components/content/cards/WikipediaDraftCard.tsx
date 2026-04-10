@@ -6,7 +6,6 @@ import {
   ExternalLink,
   Trash2,
   Edit2,
-  AlertTriangle,
   Copy,
   Check,
 } from 'lucide-react';
@@ -93,23 +92,6 @@ export function WikipediaDraftCard({
 
   return (
     <>
-      {showCOI && (
-        <div className="flex items-center gap-2 text-xs text-[var(--warning)] px-1 -mb-1">
-          <AlertTriangle size={11} className="shrink-0" />
-          <span>
-            Conflict of interest disclosure may be required if this content references your brand.{' '}
-            <a
-              href="https://en.wikipedia.org/wiki/Wikipedia:Conflict_of_interest"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="underline decoration-[var(--warning)]/50 hover:decoration-[var(--warning)]"
-            >
-              See Wikipedia&apos;s COI guidelines.
-            </a>
-          </span>
-        </div>
-      )}
-
       <div className="card card-hover p-5 flex flex-col gap-3 transition-colors">
         <div className="flex items-start gap-2 flex-wrap">
           <PlatformBadge platform="wikipedia" />
@@ -135,6 +117,23 @@ export function WikipediaDraftCard({
             <p className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-1 font-medium">Where to insert</p>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{insertLocation}</p>
           </div>
+        )}
+
+        {showCOI && (
+          <p className="text-[11px] text-[var(--text-faint)] leading-relaxed">
+            <span className="text-[var(--warning)]">COI</span>
+            {' · '}
+            This draft references your brand — a{' '}
+            <a
+              href="https://en.wikipedia.org/wiki/Wikipedia:Conflict_of_interest"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline decoration-[var(--text-faint)]/40 hover:decoration-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors"
+            >
+              COI disclosure
+            </a>
+            {' '}may be needed.
+          </p>
         )}
 
         {editing ? (

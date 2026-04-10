@@ -61,7 +61,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${inter.variable} ${geistMono.variable}`}>
-      <body className="bg-[var(--bg-base)] text-[var(--text-primary)] antialiased">
+      <body suppressHydrationWarning className="bg-[var(--bg-base)] text-[var(--text-primary)] antialiased">
         <AuthProvider>
           <AppShell>{children}</AppShell>
         </AuthProvider>

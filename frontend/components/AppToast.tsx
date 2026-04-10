@@ -24,7 +24,7 @@ const styles: Record<ToastType, { wrapper: string; icon: JSX.Element }> = {
     icon: <AlertCircle size={15} className="text-[var(--danger)] shrink-0" />,
   },
   info: {
-    wrapper: 'bg-[rgba(10,14,24,0.95)] border-[rgba(167,139,250,0.25)] text-[var(--text-secondary)]',
+    wrapper: 'bg-[rgba(10,14,24,0.95)] border-[rgba(95,126,166,0.25)] text-[var(--text-secondary)]',
     icon: <Info size={15} className="text-[var(--accent)] shrink-0" />,
   },
 };

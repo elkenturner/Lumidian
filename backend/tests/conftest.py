@@ -69,7 +69,7 @@ async def clean_tables():
         # Order matters for FK constraints
         for table in [
             "prompt_run_scores", "content_events",
-            "analytics_events", "content_attribution", "content_posts",
+            "analytics_events", "draft_attributions", "content_attribution", "content_posts",
             "content_drafts", "content_gaps", "content_opportunities",
             "run_model_scores", "query_results", "tracking_runs",
             "competitors", "prompts", "brand_profiles",

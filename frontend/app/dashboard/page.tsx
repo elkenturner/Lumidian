@@ -950,6 +950,7 @@ export default function DashboardPage() {
           brandName={brandDetail.name}
           prompts={brandDetail.prompts}
           promptLimit={brandDetail.brand_type === 'pitch' ? 10 : (user?.prompt_limit ?? 10)}
+          isRunning={isRunning}
           onClose={() => setPromptModalOpen(false)}
           onChanged={(updated) => setBrandDetail((prev) => prev ? { ...prev, prompts: updated } : prev)}
         />

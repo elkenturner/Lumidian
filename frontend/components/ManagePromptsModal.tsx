@@ -10,6 +10,7 @@ export function ManagePromptsModal({
   brandName,
   prompts,
   promptLimit,
+  isRunning = false,
   onClose,
   onChanged,
 }: {
@@ -17,6 +18,7 @@ export function ManagePromptsModal({
   brandName?: string;
   prompts: Prompt[];
   promptLimit: number;
+  isRunning?: boolean;
   onClose: () => void;
   onChanged: (updated: Prompt[]) => void;
 }) {
@@ -29,6 +31,7 @@ export function ManagePromptsModal({
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const atLimit = localPrompts.length >= promptLimit;
+  const locked = isRunning;
 
   async function handleAdd() {
     if (!newText.trim() || atLimit) return;
@@ -97,7 +100,7 @@ export function ManagePromptsModal({
                 <p className="text-sm text-[var(--text-secondary)] flex-1 leading-snug">{p.text}</p>
                 <button
                   onClick={() => handleDelete(p.id)}
-                  disabled={deletingId === p.id}
+                  disabled={deletingId === p.id || locked}
                   aria-label="Delete prompt"
                   className="text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors shrink-0 disabled:opacity-40"
                 >
@@ -129,7 +132,10 @@ export function ManagePromptsModal({
           {addError && (
             <p className="text-xs text-[var(--danger)]">{addError}</p>
           )}
-          {atLimit && (
+          {locked && (
+            <p className="text-xs text-[var(--warning)]">Prompts are locked while a report is running.</p>
+          )}
+          {atLimit && !locked && (
             <p className="text-xs text-[var(--warning)]">Prompt limit reached ({promptLimit}/{promptLimit}). Remove a prompt to add another.</p>
           )}
           <div className="flex gap-2">
@@ -139,12 +145,12 @@ export function ManagePromptsModal({
               onChange={(e) => setNewText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder={`e.g. What is the best ${brandName || 'product'} alternative?`}
-              disabled={atLimit}
+              disabled={atLimit || locked}
               className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-40"
             />
             <button
               onClick={handleAdd}
-              disabled={adding || !newText.trim() || atLimit}
+              disabled={adding || !newText.trim() || atLimit || locked}
               className="flex items-center gap-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-3 py-2 transition-colors shrink-0"
             >
               {adding ? <Loader2 size={11} className="animate-spin" /> : <Plus size={11} />}
@@ -153,7 +159,7 @@ export function ManagePromptsModal({
           </div>
           <button
             onClick={handleSuggest}
-            disabled={suggesting}
+            disabled={suggesting || locked}
             className="w-full flex items-center justify-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.14)] rounded-lg py-2 transition-colors"
           >
             {suggesting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}

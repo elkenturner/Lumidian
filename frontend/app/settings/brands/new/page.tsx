@@ -353,8 +353,8 @@ export default function NewBrandPage() {
                 );
               })()}
 
-              {/* Pitch brand */}
-              {(() => {
+              {/* Pitch brand — only shown for free users (paid users get full brands) */}
+              {!isOnPaidPlan && (() => {
                 const locked = pitchRemaining === 0;
                 return (
                   <button

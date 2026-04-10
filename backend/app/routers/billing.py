@@ -498,20 +498,37 @@ async def stripe_webhook(request: Request, db: DbDep):
                     {"old_plan": old_tier, "new_plan": tier},
                     user_id=user.id,
                 )
-            # Auto-upgrade standard brands to pro if user upgraded to pro tier
+            # Auto-upgrade brands when user upgrades their subscription
             if tier == "pro" and tier != old_tier:
                 from sqlalchemy import update as sa_update
 
                 from app.models import Brand
+                # Upgrade standard AND pitch brands to pro
                 upgrade_result = await db.execute(
                     sa_update(Brand)
-                    .where(Brand.user_id == user.id, Brand.brand_type == "standard")
+                    .where(Brand.user_id == user.id, Brand.brand_type.in_(["standard", "pitch"]))
                     .values(brand_type="pro", prompt_limit=100)
                 )
                 if upgrade_result.rowcount > 0:
                     await db.commit()
                     logger.info(
-                        "Auto-upgraded %d standard brand(s) to pro for user %d",
+                        "Auto-upgraded %d brand(s) to pro for user %d",
+                        upgrade_result.rowcount, user.id,
+                    )
+            elif tier == "starter" and old_tier in (None, ""):
+                from sqlalchemy import update as sa_update
+
+                from app.models import Brand
+                # Upgrade pitch brands to standard on starter plan
+                upgrade_result = await db.execute(
+                    sa_update(Brand)
+                    .where(Brand.user_id == user.id, Brand.brand_type == "pitch")
+                    .values(brand_type="standard", prompt_limit=25)
+                )
+                if upgrade_result.rowcount > 0:
+                    await db.commit()
+                    logger.info(
+                        "Auto-upgraded %d pitch brand(s) to standard for user %d",
                         upgrade_result.rowcount, user.id,
                     )
 

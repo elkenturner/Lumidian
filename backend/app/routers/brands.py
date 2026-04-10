@@ -396,6 +396,19 @@ async def add_prompt(
     # Verify brand exists and belongs to user
     brand_obj = await get_brand_for_user(brand_id, db, user)
 
+    # Block prompt changes while a tracking run is active
+    active_run = await db.execute(
+        select(TrackingRun.id).where(
+            TrackingRun.brand_id == brand_id,
+            TrackingRun.status.in_(["pending", "running"]),
+        ).limit(1)
+    )
+    if active_run.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot modify prompts while a report is running.",
+        )
+
     text = payload.text.strip()
     if not text:
         raise HTTPException(
@@ -438,6 +451,20 @@ async def add_prompt(
 )
 async def delete_prompt(brand_id: int, prompt_id: int, db: DbDep, user: CurrentUser):
     await get_brand_for_user(brand_id, db, user)
+
+    # Block prompt changes while a tracking run is active
+    active_run = await db.execute(
+        select(TrackingRun.id).where(
+            TrackingRun.brand_id == brand_id,
+            TrackingRun.status.in_(["pending", "running"]),
+        ).limit(1)
+    )
+    if active_run.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot modify prompts while a report is running.",
+        )
+
     result = await db.execute(
         select(Prompt).where(Prompt.id == prompt_id, Prompt.brand_id == brand_id)
     )

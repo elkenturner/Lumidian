@@ -253,13 +253,15 @@ def _get_gemini_client():
     return _gemini_client
 
 
-_GEMINI_TIMEOUT = 45.0  # seconds; Pro models are slower than Flash
+_GEMINI_TIMEOUT = 90.0   # seconds; default for Flash models
+_GEMINI_PRO_TIMEOUT = 120.0  # seconds; Pro models are significantly slower
 
 
 async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemini-2.5-flash") -> dict:
     if not GEMINI_API_KEY:
         return _api_key_placeholder("gemini")
     start = time.monotonic()
+    timeout = _GEMINI_PRO_TIMEOUT if "pro" in model_version else _GEMINI_TIMEOUT
     try:
         from google.genai import types
 
@@ -283,7 +285,7 @@ async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemi
                             contents=prompt,
                             config=config,
                         ),
-                        timeout=_GEMINI_TIMEOUT,
+                        timeout=timeout,
                     )
                 break  # success — stop trying configs
             except Exception as inner_exc:
@@ -319,8 +321,8 @@ async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemi
         return _build_result(text, brand_name, latency_ms)
     except asyncio.TimeoutError:
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.error("[gemini] Request timed out after %.0fs for prompt %r", _GEMINI_TIMEOUT, prompt[:100])
-        return _build_result(None, brand_name, latency_ms, error=f"Request timed out ({_GEMINI_TIMEOUT:.0f}s)")
+        logger.error("[gemini] Request timed out after %.0fs for prompt %r", timeout, prompt[:100])
+        return _build_result(None, brand_name, latency_ms, error=f"Request timed out ({timeout:.0f}s)")
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.error("[gemini] API error for prompt %r: %s", prompt[:100], exc)

@@ -88,7 +88,7 @@ export default function StatsCard({
           )}
         </div>
         {icon && (
-          <div className="ml-4 w-10 h-10 rounded-xl bg-[rgba(167,139,250,0.08)] border border-[rgba(167,139,250,0.15)] flex items-center justify-center text-[var(--accent-light)] flex-shrink-0">
+          <div className="ml-4 w-10 h-10 rounded-xl bg-[rgba(95,126,166,0.08)] border border-[rgba(95,126,166,0.15)] flex items-center justify-center text-[var(--accent-light)] flex-shrink-0">
             {icon}
           </div>
         )}

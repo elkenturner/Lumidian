@@ -57,7 +57,7 @@ function buildGroups(responses: QueryResult[]): PromptGroup[] {
 
 function SkeletonRow() {
   return (
-    <div className="border-b border-[rgba(167,139,250,0.12)] px-5 py-4 animate-pulse">
+    <div className="border-b border-[rgba(95,126,166,0.12)] px-5 py-4 animate-pulse">
       <div className="flex items-center gap-4">
         <div className="flex-1 h-4 skeleton rounded" />
         <div className="flex gap-2">
@@ -77,9 +77,9 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
   );
 
   return (
-    <div className="bg-[rgba(167,139,250,0.06)] border border-[rgba(167,139,250,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
+    <div className="bg-[rgba(95,126,166,0.06)] border border-[rgba(95,126,166,0.22)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
       {/* Header */}
-      <div className="px-5 py-3.5 border-b border-[rgba(167,139,250,0.15)] flex items-center justify-between bg-[rgba(167,139,250,0.04)]">
+      <div className="px-5 py-3.5 border-b border-[rgba(95,126,166,0.15)] flex items-center justify-between bg-[rgba(95,126,166,0.04)]">
         <h3 className="text-sm font-semibold text-[var(--text-primary)]">Query Responses</h3>
         {!loading && groups.length > 0 && (
           <div className="flex items-center gap-3">
@@ -95,7 +95,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                 </span>
               );
             })}
-            <span className="text-xs text-[var(--text-muted)] border-l border-[rgba(167,139,250,0.20)] pl-3">
+            <span className="text-xs text-[var(--text-muted)] border-l border-[rgba(95,126,166,0.20)] pl-3">
               {groups.length} prompt{groups.length !== 1 ? 's' : ''}
             </span>
           </div>
@@ -112,13 +112,13 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
           No responses found for this run.
         </div>
       ) : (
-        <div className="divide-y divide-[rgba(167,139,250,0.12)]">
+        <div className="divide-y divide-[rgba(95,126,166,0.12)]">
           {groups.map((g) => {
             const overallPct = g.total > 0 ? Math.round((g.mentioned / g.total) * 100) : 0;
             const overallColor = overallPct >= 60 ? 'var(--success)' : overallPct >= 30 ? 'var(--warning)' : 'var(--danger)';
 
             return (
-              <div key={g.promptId} className="stagger-row px-5 py-4 hover:bg-[rgba(167,139,250,0.04)] transition-colors">
+              <div key={g.promptId} className="stagger-row px-5 py-4 hover:bg-[rgba(95,126,166,0.04)] transition-colors">
                 {/* Prompt text */}
                 <p className="text-sm text-[var(--text-secondary)] mb-3 leading-snug font-medium">
                   {g.promptText}
@@ -136,7 +136,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                     return (
                       <div
                         key={modelKey}
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[rgba(167,139,250,0.22)] bg-[rgba(167,139,250,0.06)]"
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[rgba(95,126,166,0.22)] bg-[rgba(95,126,166,0.06)]"
                       >
                         <span
                           className="text-xs font-semibold"
@@ -144,7 +144,7 @@ export default function ResponsesTable({ responses, loading }: ResponsesTablePro
                         >
                           {cfg.label}
                         </span>
-                        <span className="text-[rgba(167,139,250,0.40)]">&middot;</span>
+                        <span className="text-[rgba(95,126,166,0.40)]">&middot;</span>
                         <span
                           className="text-xs font-bold tabular-nums font-mono"
                           style={{ color: mentionColor }}

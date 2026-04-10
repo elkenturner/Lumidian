@@ -57,7 +57,7 @@ const NavLink = memo(function NavLink({
       ].join(' ')}
       style={{
         transition: 'background-color 200ms var(--ease-out), border-color 200ms var(--ease-out)',
-        ...(isActive ? { background: 'rgba(167,139,250,0.12)' } : {}),
+        ...(isActive ? { background: 'rgba(95,126,166,0.12)' } : {}),
       }}
       onMouseEnter={(e) => {
         if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
@@ -138,7 +138,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
           background: 'linear-gradient(180deg, rgba(6,10,22,0.92) 0%, rgba(4,6,14,0.96) 100%)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
-          borderRight: '1px solid rgba(167,139,250,0.10)',
+          borderRight: '1px solid rgba(95,126,166,0.10)',
         }}
         onMouseEnter={() => onExpandedChange(true)}
         onMouseLeave={() => onExpandedChange(false)}
@@ -183,7 +183,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 transition: 'background-color 150ms var(--ease-out), border-color 150ms var(--ease-out)',
                 padding: expanded ? '8px 10px' : '8px 0',
                 justifyContent: expanded ? 'flex-start' : 'center',
-                background: brandOpen ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)',
+                background: brandOpen ? 'rgba(95,126,166,0.12)' : 'rgba(255,255,255,0.04)',
                 border: '1px solid rgba(255,255,255,0.07)',
               }}
               onMouseEnter={(e) => { if (!brandOpen) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.07)'; }}
@@ -194,7 +194,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 websiteUrl={activeBrand?.website_url}
                 size={22}
                 className="rounded-md flex-shrink-0"
-                style={{ background: 'rgba(167,139,250,0.20)', border: '1px solid rgba(167,139,250,0.30)', padding: 3 }}
+                style={{ background: 'rgba(95,126,166,0.20)', border: '1px solid rgba(95,126,166,0.30)', padding: 3 }}
                 textClassName="text-[9px] font-bold text-[var(--accent-light)]"
               />
               {expanded && (
@@ -223,7 +223,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                   background: 'rgba(10,14,24,0.97)',
                   backdropFilter: 'blur(20px)',
                   WebkitBackdropFilter: 'blur(20px)',
-                  border: '1px solid rgba(167,139,250,0.20)',
+                  border: '1px solid rgba(95,126,166,0.20)',
                   borderRadius: 12,
                   boxShadow: '0 12px 40px rgba(0,0,0,0.50)',
                   overflow: 'hidden',
@@ -243,7 +243,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                         key={brand.id}
                         onClick={() => { setActiveBrandId(brand.id); setBrandOpen(false); }}
                         className="w-full flex items-center gap-2.5 px-3 py-2 transition-colors text-left"
-                        style={{ background: isActive ? 'rgba(167,139,250,0.10)' : 'transparent' }}
+                        style={{ background: isActive ? 'rgba(95,126,166,0.10)' : 'transparent' }}
                         onMouseEnter={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.05)'; }}
                         onMouseLeave={(e) => { if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                       >
@@ -253,8 +253,8 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                           size={24}
                           className="rounded-md"
                           style={{
-                            background: isActive ? 'rgba(167,139,250,0.25)' : 'rgba(255,255,255,0.06)',
-                            border: `1px solid ${isActive ? 'rgba(167,139,250,0.40)' : 'rgba(255,255,255,0.08)'}`,
+                            background: isActive ? 'rgba(95,126,166,0.25)' : 'rgba(255,255,255,0.06)',
+                            border: `1px solid ${isActive ? 'rgba(95,126,166,0.40)' : 'rgba(255,255,255,0.08)'}`,
                             padding: 3,
                           }}
                           textClassName="text-[10px] font-bold"
@@ -384,7 +384,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 >
                   <div
                     className="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(167,139,250,0.18)', border: '1px solid rgba(167,139,250,0.30)' }}
+                    style={{ background: 'rgba(95,126,166,0.18)', border: '1px solid rgba(95,126,166,0.30)' }}
                   >
                     <User size={11} className="text-[var(--accent-light)]" />
                   </div>
@@ -422,7 +422,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                   title="Sign out"
                   aria-label="Sign out"
                   className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
-                  style={{ background: 'rgba(167,139,250,0.18)', border: '1px solid rgba(167,139,250,0.30)' }}
+                  style={{ background: 'rgba(95,126,166,0.18)', border: '1px solid rgba(95,126,166,0.30)' }}
                 >
                   <User size={12} className="text-[var(--accent-light)]" />
                 </button>

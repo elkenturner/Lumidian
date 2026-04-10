@@ -714,7 +714,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 max-w-5xl">
+      <div className="p-4 sm:p-8 max-w-7xl">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-32" />
           <div className="h-10 bg-[rgba(255,255,255,0.06)] rounded w-64" />
@@ -731,7 +731,7 @@ export default function SettingsPage() {
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl"
+      className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl"
     >
       {/* Header */}
       <div className="mb-6">
@@ -769,9 +769,7 @@ export default function SettingsPage() {
         >
       {/* ── GENERAL TAB ──────────────────────────────────────────────────────── */}
       {activeTab === 'general' && brand && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* Left column */}
-          <div className="space-y-6">
+        <div className="space-y-6 max-w-3xl">
           {/* Brand Settings */}
           <div className="card" style={{ padding: 20 }}>
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)] pb-3 mb-5 border-b border-[var(--border-subtle)]">Brand Settings</h2>
@@ -952,9 +950,7 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-          </div>
 
-          <div className="space-y-6">
           {/* Competitors */}
           <div className="card" style={{ padding: 20 }}>
             <div className="pb-3 mb-5 border-b border-[var(--border-subtle)]">
@@ -1006,8 +1002,6 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
-          </div>
-
           </div>
         </div>
       )}

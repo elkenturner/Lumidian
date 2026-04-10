@@ -256,7 +256,7 @@ export function QualityChecklist({
     <div className="border border-[rgba(255,255,255,0.10)] rounded-lg overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(167,139,250,0.06)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(95,126,166,0.06)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
       >
         <div className="flex items-center gap-2">
           <span className={`text-xs font-semibold font-mono ${scoreColor}`}>
@@ -276,7 +276,7 @@ export function QualityChecklist({
         />
       </button>
       {expanded && (
-        <div className="divide-y divide-[rgba(167,139,250,0.10)]">
+        <div className="divide-y divide-[rgba(95,126,166,0.10)]">
           {checks.map((check) => {
             const icon = check.passed === true ? '✓' : check.passed === 'warning' ? '~' : '⚠';
             const iconColor = check.passed === true

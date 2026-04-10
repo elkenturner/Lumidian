@@ -255,7 +255,7 @@ function DraftCard({
                 <button
                   onClick={() => pendingQuestion && handleRegenerate(pendingQuestion)}
                   disabled={!pendingQuestion || regenerating}
-                  className="flex items-center gap-1.5 text-xs bg-[rgba(167,139,250,0.15)] hover:bg-[rgba(167,139,250,0.22)] border border-[rgba(167,139,250,0.30)] hover:border-[rgba(167,139,250,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(167,139,250,0.18)] disabled:opacity-40 rounded-lg px-3 py-1.5 transition-colors"
+                  className="flex items-center gap-1.5 text-xs bg-[rgba(95,126,166,0.15)] hover:bg-[rgba(95,126,166,0.22)] border border-[rgba(95,126,166,0.30)] hover:border-[rgba(95,126,166,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(95,126,166,0.18)] disabled:opacity-40 rounded-lg px-3 py-1.5 transition-colors"
                 >
                   {regenerating ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
                   Regenerate with this question
@@ -346,7 +346,7 @@ function DraftCard({
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-1.5 text-xs bg-[rgba(167,139,250,0.15)] hover:bg-[rgba(167,139,250,0.22)] border border-[rgba(167,139,250,0.30)] hover:border-[rgba(167,139,250,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(167,139,250,0.18)] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors"
+              className="flex items-center gap-1.5 text-xs bg-[rgba(95,126,166,0.15)] hover:bg-[rgba(95,126,166,0.22)] border border-[rgba(95,126,166,0.30)] hover:border-[rgba(95,126,166,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(95,126,166,0.18)] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors"
             >
               {saving ? <Loader2 size={11} className="animate-spin" /> : null}
               Save
@@ -365,7 +365,7 @@ function DraftCard({
           {targetPrompt && (
             <div className="flex items-start gap-1.5 mb-2">
               <span className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide font-medium mt-0.5 flex-shrink-0">Targeting</span>
-              <span className="text-[11px] text-[var(--accent)] bg-[rgba(167,139,250,0.08)] border border-[var(--border-subtle)] rounded-md px-2 py-0.5 leading-relaxed">{targetPrompt.text}</span>
+              <span className="text-[11px] text-[var(--accent)] bg-[rgba(95,126,166,0.08)] border border-[var(--border-subtle)] rounded-md px-2 py-0.5 leading-relaxed">{targetPrompt.text}</span>
             </div>
           )}
           {draft.title && (
@@ -376,11 +376,11 @@ function DraftCard({
             <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
               <button
                 onClick={() => setPreviewMode(false)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${!previewMode ? 'bg-[rgba(167,139,250,0.25)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${!previewMode ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
               >Raw</button>
               <button
                 onClick={() => setPreviewMode(true)}
-                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${previewMode ? 'bg-[rgba(167,139,250,0.25)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
+                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${previewMode ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
               >Preview</button>
             </div>
             <span className="text-[10px] text-[var(--text-faint)] font-mono">{wordCount} words</span>
@@ -685,7 +685,7 @@ function WikipediaDraftCard({
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center gap-1.5 text-xs bg-[rgba(167,139,250,0.15)] hover:bg-[rgba(167,139,250,0.22)] border border-[rgba(167,139,250,0.30)] hover:border-[rgba(167,139,250,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(167,139,250,0.18)] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors"
+                className="flex items-center gap-1.5 text-xs bg-[rgba(95,126,166,0.15)] hover:bg-[rgba(95,126,166,0.22)] border border-[rgba(95,126,166,0.30)] hover:border-[rgba(95,126,166,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(95,126,166,0.18)] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors"
               >
                 {saving ? <Loader2 size={11} className="animate-spin" /> : null}
                 Save
@@ -705,11 +705,11 @@ function WikipediaDraftCard({
               <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
                 <button
                   onClick={() => setViewMode('preview')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'preview' ? 'bg-[rgba(167,139,250,0.25)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'preview' ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
                 >Preview</button>
                 <button
                   onClick={() => setViewMode('raw')}
-                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'raw' ? 'bg-[rgba(167,139,250,0.25)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'raw' ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
                 >Raw</button>
               </div>
               <span className="text-[10px] text-[var(--text-faint)] font-mono">{wordCount} words</span>
@@ -745,7 +745,7 @@ function WikipediaDraftCard({
               className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors ${
                 copied
                   ? 'bg-[#064e3b]/20 border border-[#065f46]/25 text-[var(--success)]'
-                  : 'bg-[rgba(167,139,250,0.15)] hover:bg-[rgba(167,139,250,0.22)] border border-[rgba(167,139,250,0.30)] hover:border-[rgba(167,139,250,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(167,139,250,0.18)]'
+                  : 'bg-[rgba(95,126,166,0.15)] hover:bg-[rgba(95,126,166,0.22)] border border-[rgba(95,126,166,0.30)] hover:border-[rgba(95,126,166,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(95,126,166,0.18)]'
               }`}
             >
               {copied ? <Check size={11} /> : <Copy size={11} />}
@@ -855,7 +855,7 @@ function QuoraQuestionPicker({
         <button
           key={q.url}
           onClick={() => onSelect(q)}
-          className="w-full text-left flex items-start gap-2.5 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(167,139,250,0.08)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(167,139,250,0.25)] rounded-lg px-3 py-2.5 transition-colors group"
+          className="w-full text-left flex items-start gap-2.5 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(95,126,166,0.08)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(95,126,166,0.25)] rounded-lg px-3 py-2.5 transition-colors group"
         >
           <span className="text-[var(--accent)] text-xs mt-0.5 flex-shrink-0">Q</span>
           <div className="flex-1 min-w-0">
@@ -987,7 +987,7 @@ function RequestDraftModal({
                     >
                       <PlatformIcon platform={p} size={12} color="var(--text-faint)" />
                       {label}
-                      <span className="text-[9px] bg-[rgba(167,139,250,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
+                      <span className="text-[9px] bg-[rgba(95,126,166,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
                     </button>
                   );
                 }
@@ -1016,7 +1016,7 @@ function RequestDraftModal({
                   onClick={() => setSubPlatform('linkedin_article')}
                   className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
                     subPlatform === 'linkedin_article'
-                      ? 'border-[var(--accent)] bg-[rgba(167,139,250,0.1)] text-[var(--accent)]'
+                      ? 'border-[var(--accent)] bg-[rgba(95,126,166,0.1)] text-[var(--accent)]'
                       : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
                   }`}
                 >
@@ -1026,7 +1026,7 @@ function RequestDraftModal({
                   onClick={() => setSubPlatform('linkedin_post')}
                   className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
                     subPlatform === 'linkedin_post'
-                      ? 'border-[var(--accent)] bg-[rgba(167,139,250,0.1)] text-[var(--accent)]'
+                      ? 'border-[var(--accent)] bg-[rgba(95,126,166,0.1)] text-[var(--accent)]'
                       : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
                   }`}
                 >
@@ -1042,7 +1042,7 @@ function RequestDraftModal({
                   onClick={() => setSubPlatform('x_thread')}
                   className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
                     subPlatform === 'x_thread'
-                      ? 'border-[var(--accent)] bg-[rgba(167,139,250,0.1)] text-[var(--accent)]'
+                      ? 'border-[var(--accent)] bg-[rgba(95,126,166,0.1)] text-[var(--accent)]'
                       : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
                   }`}
                 >
@@ -1052,7 +1052,7 @@ function RequestDraftModal({
                   onClick={() => setSubPlatform('x_post')}
                   className={`px-3 py-1.5 text-xs rounded-lg border transition-colors ${
                     subPlatform === 'x_post'
-                      ? 'border-[var(--accent)] bg-[rgba(167,139,250,0.1)] text-[var(--accent)]'
+                      ? 'border-[var(--accent)] bg-[rgba(95,126,166,0.1)] text-[var(--accent)]'
                       : 'border-[rgba(255,255,255,0.1)] text-[var(--text-muted)] hover:border-[rgba(255,255,255,0.2)]'
                   }`}
                 >
@@ -1138,7 +1138,7 @@ function RequestDraftModal({
           <button
             onClick={handleSubmit}
             disabled={creating || (promptId === '' && !customTopic.trim())}
-            className="w-full flex items-center justify-center gap-2 bg-[rgba(167,139,250,0.15)] hover:bg-[rgba(167,139,250,0.22)] border border-[rgba(167,139,250,0.30)] hover:border-[rgba(167,139,250,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(167,139,250,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-[rgba(95,126,166,0.15)] hover:bg-[rgba(95,126,166,0.22)] border border-[rgba(95,126,166,0.30)] hover:border-[rgba(95,126,166,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(95,126,166,0.18)] disabled:opacity-50 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
           >
             {creating ? (
               <><Loader2 size={14} className="animate-spin" /> Generating…</>
@@ -1233,7 +1233,7 @@ function OpportunityCard({
           onClick={handleDraft}
           disabled={drafting || queueFull}
           title={queueFull ? 'Draft queue full — approve or dismiss drafts to make room' : undefined}
-          className="flex items-center gap-1.5 text-xs bg-[rgba(167,139,250,0.15)] hover:bg-[rgba(167,139,250,0.22)] border border-[rgba(167,139,250,0.30)] hover:border-[rgba(167,139,250,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(167,139,250,0.18)] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 py-1.5 transition-colors"
+          className="flex items-center gap-1.5 text-xs bg-[rgba(95,126,166,0.15)] hover:bg-[rgba(95,126,166,0.22)] border border-[rgba(95,126,166,0.30)] hover:border-[rgba(95,126,166,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(95,126,166,0.18)] disabled:opacity-50 disabled:cursor-not-allowed rounded-lg px-3 py-1.5 transition-colors"
         >
           {drafting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
           {drafting ? 'Drafting…' : queueFull ? 'Queue full' : 'Draft Reply'}
@@ -1361,7 +1361,7 @@ function ScheduledCard({
 
       {/* Expandable full draft */}
       {expanded && (
-        <div className="bg-[rgba(167,139,250,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg p-3 relative">
+        <div className="bg-[rgba(95,126,166,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg p-3 relative">
           <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed font-mono pr-14">
             {draft.content_text}
           </pre>
@@ -1380,7 +1380,7 @@ function ScheduledCard({
         <div className="border border-[var(--border-subtle)] rounded-lg overflow-hidden">
           <button
             onClick={() => setGuideOpen(!guideOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(167,139,250,0.06)] hover:bg-[rgba(255,255,255,0.06)] text-left transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(95,126,166,0.06)] hover:bg-[rgba(255,255,255,0.06)] text-left transition-colors"
           >
             <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-medium">
               <BookOpen size={11} />
@@ -2180,7 +2180,7 @@ export default function ContentHubPage() {
               className="absolute inset-0 bg-black/75 backdrop-blur-sm cursor-pointer"
               onClick={() => setPostingGuideOpen(false)}
             />
-            <div className="relative w-full max-w-xl max-h-[88vh] flex flex-col bg-[rgba(8,12,20,0.98)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.70),0_0_0_1px_rgba(167,139,250,0.08)] overflow-hidden">
+            <div className="relative w-full max-w-xl max-h-[88vh] flex flex-col bg-[rgba(8,12,20,0.98)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.70),0_0_0_1px_rgba(95,126,166,0.08)] overflow-hidden">
 
               {/* Header with platform-colored accent line */}
               <div className="shrink-0" style={{ borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
@@ -2345,8 +2345,8 @@ export default function ContentHubPage() {
 
                 {/* Pro tip */}
                 {p.tip && (
-                  <div className="flex items-start gap-3 p-4 rounded-xl bg-[rgba(167,139,250,0.04)] border border-[rgba(167,139,250,0.12)]">
-                    <div className="shrink-0 w-6 h-6 rounded-full bg-[rgba(167,139,250,0.12)] border border-[rgba(167,139,250,0.22)] flex items-center justify-center mt-0.5">
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-[rgba(95,126,166,0.04)] border border-[rgba(95,126,166,0.12)]">
+                    <div className="shrink-0 w-6 h-6 rounded-full bg-[rgba(95,126,166,0.12)] border border-[rgba(95,126,166,0.22)] flex items-center justify-center mt-0.5">
                       <Lightbulb size={12} className="text-[var(--accent-foreground)]" />
                     </div>
                     <div>
@@ -2395,14 +2395,14 @@ export default function ContentHubPage() {
 
       {!brandsLoading && brands.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="w-14 h-14 bg-[rgba(167,139,250,0.08)] border border-[var(--border-subtle)] rounded-2xl flex items-center justify-center mb-4">
+          <div className="w-14 h-14 bg-[rgba(95,126,166,0.08)] border border-[var(--border-subtle)] rounded-2xl flex items-center justify-center mb-4">
             <PenLine size={24} className="text-[var(--accent)]" />
           </div>
           <h3 className="text-base font-semibold text-[var(--text-primary)] mb-2">No brands tracked yet</h3>
           <p className="text-sm text-[var(--text-muted)] max-w-sm mb-6">Add your first brand to start generating content drafts and finding opportunities.</p>
           <Link
             href="/onboarding"
-            className="flex items-center gap-2 bg-[rgba(167,139,250,0.15)] hover:bg-[rgba(167,139,250,0.22)] border border-[rgba(167,139,250,0.30)] hover:border-[rgba(167,139,250,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(167,139,250,0.18)] rounded-lg px-4 py-2 text-sm font-medium transition-colors"
+            className="flex items-center gap-2 bg-[rgba(95,126,166,0.15)] hover:bg-[rgba(95,126,166,0.22)] border border-[rgba(95,126,166,0.30)] hover:border-[rgba(95,126,166,0.45)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_rgba(95,126,166,0.18)] rounded-lg px-4 py-2 text-sm font-medium transition-colors"
           >
             <Plus size={16} />
             Track Your First Brand
@@ -2426,7 +2426,7 @@ export default function ContentHubPage() {
                   onClick={() => setActiveTab(tab.key)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-[color,background-color,border-color] ${
                     activeTab === tab.key
-                      ? 'bg-[rgba(167,139,250,0.18)] text-[var(--accent-foreground)] border border-[rgba(167,139,250,0.30)] shadow-[0_0_14px_rgba(167,139,250,0.14)]'
+                      ? 'bg-[rgba(95,126,166,0.18)] text-[var(--accent-foreground)] border border-[rgba(95,126,166,0.30)] shadow-[0_0_14px_rgba(95,126,166,0.14)]'
                       : 'text-[var(--text-faint)] bg-transparent border border-transparent hover:text-[var(--text-muted)]'
                   }`}
                 >
@@ -2434,7 +2434,7 @@ export default function ContentHubPage() {
                   {tabCounts[tab.key] > 0 && (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                       activeTab === tab.key
-                        ? 'bg-[rgba(167,139,250,0.25)] text-[var(--accent-foreground)]'
+                        ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]'
                         : 'bg-[rgba(255,255,255,0.08)] text-[var(--text-faint)]'
                     }`}>
                       {tabCounts[tab.key]}
@@ -2489,7 +2489,7 @@ export default function ContentHubPage() {
             <div className="card p-5">
               {!user?.subscription_tier && !user?.is_admin ? (
                 <div className="flex flex-col items-center text-center gap-3">
-                  <div className="w-10 h-10 bg-[rgba(167,139,250,0.08)] border border-[var(--border-subtle)] rounded-xl flex items-center justify-center">
+                  <div className="w-10 h-10 bg-[rgba(95,126,166,0.08)] border border-[var(--border-subtle)] rounded-xl flex items-center justify-center">
                     <Zap size={16} className="text-[var(--accent)]/50" />
                   </div>
                   <div>
@@ -2498,7 +2498,7 @@ export default function ContentHubPage() {
                   </div>
                   <Link
                     href="/settings/billing"
-                    className="w-full flex items-center justify-center gap-2 bg-[rgba(167,139,250,0.10)] hover:bg-[rgba(167,139,250,0.16)] border border-[rgba(167,139,250,0.25)] text-[var(--accent-foreground)] hover:text-[var(--accent-foreground)] rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-150"
+                    className="w-full flex items-center justify-center gap-2 bg-[rgba(95,126,166,0.10)] hover:bg-[rgba(95,126,166,0.16)] border border-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)] hover:text-[var(--accent-foreground)] rounded-lg px-4 py-2 text-sm font-semibold transition-colors duration-150"
                   >
                     Upgrade to unlock
                   </Link>
@@ -2522,7 +2522,7 @@ export default function ContentHubPage() {
                           <button
                             onClick={handleScanNow}
                             disabled={scanning || generating || !selectedBrandId || reportRunning}
-                            className="w-full flex items-center justify-center gap-2 border border-[var(--border-default)] hover:border-[var(--accent)] hover:text-[var(--accent)] disabled:opacity-40 disabled:cursor-not-allowed text-[var(--text-secondary)] rounded-lg px-5 py-2.5 text-sm font-medium transition-colors duration-150"
+                            className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-lg px-5 py-2.5 text-sm font-medium transition-colors duration-150"
                           >
                             {scanning ? (
                               <>
@@ -2597,8 +2597,8 @@ export default function ContentHubPage() {
                       { label: 'Scheduled', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
                     ] as Array<{ label: string; count: number; cap: number }>).map(({ label, count, cap }) => {
                       const pct = cap > 0 ? count / cap : 0;
-                      const barColor = pct >= 1 ? 'var(--danger)' : pct >= 0.6 ? 'var(--warning)' : 'var(--success)';
-                      const textColor = pct >= 1 ? 'var(--danger)' : pct >= 0.6 ? 'var(--warning)' : 'var(--text-secondary)';
+                      const barColor = 'var(--accent)';
+                      const textColor = 'var(--text-secondary)';
                       return (
                         <div key={label}>
                           <div className="flex items-center justify-between mb-1">
@@ -2619,8 +2619,8 @@ export default function ContentHubPage() {
                   </>
                 ) : (
                   <div className="space-y-3 animate-pulse">
-                    <div className="h-8 bg-[rgba(167,139,250,0.06)] rounded" />
-                    <div className="h-8 bg-[rgba(167,139,250,0.06)] rounded" />
+                    <div className="h-8 bg-[rgba(95,126,166,0.06)] rounded" />
+                    <div className="h-8 bg-[rgba(95,126,166,0.06)] rounded" />
                   </div>
                 )}
                 {draftStatus?.last_scan_at && (
@@ -2644,7 +2644,10 @@ export default function ContentHubPage() {
                   { key: 'wikipedia', color: '#64748b', proOnly: false },
                   { key: 'linkedin', color: '#0a66c2', proOnly: true },
                   { key: 'x', color: '#94a3b8', proOnly: true },
-                ] as const).map(({ key, color, proOnly }) => {
+                ] as const).filter(({ key }) => {
+                  if (activeTab === 'opportunities') return key !== 'medium' && key !== 'wikipedia';
+                  return true;
+                }).map(({ key, color, proOnly }) => {
                   const isLocked = proOnly && user?.subscription_tier !== 'pro' && !user?.is_admin;
                   const setting = contentSettings.find((s) => s.platform === key);
                   const enabled = setting?.enabled ?? true;
@@ -2673,13 +2676,13 @@ export default function ContentHubPage() {
                             border: `1px solid ${enabled && !isLocked ? `${color}30` : 'rgba(255,255,255,0.06)'}`,
                           }}
                         >
-                          <PlatformIcon platform={key} size={12} color={enabled && !isLocked ? color : 'var(--text-faint)'} />
+                          <PlatformIcon platform={key} size={14} color={enabled && !isLocked ? color : 'var(--text-faint)'} />
                         </div>
                         <span className={`text-[13px] font-medium transition-colors duration-200 ${enabled && !isLocked ? 'text-[var(--text-secondary)]' : 'text-[var(--text-faint)]'}`}>
                           {PLATFORM_DISPLAY[key] ?? key}
                         </span>
                         {isLocked && (
-                          <span className="text-[9px] bg-[rgba(167,139,250,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
+                          <span className="text-[9px] bg-[rgba(95,126,166,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
                         )}
                         {!isLocked && savedPlatform === key && (
                           <Check size={12} className="text-[var(--success)]" />
@@ -2690,7 +2693,7 @@ export default function ContentHubPage() {
                         className="relative w-8 h-[18px] rounded-full transition-[background-color,box-shadow] duration-200 shrink-0"
                         style={{
                           background: enabled && !isLocked ? 'var(--accent)' : 'rgba(255,255,255,0.10)',
-                          boxShadow: enabled && !isLocked ? '0 0 8px rgba(167,139,250,0.3)' : 'none',
+                          boxShadow: enabled && !isLocked ? '0 0 8px rgba(95,126,166,0.3)' : 'none',
                         }}
                       >
                         <div
@@ -2755,7 +2758,7 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-[rgba(167,139,250,0.08)] border border-[rgba(167,139,250,0.16)] flex items-center justify-center mb-4">
+      <div className="w-16 h-16 rounded-2xl bg-[rgba(95,126,166,0.08)] border border-[rgba(95,126,166,0.16)] flex items-center justify-center mb-4">
         {icon}
       </div>
       <p className="text-[15px] font-semibold text-[var(--text-primary)] mb-2">{title}</p>

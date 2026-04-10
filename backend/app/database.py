@@ -307,6 +307,8 @@ async def run_migrations():
         "CREATE TABLE IF NOT EXISTS content_events (id INTEGER PRIMARY KEY, brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE, prompt_id INTEGER REFERENCES prompts(id) ON DELETE SET NULL, event_type TEXT NOT NULL, data TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP)",
         "CREATE INDEX IF NOT EXISTS idx_content_events_brand_type ON content_events(brand_id, event_type, created_at)",
         "CREATE INDEX IF NOT EXISTS idx_content_events_prompt ON content_events(prompt_id, created_at)",
+        # 2026-04-10: Rename DraftAttribution table to avoid confusion with ContentAttribution
+        "ALTER TABLE content_attributions RENAME TO draft_attributions",
     ]
     async with engine.begin() as conn:
         for stmt in migrations:

@@ -976,8 +976,8 @@ async def auto_draft_top_gaps(
     )
     enabled_settings = list(settings_result.scalars().all())
     enabled_platforms = [
-        resolve_platform_key(s.platform) for s in enabled_settings
-        if resolve_platform_key(s.platform) in CONTENT_PLATFORMS
+        resolved for s in enabled_settings
+        if (resolved := resolve_platform_key(s.platform)) in CONTENT_PLATFORMS
     ]
     if not enabled_platforms:
         enabled_platforms = ["reddit", "quora"]

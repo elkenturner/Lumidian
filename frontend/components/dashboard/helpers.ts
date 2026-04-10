@@ -34,10 +34,10 @@ export const formatPct = (pct: number) => pct % 1 === 0 ? `${Math.round(pct)}%` 
 // ── Domain colors for DonutDomains ───────────────────────────────────────────
 
 export const DOMAIN_COLORS = [
-  { color: '#c4b5fd', glow: 'rgba(129,140,248,0.4)' },
+  { color: '#8ba8cc', glow: 'rgba(139,168,204,0.4)' },
   { color: '#34d399', glow: 'rgba(52,211,153,0.4)' },
   { color: '#fbbf24', glow: 'rgba(251,191,36,0.4)' },
-  { color: '#a78bfa', glow: 'rgba(167,139,250,0.4)' },
+  { color: '#5f7ea6', glow: 'rgba(95,126,166,0.4)' },
   { color: '#f472b6', glow: 'rgba(244,114,182,0.4)' },
   { color: '#22d3ee', glow: 'rgba(34,211,238,0.4)' },
 ];

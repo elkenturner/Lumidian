@@ -668,6 +668,8 @@ export interface DashboardAnalytics {
   model_breakdown: ModelStat[];
   citation_gaps: CitationGap[];
   total_responses_analyzed: number;
+  score_confidence: 'low' | 'medium' | 'high';
+  active_models: number;
 }
 
 export async function getDashboardAnalytics(brandId: number): Promise<DashboardAnalytics> {

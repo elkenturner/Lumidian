@@ -12,7 +12,7 @@ import logging
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +31,12 @@ from app.utils import MODEL_LABELS, MODEL_ORDER, normalise_model  # noqa: E402
 
 
 @router.get("/{brand_id}/export")
-async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
+async def export_report(
+    brand_id: int,
+    db: DbDep,
+    user: CurrentUser,
+    run_id: int | None = Query(None, description="Specific run ID to report on (defaults to latest)"),
+):
     """Generate and return a PDF visibility report for the brand."""
     brand = await get_brand_for_user(brand_id, db, user)
 
@@ -45,23 +50,31 @@ async def export_report(brand_id: int, db: DbDep, user: CurrentUser):
     )
     completed_runs: list[TrackingRun] = list(runs_result.scalars().all())
 
-    latest_run = completed_runs[-1] if completed_runs else None
-    overall_score: float | None = latest_run.overall_score if latest_run else None
+    # Use specified run or fall back to latest
+    target_run: TrackingRun | None = None
+    if run_id is not None:
+        target_run = next((r for r in completed_runs if r.id == run_id), None)
+        if target_run is None:
+            raise HTTPException(status_code=404, detail="Run not found or not completed")
+    else:
+        target_run = completed_runs[-1] if completed_runs else None
 
-    # Per-model scores for latest run
+    overall_score: float | None = target_run.overall_score if target_run else None
+
+    # Per-model scores for target run
     model_scores: dict[str, float] = {}
-    if latest_run:
+    if target_run:
         ms_result = await db.execute(
-            select(RunModelScore).where(RunModelScore.tracking_run_id == latest_run.id)
+            select(RunModelScore).where(RunModelScore.tracking_run_id == target_run.id)
         )
         for ms in ms_result.scalars().all():
             model_scores[normalise_model(ms.model)] = round(ms.score, 1)
 
-    # Query results for latest run
+    # Query results for target run
     query_results: list[QueryResult] = []
-    if latest_run:
+    if target_run:
         qr_result = await db.execute(
-            select(QueryResult).where(QueryResult.tracking_run_id == latest_run.id)
+            select(QueryResult).where(QueryResult.tracking_run_id == target_run.id)
         )
         query_results = list(qr_result.scalars().all())
 

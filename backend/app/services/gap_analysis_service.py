@@ -217,11 +217,28 @@ async def run_gap_analysis(brand_id: int, run_id: int) -> list[int]:
                 # Caps at 30 days = score of 100
                 recency_score = min(100.0, days_since / 30.0 * 100.0)
 
-            # Composite gap score
+            # Competitor pressure: prompts where competitors dominate are higher priority
+            total_comp_mentions = sum(competitor_mention_counts.values()) if competitor_mention_counts else 0
+            # Normalize: cap at 20 competitor mentions → score 0-100
+            competitor_pressure = min(100.0, total_comp_mentions / 20.0 * 100.0) if competitors else 0.0
+
+            # Model variance: if some models mention and others don't, there's opportunity
+            vis_values = list(prompt_model_visibility.values())
+            if len(vis_values) >= 2:
+                mean_vis = sum(vis_values) / len(vis_values)
+                variance = sum((v - mean_vis) ** 2 for v in vis_values) / len(vis_values)
+                # Normalize: sqrt(variance) as coefficient of variation proxy, cap at 50
+                model_variance_score = min(100.0, (variance ** 0.5) / 50.0 * 100.0)
+            else:
+                model_variance_score = 0.0
+
+            # Composite gap score: core components + tiebreakers
             gap_score = (
-                severity_score * 0.4
-                + opportunity_score * 0.3
-                + recency_score * 0.3
+                severity_score * 0.35
+                + opportunity_score * 0.25
+                + recency_score * 0.20
+                + competitor_pressure * 0.10
+                + model_variance_score * 0.10
             )
 
             # Fetch Quora questions relevant to this prompt (non-fatal, runs in thread)

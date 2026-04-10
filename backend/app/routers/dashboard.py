@@ -228,6 +228,8 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
             model_breakdown=[],
             citation_gaps=[],
             total_responses_analyzed=0,
+            score_confidence="low",
+            active_models=0,
         )
 
     run_ids = [r.id for r in runs]
@@ -319,7 +321,8 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         for s in [_position_score(qr.response_text, brand.name)]
         if s is not None
     ]
-    if position_scores:
+    _MIN_POSITION_SAMPLES = 3  # need at least 3 data points for meaningful position
+    if len(position_scores) >= _MIN_POSITION_SAMPLES:
         avg_pos = sum(position_scores) / len(position_scores)
         pos_label = "Early" if avg_pos <= 3.5 else "Middle" if avg_pos <= 6.5 else "Late"
         position = PositionData(
@@ -328,7 +331,7 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
             sample_count=len(position_scores),
         )
     else:
-        position = PositionData(score=None, label="N/A", sample_count=0)
+        position = PositionData(score=None, label="N/A", sample_count=len(position_scores))
 
     # 8. Top domains
     domain_counts: dict[str, int] = defaultdict(int)
@@ -443,6 +446,15 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         reverse=True,
     )[:10]
 
+    final_total = total_analyzed if total_analyzed > 0 else total
+    if final_total >= 100:
+        score_confidence = "high"
+    elif final_total >= 20:
+        score_confidence = "medium"
+    else:
+        score_confidence = "low"
+    active_model_count = len([m for m in model_agg.values() if m["total"] > 0])
+
     return DashboardAnalytics(
         brand_id=brand.id,
         brand_name=brand.name,
@@ -454,5 +466,7 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         competitor_comparison=competitor_comparison,
         model_breakdown=model_breakdown,
         citation_gaps=citation_gaps,
-        total_responses_analyzed=total_analyzed if total_analyzed > 0 else total,
+        total_responses_analyzed=final_total,
+        score_confidence=score_confidence,
+        active_models=active_model_count,
     )

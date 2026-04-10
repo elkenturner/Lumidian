@@ -17,9 +17,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 logger = logging.getLogger(__name__)
-from datetime import UTC
+from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -55,6 +55,23 @@ def _enrich_opportunity(opp: ContentOpportunity, prompt_text_map: dict[int, str]
     return data
 
 
+def _blended_score(opp: ContentOpportunity) -> float:
+    """Blend relevance (70%) with recency (30%) for sort ordering."""
+    rel = opp.relevance_score or 0
+    posted = opp.posted_at or opp.created_at
+    now = datetime.now(UTC).replace(tzinfo=None)
+    age_days = (now - posted).days if posted else 90
+    if age_days <= 7:
+        recency = 100
+    elif age_days <= 30:
+        recency = 70
+    elif age_days <= 60:
+        recency = 40
+    else:
+        recency = 20
+    return rel * 0.7 + recency * 0.3
+
+
 @router.get("/{brand_id}", response_model=list[dict])
 async def list_opportunities(
     brand_id: int,
@@ -66,21 +83,25 @@ async def list_opportunities(
     """List content opportunities for a brand, balanced across platforms."""
     await get_brand_for_user(brand_id, db, user)
 
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=90)
+
     stmt = (
         select(ContentOpportunity)
         .where(ContentOpportunity.brand_id == brand_id)
+        .where(
+            func.coalesce(ContentOpportunity.posted_at, ContentOpportunity.created_at) >= cutoff
+        )
     )
     if opp_status is not None:
         stmt = stmt.where(ContentOpportunity.status == opp_status)
     else:
         stmt = stmt.where(ContentOpportunity.status == "new")
 
-    stmt = stmt.order_by(
-        ContentOpportunity.relevance_score.desc(),
-        ContentOpportunity.created_at.desc(),
-    )
     result = await db.execute(stmt)
     all_opps = list(result.scalars().all())
+
+    # Sort by blended relevance + recency score (Python-side, small dataset)
+    all_opps.sort(key=_blended_score, reverse=True)
 
     # Filter out Pro-only platforms for non-Pro users
     user_tier = getattr(user, "subscription_tier", None)

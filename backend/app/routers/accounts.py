@@ -20,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import CurrentUser
 from app.models import AccountConnection, utcnow
 from app.schemas import AccountConnectionSchema, ConnectAccountRequest
 
@@ -46,7 +47,7 @@ async def _get_account_or_404(db: AsyncSession, platform: str) -> AccountConnect
 # ── List all accounts ─────────────────────────────────────────────────────────
 
 @router.get("/accounts", response_model=list[AccountConnectionSchema])
-async def list_accounts(db: DbDep):
+async def list_accounts(db: DbDep, user: CurrentUser):
     """Return all account connections."""
     result = await db.execute(
         select(AccountConnection).order_by(AccountConnection.platform)
@@ -58,7 +59,7 @@ async def list_accounts(db: DbDep):
 # ── Connect / update account ──────────────────────────────────────────────────
 
 @router.post("/accounts/connect", response_model=AccountConnectionSchema, status_code=status.HTTP_200_OK)
-async def connect_account(request: ConnectAccountRequest, db: DbDep):
+async def connect_account(request: ConnectAccountRequest, db: DbDep, user: CurrentUser):
     """
     Connect or update an account connection.
 
@@ -116,7 +117,7 @@ async def connect_account(request: ConnectAccountRequest, db: DbDep):
 # ── Disconnect account ────────────────────────────────────────────────────────
 
 @router.delete("/accounts/{platform}", status_code=status.HTTP_204_NO_CONTENT)
-async def disconnect_account(platform: str, db: DbDep):
+async def disconnect_account(platform: str, db: DbDep, user: CurrentUser):
     """Disconnect an account (clears credentials, sets status to disconnected)."""
     account = await _get_account_or_404(db, platform)
     account.status = "disconnected"
@@ -132,7 +133,7 @@ async def disconnect_account(platform: str, db: DbDep):
 # ── Get specific account ──────────────────────────────────────────────────────
 
 @router.get("/accounts/{platform}", response_model=AccountConnectionSchema)
-async def get_account(platform: str, db: DbDep):
+async def get_account(platform: str, db: DbDep, user: CurrentUser):
     """Return status of a specific account connection."""
     account = await _get_account_or_404(db, platform)
     return AccountConnectionSchema.model_validate(account)
@@ -141,7 +142,7 @@ async def get_account(platform: str, db: DbDep):
 # ── API key status ────────────────────────────────────────────────────────────
 
 @router.get("/settings/api-keys")
-async def get_api_key_status():
+async def get_api_key_status(user: CurrentUser):
     """
     Return which LLM API keys are configured (True/False, never the values).
     """

@@ -522,6 +522,8 @@ class DashboardAnalytics(BaseModel):
     model_breakdown: list[ModelStat]
     citation_gaps: list[CitationGap]
     total_responses_analyzed: int
+    score_confidence: str = "high"  # "low" (<20 responses), "medium" (20-99), "high" (100+)
+    active_models: int = 0  # number of models with successful responses
 
 
 # ── Brand Profile schemas ─────────────────────────────────────────────────────
@@ -534,13 +536,31 @@ class Publication(BaseModel):
 
 
 class BrandProfileUpdate(BaseModel):
-    company_description: str | None = None
+    company_description: str | None = Field(None, max_length=5000)
     key_stats: list[str] | None = None
-    tone_of_voice: str | None = None
+    tone_of_voice: str | None = Field(None, max_length=2000)
     what_not_to_say: list[str] | None = None
-    target_audience: str | None = None
+    target_audience: str | None = Field(None, max_length=2000)
     approved_language: list[str] | None = None
     publications: list[Publication] | None = None
+
+    @field_validator("key_stats", "what_not_to_say", "approved_language")
+    @classmethod
+    def validate_list_lengths(cls, v: list[str] | None) -> list[str] | None:
+        if v is not None:
+            if len(v) > 50:
+                raise ValueError("Maximum 50 items allowed")
+            for item in v:
+                if len(item) > 1000:
+                    raise ValueError("Each item must be 1000 characters or less")
+        return v
+
+    @field_validator("publications")
+    @classmethod
+    def validate_publications_length(cls, v: list[Publication] | None) -> list[Publication] | None:
+        if v is not None and len(v) > 50:
+            raise ValueError("Maximum 50 publications allowed")
+        return v
 
 
 class BrandProfileResponse(BaseModel):

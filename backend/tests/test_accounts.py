@@ -8,15 +8,31 @@ Covers:
 - DELETE /api/accounts/{platform}   — disconnect account
 - GET    /api/settings/api-keys     — API key status
 - Validation (unsupported platforms)
+- Authentication required on all endpoints
 """
 from __future__ import annotations
 
 import os
 from unittest.mock import patch
 
+from tests.conftest import register_and_login
+
+
+# ── Authentication required ─────────────────────────────────────────────────
+
+async def test_accounts_require_auth(client):
+    """All account endpoints should return 401 without authentication."""
+    assert (await client.get("/api/accounts")).status_code == 401
+    assert (await client.post("/api/accounts/connect", json={"platform": "reddit", "credentials": {}})).status_code == 401
+    assert (await client.get("/api/accounts/reddit")).status_code == 401
+    assert (await client.delete("/api/accounts/reddit")).status_code == 401
+    assert (await client.get("/api/settings/api-keys")).status_code == 401
+
+
 # ── GET /api/accounts — empty ────────────────────────────────────────────────
 
 async def test_list_accounts_empty(client):
+    await register_and_login(client)
     resp = await client.get("/api/accounts")
     assert resp.status_code == 200
     assert resp.json() == []
@@ -25,6 +41,7 @@ async def test_list_accounts_empty(client):
 # ── POST /api/accounts/connect ───────────────────────────────────────────────
 
 async def test_connect_reddit_account(client):
+    await register_and_login(client)
     resp = await client.post(
         "/api/accounts/connect",
         json={"platform": "reddit", "credentials": {"username": "testuser", "password": "secret"}},
@@ -37,6 +54,7 @@ async def test_connect_reddit_account(client):
 
 
 async def test_connect_extracts_display_name_from_email(client):
+    await register_and_login(client)
     resp = await client.post(
         "/api/accounts/connect",
         json={"platform": "medium", "credentials": {"email": "writer@blog.com"}},
@@ -46,6 +64,7 @@ async def test_connect_extracts_display_name_from_email(client):
 
 
 async def test_connect_unsupported_platform(client):
+    await register_and_login(client)
     resp = await client.post(
         "/api/accounts/connect",
         json={"platform": "tiktok", "credentials": {"token": "abc"}},
@@ -56,6 +75,7 @@ async def test_connect_unsupported_platform(client):
 
 async def test_connect_update_existing(client):
     """Connecting the same platform twice should update, not duplicate."""
+    await register_and_login(client)
     await client.post(
         "/api/accounts/connect",
         json={"platform": "reddit", "credentials": {"username": "old_user"}},
@@ -74,6 +94,7 @@ async def test_connect_update_existing(client):
 
 async def test_connect_all_supported_platforms(client):
     """All four supported platforms should be connectable."""
+    await register_and_login(client)
     for platform in ["reddit", "quora", "medium", "wikipedia"]:
         resp = await client.post(
             "/api/accounts/connect",
@@ -85,6 +106,7 @@ async def test_connect_all_supported_platforms(client):
 # ── GET /api/accounts — with data ────────────────────────────────────────────
 
 async def test_list_accounts_returns_connected(client):
+    await register_and_login(client)
     await client.post(
         "/api/accounts/connect",
         json={"platform": "reddit", "credentials": {"username": "u1"}},
@@ -102,6 +124,7 @@ async def test_list_accounts_returns_connected(client):
 # ── GET /api/accounts/{platform} ─────────────────────────────────────────────
 
 async def test_get_specific_account(client):
+    await register_and_login(client)
     await client.post(
         "/api/accounts/connect",
         json={"platform": "reddit", "credentials": {"username": "redditor"}},
@@ -113,6 +136,7 @@ async def test_get_specific_account(client):
 
 
 async def test_get_specific_account_not_found(client):
+    await register_and_login(client)
     resp = await client.get("/api/accounts/reddit")
     assert resp.status_code == 404
 
@@ -120,6 +144,7 @@ async def test_get_specific_account_not_found(client):
 # ── DELETE /api/accounts/{platform} ──────────────────────────────────────────
 
 async def test_disconnect_account(client):
+    await register_and_login(client)
     await client.post(
         "/api/accounts/connect",
         json={"platform": "reddit", "credentials": {"username": "redditor"}},
@@ -135,6 +160,7 @@ async def test_disconnect_account(client):
 
 
 async def test_disconnect_nonexistent(client):
+    await register_and_login(client)
     resp = await client.delete("/api/accounts/reddit")
     assert resp.status_code == 404
 
@@ -143,6 +169,7 @@ async def test_disconnect_nonexistent(client):
 
 async def test_api_key_status_none_configured(client):
     """When no LLM keys are set, all should be False."""
+    await register_and_login(client)
     with patch.dict(os.environ, {
         "OPENAI_API_KEY": "",
         "ANTHROPIC_API_KEY": "",
@@ -156,6 +183,7 @@ async def test_api_key_status_none_configured(client):
 
 
 async def test_api_key_status_some_configured(client):
+    await register_and_login(client)
     with patch.dict(os.environ, {
         "OPENAI_API_KEY": "sk-test",
         "ANTHROPIC_API_KEY": "",
@@ -173,6 +201,7 @@ async def test_api_key_status_some_configured(client):
 
 async def test_api_key_status_never_exposes_values(client):
     """API key endpoint must only return booleans, never actual key values."""
+    await register_and_login(client)
     with patch.dict(os.environ, {"OPENAI_API_KEY": "sk-super-secret-key"}):
         resp = await client.get("/api/settings/api-keys")
     data = resp.json()
@@ -184,6 +213,7 @@ async def test_api_key_status_never_exposes_values(client):
 # ── Response shape ───────────────────────────────────────────────────────────
 
 async def test_account_response_shape(client):
+    await register_and_login(client)
     resp = await client.post(
         "/api/accounts/connect",
         json={"platform": "reddit", "credentials": {"username": "test"}},

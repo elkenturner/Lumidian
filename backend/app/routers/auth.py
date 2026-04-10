@@ -353,6 +353,12 @@ async def google_auth(request: GoogleAuthRequest, response: Response, db: DbDep)
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=f"Invalid Google token: {exc}")
 
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google account does not have a verified email address.",
+        )
+
     # Find or create user
     result = await db.execute(select(User).where(User.google_id == google_id))
     user = result.scalar_one_or_none()
@@ -493,6 +499,11 @@ async def google_auth_callback(
             f"{frontend_url}/login?error=token_invalid", status_code=302
         )
 
+    if not email:
+        return RedirectResponse(
+            f"{frontend_url}/login?error=no_email", status_code=302
+        )
+
     # Find or create user — same logic as POST /google
     result = await db.execute(select(User).where(User.google_id == google_sub))
     user = result.scalar_one_or_none()
@@ -554,11 +565,12 @@ class ForgotPasswordRequest(BaseModel):
 
 
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
-async def forgot_password(request: ForgotPasswordRequest, db: DbDep):
+async def forgot_password(request: ForgotPasswordRequest, http_req: Request, db: DbDep):
     """
     Generate a 1-hour password reset token and log the reset link to console.
     Always returns 200 to avoid user enumeration.
     """
+    _rate_check(http_req.client.host if http_req.client else "unknown", _reset_attempts, _MAX_RESET)
     email = request.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()

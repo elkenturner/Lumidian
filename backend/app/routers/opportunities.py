@@ -55,12 +55,11 @@ def _enrich_opportunity(opp: ContentOpportunity, prompt_text_map: dict[int, str]
     return data
 
 
-def _blended_score(opp: ContentOpportunity) -> float:
+def _blended_score(opp: ContentOpportunity, now: datetime) -> float:
     """Blend relevance (70%) with recency (30%) for sort ordering."""
     rel = opp.relevance_score or 0
     posted = opp.posted_at or opp.created_at
-    now = datetime.now(UTC).replace(tzinfo=None)
-    age_days = (now - posted).days if posted else 90
+    age_days = (now - posted).days
     if age_days <= 7:
         recency = 100
     elif age_days <= 30:
@@ -83,7 +82,8 @@ async def list_opportunities(
     """List content opportunities for a brand, balanced across platforms."""
     await get_brand_for_user(brand_id, db, user)
 
-    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=90)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    cutoff = now - timedelta(days=90)
 
     stmt = (
         select(ContentOpportunity)
@@ -101,7 +101,7 @@ async def list_opportunities(
     all_opps = list(result.scalars().all())
 
     # Sort by blended relevance + recency score (Python-side, small dataset)
-    all_opps.sort(key=_blended_score, reverse=True)
+    all_opps.sort(key=lambda opp: _blended_score(opp, now), reverse=True)
 
     # Filter out Pro-only platforms for non-Pro users
     user_tier = getattr(user, "subscription_tier", None)

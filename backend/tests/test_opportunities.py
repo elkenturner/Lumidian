@@ -35,7 +35,7 @@ async def _seed_opportunity(db, brand_id: int, platform: str, relevance: float,
 
 async def test_opportunities_excludes_older_than_90_days(client: httpx.AsyncClient, db_session):
     """Opportunities posted more than 90 days ago should not appear."""
-    tokens = await register_and_login(client, email="stale@example.com")
+    await register_and_login(client, email="stale@example.com")
     brand = await create_brand(client, name="Stale Test Brand")
     brand_id = brand["id"]
 
@@ -53,7 +53,7 @@ async def test_opportunities_excludes_older_than_90_days(client: httpx.AsyncClie
 
 async def test_opportunities_recency_boosts_fresh_over_stale(client: httpx.AsyncClient, db_session):
     """A moderately relevant fresh opportunity should rank above a highly relevant old one."""
-    tokens = await register_and_login(client, email="recency@example.com")
+    await register_and_login(client, email="recency@example.com")
     brand = await create_brand(client, name="Recency Test Brand")
     brand_id = brand["id"]
 

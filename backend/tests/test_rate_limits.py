@@ -25,7 +25,19 @@ def _reset_rate_store():
     _rate_store.clear()
 
 
-async def test_tracking_rate_limit(client: httpx.AsyncClient):
+async def _complete_pending_runs(db, brand_id: int):
+    """Mark all pending/running tracking runs as completed so the concurrent guard doesn't block."""
+    from sqlalchemy import update
+    from app.models import TrackingRun
+    await db.execute(
+        update(TrackingRun)
+        .where(TrackingRun.brand_id == brand_id, TrackingRun.status.in_(["pending", "running"]))
+        .values(status="completed")
+    )
+    await db.commit()
+
+
+async def test_tracking_rate_limit(client: httpx.AsyncClient, db_session):
     """4th manual run within 1 minute should return 429."""
     _reset_rate_store()
     await register_and_login(client, email="ratelimit@example.com")
@@ -36,13 +48,14 @@ async def test_tracking_rate_limit(client: httpx.AsyncClient):
         for _ in range(3):
             resp = await client.post(f"/api/tracking/run/{brand['id']}")
             assert resp.status_code == 202, f"Expected 202, got {resp.status_code}"
+            await _complete_pending_runs(db_session, brand["id"])
 
         # 4th should be rate limited
         resp = await client.post(f"/api/tracking/run/{brand['id']}")
         assert resp.status_code == 429
 
 
-async def test_rate_limit_resets_per_user(client: httpx.AsyncClient):
+async def test_rate_limit_resets_per_user(client: httpx.AsyncClient, db_session):
     """Two different users each get their own rate limit window."""
     _reset_rate_store()
 
@@ -52,6 +65,7 @@ async def test_rate_limit_resets_per_user(client: httpx.AsyncClient):
     with patch("app.routers.tracking._background_run_with_id", new_callable=AsyncMock):
         for _ in range(3):
             await client.post(f"/api/tracking/run/{brand_a['id']}")
+            await _complete_pending_runs(db_session, brand_a["id"])
         resp = await client.post(f"/api/tracking/run/{brand_a['id']}")
         assert resp.status_code == 429
 

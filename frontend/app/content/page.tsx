@@ -2628,7 +2628,7 @@ export default function ContentHubPage() {
                             </p>
                           ) : (
                             <p className="text-xs text-[var(--text-faint)] mt-2 text-center">
-                              {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : draftStatus?.weekly_drafts_limit != null ? `Replaces all existing drafts · ${draftStatus.weekly_drafts_remaining}/${draftStatus.weekly_drafts_limit} weekly` : draftStatus?.draft_cap != null ? `Replaces all existing drafts with a fresh set of up to ${draftStatus.draft_cap}` : 'Replaces all existing drafts with a fresh set'}
+                              {generating ? 'This takes ~20 seconds — drafts will all appear when ready' : draftStatus?.weekly_drafts_limit != null ? `Replaces all unapproved drafts · ${draftStatus.weekly_drafts_remaining}/${draftStatus.weekly_drafts_limit} weekly` : draftStatus?.draft_cap != null ? `Replaces all unapproved drafts · Approve any you want to keep first` : 'Replaces all unapproved drafts · Approve any you want to keep first'}
                             </p>
                           )}
                         </>

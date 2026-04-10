@@ -4,6 +4,7 @@ from app.services.drafting.platforms import (
     CONTENT_PLATFORMS,
     PLATFORM_MAX_TOKENS,
     PLATFORM_SPECS,
+    resolve_platform_key,
 )
 
 REQUIRED_KEYS = {"format", "word_range", "tone", "rules", "posting_tip"}
@@ -63,3 +64,24 @@ def test_max_tokens_set_for_all_new_specs():
                 "x_thread", "x_post"):
         assert key in PLATFORM_MAX_TOKENS, f"Missing max_tokens for {key}"
         assert PLATFORM_MAX_TOKENS[key] > 0
+
+
+def test_resolve_platform_key_maps_base_names():
+    assert resolve_platform_key("linkedin") == "linkedin_article"
+    assert resolve_platform_key("x") == "x_thread"
+
+
+def test_resolve_platform_key_passes_through_variants():
+    assert resolve_platform_key("reddit") == "reddit"
+    assert resolve_platform_key("quora") == "quora"
+    assert resolve_platform_key("medium") == "medium"
+    assert resolve_platform_key("wikipedia") == "wikipedia"
+    assert resolve_platform_key("linkedin_article") == "linkedin_article"
+    assert resolve_platform_key("x_post") == "x_post"
+
+
+def test_resolved_base_names_are_in_content_platforms():
+    """Verifies that after resolution, base names like 'linkedin' and 'x'
+    land in CONTENT_PLATFORMS — the bug that caused silent filtering."""
+    assert resolve_platform_key("linkedin") in CONTENT_PLATFORMS
+    assert resolve_platform_key("x") in CONTENT_PLATFORMS

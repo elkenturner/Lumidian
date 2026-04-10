@@ -581,28 +581,35 @@ async def _onboarding_post_process(brand_id: int) -> None:
 
     Fired as a background asyncio.create_task after gap analysis completes.
     Steps run in order; each is non-fatal:
-      1. Generate up to 5 initial content drafts  (source="onboarding")
+      1. Generate initial content drafts (count depends on user tier)
       2. Scan Reddit + Quora for live opportunities (parallel)
 
     state.generating_brands and state.scanning_brands are updated so
     AppShell's background-status banners reflect each phase.
     """
     from app import state
+    from app.models import User
+    from app.services.drafting_service import get_draft_cap
 
     # ── Step 1: Draft generation ─────────────────────────────────────────────
     state.generating_brands.add(brand_id)
     try:
         async with AsyncSessionLocal() as db:
+            brand = await db.get(Brand, brand_id)
+            user = await db.get(User, brand.user_id) if brand else None
+            tier = user.subscription_tier if user else None
+            cap = get_draft_cap(tier, brand.brand_type if brand else "standard")
+
             drafts = await auto_draft_top_gaps(
                 db=db,
                 brand_id=brand_id,
-                max_gaps=20,
+                max_gaps=cap,
                 clear_existing=False,
                 source="onboarding",
             )
         logger.info(
-            "Onboarding post-process: generated %d drafts for brand_id=%d",
-            len(drafts), brand_id,
+            "Onboarding post-process: generated %d/%d drafts for brand_id=%d (tier=%s)",
+            len(drafts), cap, brand_id, tier,
         )
     except Exception as exc:
         logger.warning(

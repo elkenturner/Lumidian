@@ -37,6 +37,7 @@ _PERPLEXITY_SEM = asyncio.Semaphore(2)
 # Combined with the 65s retry backoff for 429s, this keeps us under the limit.
 _CLAUDE_SEM = asyncio.Semaphore(3)
 
+
 # Human-readable display names for each model (used in placeholder messages)
 _MODEL_DISPLAY_NAMES = {
     "chatgpt": "ChatGPT",
@@ -241,82 +242,44 @@ async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemi
         return _api_key_placeholder("gemini")
     start = time.monotonic()
     try:
-        import google.generativeai as genai
+        from google import genai
+        from google.genai import types
 
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel(model_version)
-        # google-generativeai does not provide a native async client for
-        # generate_content, so we run it in a thread pool to keep the event
-        # loop free.
-        # Enable Google Search grounding so Gemini queries the live web index.
-        # SDK ≥0.8.6 supports the google_search Tool proto field; older builds
-        # only have google_search_retrieval (now rejected server-side with 400).
-        gen_kwargs: dict = {}
-        _tool = genai.protos.Tool()
-        if "google_search" in [f.name for f in genai.protos.Tool.meta.fields.values()]:
-            _tool.google_search = {}
-            gen_kwargs = {"tools": [_tool]}
-        else:
-            try:
-                gen_kwargs = {"tools": [genai.protos.Tool(
-                    google_search_retrieval=genai.protos.GoogleSearchRetrieval()
-                )]}
-            except (AttributeError, TypeError):
-                logger.warning(
-                    "[gemini] Google Search grounding unavailable in this SDK build "
-                    "(google-generativeai %s) — running ungrounded",
-                    getattr(genai, "__version__", "unknown"),
-                )
-        loop = asyncio.get_running_loop()
+        client = genai.Client(api_key=GEMINI_API_KEY)
         response = await asyncio.wait_for(
-            loop.run_in_executor(
-                None, lambda: model.generate_content(prompt, **gen_kwargs)
+            client.aio.models.generate_content(
+                model=model_version,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[types.Tool(google_search=types.GoogleSearch())],
+                ),
             ),
-            timeout=20.0,  # 20s timeout to avoid hanging
+            timeout=30.0,
         )
-        # response.text raises ValueError when the response was blocked by a
-        # safety filter or finished with a non-STOP reason (e.g. RECITATION,
-        # MAX_TOKENS with no content).  Extract the text safely so we can log
-        # exactly what happened instead of silently returning mentioned=False.
-        try:
-            text = response.text
-        except ValueError as val_err:
+        text = response.text  # Returns None on safety blocks (no ValueError)
+        latency_ms = int((time.monotonic() - start) * 1000)
+        if not text:
+            # Safety block or empty response — log details for debugging
             finish_reason = "unknown"
             if response.candidates:
                 finish_reason = str(getattr(response.candidates[0], "finish_reason", "unknown"))
-            logger.error(
-                "[gemini] response.text raised ValueError (likely safety block) — "
-                "finish_reason=%s error=%s candidates=%s",
-                finish_reason,
-                val_err,
-                response.candidates,
-            )
-            latency_ms = int((time.monotonic() - start) * 1000)
-            return _build_result(None, brand_name, latency_ms, error=f"gemini_blocked: {val_err}")
-        latency_ms = int((time.monotonic() - start) * 1000)
-        if not text:
             logger.warning(
-                "[gemini] API returned empty/null content for prompt %r", prompt[:100]
+                "[gemini] Empty/blocked response for prompt %r — finish_reason=%s",
+                prompt[:100], finish_reason,
             )
             return _build_result(
                 None, brand_name, latency_ms,
-                error="Empty response from Gemini API",
+                error=f"Empty response from Gemini API (finish_reason={finish_reason})",
             )
         logger.debug("[gemini] response preview: %r", text[:200])
         return _build_result(text, brand_name, latency_ms)
     except asyncio.TimeoutError:
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.error("[gemini] Request timed out after 20s for prompt %r", prompt[:100])
-        return _build_result(None, brand_name, latency_ms, error="Request timed out (20s)")
+        logger.error("[gemini] Request timed out after 30s for prompt %r", prompt[:100])
+        return _build_result(None, brand_name, latency_ms, error="Request timed out (30s)")
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.error("[gemini] API error for prompt %r: %s", prompt[:100], exc)
-        body = getattr(exc, "response", None)
-        if body is not None:
-            try:
-                logger.error("[gemini] API error body: %s", body.text)
-            except Exception:
-                pass
         return _build_result(None, brand_name, latency_ms, error=str(exc))
 
 

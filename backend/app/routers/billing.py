@@ -39,8 +39,8 @@ TIER_PRICES = {
 BRAND_LIMITS = {
     None: {"standard": 0, "pitch": 1},       # free: 1 pitch deck, no standard brands
     "": {"standard": 0, "pitch": 1},
-    "starter": {"standard": 2, "pitch": 1},  # 2 standard + 1 pitch deck
-    "pro": {"standard": 2, "pitch": 3},      # 2 standard + 3 pitch decks
+    "starter": {"standard": 1, "pitch": 1},  # 1 standard + 1 pitch deck
+    "pro": {"standard": 2, "pitch": 3},      # 2 pro brands + 3 pitch decks
 }
 # Manual run limits per tier (per day, UTC). None = unlimited.
 # Only free-plan users (no subscription_tier) are limited to 1 run/day.
@@ -528,6 +528,25 @@ async def stripe_webhook(request: Request, db: DbDep):
             user.stripe_subscription_id = None
             user.updated_at = utcnow()
             await db.commit()
+
+            # Downgrade pro brands back to standard so they don't retain
+            # elevated prompt limits (100 → 25) after subscription cancellation.
+            if old_tier == "pro":
+                from sqlalchemy import update as sa_update
+
+                from app.models import Brand
+                downgrade_result = await db.execute(
+                    sa_update(Brand)
+                    .where(Brand.user_id == user.id, Brand.brand_type == "pro")
+                    .values(brand_type="standard", prompt_limit=25, tier="standard")
+                )
+                if downgrade_result.rowcount > 0:
+                    await db.commit()
+                    logger.info(
+                        "Downgraded %d pro brand(s) to standard for user %d after cancellation",
+                        downgrade_result.rowcount, user.id,
+                    )
+
             logger.warning(
                 "Subscription canceled for user %s (was %s). customer=%s",
                 user.email, old_tier, customer_id,

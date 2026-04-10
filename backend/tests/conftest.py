@@ -54,11 +54,20 @@ async def clean_tables():
     # Reset in-memory rate limiters so tests don't affect each other
     from app.dependencies import _rate_store
     _rate_store.clear()
-    from app.routers.auth import _login_attempts, _register_attempts, _resend_attempts, _totp_setup_attempts
+    from app.routers.auth import (
+        _login_attempts,
+        _register_attempts,
+        _resend_attempts,
+        _reset_attempts,
+        _totp_setup_attempts,
+        _verify_attempts,
+    )
     _login_attempts.clear()
     _register_attempts.clear()
     _totp_setup_attempts.clear()
     _resend_attempts.clear()
+    _verify_attempts.clear()
+    _reset_attempts.clear()
     # Reset shared background-task state sets
     from app import state
     state.generating_brands.clear()
@@ -71,9 +80,10 @@ async def clean_tables():
             "prompt_run_scores", "content_events",
             "analytics_events", "draft_attributions", "content_attribution", "content_posts",
             "content_drafts", "content_gaps", "content_opportunities",
-            "run_model_scores", "query_results", "tracking_runs",
+            "competitor_mentions", "run_model_scores", "query_results", "tracking_runs",
             "competitors", "prompts", "brand_profiles",
             "brand_content_settings", "account_connections",
+            "notifications", "team_members", "password_reset_tokens",
             "system_settings", "brands", "users",
         ]:
             await db.execute(text(f"DELETE FROM {table}"))

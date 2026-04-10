@@ -52,8 +52,14 @@ async def invite_team_member(request: InviteTeamMemberRequest, db: DbDep, user: 
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
                 detail="Team members require a Starter or Pro plan.",
             )
+        # Count only active seats: accepted members + non-expired pending invites
+        now = _utcnow_naive()
         count_result = await db.execute(
-            select(func.count(TeamMember.id)).where(TeamMember.account_owner_id == user.id)
+            select(func.count(TeamMember.id)).where(
+                TeamMember.account_owner_id == user.id,
+                # Accepted OR still-valid pending invite
+                (TeamMember.accepted_at.is_not(None)) | (TeamMember.expires_at > now),
+            )
         )
         current_count = count_result.scalar_one()
         if current_count >= limit:
@@ -140,6 +146,19 @@ async def accept_invite(token: str, db: DbDep, user: CurrentUser):
         raise HTTPException(
             status_code=403,
             detail=f"This invitation was sent to {member.invited_email}. Please log in with that account.",
+        )
+
+    # Block accepting if already a member of another team
+    existing_membership = await db.execute(
+        select(TeamMember).where(
+            TeamMember.user_id == user.id,
+            TeamMember.accepted_at.is_not(None),
+        ).limit(1)
+    )
+    if existing_membership.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="You are already a member of another team. Leave that team first to accept this invite.",
         )
 
     member.user_id = user.id

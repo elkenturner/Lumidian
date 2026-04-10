@@ -65,8 +65,8 @@ TEAM_MEMBER_LIMITS: dict = {
 # Weekly manual draft limits per standard brand. Pitch brands are always capped at 1.
 WEEKLY_DRAFT_LIMITS: dict = {
     None: 0, "": 0,
-    "starter": 10,
-    "pro": 25,
+    "starter": 50,
+    "pro": 100,
 }
 # Weekly manual opp-scan limits per brand. Mirrors WEEKLY_DRAFT_LIMITS.
 # Free users only get the weekly auto-scan; manual re-scans require a paid plan.

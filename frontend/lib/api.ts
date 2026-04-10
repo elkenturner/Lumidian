@@ -463,6 +463,7 @@ export interface DraftQueueStatus {
   generating?: boolean;
   weekly_drafts_remaining: number | null;  // null = admin (unlimited)
   weekly_drafts_limit: number | null;       // null = admin (unlimited)
+  show_upgrade?: boolean;
 }
 
 export async function getDraftStatus(brandId: number): Promise<DraftQueueStatus> {

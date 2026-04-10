@@ -596,7 +596,7 @@ async def _onboarding_post_process(brand_id: int) -> None:
             drafts = await auto_draft_top_gaps(
                 db=db,
                 brand_id=brand_id,
-                max_gaps=5,
+                max_gaps=20,
                 clear_existing=False,
                 source="onboarding",
             )

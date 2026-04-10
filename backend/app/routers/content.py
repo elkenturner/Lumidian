@@ -108,18 +108,20 @@ async def _check_weekly_manual_draft_limit(
     Enforce per-brand weekly manual draft limits.
     Returns the number of manual draft slots remaining this week.
     Raises HTTP 429 if the limit is already reached.
+
+    Paid users (starter/pro) have no weekly limit — only pitch brands
+    are capped. The per-click rate limiter is sufficient cost control
+    for paid tiers.
     """
+    is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
+    if not is_pitch and subscription_tier in ("starter", "pro"):
+        return 999  # unlimited for paid users
+
     from datetime import datetime, timedelta
 
     from sqlalchemy import func as sqlfunc
 
-    from app.routers.billing import WEEKLY_DRAFT_LIMITS
-
-    is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
-    if is_pitch:
-        weekly_limit = _WEEKLY_MANUAL_LIMIT_PITCH
-    else:
-        weekly_limit = WEEKLY_DRAFT_LIMITS.get(subscription_tier or "", 10)
+    weekly_limit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else 0
 
     week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
     count_result = await db.execute(
@@ -507,18 +509,15 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
     brand = await get_brand_for_user(brand_id, db, user)
     require_brand_active(brand, user)
 
-    if not user.is_admin:
+    # Paid users have no weekly draft limit — the per-click rate limiter
+    # (2/min) is sufficient cost control.  Only pitch brands are capped.
+    is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
+    if not user.is_admin and is_pitch:
         from datetime import datetime, timedelta
 
         from sqlalchemy import func as sqlfunc
 
-        from app.routers.billing import WEEKLY_DRAFT_LIMITS
-        is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
-        weekly_limit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else WEEKLY_DRAFT_LIMITS.get(user.subscription_tier or "", 0)
         week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
-        # Only count committed (approved/posted) manual drafts toward the weekly
-        # limit.  Pending "draft"-status items are replaced each regeneration via
-        # clear_existing, so they should not block the user from refreshing.
         committed_result = await db.execute(
             select(sqlfunc.count(ContentDraft.id)).where(
                 ContentDraft.brand_id == brand_id,
@@ -528,19 +527,18 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
             )
         )
         committed = committed_result.scalar_one_or_none() or 0
-        effective_remaining = weekly_limit - committed
+        effective_remaining = _WEEKLY_MANUAL_LIMIT_PITCH - committed
         if effective_remaining <= 0:
-            label = "pitch deck" if is_pitch else "brand"
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=(
-                    f"Weekly manual draft limit reached ({weekly_limit}/{weekly_limit} for this {label}). "
+                    f"Weekly manual draft limit reached ({_WEEKLY_MANUAL_LIMIT_PITCH}/{_WEEKLY_MANUAL_LIMIT_PITCH} for this pitch deck). "
                     "Resets 7 days after your first manual draft this week."
                 ),
             )
         remaining = min(request.max_gaps, effective_remaining)
     else:
-        remaining = 20
+        remaining = request.max_gaps
 
     _state.generating_brands.add(brand_id)
     asyncio.create_task(
@@ -589,18 +587,14 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
     )
     last_scan_at = last_scan_result.scalar_one_or_none()
 
-    # Weekly draft quota for non-admin users
+    # Weekly draft quota — only applies to pitch brands (paid users are unlimited)
     weekly_drafts_remaining: int | None = None
     weekly_drafts_limit: int | None = None
-    if not user.is_admin:
+    is_pitch = getattr(brand_obj, "brand_type", "standard") == "pitch"
+    if not user.is_admin and is_pitch:
         from datetime import datetime, timedelta
 
-        from app.routers.billing import WEEKLY_DRAFT_LIMITS
-        is_pitch = getattr(brand_obj, "brand_type", "standard") == "pitch"
-        wlimit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else WEEKLY_DRAFT_LIMITS.get(user.subscription_tier or "", 0)
         week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
-        # Only committed (approved/posted) drafts count toward weekly limit —
-        # pending drafts are replaced on each regeneration.
         committed_result = await db.execute(
             select(sqlfunc.count(ContentDraft.id)).where(
                 ContentDraft.brand_id == brand_id,
@@ -610,10 +604,9 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
             )
         )
         committed = committed_result.scalar_one_or_none() or 0
-        weekly_drafts_limit = wlimit
-        weekly_drafts_remaining = max(0, wlimit - committed)
+        weekly_drafts_limit = _WEEKLY_MANUAL_LIMIT_PITCH
+        weekly_drafts_remaining = max(0, _WEEKLY_MANUAL_LIMIT_PITCH - committed)
 
-    is_pitch = getattr(brand_obj, "brand_type", "standard") == "pitch"
     tier = user.subscription_tier
     tier_draft_cap = get_draft_cap(tier, brand_obj.brand_type) if not user.is_admin else DRAFT_CAP
     tier_sched_cap = TIER_SCHEDULED_CAPS.get(tier, 5) if not user.is_admin else SCHEDULED_CAP

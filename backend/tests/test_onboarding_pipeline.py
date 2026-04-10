@@ -58,7 +58,7 @@ async def test_onboarding_post_process_drafting_kwargs():
         await _onboarding_post_process(brand_id=7)
 
     assert captured["brand_id"] == 7
-    assert captured["max_gaps"] == 5
+    assert captured["max_gaps"] == 20
     assert captured["clear_existing"] is False
     assert captured["source"] == "onboarding"
 

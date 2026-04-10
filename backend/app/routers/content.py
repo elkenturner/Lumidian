@@ -54,9 +54,16 @@ from app.services.drafting_service import (
     PLATFORM_SPECS,
     auto_draft_top_gaps,
     generate_gap_draft,
+    get_draft_cap,
 )
 
-SCHEDULED_CAP = 20  # max approved/scheduled drafts queued at once
+SCHEDULED_CAP = 20  # max approved/scheduled drafts queued at once (pro tier default)
+
+TIER_SCHEDULED_CAPS: dict[str | None, int] = {
+    None: 5, "": 5,
+    "starter": 10,
+    "pro": 20,
+}
 
 logger = logging.getLogger(__name__)
 
@@ -368,10 +375,14 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
                 )
             )
             sched_count = sched_count_result.scalar_one_or_none() or 0
-            if sched_count >= SCHEDULED_CAP:
+            brand_obj = await get_brand_for_user(draft.brand_id, db, user)
+            sched_cap = TIER_SCHEDULED_CAPS.get(user.subscription_tier, 5) if not user.is_admin else SCHEDULED_CAP
+            if getattr(brand_obj, "brand_type", "standard") == "pitch":
+                sched_cap = 5
+            if sched_count >= sched_cap:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Scheduled queue is full ({SCHEDULED_CAP}/{SCHEDULED_CAP}). Mark some drafts as posted before approving more.",
+                    detail=f"Scheduled queue is full ({sched_cap}/{sched_cap}). Mark some drafts as posted before approving more.",
                 )
             now = utcnow()
             draft.approved_at = now
@@ -602,17 +613,25 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
         weekly_drafts_limit = wlimit
         weekly_drafts_remaining = max(0, wlimit - committed)
 
+    is_pitch = getattr(brand_obj, "brand_type", "standard") == "pitch"
+    tier = user.subscription_tier
+    tier_draft_cap = get_draft_cap(tier, brand_obj.brand_type) if not user.is_admin else DRAFT_CAP
+    tier_sched_cap = TIER_SCHEDULED_CAPS.get(tier, 5) if not user.is_admin else SCHEDULED_CAP
+    if is_pitch:
+        tier_sched_cap = 5
+
     return {
         "draft_count": draft_count,
-        "draft_cap": DRAFT_CAP,
-        "draft_queue_full": draft_count >= DRAFT_CAP,
+        "draft_cap": tier_draft_cap,
+        "draft_queue_full": draft_count >= tier_draft_cap,
         "scheduled_count": scheduled_count,
-        "scheduled_cap": SCHEDULED_CAP,
-        "scheduled_queue_full": scheduled_count >= SCHEDULED_CAP,
+        "scheduled_cap": tier_sched_cap,
+        "scheduled_queue_full": scheduled_count >= tier_sched_cap,
         "last_scan_at": last_scan_at.isoformat() if last_scan_at else None,
         "generating": brand_id in _state.generating_brands,
         "weekly_drafts_remaining": weekly_drafts_remaining,
         "weekly_drafts_limit": weekly_drafts_limit,
+        "show_upgrade": not user.is_admin and tier not in ("starter", "pro"),
     }
 
 

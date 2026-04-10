@@ -2674,6 +2674,15 @@ export default function ContentHubPage() {
                         </div>
                       );
                     })}
+                    {draftStatus.show_upgrade && (
+                      <Link
+                        href="/settings/billing"
+                        className="flex items-center justify-center gap-1.5 text-[11px] text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors mt-1"
+                      >
+                        <Zap size={11} />
+                        Upgrade for more
+                      </Link>
+                    )}
                   </>
                 ) : (
                   <div className="space-y-3 animate-pulse">

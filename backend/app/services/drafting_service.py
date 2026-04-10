@@ -154,7 +154,20 @@ async def _load_publications(db: AsyncSession, brand_id: int) -> list[dict]:
     return _extract_publications(profile) if profile else []
 
 
-DRAFT_CAP = 20
+DRAFT_CAP = 20  # default / max cap (pro tier)
+
+TIER_DRAFT_CAPS: dict[str | None, int] = {
+    None: 5, "": 5,
+    "starter": 10,
+    "pro": 20,
+}
+
+
+def get_draft_cap(subscription_tier: str | None = None, brand_type: str = "standard") -> int:
+    """Return the draft queue cap for the given tier/brand type."""
+    if brand_type == "pitch":
+        return 5
+    return TIER_DRAFT_CAPS.get(subscription_tier, 5)
 
 
 async def _get_existing_drafts_for_prompt(
@@ -456,14 +469,15 @@ async def generate_gap_draft(
             f"Approve or dismiss existing drafts before generating new ones."
         )
 
-    # Check for repetition: if 3+ active (non-posted) drafts already exist for this
-    # prompt/platform, skip.  Posted drafts are fetched for deduplication context below
-    # but should not block new generation — the user already acted on them.
+    # Check for repetition: if 3+ pending "draft" items already exist for this
+    # prompt/platform, skip.  Approved drafts are committed content the user already
+    # acted on — they should not block new generation.  Posted drafts are fetched for
+    # deduplication context below so Claude takes a different angle.
     existing_drafts = await _get_existing_drafts_for_prompt(db, brand_id, prompt_id, platform)
-    active_draft_count = sum(1 for d in existing_drafts if d.status in ("draft", "approved"))
-    if active_draft_count >= 3:
+    pending_draft_count = sum(1 for d in existing_drafts if d.status == "draft")
+    if pending_draft_count >= 3:
         raise ValueError(
-            f"3 or more drafts already exist for this prompt on {platform}. "
+            f"3 or more pending drafts already exist for this prompt on {platform}. "
             f"Approve or dismiss existing drafts before generating another."
         )
 

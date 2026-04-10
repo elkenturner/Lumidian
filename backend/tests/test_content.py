@@ -208,6 +208,17 @@ async def test_draft_cap_constant():
     assert DRAFT_CAP == 20
 
 
+async def test_get_draft_cap_tiers():
+    """Draft cap should vary by tier and brand type."""
+    from app.services.drafting_service import get_draft_cap
+    assert get_draft_cap(None, "standard") == 5
+    assert get_draft_cap("", "standard") == 5
+    assert get_draft_cap("starter", "standard") == 10
+    assert get_draft_cap("pro", "standard") == 20
+    assert get_draft_cap("pro", "pitch") == 5
+    assert get_draft_cap("starter", "pitch") == 5
+
+
 # ── Platform guidelines ───────────────────────────────────────────────────────
 
 async def test_get_platform_guidelines_reddit(client: httpx.AsyncClient):

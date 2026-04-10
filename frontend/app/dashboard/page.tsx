@@ -14,6 +14,7 @@ import {
   Play,
   Loader2,
   Globe,
+  Link2,
 } from 'lucide-react';
 import { logError } from '@/lib/utils/errors';
 import {
@@ -67,6 +68,7 @@ import {
   BestPromptCard,
   DonutDomains,
   DashboardModelBreakdown,
+  CitationGaps,
   HelpTooltip,
   buildPromptGroups,
 } from '@/components/dashboard';
@@ -748,6 +750,8 @@ export default function DashboardPage() {
                   loadingAnalytics={loadingAnalytics}
                   liveScore={liveScore}
                   indexScore={indexScore}
+                  scoreConfidence={analytics?.score_confidence}
+                  activeModels={analytics?.active_models}
                 />
 
                 {/* Right column: Best Prompt + Sentiment on top, SOV below */}
@@ -938,6 +942,20 @@ export default function DashboardPage() {
                   )}
                 </div>
               </div>
+
+              {/* Row 4: Citation Gaps */}
+              {analytics && analytics.citation_gaps && analytics.citation_gaps.length > 0 && (
+                <div className="mb-4">
+                  <div className="card p-5">
+                    <div className="flex items-center gap-2 mb-4">
+                      <Link2 size={15} className="text-[var(--accent)]" />
+                      <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Citation Gaps</h3>
+                      <HelpTooltip text="Domains frequently cited by AI models in responses that don't mention your brand. High gap scores indicate sources where your brand is absent but competitors may be present." />
+                    </div>
+                    <CitationGaps gaps={analytics.citation_gaps} />
+                  </div>
+                </div>
+              )}
 
               {/* Recent Conversations */}
               <BrandTable

@@ -820,13 +820,25 @@ export default function DashboardPage() {
                       const allStats = analytics.competitor_comparison;
                       const sorted = [...allStats].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
                       const count = sorted.length;
+                      const mutedColors = [
+                        '#7c8aaa', // slate
+                        '#8a7ca5', // lavender
+                        '#7ca58a', // sage
+                        '#a5917c', // tan
+                        '#7c9ba5', // teal
+                        '#a57c8a', // mauve
+                        '#9a9a7c', // olive
+                        '#7c88a5', // steel
+                      ];
+                      let colorIdx = 0;
 
                       return (
                         <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : count <= 2 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
                           {sorted.map((s) => {
                             const pct = Math.round(s.mention_rate * 100);
-                            const barColor = s.is_primary ? 'var(--accent)' : 'var(--text-faint)';
-                            const textColor = s.is_primary ? 'var(--accent-light)' : 'var(--text-muted)';
+                            const competitorColor = s.is_primary ? null : mutedColors[colorIdx++ % mutedColors.length];
+                            const barColor = s.is_primary ? 'var(--accent)' : competitorColor!;
+                            const textColor = s.is_primary ? 'var(--accent-light)' : competitorColor!;
                             return (
                               <div key={s.name} className="flex flex-col gap-1.5">
                                 <div className="flex items-center justify-between">

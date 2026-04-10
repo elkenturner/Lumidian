@@ -39,8 +39,8 @@ TIER_PRICES = {
 BRAND_LIMITS = {
     None: {"standard": 0, "pitch": 1},       # free: 1 pitch deck, no standard brands
     "": {"standard": 0, "pitch": 1},
-    "starter": {"standard": 1, "pitch": 1},  # 1 standard + 1 pitch deck
-    "pro": {"standard": 2, "pitch": 3},      # 2 pro brands + 3 pitch decks
+    "starter": {"standard": 1, "pitch": 0},
+    "pro": {"standard": 2, "pitch": 0},
 }
 # Manual run limits per tier (per day, UTC). None = unlimited.
 # Only free-plan users (no subscription_tier) are limited to 1 run/day.
@@ -81,8 +81,8 @@ PROMPT_LIMITS: dict[str, int] = {
 BRAND_TYPE_LIMITS: dict = {
     None: {"pitch": 1, "standard": 0, "pro": 0},
     "": {"pitch": 1, "standard": 0, "pro": 0},
-    "starter": {"pitch": 1, "standard": 1, "pro": 0},
-    "pro": {"pitch": 3, "standard": 0, "pro": 2},  # Pro users create pro brands, not standard
+    "starter": {"pitch": 0, "standard": 1, "pro": 0},
+    "pro": {"pitch": 0, "standard": 0, "pro": 2},
 }
 
 # Daily manual run limit for pitch brands (all tiers)

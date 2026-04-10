@@ -297,7 +297,8 @@ The following skills are installed and must be used when applicable. Always chec
 | `superpowers:finishing-a-development-branch` | When implementation is complete and tests pass — guides merge/PR/cleanup decisions. |
 | `superpowers:using-git-worktrees` | Before feature work needing isolation from current workspace, or before executing plans. |
 | `code-review:code-review` | To review a pull request. |
-| `ui-ux-pro-max` | For all UI/UX design work — designing, building, reviewing, or improving frontend components. Covers 67 styles, 96 palettes, 57 font pairings, 25 chart types across React/Next.js/Tailwind/shadcn. |
+| `impeccable` | For frontend design — distinctive, production-grade interfaces with context gathering, anti-AI-slop rules, and detailed design references. Use `craft` for full flow, `teach` for project context setup. |
+| `emil-design-eng` | For UI animation and interaction polish — Emil Kowalski's philosophy on easing, springs, gestures, component feel, and performance. |
 | `simplify` | After writing code — review changed code for reuse, quality, and efficiency. |
 | `update-config` | To configure Claude Code behaviors via `settings.json` (hooks for automated tasks). |
 | `schedule` | To create/manage scheduled remote agents running on a cron schedule. |

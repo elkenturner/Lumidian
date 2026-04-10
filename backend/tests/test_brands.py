@@ -53,15 +53,18 @@ async def test_create_brand_slugifies_name(client: httpx.AsyncClient):
 
 
 async def test_create_brand_duplicate_slug(client: httpx.AsyncClient):
-    # Use a second user (pro tier allows 2 pitch brands) to test global slug uniqueness
-    await register_and_login(client, email="dupslug@example.com", subscription_tier="pro")
-    await client.post(
+    # Use a starter user (allows 1 standard brand) + free user for slug collision test
+    await register_and_login(client, email="dupslug@example.com", subscription_tier="starter")
+    resp1 = await client.post(
         "/api/brands",
-        json={"name": "Duplicate Brand", "tier": "basic", "website_url": "https://duplicate1.com", "brand_type": "pitch", "prompts": []},
+        json={"name": "Duplicate Brand", "tier": "basic", "website_url": "https://duplicate1.com", "prompts": []},
     )
+    assert resp1.status_code == 201, resp1.text
+    # Second brand with same name from a different user should get 409 (slug conflict)
+    await register_and_login(client, email="dupslug2@example.com", subscription_tier="starter")
     resp = await client.post(
         "/api/brands",
-        json={"name": "Duplicate Brand", "tier": "basic", "website_url": "https://duplicate2.com", "brand_type": "pitch", "prompts": []},
+        json={"name": "Duplicate Brand", "tier": "basic", "website_url": "https://duplicate2.com", "prompts": []},
     )
     assert resp.status_code == 409
 

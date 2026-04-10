@@ -10,9 +10,9 @@ from tests.conftest import register_and_login
 @pytest.mark.asyncio
 async def test_paused_pitch_brand_blocks_run(client: AsyncClient):
     """Expired pitch brand should block tracking runs."""
-    await register_and_login(client, "pause@test.com", "Password123")
+    await register_and_login(client, "pause@test.com", "Password123", subscription_tier=None)
 
-    # Create a pitch brand
+    # Create a pitch brand (free tier)
     brand_resp = await client.post(
         "/api/brands",
         json={"name": "PausedBrand", "tier": "basic", "brand_type": "pitch", "prompts": ["test prompt"], "website_url": "https://paused.example.com"},
@@ -37,9 +37,9 @@ async def test_paused_pitch_brand_blocks_run(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_paused_brand_allows_read(client: AsyncClient):
     """Paused brand should still allow reading data."""
-    await register_and_login(client, "pauseread@test.com", "Password123")
+    await register_and_login(client, "pauseread@test.com", "Password123", subscription_tier=None)
 
-    # Create a pitch brand
+    # Create a pitch brand (free tier)
     brand_resp = await client.post(
         "/api/brands",
         json={"name": "ReadableBrand", "tier": "basic", "brand_type": "pitch", "prompts": ["test prompt"], "website_url": "https://readable.example.com"},
@@ -63,14 +63,14 @@ async def test_paused_brand_allows_read(client: AsyncClient):
 @pytest.mark.asyncio
 async def test_lapsed_subscription_blocks_run(client: AsyncClient):
     """Lapsed subscription should block tracking runs."""
-    token = await register_and_login(client, "lapsed@test.com", "Password123")
+    await register_and_login(client, "lapsed@test.com", "Password123")
 
-    # Create a brand
+    # Create a standard brand (starter tier)
     brand_resp = await client.post(
         "/api/brands",
-        json={"name": "LapsedBrand", "tier": "basic", "brand_type": "pitch", "prompts": ["test"], "website_url": "https://lapsed.com"},
-        cookies={"clarity_token": token},
+        json={"name": "LapsedBrand", "tier": "basic", "prompts": ["test"], "website_url": "https://lapsed.com"},
     )
+    assert brand_resp.status_code == 201, brand_resp.text
     brand_id = brand_resp.json()["id"]
 
     # Set subscription status to canceled
@@ -87,6 +87,6 @@ async def test_lapsed_subscription_blocks_run(client: AsyncClient):
     # Attempt to trigger a run — should be blocked.
     # require_active_subscription fires before require_brand_active, so a
     # canceled subscription returns 402 (payment required) rather than 403.
-    run_resp = await client.post(f"/api/tracking/run/{brand_id}", cookies={"clarity_token": token})
+    run_resp = await client.post(f"/api/tracking/run/{brand_id}")
     assert run_resp.status_code in (402, 403)
     assert run_resp.status_code != 202, "Run should be blocked for a canceled subscription"

@@ -68,7 +68,7 @@ export default function BestPromptCard({ responses, loading }: BestPromptCardPro
   })();
 
   return (
-    <div className="self-start card p-5" style={{ borderLeft: '2px solid var(--accent-muted)' }}>
+    <div className="card p-5">
       <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center mb-3">
         Best Performing Prompt
         <HelpTooltip text="The prompt where your brand is mentioned most often across AI models." />

@@ -451,11 +451,10 @@ async def add_prompt(
             )
 
     # Check for duplicate prompt text (case-insensitive)
-    from sqlalchemy import func as sqlfunc_lower
     existing = await db.execute(
         select(Prompt.id).where(
             Prompt.brand_id == brand_id,
-            sqlfunc_lower.lower(Prompt.text) == text.lower(),
+            func.lower(Prompt.text) == text.lower(),
         ).limit(1)
     )
     if existing.scalar_one_or_none() is not None:

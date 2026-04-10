@@ -34,14 +34,33 @@ logger = logging.getLogger(__name__)
 scheduler = AsyncIOScheduler(timezone="UTC")
 
 
-def _is_brand_paused(brand) -> bool:
-    """Check if a brand should be skipped in scheduled sweeps."""
+async def _is_brand_paused(brand) -> bool:
+    """Check if a brand should be skipped in scheduled sweeps.
+
+    Skips if:
+      - Pitch brand has expired
+      - Brand owner has is_paused=True (admin-paused account)
+    """
     from datetime import datetime
+
+    from sqlalchemy import select
+
+    from app.database import AsyncSessionLocal
+    from app.models import User
+
     now = datetime.now(UTC).replace(tzinfo=None)
 
     # Skip expired pitch brands
     if brand.brand_type == "pitch" and brand.pitch_expires_at and brand.pitch_expires_at <= now:
         return True
+
+    # Skip brands whose owner is paused
+    if brand.user_id:
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(select(User.is_paused).where(User.id == brand.user_id))
+            is_paused = result.scalar_one_or_none()
+            if is_paused:
+                return True
 
     return False
 
@@ -83,7 +102,7 @@ async def _run_all_brands(schedule_slot: str) -> None:
 
     for brand in brands:
         # Skip paused brands
-        if _is_brand_paused(brand):
+        if await _is_brand_paused(brand):
             logger.info(
                 "Scheduler: skipping paused brand %d (%s) [%s]",
                 brand.id, brand.name, schedule_slot,
@@ -145,7 +164,7 @@ async def _reddit_scanner_sweep() -> None:
         brands = result.scalars().all()
 
     for brand in brands:
-        if _is_brand_paused(brand):
+        if await _is_brand_paused(brand):
             logger.info("Scheduler: skipping paused brand %d in Reddit sweep", brand.id)
             continue
         state.scanning_brands.add(brand.id)
@@ -179,7 +198,7 @@ async def _quora_scanner_sweep() -> None:
         brands = result.scalars().all()
 
     for brand in brands:
-        if _is_brand_paused(brand):
+        if await _is_brand_paused(brand):
             logger.info("Scheduler: skipping paused brand %d in Quora sweep", brand.id)
             continue
         state.scanning_brands.add(brand.id)
@@ -215,7 +234,7 @@ async def _linkedin_scanner_sweep() -> None:
         brands = result.scalars().all()
 
     for brand in brands:
-        if _is_brand_paused(brand):
+        if await _is_brand_paused(brand):
             logger.info("Scheduler: skipping paused brand %d in LinkedIn sweep", brand.id)
             continue
         state.scanning_brands.add(brand.id)
@@ -251,7 +270,7 @@ async def _x_scanner_sweep() -> None:
         brands = result.scalars().all()
 
     for brand in brands:
-        if _is_brand_paused(brand):
+        if await _is_brand_paused(brand):
             logger.info("Scheduler: skipping paused brand %d in X sweep", brand.id)
             continue
         state.scanning_brands.add(brand.id)
@@ -290,7 +309,7 @@ async def _auto_draft_sweep() -> None:
 
     for brand in brands:
         # Skip paused brands
-        if _is_brand_paused(brand):
+        if await _is_brand_paused(brand):
             logger.info(
                 "Scheduler: skipping paused brand %d (%s) in auto-draft sweep",
                 brand.id, brand.name,
@@ -402,7 +421,7 @@ async def _website_context_refresh_sweep() -> None:
         brands = result.scalars().all()
 
     for brand in brands:
-        if _is_brand_paused(brand):
+        if await _is_brand_paused(brand):
             logger.info("Scheduler: skipping paused brand %d in website context refresh", brand.id)
             continue
         try:
@@ -444,7 +463,7 @@ async def _visibility_alert_sweep() -> None:
     overall_score values. If the drop exceeds ALERT_DROP_PCT, email the brand
     owner. A brand is only alerted once per 7-day window to avoid spam.
     """
-    ALERT_DROP_PCT = 15.0       # trigger when score drops ≥ 15 points
+    ALERT_DROP_PCT = 10.0       # trigger when score drops ≥ 10 points
     ALERT_COOLDOWN_DAYS = 7     # don't re-alert within 7 days
 
     if await _is_scheduler_paused():
@@ -468,7 +487,7 @@ async def _visibility_alert_sweep() -> None:
         brands = brands_result.scalars().all()
 
         for brand in brands:
-            if _is_brand_paused(brand):
+            if await _is_brand_paused(brand):
                 continue  # No need to log - this is a silent skip for alert processing
             if brand.user_id is None:
                 continue

@@ -253,6 +253,9 @@ def _get_gemini_client():
     return _gemini_client
 
 
+_GEMINI_TIMEOUT = 45.0  # seconds; Pro models are slower than Flash
+
+
 async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemini-2.5-flash") -> dict:
     if not GEMINI_API_KEY:
         return _api_key_placeholder("gemini")
@@ -261,17 +264,42 @@ async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemi
         from google.genai import types
 
         client = _get_gemini_client()
-        async with _GEMINI_SEM:
-            response = await asyncio.wait_for(
-                client.aio.models.generate_content(
-                    model=model_version,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        tools=[types.Tool(google_search=types.GoogleSearch())],
-                    ),
-                ),
-                timeout=30.0,
-            )
+
+        # Try with google_search grounding first; fall back to plain call if
+        # the model doesn't support the tool (older API versions return
+        # "google_search_retrieval is not supported").
+        config_with_search = types.GenerateContentConfig(
+            tools=[types.Tool(google_search=types.GoogleSearch())],
+        )
+        config_plain = types.GenerateContentConfig()
+
+        response = None
+        for config in (config_with_search, config_plain):
+            try:
+                async with _GEMINI_SEM:
+                    response = await asyncio.wait_for(
+                        client.aio.models.generate_content(
+                            model=model_version,
+                            contents=prompt,
+                            config=config,
+                        ),
+                        timeout=_GEMINI_TIMEOUT,
+                    )
+                break  # success — stop trying configs
+            except Exception as inner_exc:
+                err_str = str(inner_exc).lower()
+                if "google_search" in err_str and config is config_with_search:
+                    logger.warning(
+                        "[gemini] google_search tool not supported for %s, retrying without it",
+                        model_version,
+                    )
+                    continue  # try plain config
+                raise  # re-raise for outer handler
+
+        if response is None:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return _build_result(None, brand_name, latency_ms, error="No response from Gemini API")
+
         text = response.text  # Returns None on safety blocks (no ValueError)
         latency_ms = int((time.monotonic() - start) * 1000)
         if not text:
@@ -291,8 +319,8 @@ async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemi
         return _build_result(text, brand_name, latency_ms)
     except asyncio.TimeoutError:
         latency_ms = int((time.monotonic() - start) * 1000)
-        logger.error("[gemini] Request timed out after 30s for prompt %r", prompt[:100])
-        return _build_result(None, brand_name, latency_ms, error="Request timed out (30s)")
+        logger.error("[gemini] Request timed out after %.0fs for prompt %r", _GEMINI_TIMEOUT, prompt[:100])
+        return _build_result(None, brand_name, latency_ms, error=f"Request timed out ({_GEMINI_TIMEOUT:.0f}s)")
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.error("[gemini] API error for prompt %r: %s", prompt[:100], exc)
@@ -314,6 +342,8 @@ SUPPORTED_MODELS = list(_DISPATCHERS.keys())
 def _classify_error(error: str) -> str:
     """Classify an error string for retry strategy."""
     e = error.lower()
+    if "401" in e or "unauthorized" in e or "invalid api key" in e or "invalid_api_key" in e:
+        return "auth"  # permanent — bad API key
     if "429" in e or "rate_limit" in e or "rate limit" in e or "insufficient_quota" in e:
         return "rate_limit"
     if "503" in e or "unavailable" in e or "overloaded" in e or "timed out" in e:
@@ -348,6 +378,17 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
             return result
 
         error = result.get("error") or "empty response"
+
+        # 401/unauthorized is permanent — invalid API key, no point retrying
+        if _classify_error(error) == "auth":
+            logger.error("[%s] Authentication failed (invalid API key?) — not retrying", model_key)
+            return {
+                "response_text": None,
+                "mentioned": False,
+                "latency_ms": result.get("latency_ms"),
+                "error": f"{display} API key is invalid or expired. Update it in Settings → Connected Accounts.",
+            }
+
         errors.append(f"attempt {attempt}: {error}")
 
         # Don't sleep after the last attempt

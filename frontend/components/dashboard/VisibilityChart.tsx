@@ -23,7 +23,15 @@ interface VisibilityChartProps {
   loadingAnalytics: boolean;
   liveScore: number | null;
   indexScore: number | null;
+  scoreConfidence?: 'low' | 'medium' | 'high';
+  activeModels?: number;
 }
+
+const CONFIDENCE_STYLES: Record<string, { label: string; color: string; bg: string }> = {
+  low: { label: 'Low confidence', color: 'var(--danger-text, #ef4444)', bg: 'rgba(239,68,68,0.12)' },
+  medium: { label: 'Medium confidence', color: 'var(--warning, #f59e0b)', bg: 'rgba(245,158,11,0.12)' },
+  high: { label: 'High confidence', color: 'var(--success)', bg: 'rgba(16,185,129,0.12)' },
+};
 
 export default function VisibilityChart({
   score,
@@ -34,6 +42,8 @@ export default function VisibilityChart({
   loadingAnalytics,
   liveScore,
   indexScore,
+  scoreConfidence,
+  activeModels,
 }: VisibilityChartProps) {
   const animatedScore = useCountUp(score ?? 0);
   const animatedLive = useCountUp(liveScore ?? 0);
@@ -58,6 +68,15 @@ export default function VisibilityChart({
                 <p className={`text-xs font-medium mt-2 ${scoreDelta > 0 ? 'text-[var(--success)]' : scoreDelta < 0 ? 'text-[var(--danger-text)]' : 'text-[var(--text-muted)]'}`}>
                   {scoreDelta > 0 ? `+${scoreDelta}%` : scoreDelta < 0 ? `${scoreDelta}%` : '\u2014'} since {sinceLastRun ?? 'last run'}
                 </p>
+              )}
+              {scoreConfidence && scoreConfidence !== 'high' && score != null && (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-medium mt-1.5 px-2 py-0.5 rounded-full"
+                  style={{ color: CONFIDENCE_STYLES[scoreConfidence].color, backgroundColor: CONFIDENCE_STYLES[scoreConfidence].bg }}
+                >
+                  {CONFIDENCE_STYLES[scoreConfidence].label}
+                  {activeModels !== undefined && activeModels < 4 && ` \u00b7 ${activeModels}/4 models`}
+                </span>
               )}
             </>
           )}

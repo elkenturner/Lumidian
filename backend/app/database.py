@@ -321,6 +321,23 @@ async def run_migrations():
                 # Column/index already exists — safe to ignore
                 pass
 
+    # ── One-time data fixes (idempotent) ─────────────────────────────────────
+    async with engine.begin() as conn:
+        # 2026-04-10: Upgrade pitch brands owned by paid users.
+        # Previously the Stripe webhook only converted standard→pro brands,
+        # leaving pitch brands stuck with pitch-level caps even after upgrade.
+        await conn.execute(text("""
+            UPDATE brands SET brand_type = 'pro', prompt_limit = 100
+            WHERE brand_type = 'pitch'
+              AND user_id IN (SELECT id FROM users WHERE subscription_tier = 'pro')
+        """))
+        await conn.execute(text("""
+            UPDATE brands SET brand_type = 'standard', prompt_limit = 25
+            WHERE brand_type = 'pitch'
+              AND user_id IN (SELECT id FROM users WHERE subscription_tier = 'starter')
+        """))
+        logger.info("Data fix: upgraded pitch brands for paid users")
+
 
 async def cleanup_stale_runs(max_age_minutes: int = 30):
     """Mark tracking runs stuck in pending/running for > max_age_minutes as failed.

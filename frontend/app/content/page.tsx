@@ -42,6 +42,7 @@ import {
   draftOpportunity,
   generateNow,
   getDraftStatus,
+  getDraftStatusFresh,
   getBrandProfile,
   getContentSettings,
   updateContentSettings,
@@ -1735,6 +1736,60 @@ export default function ContentHubPage() {
   // Cleanup generate-now poll on unmount
   useEffect(() => () => { if (generatePollRef.current) clearInterval(generatePollRef.current); }, []);
 
+  // ── Auto-poll when generation is already running on page load ─────────────
+  // If the user navigates to the page while backend generation is in progress
+  // (scheduled job, or they left mid-generation and came back), keep fetching
+  // fresh drafts until generation completes.
+  const generationPollActive = useRef(false);
+  useEffect(() => {
+    if (!selectedBrandId || !draftStatus?.generating || generating || generationPollActive.current) return;
+    generationPollActive.current = true;
+    setGenerating(true);
+
+    const brandId = selectedBrandId;
+    let cancelled = false;
+
+    (async () => {
+      const deadline = Date.now() + 360_000;
+      let prevCount = draftStatus.draft_count;
+      let unchangedStreak = 0;
+
+      while (Date.now() < deadline && !cancelled) {
+        await new Promise<void>((r) => setTimeout(r, 4000));
+        if (cancelled) break;
+
+        let status: DraftQueueStatus | null = null;
+        try {
+          status = await getDraftStatusFresh(brandId);
+        } catch { break; }
+
+        if (cancelled) break;
+        setDraftStatus(status);
+
+        if (status.draft_count !== prevCount) {
+          prevCount = status.draft_count;
+          unchangedStreak = 0;
+          // Lightweight: only refresh drafts, not all 9 endpoints
+          getDrafts(brandId, undefined, 'draft').then(setDraftItems).catch(() => {});
+        } else {
+          unchangedStreak++;
+        }
+
+        if (!status.generating && unchangedStreak >= 2) break;
+      }
+
+      if (!cancelled) {
+        setGenerating(false);
+        loadAll(brandId).catch(() => {});
+      }
+      generationPollActive.current = false;
+    })();
+
+    return () => { cancelled = true; generationPollActive.current = false; };
+  // Only trigger on initial load / brand switch — not on every draftStatus change
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBrandId, draftStatus?.generating]);
+
   // ── Draft actions ──────────────────────────────────────────────────────────
 
   async function handleApprove(id: number) {
@@ -1839,6 +1894,8 @@ export default function ContentHubPage() {
     try {
       // Backend starts generation in the background and returns 202 immediately.
       // Poll draft-status every 4 seconds until generation completes (up to 6 min).
+      // Invalidate cached status so polling reads fresh data from the server.
+      invalidateCache(`/content/${brandId}/draft-status`);
       await generateNow(brandId);
 
       const deadline = Date.now() + 360_000; // 6-minute max
@@ -1851,7 +1908,7 @@ export default function ContentHubPage() {
 
         let currentStatus: DraftQueueStatus | null = null;
         try {
-          currentStatus = await getDraftStatus(brandId);
+          currentStatus = await getDraftStatusFresh(brandId);
         } catch {
           break;
         }
@@ -1861,7 +1918,8 @@ export default function ContentHubPage() {
         if (currentStatus.draft_count !== prevCount) {
           prevCount = currentStatus.draft_count;
           unchangedStreak = 0;
-          loadAll(brandId).catch((err) => logError(err, 'Content: reload during generation poll'));
+          // Lightweight refresh: only fetch drafts, not all 9 endpoints
+          getDrafts(brandId, undefined, 'draft').then(setDraftItems).catch((err) => logError(err, 'Content: refresh drafts during generation poll'));
         } else {
           unchangedStreak++;
         }
@@ -1873,7 +1931,7 @@ export default function ContentHubPage() {
       setGenerating(false);
       loadAll(brandId).catch((err) => logError(err, 'Content: reload after generation complete'));
 
-      const finalStatus = await getDraftStatus(brandId).catch((err) => { logError(err, 'Content: fetch final draft status'); return null; });
+      const finalStatus = await getDraftStatusFresh(brandId).catch((err) => { logError(err, 'Content: fetch final draft status'); return null; });
       const count = finalStatus?.draft_count ?? prevCount;
       const promptCount = brandPrompts.length;
       if (count >= 20) {
@@ -1906,7 +1964,7 @@ export default function ContentHubPage() {
         setGenerateError(detail);
       }
       setGenerating(false);
-      getDraftStatus(brandId).then(setDraftStatus).catch((err) => logError(err, 'Content: refresh draft status after generation error'));
+      getDraftStatusFresh(brandId).then(setDraftStatus).catch((err) => logError(err, 'Content: refresh draft status after generation error'));
       loadAll(brandId).catch((err) => logError(err, 'Content: reload after generation error'));
     }
   }

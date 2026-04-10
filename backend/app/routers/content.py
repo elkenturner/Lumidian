@@ -505,27 +505,19 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
         is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
         weekly_limit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else WEEKLY_DRAFT_LIMITS.get(user.subscription_tier or "", 0)
         week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
-        # How many manual drafts were created this week
-        used_result = await db.execute(
+        # Only count committed (approved/posted) manual drafts toward the weekly
+        # limit.  Pending "draft"-status items are replaced each regeneration via
+        # clear_existing, so they should not block the user from refreshing.
+        committed_result = await db.execute(
             select(sqlfunc.count(ContentDraft.id)).where(
                 ContentDraft.brand_id == brand_id,
                 ContentDraft.source == "manual",
+                ContentDraft.status.in_(["approved", "posted"]),
                 ContentDraft.created_at >= week_ago,
             )
         )
-        used = used_result.scalar_one_or_none() or 0
-        # Pending "draft"-status manual drafts will be deleted by clear_existing — reclaim those slots
-        # before checking the limit so users at cap can always regenerate their existing drafts.
-        pending_result = await db.execute(
-            select(sqlfunc.count(ContentDraft.id)).where(
-                ContentDraft.brand_id == brand_id,
-                ContentDraft.source == "manual",
-                ContentDraft.status == "draft",
-                ContentDraft.created_at >= week_ago,
-            )
-        )
-        pending_manual = pending_result.scalar_one_or_none() or 0
-        effective_remaining = weekly_limit - used + pending_manual
+        committed = committed_result.scalar_one_or_none() or 0
+        effective_remaining = weekly_limit - committed
         if effective_remaining <= 0:
             label = "pitch deck" if is_pitch else "brand"
             raise HTTPException(
@@ -596,16 +588,19 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
         is_pitch = getattr(brand_obj, "brand_type", "standard") == "pitch"
         wlimit = _WEEKLY_MANUAL_LIMIT_PITCH if is_pitch else WEEKLY_DRAFT_LIMITS.get(user.subscription_tier or "", 0)
         week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
-        used_result = await db.execute(
+        # Only committed (approved/posted) drafts count toward weekly limit —
+        # pending drafts are replaced on each regeneration.
+        committed_result = await db.execute(
             select(sqlfunc.count(ContentDraft.id)).where(
                 ContentDraft.brand_id == brand_id,
                 ContentDraft.source == "manual",
+                ContentDraft.status.in_(["approved", "posted"]),
                 ContentDraft.created_at >= week_ago,
             )
         )
-        used = used_result.scalar_one_or_none() or 0
+        committed = committed_result.scalar_one_or_none() or 0
         weekly_drafts_limit = wlimit
-        weekly_drafts_remaining = max(0, wlimit - used)
+        weekly_drafts_remaining = max(0, wlimit - committed)
 
     return {
         "draft_count": draft_count,

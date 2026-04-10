@@ -469,6 +469,13 @@ export async function getDraftStatus(brandId: number): Promise<DraftQueueStatus>
   return dedupedGet<DraftQueueStatus>(`/content/${brandId}/draft-status`);
 }
 
+/** Bypass cache — used during generation polling where fresh data is critical. */
+export async function getDraftStatusFresh(brandId: number): Promise<DraftQueueStatus> {
+  invalidateCache(`/content/${brandId}/draft-status`);
+  const res = await api.get<DraftQueueStatus>(`/content/${brandId}/draft-status`);
+  return res.data;
+}
+
 // ── Opportunity functions ────────────────────────────────────────────────────
 
 export async function getOpportunities(brandId: number): Promise<ContentOpportunity[]> {

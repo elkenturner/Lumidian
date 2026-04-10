@@ -28,13 +28,9 @@ Gradient CTAs: `linear-gradient(135deg, oklch(0.58 0.22 293), oklch(0.746 0.16 2
 
 Reduced chroma at high lightness for `--accent-light` per Impeccable's OKLCH principle.
 
-### Neutral Tinting
+### Neutral Backgrounds
 
-Shift neutral backgrounds subtly toward the lavender hue (293 in OKLCH) for subconscious cohesion between accent and surfaces. The tint is barely perceptible but makes the accent feel like it belongs.
-
-Example: `--bg-card` from pure slate `#1e293b` to lavender-tinted `oklch(0.21 0.008 293)`.
-
-Apply the same subtle tint to all background tokens (`--bg-base`, `--bg-raised`, `--bg-card`, `--bg-elevated`).
+Keep current background colors unchanged (`--bg-base`, `--bg-raised`, `--bg-card`, `--bg-elevated`). User preference: current dark slate backgrounds are fine as-is.
 
 ### Banned Patterns
 

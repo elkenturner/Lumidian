@@ -183,7 +183,7 @@ export default function BillingPage() {
             </p>
             <button
               onClick={handlePortal}
-              className="mt-2 text-xs text-[var(--danger)] underline hover:no-underline transition-all"
+              className="mt-2 text-xs text-[var(--danger)] underline hover:no-underline transition-[text-decoration-line]"
             >
               Update payment method →
             </button>

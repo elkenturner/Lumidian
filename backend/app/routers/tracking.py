@@ -380,9 +380,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
                 m: {"total_queries": 0, "total_mentions": 0} for m in SUPPORTED_MODELS
             }
             for qr in query_results:
-                # Exclude ALL errors — they should not count as "not mentioned"
-                # and should not inflate the denominator (mirrors tracking_service.py)
-                if not qr.response_text:
+                if qr.error:
                     continue
                 model_stats[qr.model]["total_queries"] += 1
                 if qr.mentioned:

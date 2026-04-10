@@ -16,7 +16,7 @@ import { formatDistanceToNow, parseISO } from 'date-fns';
 import type { AppNotification } from '@/lib/api';
 
 const TYPE_META: Record<string, { icon: React.ElementType; dot: string; border: string }> = {
-  report_ready:    { icon: FileCheck2,   dot: 'var(--accent)', border: 'rgba(99,102,241,0.50)' },
+  report_ready:    { icon: FileCheck2,   dot: 'var(--accent)', border: 'rgba(95,126,166,0.50)' },
   visibility_drop: { icon: TrendingDown, dot: 'var(--danger)', border: 'rgba(239,68,68,0.50)' },
   draft_ready:     { icon: Sparkles,     dot: 'var(--success)', border: 'rgba(16,185,129,0.50)' },
   info:            { icon: Info,         dot: 'var(--text-muted)', border: 'rgba(100,116,139,0.30)' },
@@ -55,7 +55,7 @@ export default function NotificationPanel({
         background: 'rgba(10,14,24,0.97)',
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
-        border: '1px solid rgba(99,102,241,0.20)',
+        border: '1px solid rgba(95,126,166,0.20)',
         borderRadius: 16,
         boxShadow: '0 20px 60px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.04) inset',
       }}
@@ -100,7 +100,7 @@ export default function NotificationPanel({
           <div className="flex flex-col items-center justify-center py-14 gap-3">
             <div
               className="w-10 h-10 rounded-full flex items-center justify-center"
-              style={{ background: 'rgba(99,102,241,0.08)', border: '1px solid rgba(99,102,241,0.18)' }}
+              style={{ background: 'rgba(95,126,166,0.08)', border: '1px solid rgba(95,126,166,0.18)' }}
             >
               <Inbox size={18} className="text-[var(--text-faint)]" />
             </div>
@@ -114,7 +114,7 @@ export default function NotificationPanel({
               <div
                 className="px-4 py-3.5 border-b border-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.03)] transition-colors"
                 style={{
-                  background: !n.read ? 'rgba(99,102,241,0.04)' : undefined,
+                  background: !n.read ? 'rgba(95,126,166,0.04)' : undefined,
                   borderLeft: !n.read ? `2px solid ${meta.border}` : '2px solid transparent',
                 }}
               >

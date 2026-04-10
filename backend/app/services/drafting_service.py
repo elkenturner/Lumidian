@@ -992,9 +992,10 @@ async def auto_draft_top_gaps(
     n_prompts = len(ordered_prompts)
     prompt_idx = 0
     platform_idx = 0  # absolute index, wraps via modulo
-    # Safety limit: stop after trying each (prompt, platform) combo 3× — prevents
-    # infinite loops when every attempt raises a non-cap exception.
-    max_attempts = n_prompts * n_platforms * 3
+    # Safety limit: stop after enough retries to fill max_gaps even with failures.
+    # Floor of max_gaps * 3 ensures brands with few prompts/platforms still get
+    # adequate retry budget when some attempts fail due to API errors.
+    max_attempts = max(n_prompts * n_platforms * 3, max_gaps * 3)
     attempts = 0
     # Per-prompt Quora question index — cycles through results so multiple drafts
     # for the same prompt each target a different question.

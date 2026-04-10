@@ -27,7 +27,6 @@ import {
   getRecentRuns,
   triggerRun,
   getRunStatus,
-  generateNow,
   triggerScan,
   getCompetitors,
   getBrandProfile,
@@ -312,10 +311,10 @@ export default function DashboardPage() {
             loadData(selectedBrandId);
             if (newBrandMode && !newBrandHandledRef.current && run.status === 'completed') {
               newBrandHandledRef.current = true;
+              // Draft generation is handled by the backend onboarding pipeline
+              // (auto_draft_top_gaps with source="onboarding") — skip the redundant
+              // frontend call that was burning weekly manual draft quota.
               setNewBrandStep('drafting');
-              try {
-                await generateNow(selectedBrandId, 20);
-              } catch { /* non-fatal */ }
               triggerScan(selectedBrandId).catch((err) => logError(err, 'Dashboard: trigger Reddit scan'));
               setNewBrandStep('done');
               setTimeout(() => setNewBrandMode(false), 10000);

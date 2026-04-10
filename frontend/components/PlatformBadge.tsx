@@ -1,7 +1,6 @@
 'use client';
 
 import { memo } from 'react';
-import PlatformIcon from '@/components/PlatformIcon';
 
 interface PlatformBadgeProps {
   platform: string;
@@ -68,7 +67,6 @@ const PlatformBadge = memo(function PlatformBadge({ platform, size = 'md' }: Pla
         whiteSpace: 'nowrap',
       }}
     >
-      <PlatformIcon platform={key} size={size === 'sm' ? 10 : 12} color={styles.text} />
       {label}
     </span>
   );

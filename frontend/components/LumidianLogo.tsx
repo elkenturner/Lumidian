@@ -38,14 +38,14 @@ export default function LumidianLogo({
         fontWeight: 700,
         letterSpacing: '0.06em',
         fontFamily: 'var(--font-inter, system-ui, sans-serif)',
-        color: '#1e1b4b',
+        color: '#1a2440',
       }
     : {
         fontSize: Math.round(size * 0.5),
         fontWeight: 700,
         letterSpacing: '0.06em',
         fontFamily: 'var(--font-inter, system-ui, sans-serif)',
-        background: 'linear-gradient(115deg, #c4b5fd 0%, #a5b4fc 45%, #dde4ff 100%)',
+        background: 'linear-gradient(115deg, #8ba8cc 0%, #7a98b8 45%, #bcc8d8 100%)',
         WebkitBackgroundClip: 'text',
         WebkitTextFillColor: 'transparent',
         backgroundClip: 'text',

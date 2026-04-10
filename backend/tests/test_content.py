@@ -302,3 +302,9 @@ async def test_scan_log_calls_both_reddit_and_quora():
 
     mock_reddit.assert_called_once_with(99, clear_existing=True)
     mock_quora.assert_called_once_with(99, clear_existing=True)
+
+
+def test_draft_attribution_table_name():
+    """DraftAttribution must use 'draft_attributions' table, not 'content_attributions'."""
+    from app.models import DraftAttribution
+    assert DraftAttribution.__tablename__ == "draft_attributions"

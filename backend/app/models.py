@@ -492,7 +492,7 @@ class ContentGap(Base):
 
 class DraftAttribution(Base):
     """Tracks visibility score change for a prompt after a draft is posted."""
-    __tablename__ = "content_attributions"
+    __tablename__ = "draft_attributions"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     draft_id: Mapped[int] = mapped_column(

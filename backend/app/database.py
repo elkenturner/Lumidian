@@ -210,7 +210,7 @@ async def run_migrations():
             created_at DATETIME
         )""",
         # Content performance tracking — draft attribution
-        """CREATE TABLE IF NOT EXISTS content_attributions (
+        """CREATE TABLE IF NOT EXISTS draft_attributions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             draft_id INTEGER NOT NULL REFERENCES content_drafts(id) ON DELETE CASCADE,
             brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,

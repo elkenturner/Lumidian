@@ -67,14 +67,7 @@ async def _get_or_create_user(db, email: str) -> int:
     return user.id
 
 
-# ── Weekly limit constants ───────────────────────────────────────────────────
-
-def test_weekly_draft_limits():
-    """Starter=50, Pro=100 so regeneration isn't easily blocked."""
-    from app.routers.billing import WEEKLY_DRAFT_LIMITS
-    assert WEEKLY_DRAFT_LIMITS["starter"] == 50
-    assert WEEKLY_DRAFT_LIMITS["pro"] == 100
-
+# ── Tier draft caps ──────────────────────────────────────────────────────────
 
 def test_tier_draft_caps():
     """Draft queue caps scale with tier: free=5, starter=10, pro=20."""
@@ -85,16 +78,16 @@ def test_tier_draft_caps():
     assert get_draft_cap(None, brand_type="pitch") == 5
 
 
-# ── generate_now: weekly limit only counts approved/posted ───────────────────
+# ── generate_now: paid users have no weekly limit ────────────────────────────
 
-async def test_generate_now_pro_20_after_many_approved(client):
-    """Pro user with 30 approved manual drafts this week still gets max_gaps=20."""
+async def test_generate_now_pro_unlimited_weekly(client):
+    """Pro user with 200 approved manual drafts this week still gets max_gaps=20."""
     await register_and_login(client, email="pro@example.com", subscription_tier="pro")
 
     async with AsyncSessionLocal() as db:
         uid = await _get_or_create_user(db, "pro@example.com")
         bid, pids = await _create_brand_direct(db, uid, "Pro Brand", ["test prompt?"])
-        await _insert_drafts(db, bid, pids[0], 30, status="approved", source="manual")
+        await _insert_drafts(db, bid, pids[0], 200, status="approved", source="manual")
 
     captured = {}
 
@@ -105,56 +98,20 @@ async def test_generate_now_pro_20_after_many_approved(client):
         resp = await client.post(f"/api/content/{bid}/generate-now", json={"max_gaps": 20})
 
     assert resp.status_code == 202
-    # 30 approved out of 100 limit → effective=70 → min(20, 70) = 20
     assert captured["max_gaps"] == 20
 
 
-async def test_generate_now_starter_20_fresh_week(client):
-    """Starter with 0 approved drafts gets max_gaps=20 (limit=50)."""
+async def test_generate_now_starter_unlimited_weekly(client):
+    """Starter with 200 approved drafts this week still gets max_gaps=20."""
     await register_and_login(client, email="starter@example.com", subscription_tier="starter")
     brand = await create_brand(client, name="Starter Brand", prompts=["starter prompt?"])
-
-    captured = {}
-
-    async def _capture_bg(brand_id, max_gaps, source):
-        captured["max_gaps"] = max_gaps
-
-    with patch("app.routers.content._bg_generate_drafts", side_effect=_capture_bg):
-        resp = await client.post(f"/api/content/{brand['id']}/generate-now", json={"max_gaps": 20})
-
-    assert resp.status_code == 202
-    assert captured["max_gaps"] == 20
-
-
-async def test_generate_now_blocked_at_weekly_ceiling(client):
-    """Pro user with 100 approved drafts this week gets 429."""
-    await register_and_login(client, email="capped@example.com", subscription_tier="pro")
-
-    async with AsyncSessionLocal() as db:
-        uid = await _get_or_create_user(db, "capped@example.com")
-        bid, pids = await _create_brand_direct(db, uid, "Capped Brand", ["capped?"])
-        await _insert_drafts(db, bid, pids[0], 100, status="approved", source="manual")
-
-    async def _noop(*a, **kw):
-        pass
-
-    with patch("app.routers.content._bg_generate_drafts", side_effect=_noop):
-        resp = await client.post(f"/api/content/{bid}/generate-now", json={"max_gaps": 20})
-
-    assert resp.status_code == 429
-
-
-async def test_pending_drafts_dont_count_toward_weekly_limit(client):
-    """40 pending 'draft'-status manual items should NOT reduce remaining."""
-    await register_and_login(client, email="pending@example.com", subscription_tier="starter")
-    brand = await create_brand(client, name="Pending Brand", prompts=["pending?"])
 
     async with AsyncSessionLocal() as db:
         from sqlalchemy import text
         pr = await db.execute(text("SELECT id FROM prompts WHERE brand_id = :bid"),
                               {"bid": brand["id"]})
         pid = pr.scalar_one()
-        await _insert_drafts(db, brand["id"], pid, 40, status="draft", source="manual")
+        await _insert_drafts(db, brand["id"], pid, 200, status="approved", source="manual")
 
     captured = {}
 

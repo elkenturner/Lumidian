@@ -10,19 +10,19 @@
   --card-foreground: 210 25% 96%;
   --popover: 220 57% 6%;
   --popover-foreground: 210 25% 96%;
-  --primary: 239 84% 67%;
+  --primary: 214 28% 51%;
   --primary-foreground: 0 0% 100%;
   --secondary: 240 18% 14%;
   --secondary-foreground: 215 16% 60%;
   --muted: 240 18% 14%;
   --muted-foreground: 215 16% 47%;
   --accent: 240 18% 17%;
-  --accent-foreground: 239 68% 75%;
+  --accent-foreground: 214 25% 60%;
   --destructive: 0 63% 60%;
   --destructive-foreground: 0 0% 100%;
   --border: 240 18% 20%;
   --input: 240 18% 17%;
-  --ring: 271 76% 76%;
+  --ring: 214 28% 48%;
   --radius: 0.625rem;
 }
 
@@ -46,8 +46,8 @@
   --text-faint: #546880;
 
   /* Model colors */
-  --color-chatgpt: #22c55e;
-  --color-chatgpt-muted: rgba(34, 197, 94, 0.15);
+  --color-chatgpt: #10a37f;
+  --color-chatgpt-muted: rgba(16, 163, 127, 0.15);
   --color-claude: #f97316;
   --color-claude-muted: rgba(249, 115, 22, 0.15);
   --color-perplexity: #8b5cf6;
@@ -64,12 +64,12 @@
   --danger: #ef4444;
   --danger-text: #f87171;
 
-  /* Accent */
-  --accent: oklch(0.746 0.16 293);
-  --accent-hover: oklch(0.655 0.19 293);
-  --accent-light: oklch(0.84 0.1 293);
-  --accent-muted: oklch(0.746 0.16 293 / 0.15);
-  --accent-border: oklch(0.746 0.16 293 / 0.20);
+  /* Accent — Slate Blue */
+  --accent: oklch(0.58 0.06 235);
+  --accent-hover: oklch(0.50 0.08 235);
+  --accent-light: oklch(0.70 0.04 235);
+  --accent-muted: oklch(0.58 0.06 235 / 0.15);
+  --accent-border: oklch(0.58 0.06 235 / 0.20);
 
   /* Radius */
   --radius-sm: 6px;
@@ -169,7 +169,7 @@ body {
 .input::placeholder { color: var(--text-faint); }
 .input:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px oklch(0.746 0.16 293 / 0.15);
+  box-shadow: 0 0 0 3px oklch(0.58 0.06 235 / 0.15);
 }
 
 /* ── Button utilities ──────────────────────────────────────────────────────── */
@@ -195,11 +195,11 @@ body {
   background: var(--accent);
   color: white;
   border-color: transparent;
-  box-shadow: 0 1px 3px oklch(0.746 0.16 293 / 0.25);
+  box-shadow: 0 1px 3px oklch(0.58 0.06 235 / 0.25);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
-  box-shadow: 0 2px 8px oklch(0.746 0.16 293 / 0.35);
+  box-shadow: 0 2px 8px oklch(0.58 0.06 235 / 0.35);
 }
 
 .btn-secondary {
@@ -268,9 +268,9 @@ body {
   width: 52px;
   height: 52px;
   border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, oklch(0.746 0.16 293 / 0.12), oklch(0.58 0.22 293 / 0.08));
-  border: 1px solid oklch(0.746 0.16 293 / 0.22);
-  box-shadow: 0 0 24px oklch(0.746 0.16 293 / 0.08);
+  background: linear-gradient(135deg, oklch(0.58 0.06 235 / 0.12), oklch(0.42 0.06 235 / 0.08));
+  border: 1px solid oklch(0.58 0.06 235 / 0.22);
+  box-shadow: 0 0 24px oklch(0.58 0.06 235 / 0.08);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -292,7 +292,7 @@ body {
 
 /* ── Focus-visible ring (accessibility) ────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid oklch(0.746 0.16 293 / 0.6);
+  outline: 2px solid oklch(0.58 0.06 235 / 0.6);
   outline-offset: 2px;
 }
 
@@ -322,6 +322,12 @@ body {
 .orb-3 { animation: orb-drift-3 58s ease-in-out infinite; }
 .orb-4 { animation: orb-drift-4 36s ease-in-out infinite; }
 
+@keyframes ctaOrb {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  33%      { transform: translate(-45%, -55%) scale(1.1); }
+  66%      { transform: translate(-55%, -45%) scale(0.95); }
+}
+
 /* ── Shimmer skeleton ───────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
@@ -330,20 +336,14 @@ body {
 .skeleton {
   background: linear-gradient(
     90deg,
-    oklch(0.746 0.16 293 / 0.06) 25%,
-    oklch(0.746 0.16 293 / 0.14) 50%,
-    oklch(0.746 0.16 293 / 0.06) 75%
+    oklch(0.58 0.06 235 / 0.06) 25%,
+    oklch(0.58 0.06 235 / 0.14) 50%,
+    oklch(0.58 0.06 235 / 0.06) 75%
   );
   background-size: 200% 100%;
   animation: shimmer 1.8s ease-in-out infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; background: oklch(0.746 0.16 293 / 0.07); }
-  .orb-1, .orb-2, .orb-3, .orb-4 { animation: none; }
-}
-
-/* Respect user's motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -352,6 +352,7 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+  .skeleton { background: oklch(0.58 0.06 235 / 0.07); }
 }
 
 /* ── Stat value (mono font for data) ───────────────────────────────────────── */
@@ -373,7 +374,7 @@ body {
 
 /* ── Selection ────────────────────────────────────────────────────────────── */
 ::selection {
-  background: oklch(0.746 0.16 293 / 0.30);
+  background: oklch(0.58 0.06 235 / 0.30);
   color: var(--text-primary);
 }
 
@@ -415,8 +416,8 @@ body {
 }
 
 @keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 24px oklch(0.746 0.16 293 / 0.4); }
-  50% { box-shadow: 0 0 32px oklch(0.746 0.16 293 / 0.6); }
+  0%, 100% { box-shadow: 0 0 24px oklch(0.58 0.06 235 / 0.4); }
+  50% { box-shadow: 0 0 32px oklch(0.58 0.06 235 / 0.6); }
 }
 
 @keyframes drawLine {
@@ -440,8 +441,8 @@ body {
 }
 
 @keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 20px oklch(0.746 0.16 293 / 0.12), 0 0 6px oklch(0.746 0.16 293 / 0.06); }
-  50% { box-shadow: 0 0 30px oklch(0.746 0.16 293 / 0.22), 0 0 12px oklch(0.746 0.16 293 / 0.10); }
+  0%, 100% { box-shadow: 0 0 20px oklch(0.58 0.06 235 / 0.12), 0 0 6px oklch(0.58 0.06 235 / 0.06); }
+  50% { box-shadow: 0 0 30px oklch(0.58 0.06 235 / 0.22), 0 0 12px oklch(0.58 0.06 235 / 0.10); }
 }
 
 @keyframes slideInRight {

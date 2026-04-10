@@ -78,7 +78,7 @@ export default function VerifyEmailPage() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(95,126,166,0.15) 0%, transparent 60%)',
         }}
       />
 
@@ -132,14 +132,14 @@ export default function VerifyEmailPage() {
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="000000"
                     autoFocus
-                    className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 text-3xl md:text-2xl text-center font-mono tracking-[0.3em] text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#6366f1] focus:ring-2 focus:ring-[rgba(99,102,241,0.2)] transition-all"
+                    className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 text-3xl md:text-2xl text-center font-mono tracking-[0.3em] text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#5f7ea6] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading || code.length !== 6}
-                  className="w-full flex items-center justify-center gap-2 bg-[#6366f1] hover:bg-[#4f46e5] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 transition-colors min-h-[48px]"
+                  className="w-full flex items-center justify-center gap-2 bg-[#5f7ea6] hover:bg-[#4a6a90] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 transition-colors min-h-[48px]"
                 >
                   {loading && <Loader2 size={15} className="animate-spin" />}
                   {loading ? 'Verifying…' : 'Verify email'}
@@ -151,7 +151,7 @@ export default function VerifyEmailPage() {
                 <button
                   onClick={handleResend}
                   disabled={resending}
-                  className="text-[#6366f1] hover:text-[#818cf8] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="text-[#5f7ea6] hover:text-[#8ba8cc] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {resending ? 'Sending…' : 'Resend code'}
                 </button>

@@ -4,7 +4,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[color,background-color,border-color,box-shadow] disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0",
   {
     variants: {
       variant: {
@@ -15,7 +15,7 @@ const buttonVariants = cva(
         outline:
           "border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.05)] text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.09)] hover:text-[var(--text-primary)]",
         secondary:
-          "bg-[rgba(99,102,241,0.08)] text-[var(--accent-foreground)] border border-[var(--border-default)] hover:bg-[rgba(99,102,241,0.14)]",
+          "bg-[rgba(95,126,166,0.08)] text-[var(--accent-foreground)] border border-[var(--border-default)] hover:bg-[rgba(95,126,166,0.14)]",
         ghost:
           "text-[var(--text-muted)] hover:bg-[rgba(255,255,255,0.06)] hover:text-[var(--text-secondary)]",
         link: "text-[var(--accent-foreground)] underline-offset-4 hover:underline",

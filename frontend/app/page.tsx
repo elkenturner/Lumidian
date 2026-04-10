@@ -25,6 +25,9 @@ import LumidianLogo from '@/components/LumidianLogo';
 // ANIMATION HOOKS
 // ═══════════════════════════════════════════════════════════════════════════════
 
+// Design system easing — matches --ease-out in globals.css
+const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
+
 function useInView(threshold = 0.1, rootMargin = '50px') {
   const ref = useRef<HTMLDivElement>(null);
   const [inView, setInView] = useState(false);
@@ -55,7 +58,7 @@ function useInView(threshold = 0.1, rootMargin = '50px') {
   return { ref, inView };
 }
 
-function useCountUp(target: number, duration = 1800) {
+function useCountUp(target: number, duration = 1200) {
   const [value, setValue] = useState(0);
   const triggered = useRef(false);
   const { ref, inView } = useInView(0.3);
@@ -94,9 +97,8 @@ function FadeUp({
       className={className}
       style={{
         opacity: inView ? 1 : 0,
-        transform: inView ? 'translateY(0)' : 'translateY(30px)',
-        transition: `opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
-        willChange: 'opacity, transform',
+        transform: inView ? 'translateY(0)' : 'translateY(10px)',
+        transition: `opacity 0.35s ${EASE_OUT} ${delay}ms, transform 0.35s ${EASE_OUT} ${delay}ms`,
       }}
     >
       {children}
@@ -120,9 +122,8 @@ function ScaleIn({
       className={className}
       style={{
         opacity: inView ? 1 : 0,
-        transform: inView ? 'scale(1)' : 'scale(0.95)',
-        transition: `opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) ${delay}ms`,
-        willChange: 'opacity, transform',
+        transform: inView ? 'scale(1)' : 'scale(0.97)',
+        transition: `opacity 0.4s ${EASE_OUT} ${delay}ms, transform 0.4s ${EASE_OUT} ${delay}ms`,
       }}
     >
       {children}
@@ -178,7 +179,7 @@ const FEATURES = [
 ];
 
 const AI_MODELS = [
-  { name: 'ChatGPT', color: '#22c55e' },
+  { name: 'ChatGPT', color: '#10a37f' },
   { name: 'Claude', color: '#f97316' },
   { name: 'Perplexity', color: '#8b5cf6' },
   { name: 'Gemini', color: '#3b82f6' },
@@ -270,7 +271,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+      className={`fixed top-0 left-0 right-0 z-50 transition-[background-color,backdrop-filter,border-color] duration-300 ${
         scrolled
           ? 'bg-[rgba(2,6,23,0.85)] backdrop-blur-lg border-b border-[rgba(51,65,85,0.5)]'
           : 'max-md:bg-[rgba(2,6,23,0.85)] max-md:backdrop-blur-lg bg-transparent'
@@ -306,7 +307,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
             </Link>
             <Link
               href="/register"
-              className="text-sm font-semibold text-white px-5 py-2.5 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-lg"
+              className="text-sm font-semibold text-white px-5 py-2.5 rounded-full bg-[#5f7ea6] hover:bg-[#4a6a90] transition-colors shadow-lg"
             >
               Get Started
             </Link>
@@ -332,7 +333,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
                 <Link href="/login" className="text-base font-medium text-white text-center py-3 rounded-full border border-[rgba(255,255,255,0.2)]">
                   Log in
                 </Link>
-                <Link href="/register" className="text-base font-semibold text-white text-center py-3.5 rounded-full bg-[#6366f1]">
+                <Link href="/register" className="text-base font-semibold text-white text-center py-3.5 rounded-full bg-[#5f7ea6]">
                   Get Started
                 </Link>
               </div>
@@ -351,7 +352,7 @@ function HeroSection() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at 50% 0%, rgba(95,126,166,0.15) 0%, transparent 60%)',
         }}
       />
 
@@ -359,7 +360,7 @@ function HeroSection() {
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {/* Badge */}
         <FadeUp>
-          <div className="inline-flex items-center gap-2 bg-[#0f172a] border border-[rgba(99,102,241,0.3)] rounded-full px-4 py-1.5 mb-8">
+          <div className="inline-flex items-center gap-2 bg-[#0f172a] border border-[rgba(95,126,166,0.3)] rounded-full px-4 py-1.5 mb-8">
             <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
             <span className="text-sm text-[#94a3b8]">Now tracking 4 AI models</span>
           </div>
@@ -373,7 +374,7 @@ function HeroSection() {
           >
             Track Your Brand&apos;s
             <br />
-            <span className="bg-gradient-to-r from-[#6366f1] to-[#a855f7] bg-clip-text text-transparent">
+            <span className="text-[#5f7ea6]">
               Visibility in AI
             </span>
             {' — Then Fix It'}
@@ -393,14 +394,14 @@ function HeroSection() {
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/register"
-              className="flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-lg hover:shadow-xl"
+              className="flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#5f7ea6] hover:bg-[#4a6a90] transition-[background-color,box-shadow] shadow-lg hover:shadow-xl"
             >
               <Play size={18} fill="white" />
               Start Free
             </Link>
             <Link
               href="/login"
-              className="text-lg font-medium text-white px-6 py-4 rounded-full border border-[rgba(255,255,255,0.25)] hover:border-white hover:bg-[rgba(255,255,255,0.05)] transition-all"
+              className="text-lg font-medium text-white px-6 py-4 rounded-full border border-[rgba(255,255,255,0.25)] hover:border-white hover:bg-[rgba(255,255,255,0.05)] transition-[border-color,background-color]"
             >
               Log in
             </Link>
@@ -427,7 +428,7 @@ function ModelsBar() {
           {AI_MODELS.map((model, i) => (
             <FadeUp key={model.name} delay={i * 60}>
               <div
-                className="flex items-center gap-2 bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-full px-4 py-2 transition-all hover:border-opacity-100"
+                className="flex items-center gap-2 bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-full px-4 py-2 transition-[border-color] hover:border-opacity-100"
                 style={{
                   ['--model-color' as string]: model.color,
                 }}
@@ -475,9 +476,9 @@ function FeaturesSection() {
             const Icon = feature.icon;
             return (
               <FadeUp key={feature.title} delay={i * 80}>
-                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-5 md:p-7 h-full transition-all duration-200 hover:-translate-y-1 hover:border-[rgba(99,102,241,0.3)] hover:shadow-[0_0_24px_rgba(99,102,241,0.15),0_8px_32px_rgba(0,0,0,0.3)]">
-                  <div className="w-11 h-11 rounded-xl bg-[rgba(99,102,241,0.15)] flex items-center justify-center mb-4">
-                    <Icon size={20} className="text-[#6366f1]" />
+                <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-5 md:p-7 h-full transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 hover:border-[rgba(95,126,166,0.3)] hover:shadow-[0_0_24px_rgba(95,126,166,0.15),0_8px_32px_rgba(0,0,0,0.3)]">
+                  <div className="w-11 h-11 rounded-xl bg-[rgba(95,126,166,0.15)] flex items-center justify-center mb-4">
+                    <Icon size={20} className="text-[#5f7ea6]" />
                   </div>
                   <h3
                     className="text-lg font-semibold text-[#f8fafc] mb-2"
@@ -518,7 +519,7 @@ function HowItWorksSection() {
                 {/* Number */}
                 <div className="flex-shrink-0">
                   <span
-                    className="text-6xl sm:text-7xl font-extrabold bg-gradient-to-br from-[#6366f1] to-[#a855f7] bg-clip-text text-transparent"
+                    className="text-6xl sm:text-7xl font-extrabold text-[#5f7ea6]"
                     style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif', lineHeight: 1 }}
                   >
                     {step.n}
@@ -527,9 +528,9 @@ function HowItWorksSection() {
 
                 {/* Content */}
                 <div className="pt-2">
-                  <div className="inline-flex items-center gap-2 bg-[rgba(99,102,241,0.1)] border border-[rgba(99,102,241,0.2)] rounded-full px-3 py-1 mb-3">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#6366f1]" />
-                    <span className="text-xs font-semibold text-[#6366f1]">Step {step.n}</span>
+                  <div className="inline-flex items-center gap-2 bg-[rgba(95,126,166,0.1)] border border-[rgba(95,126,166,0.2)] rounded-full px-3 py-1 mb-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#5f7ea6]" />
+                    <span className="text-xs font-semibold text-[#5f7ea6]">Step {step.n}</span>
                   </div>
                   <h3
                     className="text-xl font-semibold text-[#f8fafc] mb-2"
@@ -588,7 +589,7 @@ function DashboardMockup() {
       }}
     >
       <div
-        className="bg-[#0f172a] border border-[rgba(99,102,241,0.2)] rounded-2xl overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.5),0_0_0_1px_rgba(99,102,241,0.1)]"
+        className="bg-[#0f172a] border border-[rgba(95,126,166,0.2)] rounded-2xl overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.5),0_0_0_1px_rgba(95,126,166,0.1)]"
         style={{
           transform: 'rotateX(2deg)',
         }}
@@ -610,7 +611,7 @@ function DashboardMockup() {
           <div
             ref={scoreRef}
             className="rounded-2xl p-5 text-white"
-            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
+            style={{ background: 'linear-gradient(135deg, #4a6a90, #3a5070)' }}
           >
             <p className="text-xs font-semibold uppercase tracking-wider opacity-70">AI Visibility Score</p>
             <p
@@ -631,12 +632,12 @@ function DashboardMockup() {
             <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-12">
               <defs>
                 <linearGradient id="mockupSparkGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
-                  <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+                  <stop offset="0%" stopColor="#5f7ea6" stopOpacity="0.3" />
+                  <stop offset="100%" stopColor="#5f7ea6" stopOpacity="0" />
                 </linearGradient>
               </defs>
               <path d={areaD} fill="url(#mockupSparkGrad)" />
-              <path d={pathD} fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              <path d={pathD} fill="none" stroke="#5f7ea6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
 
@@ -654,7 +655,7 @@ function DashboardMockup() {
                 </div>
                 <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#22c55e] rounded-full transition-all duration-700"
+                    className="h-full bg-[#22c55e] rounded-full transition-[width] duration-700"
                     style={{ width: `${liveVal}%` }}
                   />
                 </div>
@@ -662,14 +663,14 @@ function DashboardMockup() {
               <div ref={indexRef}>
                 <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#818cf8]" />
+                    <span className="w-2 h-2 rounded-full bg-[#8ba8cc]" />
                     <span className="text-xs text-[#94a3b8]">AI Index</span>
                   </div>
-                  <span className="text-xs font-bold text-[#818cf8]">{indexVal}%</span>
+                  <span className="text-xs font-bold text-[#8ba8cc]">{indexVal}%</span>
                 </div>
                 <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-[#818cf8] rounded-full transition-all duration-700"
+                    className="h-full bg-[#8ba8cc] rounded-full transition-[width] duration-700"
                     style={{ width: `${indexVal}%` }}
                   />
                 </div>
@@ -686,7 +687,7 @@ function DashboardMockup() {
                   <span className="text-xs font-medium text-[#94a3b8] w-20 flex-shrink-0">{m.name}</span>
                   <div className="flex-1 h-2 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full transition-all duration-700"
+                      className="h-full rounded-full transition-[width] duration-700"
                       style={{
                         width: `${barWidths[i]}%`,
                         backgroundColor: m.color,
@@ -726,8 +727,8 @@ function DashboardMockup() {
                 <span className="text-xs font-medium text-[#94a3b8] w-24 flex-shrink-0">Your Brand</span>
                 <div className="flex-1 h-2 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-700"
-                    style={{ width: `${compWidths[0]}%`, backgroundColor: '#6366f1' }}
+                    className="h-full rounded-full transition-[width] duration-700"
+                    style={{ width: `${compWidths[0]}%`, backgroundColor: '#5f7ea6' }}
                   />
                 </div>
                 <span className="text-xs font-bold text-[#f8fafc] w-10 text-right">72%</span>
@@ -736,7 +737,7 @@ function DashboardMockup() {
                 <span className="text-xs font-medium text-[#94a3b8] w-24 flex-shrink-0">Competitor A</span>
                 <div className="flex-1 h-2 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-700"
+                    className="h-full rounded-full transition-[width] duration-700"
                     style={{ width: `${compWidths[1]}%`, backgroundColor: '#64748b', transitionDelay: '100ms' }}
                   />
                 </div>
@@ -791,7 +792,7 @@ function PricingSection() {
                   <th className="text-left text-sm font-semibold text-[#f8fafc] p-3 md:p-4 rounded-tl-xl sticky left-0 bg-[#1e293b] z-10">Feature</th>
                   <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Free</th>
                   <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Starter</th>
-                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4 rounded-tr-xl bg-[rgba(99,102,241,0.2)] border-b-2 border-[#6366f1]">
+                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4 rounded-tr-xl bg-[rgba(95,126,166,0.2)] border-b-2 border-[#5f7ea6]">
                     Pro
                   </th>
                 </tr>
@@ -800,12 +801,12 @@ function PricingSection() {
                 {COMPARISON_FEATURES.map((row, i) => (
                   <tr
                     key={row.label}
-                    className={`${i % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#020617]'} hover:bg-[rgba(99,102,241,0.05)] transition-colors`}
+                    className={`${i % 2 === 0 ? 'bg-[#0f172a]' : 'bg-[#020617]'} hover:bg-[rgba(95,126,166,0.05)] transition-colors`}
                   >
                     <td className="text-sm text-[#f8fafc] p-3 md:p-4 sticky left-0 z-10" style={{ background: i % 2 === 0 ? '#0f172a' : '#020617' }}>{row.label}</td>
                     <td className="text-center p-4"><PricingCell value={row.free} /></td>
                     <td className="text-center p-4"><PricingCell value={row.starter} /></td>
-                    <td className="text-center p-4 bg-[rgba(99,102,241,0.05)] border-l border-r border-[rgba(99,102,241,0.2)]">
+                    <td className="text-center p-4 bg-[rgba(95,126,166,0.05)] border-l border-r border-[rgba(95,126,166,0.2)]">
                       <PricingCell value={row.pro} />
                     </td>
                   </tr>
@@ -824,9 +825,9 @@ function PricingSection() {
                 <button
                   key={tier}
                   onClick={() => setMobileTier(tier)}
-                  className={`flex-1 py-2.5 text-sm font-semibold rounded-full transition-all ${
+                  className={`flex-1 py-2.5 text-sm font-semibold rounded-full transition-[background-color,color,box-shadow] ${
                     mobileTier === tier
-                      ? 'bg-[#6366f1] text-white shadow-[0_0_12px_rgba(99,102,241,0.4)]'
+                      ? 'bg-[#5f7ea6] text-white shadow-[0_0_12px_rgba(95,126,166,0.4)]'
                       : 'text-[#94a3b8] hover:text-white'
                   }`}
                 >
@@ -871,7 +872,7 @@ function PricingSection() {
 
               <Link
                 href="/register"
-                className="mt-6 w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white py-3 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)]"
+                className="mt-6 w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white py-3 rounded-full bg-[#5f7ea6] hover:bg-[#4a6a90] transition-colors shadow-[0_0_24px_rgba(95,126,166,0.4)]"
               >
                 Get started free
                 <ArrowRight size={16} />
@@ -884,7 +885,7 @@ function PricingSection() {
           <div className="mt-8 text-center hidden md:block">
             <Link
               href="/register"
-              className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-[0_0_24px_rgba(99,102,241,0.4)]"
+              className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[#5f7ea6] hover:bg-[#4a6a90] transition-colors shadow-[0_0_24px_rgba(95,126,166,0.4)]"
             >
               Get started free
               <ArrowRight size={16} />
@@ -910,7 +911,7 @@ function FAQItem({
   return (
     <FadeUp delay={delay}>
       <div
-        className={`border-b border-[rgba(51,65,85,0.5)] transition-all ${isOpen ? 'border-l-2 border-l-[#6366f1] pl-4' : ''}`}
+        className={`border-b border-[rgba(51,65,85,0.5)] transition-[background-color,padding] ${isOpen ? 'bg-[rgba(95,126,166,0.04)] pl-4' : ''}`}
       >
         <button
           onClick={onToggle}
@@ -923,7 +924,7 @@ function FAQItem({
           />
         </button>
         <div
-          className={`overflow-hidden transition-all duration-300 ${isOpen ? 'max-h-96 pb-5' : 'max-h-0'}`}
+          className={`overflow-hidden transition-[max-height] duration-300 ${isOpen ? 'max-h-96 pb-5' : 'max-h-0'}`}
         >
           <p className="text-sm text-[#94a3b8] leading-relaxed">{item.a}</p>
         </div>
@@ -968,7 +969,7 @@ function CTASection() {
     <section
       className="py-32 text-center relative"
       style={{
-        background: 'radial-gradient(ellipse at 50% 100%, rgba(99,102,241,0.15) 0%, transparent 60%)',
+        background: 'radial-gradient(ellipse at 50% 100%, rgba(95,126,166,0.15) 0%, transparent 60%)',
       }}
     >
       {/* Animated gradient orb */}
@@ -978,7 +979,7 @@ function CTASection() {
         <div
           className="absolute w-[600px] h-[600px] rounded-full opacity-20 blur-[120px]"
           style={{
-            background: 'radial-gradient(circle, #6366f1 0%, #a855f7 50%, transparent 70%)',
+            background: 'radial-gradient(circle, #5f7ea6 0%, #4a6a90 50%, transparent 70%)',
             left: '50%',
             top: '50%',
             transform: 'translate(-50%, -50%)',
@@ -986,13 +987,6 @@ function CTASection() {
           }}
         />
       </div>
-      <style>{`
-        @keyframes ctaOrb {
-          0%, 100% { transform: translate(-50%, -50%) scale(1); }
-          33% { transform: translate(-45%, -55%) scale(1.1); }
-          66% { transform: translate(-55%, -45%) scale(0.95); }
-        }
-      `}</style>
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeUp>
           <h2
@@ -1010,7 +1004,7 @@ function CTASection() {
         <FadeUp delay={200}>
           <Link
             href="/register"
-            className="inline-flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#6366f1] hover:bg-[#4f46e5] transition-all shadow-lg hover:shadow-xl"
+            className="inline-flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[#5f7ea6] hover:bg-[#4a6a90] transition-[background-color,box-shadow] shadow-lg hover:shadow-xl"
           >
             Get Started Free
             <ArrowRight size={18} />

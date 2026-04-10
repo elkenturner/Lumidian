@@ -1,5 +1,7 @@
 'use client';
 
+import { AnimatePresence, motion } from 'framer-motion';
+import { fadeIn, slideIn } from '@/lib/motion';
 import { useEffect, useState, useRef } from 'react';
 import { logError } from '@/lib/utils/errors';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -140,7 +142,7 @@ function EditableList({
         />
         <button
           onClick={addItem}
-          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent-muted)] transition-all duration-150"
+          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent-muted)] transition-[color,border-color,background-color] duration-150"
         >
           <Plus size={16} />
         </button>
@@ -157,7 +159,7 @@ function CompletionBar({ pct }: { pct: number }) {
     <div className="flex items-center gap-3">
       <div className="flex-1 bg-[var(--accent-muted)] rounded-full h-2">
         <div
-          className="h-2 rounded-full transition-all duration-500"
+          className="h-2 rounded-full transition-[width] duration-500"
           style={{ width: `${pct}%`, backgroundColor: color }}
         />
       </div>
@@ -712,7 +714,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-8 max-w-5xl">
+      <div className="p-4 sm:p-8 max-w-7xl">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-32" />
           <div className="h-10 bg-[rgba(255,255,255,0.06)] rounded w-64" />
@@ -725,7 +727,12 @@ export default function SettingsPage() {
   const completionPct = profile?.completion_pct ?? 0;
 
   return (
-    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-5xl">
+    <motion.div
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
+      className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl"
+    >
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-[var(--text-primary)]" style={{ letterSpacing: '-0.3px' }}>Settings</h1>
@@ -741,7 +748,7 @@ export default function SettingsPage() {
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={clsx(
-              'px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-[3px] -mb-px transition-all',
+              'px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-[3px] -mb-px transition-[color,background-color,border-color]',
               activeTab === tab
                 ? 'text-[var(--accent-foreground)] border-[var(--accent)] bg-[var(--accent-muted)]'
                 : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)]'
@@ -752,11 +759,17 @@ export default function SettingsPage() {
         ))}
       </div>
 
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          variants={slideIn}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
       {/* ── GENERAL TAB ──────────────────────────────────────────────────────── */}
       {activeTab === 'general' && brand && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          {/* Left column */}
-          <div className="space-y-6">
+        <div className="space-y-6 max-w-3xl">
           {/* Brand Settings */}
           <div className="card" style={{ padding: 20 }}>
             <h2 className="text-[15px] font-semibold text-[var(--text-primary)] pb-3 mb-5 border-b border-[var(--border-subtle)]">Brand Settings</h2>
@@ -883,7 +896,7 @@ export default function SettingsPage() {
                       onClick={() => handleDeletePrompt(prompt.id)}
                       disabled={deletingPromptId === prompt.id}
                       aria-label="Delete prompt"
-                      className="text-[rgba(255,255,255,0.15)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                      className="text-[rgba(255,255,255,0.15)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-[opacity,color] flex-shrink-0"
                     >
                       {deletingPromptId === prompt.id ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -937,9 +950,7 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
-          </div>
 
-          <div className="space-y-6">
           {/* Competitors */}
           <div className="card" style={{ padding: 20 }}>
             <div className="pb-3 mb-5 border-b border-[var(--border-subtle)]">
@@ -979,7 +990,7 @@ export default function SettingsPage() {
                       onClick={() => handleRemoveCompetitor(comp.id)}
                       disabled={deletingCompetitorId === comp.id}
                       aria-label="Remove competitor"
-                      className="text-[rgba(255,255,255,0.15)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                      className="text-[rgba(255,255,255,0.15)] hover:text-[var(--danger)] opacity-0 group-hover:opacity-100 transition-[opacity,color] flex-shrink-0"
                     >
                       {deletingCompetitorId === comp.id ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -991,8 +1002,6 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
-          </div>
-
           </div>
         </div>
       )}
@@ -1030,7 +1039,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleAiFill}
                 disabled={aiFilling || profileSaving}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] text-[var(--accent-foreground)] disabled:opacity-50 transition-all"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] text-[var(--accent-foreground)] disabled:opacity-50 transition-opacity"
                 title="Scan website and auto-fill profile fields"
               >
                 {aiFilling ? <Loader2 size={13} className="animate-spin" /> : <Wand2 size={13} />}
@@ -1144,7 +1153,7 @@ export default function SettingsPage() {
               onClick={handleProfileSave}
               disabled={profileSaving}
               className={clsx(
-                'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all',
+                'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                 profileSaved
                   ? 'bg-[var(--success)]/15 text-[var(--success)] border border-[var(--success)]/25'
                   : 'bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] hover:border-[var(--accent-muted)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_var(--accent-muted)] disabled:opacity-50'
@@ -1249,6 +1258,8 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Delete brand confirmation modal */}
       {showDeleteBrandConfirm && brand && (
@@ -1300,6 +1311,6 @@ export default function SettingsPage() {
         </div>
       )}
       {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
-    </div>
+    </motion.div>
   );
 }

@@ -109,6 +109,7 @@ class Brand(Base):
     brand_type: Mapped[str] = mapped_column(String(20), nullable=False, default="standard")
     pitch_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     prompt_limit: Mapped[int] = mapped_column(Integer, default=25)
+    last_manual_draft_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -258,7 +259,7 @@ class CompetitorMention(Base):
         Integer, ForeignKey("competitors.id", ondelete="CASCADE"), nullable=False, index=True
     )
     prompt_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("prompts.id"), nullable=False, index=True
+        Integer, ForeignKey("prompts.id", ondelete="CASCADE"), nullable=False, index=True
     )
     model: Mapped[str] = mapped_column(String(50), nullable=False)
     run_number: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -276,7 +277,10 @@ class AccountConnection(Base):
     __tablename__ = "account_connections"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    platform: Mapped[str] = mapped_column(String(50), nullable=False, unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    platform: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="disconnected")
     credentials: Mapped[str | None] = mapped_column(Text, nullable=True)
     display_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
@@ -285,6 +289,10 @@ class AccountConnection(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "platform", name="uq_account_connection_user_platform"),
+    )
 
 
 class BrandContentSettings(Base):
@@ -379,10 +387,10 @@ class ContentAttribution(Base):
         Integer, ForeignKey("tracking_runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
     prompt_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("prompts.id"), nullable=False, index=True
+        Integer, ForeignKey("prompts.id", ondelete="CASCADE"), nullable=False, index=True
     )
     brand_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("brands.id"), nullable=False, index=True
+        Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True
     )
     visibility_before: Mapped[float | None] = mapped_column(Float, nullable=True)
     visibility_after: Mapped[float | None] = mapped_column(Float, nullable=True)

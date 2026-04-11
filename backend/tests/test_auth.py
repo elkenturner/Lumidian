@@ -330,7 +330,7 @@ async def test_csrf_allows_no_origin_header(client):
 
 @pytest.mark.asyncio
 async def test_password_reset_token_stored_as_hash(client, db_session):
-    """Reset token stored in DB must be a bcrypt hash, not the raw token."""
+    """Reset token stored in DB must be a SHA-256 hash, not the raw token."""
     from sqlalchemy import select as sa_select
 
     from app.models import PasswordResetToken
@@ -343,12 +343,12 @@ async def test_password_reset_token_stored_as_hash(client, db_session):
     resp = await client.post("/api/auth/forgot-password", json={"email": "hashtest@example.com"})
     assert resp.status_code == 200
 
-    # DB must store bcrypt hash ($2b$)
+    # DB must store SHA-256 hash (64-char hex string, not the raw token)
     result = await db_session.execute(sa_select(PasswordResetToken))
     tokens = result.scalars().all()
     assert len(tokens) > 0
     for t in tokens:
-        assert t.token.startswith("$2b$"), f"Token not hashed: {t.token[:20]}"
+        assert len(t.token) == 64 and all(c in "0123456789abcdef" for c in t.token), f"Token not hashed: {t.token[:20]}"
 
 
 @pytest.mark.asyncio

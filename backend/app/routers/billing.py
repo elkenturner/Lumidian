@@ -126,8 +126,7 @@ async def billing_status(user: Annotated[User, Depends(get_current_user)]):
         "prompt_limit": limit,
         "brand_limits": brand_limits,
         "is_admin": user.is_admin,
-        "stripe_customer_id": user.stripe_customer_id,
-        "stripe_subscription_id": user.stripe_subscription_id,
+        "has_payment_method": bool(user.stripe_customer_id),
     }
 
 
@@ -209,6 +208,17 @@ def _frontend_url() -> str:
     return os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 
+def _validate_redirect_url(url: str) -> str:
+    """Ensure redirect URL belongs to the frontend domain. Returns sanitized URL."""
+    from urllib.parse import urlparse
+    base = _frontend_url()
+    base_parsed = urlparse(base)
+    url_parsed = urlparse(url)
+    if url_parsed.netloc and url_parsed.netloc != base_parsed.netloc:
+        return base  # reject external domains
+    return url
+
+
 class CheckoutRequest(BaseModel):
     tier: str  # 'starter' | 'pro'
     success_url: str = ""
@@ -218,8 +228,12 @@ class CheckoutRequest(BaseModel):
         base = _frontend_url()
         if not self.success_url:
             self.success_url = f"{base}/settings/billing?success=true"
+        else:
+            self.success_url = _validate_redirect_url(self.success_url)
         if not self.cancel_url:
             self.cancel_url = f"{base}/settings/billing"
+        else:
+            self.cancel_url = _validate_redirect_url(self.cancel_url)
 
 
 @router.post("/create-checkout")
@@ -273,6 +287,8 @@ class PortalRequest(BaseModel):
     def model_post_init(self, __context: object) -> None:
         if not self.return_url:
             self.return_url = f"{_frontend_url()}/account"
+        else:
+            self.return_url = _validate_redirect_url(self.return_url)
 
 
 @router.post("/portal")
@@ -341,9 +357,10 @@ async def change_plan(
     except HTTPException:
         raise
     except Exception as exc:
+        logger.exception("Plan switch failed")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not switch plan: {exc}",
+            detail="Could not switch plan. Please try again or contact support.",
         )
 
     old_tier = user.subscription_tier
@@ -381,9 +398,10 @@ async def cancel_subscription(
             cancel_at_period_end=True,
         )
     except Exception as exc:
+        logger.exception("Subscription cancellation failed")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not cancel subscription: {exc}",
+            detail="Could not cancel subscription. Please try again or contact support.",
         )
 
     user.subscription_status = "canceling"
@@ -418,7 +436,8 @@ async def stripe_webhook(request: Request, db: DbDep):
     try:
         event = _stripe.Webhook.construct_event(body, sig_header, webhook_secret)
     except Exception as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        logger.warning("Webhook signature verification failed: %s", exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Webhook signature verification failed")
 
     from sqlalchemy import select as sa_select
 

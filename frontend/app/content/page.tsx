@@ -80,25 +80,11 @@ import {
   extractSubreddit,
   computeUrgency,
 } from './utils';
+import { renderPreviewHtml } from '@/components/content/helpers';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted';
-
-// ── Simple markdown-to-html renderer for preview mode ─────────────────────────
-
-function renderPreviewHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^#{3}\s+(.+)$/gm, '<h3 style="font-size:14px;font-weight:700;margin:10px 0 4px">$1</h3>')
-    .replace(/^#{2}\s+(.+)$/gm, '<h2 style="font-size:16px;font-weight:700;margin:12px 0 6px">$1</h2>')
-    .replace(/^#{1}\s+(.+)$/gm, '<h1 style="font-size:18px;font-weight:800;margin:14px 0 6px">$1</h1>')
-    .replace(/\n{2,}/g, '</p><p style="margin:8px 0">')
-    .replace(/\n/g, '<br/>');
-}
 
 // ── Draft card (Drafts tab) ───────────────────────────────────────────────────
 

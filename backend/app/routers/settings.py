@@ -11,12 +11,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.dependencies import CurrentUser
 from app.models import SystemSetting, utcnow
 
 router = APIRouter(prefix="/settings", tags=["settings"])
@@ -44,7 +45,7 @@ async def _get_paused(db: AsyncSession) -> bool:
 
 
 @router.get("/scheduler", response_model=SchedulerStatusResponse)
-async def get_scheduler_status(db: DbDep):
+async def get_scheduler_status(db: DbDep, user: CurrentUser):
     """Return whether the automatic tracking scheduler is currently paused."""
     paused = await _get_paused(db)
     return SchedulerStatusResponse(
@@ -54,8 +55,10 @@ async def get_scheduler_status(db: DbDep):
 
 
 @router.post("/scheduler", response_model=SchedulerStatusResponse)
-async def set_scheduler_status(body: SchedulerPauseRequest, db: DbDep):
-    """Pause or resume the automatic tracking scheduler."""
+async def set_scheduler_status(body: SchedulerPauseRequest, db: DbDep, user: CurrentUser):
+    """Pause or resume the automatic tracking scheduler (admin only)."""
+    if not user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     result = await db.execute(
         select(SystemSetting).where(SystemSetting.key == _PAUSED_KEY)
     )

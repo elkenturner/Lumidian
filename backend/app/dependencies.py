@@ -100,6 +100,9 @@ async def get_current_user(
     if not clarity_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     payload = decode_token(clarity_token)
+    # Reject non-session tokens (e.g. 2FA challenge tokens)
+    if payload.get("scope"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token scope")
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
@@ -107,7 +110,7 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    logger.info(f"get_current_user: id={user.id} email={user.email} is_admin={user.is_admin} is_paused={getattr(user, 'is_paused', False)} email_verified={getattr(user, 'email_verified', True)}")
+    logger.debug(f"get_current_user: id={user.id} is_admin={user.is_admin}")
     if getattr(user, "is_paused", False) and not user.is_admin:
         logger.warning(f"get_current_user: BLOCKED - account paused for user {user.id}")
         raise HTTPException(
@@ -132,6 +135,8 @@ async def get_current_user_allow_unverified(
     if not clarity_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     payload = decode_token(clarity_token)
+    if payload.get("scope"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token scope")
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")

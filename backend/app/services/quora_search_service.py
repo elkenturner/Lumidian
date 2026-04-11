@@ -64,7 +64,7 @@ def extract_keywords(prompt_text: str, max_words: int = 5) -> str:
     return ' '.join(keywords[:max_words])
 
 
-def search_quora_questions(
+async def search_quora_questions(
     query: str,
     num_results: int = 5,
     cache_key: int | None = None,
@@ -91,8 +91,8 @@ def search_quora_questions(
         return []
 
     try:
-        with httpx.Client(timeout=8.0) as client:
-            resp = client.post(
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
                 _SERPER_URL,
                 headers={
                     "X-API-KEY": api_key,

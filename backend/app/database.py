@@ -311,14 +311,17 @@ async def run_migrations():
         # already created with the correct name by CREATE TABLE above.
         # 2026-04-10: Ensure error_message column exists on tracking_runs (ORM had it, migration was missing)
         "ALTER TABLE tracking_runs ADD COLUMN error_message TEXT",
+        # 2026-04-10: Add user_id to account_connections for multi-tenancy
+        "ALTER TABLE account_connections ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
     ]
+    from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:
         for stmt in migrations:
             try:
                 await conn.execute(text(stmt))
                 logger.info("Migration applied: %s", stmt)
-            except Exception:
-                # Column/index already exists — safe to ignore
+            except OperationalError:
+                # Column/table/index already exists — safe to ignore
                 pass
 
     # ── One-time data fixes (idempotent) ─────────────────────────────────────

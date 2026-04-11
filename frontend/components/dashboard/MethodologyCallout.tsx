@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, Lightbulb } from 'lucide-react';
 import Link from 'next/link';
@@ -14,23 +14,23 @@ interface MethodologyCalloutProps {
 
 export default function MethodologyCallout({ visible }: MethodologyCalloutProps) {
   const [dismissed, setDismissed] = useState(true); // default hidden until we check
-  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setDismissed(localStorage.getItem(STORAGE_KEY) === '1');
   }, []);
-
-  if (dismissed || !visible) return null;
 
   const handleDismiss = () => {
     localStorage.setItem(STORAGE_KEY, '1');
     setDismissed(true);
   };
 
+  const show = visible && !dismissed;
+
   return (
     <AnimatePresence>
-      {!dismissed && (
+      {show && (
         <motion.div
+          key="methodology-callout"
           initial={{ opacity: 0, height: 0, marginBottom: 0 }}
           animate={{
             opacity: 1,
@@ -47,7 +47,6 @@ export default function MethodologyCallout({ visible }: MethodologyCalloutProps)
           style={{ overflow: 'hidden' }}
         >
           <div
-            ref={contentRef}
             className="relative px-4 py-3.5 rounded-lg border border-[var(--accent-border)] bg-[var(--accent-muted)]"
           >
             {/* Dismiss button */}

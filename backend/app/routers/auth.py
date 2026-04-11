@@ -202,6 +202,13 @@ class RegisterRequest(BaseModel):
     password: str
     name: str | None = None
 
+    @field_validator("name")
+    @classmethod
+    def validate_name_length(cls, v: str | None) -> str | None:
+        if v is not None and len(v) > 100:
+            raise ValueError("Name must be 100 characters or fewer")
+        return v
+
     @field_validator("email")
     @classmethod
     def validate_email_format(cls, v: str) -> str:

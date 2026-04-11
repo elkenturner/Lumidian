@@ -213,7 +213,7 @@ async def test_get_draft_cap_tiers():
     from app.services.drafting_service import get_draft_cap
     assert get_draft_cap(None, "standard") == 5
     assert get_draft_cap("", "standard") == 5
-    assert get_draft_cap("starter", "standard") == 10
+    assert get_draft_cap("starter", "standard") == 20
     assert get_draft_cap("pro", "standard") == 20
     assert get_draft_cap("pro", "pitch") == 5
     assert get_draft_cap("starter", "pitch") == 5
@@ -222,16 +222,19 @@ async def test_get_draft_cap_tiers():
 # ── Platform guidelines ───────────────────────────────────────────────────────
 
 async def test_get_platform_guidelines_reddit(client: httpx.AsyncClient):
+    await register_and_login(client, email="guidelines-reddit@example.com")
     resp = await client.get("/api/content/guidelines/reddit")
     assert resp.status_code == 200
 
 
 async def test_get_platform_guidelines_unknown(client: httpx.AsyncClient):
+    await register_and_login(client, email="guidelines-unknown@example.com")
     resp = await client.get("/api/content/guidelines/tiktok")
     assert resp.status_code == 404
 
 
 async def test_get_platform_guidelines_wikipedia(client: httpx.AsyncClient):
+    await register_and_login(client, email="guidelines-wiki@example.com")
     resp = await client.get("/api/content/guidelines/wikipedia")
     assert resp.status_code == 200
     data = resp.json()

@@ -76,6 +76,16 @@ _reset_attempts: dict = defaultdict(list)
 _MAX_RESET = 5          # 5 attempts / minute / IP
 
 
+def _get_client_ip(request: Request) -> str:
+    """Extract real client IP from X-Forwarded-For header (set by Railway/Fastly proxy).
+    Falls back to request.client.host for direct connections (e.g. local dev)."""
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        # X-Forwarded-For format: "client, proxy1, proxy2" — first entry is the real client
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def _rate_check(ip: str, store: dict, limit: int) -> None:
     now = time.monotonic()
     cutoff = now - _RATE_WINDOW
@@ -206,7 +216,7 @@ class RegisterRequest(BaseModel):
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, http_req: Request, response: Response, db: DbDep):
     request = body
-    _rate_check(http_req.client.host if http_req.client else "unknown", _register_attempts, _MAX_REGISTER)
+    _rate_check(_get_client_ip(http_req), _register_attempts, _MAX_REGISTER)
     email = request.email.strip().lower()
 
     _validate_password(request.password)
@@ -268,13 +278,13 @@ def create_challenge_token(user_id: int) -> str:
 
 @router.post("/login")
 async def login(body: LoginRequest, http_req: Request, response: Response, db: DbDep):
-    _rate_check(http_req.client.host if http_req.client else "unknown", _login_attempts, _MAX_LOGIN)
+    _rate_check(_get_client_ip(http_req), _login_attempts, _MAX_LOGIN)
     request = body
     email = request.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
     if not user or not user.password_hash or not verify_password(request.password, user.password_hash):
-        logger.warning("failed login attempt email=%s ip=%s", email, http_req.client.host if http_req.client else "unknown")
+        logger.warning("failed login attempt email=%s ip=%s", email, _get_client_ip(http_req))
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
     if not getattr(user, "email_verified", True):
@@ -643,7 +653,7 @@ async def forgot_password(request: ForgotPasswordRequest, http_req: Request, db:
     Generate a 1-hour password reset token and log the reset link to console.
     Always returns 200 to avoid user enumeration.
     """
-    _rate_check(http_req.client.host if http_req.client else "unknown", _reset_attempts, _MAX_RESET)
+    _rate_check(_get_client_ip(http_req), _reset_attempts, _MAX_RESET)
     email = request.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
@@ -688,7 +698,7 @@ class ResetPasswordRequest(BaseModel):
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
 async def reset_password(request: ResetPasswordRequest, http_req: Request, db: DbDep):
     """Validate reset token and update user's password."""
-    _rate_check(http_req.client.host if http_req.client else "unknown", _reset_attempts, _MAX_RESET)
+    _rate_check(_get_client_ip(http_req), _reset_attempts, _MAX_RESET)
     _validate_password(request.new_password)
 
     # Direct lookup by SHA-256 hash of the submitted token
@@ -737,7 +747,7 @@ async def verify_email(
 ):
     """Validate the 6-digit code and mark the user's email as verified.
     No auth cookie required — uses email + code for identification."""
-    _rate_check(http_req.client.host if http_req.client else "unknown", _verify_attempts, _MAX_VERIFY)
+    _rate_check(_get_client_ip(http_req), _verify_attempts, _MAX_VERIFY)
 
     email = body.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
@@ -792,7 +802,7 @@ async def resend_verification(
 ):
     """Generate a fresh 6-digit code and resend the verification email.
     No auth cookie required — uses email for identification."""
-    _rate_check(http_req.client.host if http_req.client else "unknown", _resend_attempts, _MAX_RESEND)
+    _rate_check(_get_client_ip(http_req), _resend_attempts, _MAX_RESEND)
 
     email = body.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
@@ -968,7 +978,7 @@ async def verify_2fa(
     Validates the challenge token (issued by /login) and the TOTP code,
     then sets auth cookies and returns the user.
     """
-    _rate_check(http_req.client.host if http_req.client else "unknown", _login_attempts, _MAX_LOGIN)
+    _rate_check(_get_client_ip(http_req), _login_attempts, _MAX_LOGIN)
     import pyotp
 
     # Decode and validate challenge token

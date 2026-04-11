@@ -676,6 +676,20 @@ function DashboardMockup() {
                 </div>
               </div>
             </div>
+
+            {/* How We Track blurb */}
+            <div className="mt-4 pt-3 border-t border-[rgba(51,65,85,0.4)]">
+              <p className="text-[11px] leading-relaxed text-[#64748b]">
+                Lumidian queries each AI model directly — including web-grounded search from Perplexity and Gemini — to measure how often your brand appears in real AI responses. No scraping, no guessing. Consistent, reproducible visibility scores you can track over time.
+              </p>
+              <Link
+                href="/methodology"
+                className="inline-flex items-center gap-1 mt-2 text-[11px] font-medium text-[#8ba8cc] hover:text-[#a8c4e0] transition-colors duration-200"
+              >
+                See our methodology
+                <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
           </div>
 
           {/* Model breakdown */}

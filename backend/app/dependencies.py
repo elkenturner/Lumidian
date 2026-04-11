@@ -111,6 +111,17 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     logger.debug(f"get_current_user: id={user.id} is_admin={user.is_admin}")
+    # Invalidate sessions issued before the last password change
+    token_iat = payload.get("iat")
+    pw_changed = getattr(user, "password_changed_at", None)
+    if token_iat and pw_changed:
+        from datetime import datetime, timezone
+        iat_dt = datetime.fromtimestamp(token_iat, tz=timezone.utc).replace(tzinfo=None)
+        if iat_dt < pw_changed:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Session expired due to password change. Please log in again.",
+            )
     if getattr(user, "is_paused", False) and not user.is_admin:
         logger.warning(f"get_current_user: BLOCKED - account paused for user {user.id}")
         raise HTTPException(
@@ -249,7 +260,7 @@ async def get_data_owner_id(db: AsyncSession, user: User) -> int:
         select(TeamMember).where(
             TeamMember.user_id == user.id,
             TeamMember.accepted_at.is_not(None),
-        ).limit(1)
+        ).order_by(TeamMember.accepted_at.desc()).limit(1)
     )
     membership = result.scalar_one_or_none()
     if membership:

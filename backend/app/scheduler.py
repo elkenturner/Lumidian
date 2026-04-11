@@ -33,8 +33,24 @@ logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler(timezone="UTC")
 
+# Limit concurrent scheduled tracking runs to avoid overwhelming LLM APIs
+_MAX_CONCURRENT_RUNS = 5
+_run_semaphore = asyncio.Semaphore(_MAX_CONCURRENT_RUNS)
 
-async def _is_brand_paused(brand) -> bool:
+
+async def _get_paused_user_ids() -> set[int]:
+    """Fetch all paused user IDs in a single query (avoids N+1 per brand)."""
+    from sqlalchemy import select
+
+    from app.database import AsyncSessionLocal
+    from app.models import User
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(User.id).where(User.is_paused == True))
+        return set(result.scalars().all())
+
+
+def _is_brand_paused(brand, paused_user_ids: set[int]) -> bool:
     """Check if a brand should be skipped in scheduled sweeps.
 
     Skips if:
@@ -43,11 +59,6 @@ async def _is_brand_paused(brand) -> bool:
     """
     from datetime import datetime
 
-    from sqlalchemy import select
-
-    from app.database import AsyncSessionLocal
-    from app.models import User
-
     now = datetime.now(UTC).replace(tzinfo=None)
 
     # Skip expired pitch brands
@@ -55,12 +66,8 @@ async def _is_brand_paused(brand) -> bool:
         return True
 
     # Skip brands whose owner is paused
-    if brand.user_id:
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(User.is_paused).where(User.id == brand.user_id))
-            is_paused = result.scalar_one_or_none()
-            if is_paused:
-                return True
+    if brand.user_id and brand.user_id in paused_user_ids:
+        return True
 
     return False
 
@@ -100,9 +107,11 @@ async def _run_all_brands(schedule_slot: str) -> None:
         logger.info("Scheduler: no brands found, skipping %s sweep", schedule_slot)
         return
 
+    paused_user_ids = await _get_paused_user_ids()
+
     for brand in brands:
         # Skip paused brands
-        if await _is_brand_paused(brand):
+        if _is_brand_paused(brand, paused_user_ids):
             logger.info(
                 "Scheduler: skipping paused brand %d (%s) [%s]",
                 brand.id, brand.name, schedule_slot,
@@ -124,24 +133,25 @@ async def _safe_run(brand_id: int, schedule_slot: str) -> None:
     """Wrapper that catches and logs exceptions so tasks don't die silently."""
     from app.services.tracking_service import run_tracking
 
-    try:
-        run_id = await run_tracking(
-            brand_id=brand_id,
-            run_type="scheduled",
-            schedule_slot=schedule_slot,
-        )
-        logger.info(
-            "Scheduler: completed run_id=%d for brand %d [%s]",
-            run_id,
-            brand_id,
-            schedule_slot,
-        )
-    except Exception:
-        logger.exception(
-            "Scheduler: tracking run failed for brand %d [%s]",
-            brand_id,
-            schedule_slot,
-        )
+    async with _run_semaphore:
+        try:
+            run_id = await run_tracking(
+                brand_id=brand_id,
+                run_type="scheduled",
+                schedule_slot=schedule_slot,
+            )
+            logger.info(
+                "Scheduler: completed run_id=%d for brand %d [%s]",
+                run_id,
+                brand_id,
+                schedule_slot,
+            )
+        except Exception:
+            logger.exception(
+                "Scheduler: tracking run failed for brand %d [%s]",
+                brand_id,
+                schedule_slot,
+            )
 
 
 async def _reddit_scanner_sweep() -> None:
@@ -163,8 +173,10 @@ async def _reddit_scanner_sweep() -> None:
         result = await db.execute(select(Brand))
         brands = result.scalars().all()
 
+    paused_user_ids = await _get_paused_user_ids()
+
     for brand in brands:
-        if await _is_brand_paused(brand):
+        if _is_brand_paused(brand, paused_user_ids):
             logger.info("Scheduler: skipping paused brand %d in Reddit sweep", brand.id)
             continue
         state.scanning_brands.add(brand.id)
@@ -197,8 +209,10 @@ async def _quora_scanner_sweep() -> None:
         result = await db.execute(select(Brand))
         brands = result.scalars().all()
 
+    paused_user_ids = await _get_paused_user_ids()
+
     for brand in brands:
-        if await _is_brand_paused(brand):
+        if _is_brand_paused(brand, paused_user_ids):
             logger.info("Scheduler: skipping paused brand %d in Quora sweep", brand.id)
             continue
         state.scanning_brands.add(brand.id)
@@ -233,8 +247,10 @@ async def _linkedin_scanner_sweep() -> None:
         )
         brands = result.scalars().all()
 
+    paused_user_ids = await _get_paused_user_ids()
+
     for brand in brands:
-        if await _is_brand_paused(brand):
+        if _is_brand_paused(brand, paused_user_ids):
             logger.info("Scheduler: skipping paused brand %d in LinkedIn sweep", brand.id)
             continue
         state.scanning_brands.add(brand.id)
@@ -269,8 +285,10 @@ async def _x_scanner_sweep() -> None:
         )
         brands = result.scalars().all()
 
+    paused_user_ids = await _get_paused_user_ids()
+
     for brand in brands:
-        if await _is_brand_paused(brand):
+        if _is_brand_paused(brand, paused_user_ids):
             logger.info("Scheduler: skipping paused brand %d in X sweep", brand.id)
             continue
         state.scanning_brands.add(brand.id)
@@ -307,9 +325,11 @@ async def _auto_draft_sweep() -> None:
         result = await db.execute(select(Brand))
         brands = result.scalars().all()
 
+    paused_user_ids = await _get_paused_user_ids()
+
     for brand in brands:
         # Skip paused brands
-        if await _is_brand_paused(brand):
+        if _is_brand_paused(brand, paused_user_ids):
             logger.info(
                 "Scheduler: skipping paused brand %d (%s) in auto-draft sweep",
                 brand.id, brand.name,
@@ -388,6 +408,48 @@ async def _sqlite_backup_sweep() -> None:
         except Exception:
             logger.warning("Could not remove old backup %s", old_backup)
 
+    # Clean up expired/used password reset tokens
+    try:
+        from sqlalchemy import delete
+
+        from app.database import AsyncSessionLocal
+        from app.models import PasswordResetToken
+
+        now = datetime.now(UTC).replace(tzinfo=None)
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                delete(PasswordResetToken).where(
+                    (PasswordResetToken.used == True) | (PasswordResetToken.expires_at < now)  # noqa: E712
+                )
+            )
+            await db.commit()
+            if result.rowcount:
+                logger.info("Cleaned up %d expired/used password reset tokens", result.rowcount)
+    except Exception:
+        logger.exception("Password reset token cleanup failed (non-fatal)")
+
+    # Clean up old read notifications (older than 30 days)
+    try:
+        from sqlalchemy import delete as sa_delete
+        from datetime import timedelta
+
+        from app.database import AsyncSessionLocal
+        from app.models import Notification
+
+        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
+        async with AsyncSessionLocal() as db:
+            result = await db.execute(
+                sa_delete(Notification).where(
+                    Notification.read == True,  # noqa: E712
+                    Notification.created_at < cutoff,
+                )
+            )
+            await db.commit()
+            if result.rowcount:
+                logger.info("Cleaned up %d old read notifications", result.rowcount)
+    except Exception:
+        logger.exception("Notification cleanup failed (non-fatal)")
+
 
 async def _website_context_refresh_sweep() -> None:
     """
@@ -410,8 +472,10 @@ async def _website_context_refresh_sweep() -> None:
         result = await db.execute(select(Brand).where(Brand.website_url.isnot(None)))
         brands = result.scalars().all()
 
+    paused_user_ids = await _get_paused_user_ids()
+
     for brand in brands:
-        if await _is_brand_paused(brand):
+        if _is_brand_paused(brand, paused_user_ids):
             logger.info("Scheduler: skipping paused brand %d in website context refresh", brand.id)
             continue
         try:
@@ -472,12 +536,14 @@ async def _visibility_alert_sweep() -> None:
     now = datetime.now(UTC).replace(tzinfo=None)
     cooldown_cutoff = now - timedelta(days=ALERT_COOLDOWN_DAYS)
 
+    paused_user_ids = await _get_paused_user_ids()
+
     async with AsyncSessionLocal() as db:
         brands_result = await db.execute(select(Brand))
         brands = brands_result.scalars().all()
 
         for brand in brands:
-            if await _is_brand_paused(brand):
+            if _is_brand_paused(brand, paused_user_ids):
                 continue  # No need to log - this is a silent skip for alert processing
             if brand.user_id is None:
                 continue

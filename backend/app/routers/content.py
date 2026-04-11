@@ -182,7 +182,7 @@ async def get_platform_guidelines(platform: str):
     if platform not in PLATFORM_GUIDELINES:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Platform '{platform}' not found. Supported: {SUPPORTED_PLATFORMS}",
+            detail=f"Platform not found. Supported: {SUPPORTED_PLATFORMS}",
         )
     return PLATFORM_GUIDELINES[platform]
 
@@ -238,7 +238,7 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
     if request.platform not in ALL_DRAFT_PLATFORMS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unsupported platform '{request.platform}'. Must be one of {ALL_DRAFT_PLATFORMS}",
+            detail=f"Unsupported platform. Must be one of {ALL_DRAFT_PLATFORMS}",
         )
 
     # Auto-select lowest-scoring prompt if none specified
@@ -365,7 +365,7 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
         if request.status not in allowed_statuses:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Invalid status '{request.status}'. Must be one of {allowed_statuses}",
+                detail=f"Invalid status. Must be one of {sorted(allowed_statuses)}",
             )
         if request.status == "approved" and old_status != "approved":
             # Check scheduled cap before approving
@@ -505,42 +505,47 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
             status_code=status.HTTP_409_CONFLICT,
             detail="Draft generation is already in progress for this brand.",
         )
-
-    brand = await get_brand_for_user(brand_id, db, user)
-    require_brand_active(brand, user)
-
-    # Paid users have no weekly draft limit — the per-click rate limiter
-    # (2/min) is sufficient cost control.  Only pitch brands are capped.
-    is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
-    if not user.is_admin and is_pitch:
-        from datetime import datetime, timedelta
-
-        from sqlalchemy import func as sqlfunc
-
-        week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
-        committed_result = await db.execute(
-            select(sqlfunc.count(ContentDraft.id)).where(
-                ContentDraft.brand_id == brand_id,
-                ContentDraft.source == "manual",
-                ContentDraft.status.in_(["approved", "posted"]),
-                ContentDraft.created_at >= week_ago,
-            )
-        )
-        committed = committed_result.scalar_one_or_none() or 0
-        effective_remaining = _WEEKLY_MANUAL_LIMIT_PITCH - committed
-        if effective_remaining <= 0:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail=(
-                    f"Weekly manual draft limit reached ({_WEEKLY_MANUAL_LIMIT_PITCH}/{_WEEKLY_MANUAL_LIMIT_PITCH} for this pitch deck). "
-                    "Resets 7 days after your first manual draft this week."
-                ),
-            )
-        remaining = min(request.max_gaps, effective_remaining)
-    else:
-        remaining = request.max_gaps
-
+    # Reserve the slot immediately to prevent races across awaits
     _state.generating_brands.add(brand_id)
+
+    try:
+        brand = await get_brand_for_user(brand_id, db, user)
+        require_brand_active(brand, user)
+
+        # Paid users have no weekly draft limit — the per-click rate limiter
+        # (2/min) is sufficient cost control.  Only pitch brands are capped.
+        is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
+        if not user.is_admin and is_pitch:
+            from datetime import datetime, timedelta
+
+            from sqlalchemy import func as sqlfunc
+
+            week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
+            committed_result = await db.execute(
+                select(sqlfunc.count(ContentDraft.id)).where(
+                    ContentDraft.brand_id == brand_id,
+                    ContentDraft.source == "manual",
+                    ContentDraft.status.in_(["approved", "posted"]),
+                    ContentDraft.created_at >= week_ago,
+                )
+            )
+            committed = committed_result.scalar_one_or_none() or 0
+            effective_remaining = _WEEKLY_MANUAL_LIMIT_PITCH - committed
+            if effective_remaining <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail=(
+                        f"Weekly manual draft limit reached ({_WEEKLY_MANUAL_LIMIT_PITCH}/{_WEEKLY_MANUAL_LIMIT_PITCH} for this pitch deck). "
+                        "Resets 7 days after your first manual draft this week."
+                    ),
+                )
+            remaining = min(request.max_gaps, effective_remaining)
+        else:
+            remaining = request.max_gaps
+    except Exception:
+        _state.generating_brands.discard(brand_id)
+        raise
+
     asyncio.create_task(
         _bg_generate_drafts(
             brand_id=brand_id,
@@ -649,7 +654,7 @@ async def create_gap_draft(brand_id: int, request: CreateDraftRequest, db: DbDep
     if request.platform not in ALL_DRAFT_PLATFORMS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unsupported platform '{request.platform}'. Must be one of {ALL_DRAFT_PLATFORMS}",
+            detail=f"Unsupported platform. Must be one of {ALL_DRAFT_PLATFORMS}",
         )
     if request.prompt_id is None:
         raise HTTPException(
@@ -771,6 +776,7 @@ async def get_attribution(brand_id: int, db: DbDep, user: CurrentUser):
         select(ContentAttribution)
         .where(ContentAttribution.brand_id == brand_id)
         .order_by(ContentAttribution.measured_at.desc())
+        .limit(200)
     )
     attributions = result.scalars().all()
     return [ContentAttributionSchema.model_validate(a) for a in attributions]

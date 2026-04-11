@@ -379,8 +379,11 @@ async def run_tracking(
                 for qr in query_results:
                     if not qr.response_text or qr.error:
                         continue
+                    response_norm = _normalize(qr.response_text)
                     for comp in competitors:
-                        mentioned = comp.name.lower() in qr.response_text.lower()
+                        exact = comp.name.lower() in qr.response_text.lower()
+                        fuzzy = _normalize(comp.name) in response_norm
+                        mentioned = exact or fuzzy
                         comp_mention_rows.append(CompetitorMention(
                             tracking_run_id=run_id,
                             competitor_id=comp.id,

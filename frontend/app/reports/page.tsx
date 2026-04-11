@@ -435,7 +435,12 @@ export default function ReportsPage() {
             if (liveS === null && indexS === null) return null;
             return (
               <div className="mb-4 bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl px-5 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-                <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">Score Breakdown</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Score Breakdown</p>
+                  <Link href="/methodology#scoring" className="text-[10px] text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors">
+                    How is this calculated?
+                  </Link>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {([
                     { label: 'Live Search', s: liveS,  models: 'Perplexity · Gemini',  color: 'var(--success)' },

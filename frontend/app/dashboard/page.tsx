@@ -69,6 +69,7 @@ import {
   DashboardModelBreakdown,
   CitationGaps,
   HelpTooltip,
+  MethodologyCallout,
   buildPromptGroups,
 } from '@/components/dashboard';
 
@@ -707,6 +708,8 @@ export default function DashboardPage() {
             </div>
           )}
 
+          <MethodologyCallout visible={!isFirstRun && score !== null} />
+
           {/* Overview */}
           {!isFirstRun && (
           <>
@@ -930,7 +933,10 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-2 mb-4">
                     <BarChart2 size={15} className="text-[var(--accent)]" />
                     <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Performance by Model</h3>
-                    <HelpTooltip text="How often each AI model mentions your brand when answering relevant prompts." />
+                    <HelpTooltip
+                      text="How often each AI model mentions your brand. Live models (Perplexity, Gemini) query the web in real-time; Index models (ChatGPT, Claude) draw from training data."
+                      href="/methodology#model-types"
+                    />
                   </div>
                   {loadingAnalytics ? (
                     <div className="space-y-3">

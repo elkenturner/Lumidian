@@ -195,7 +195,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const FAST_INTERVAL = 3_000;
-    const SLOW_INTERVAL = 15_000;
+    const SLOW_INTERVAL = 30_000;
 
     const poll = async () => {
       let active = false;

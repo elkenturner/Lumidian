@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import random
 import time
 
 from dotenv import load_dotenv
@@ -364,14 +365,20 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
 
     Retry strategy by error type:
       - rate_limit (429, quota): 65s flat backoff (wait for quota reset)
-      - overload (503, timeout): exponential backoff 5s → 10s → 20s
+      - overload (503, timeout): exponential backoff with jitter
+          Default models: 3 attempts, 5s → 10s → 20s
+          Pro models:     5 attempts, 10s → 20s → 40s → 80s → 120s (capped)
       - other: 3s flat backoff
-      - api_key_not_configured: no retry (permanent)
+      - api_key_not_configured / auth: no retry (permanent)
     """
     display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
+    is_pro_model = "pro" in model_version.lower() if model_version else False
+
+    # Pro models get more attempts for overload errors since they're more prone to 503s
+    effective_max = 5 if is_pro_model else max_attempts
     errors: list[str] = []
 
-    for attempt in range(1, max_attempts + 1):
+    for attempt in range(1, effective_max + 1):
         result = await handler(prompt, brand_name, model_version)
 
         # Successful response — return immediately
@@ -396,29 +403,40 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
                 "error": f"{display} API key is invalid or expired. Update it in Settings → Connected Accounts.",
             }
 
+        error_type = _classify_error(error)
         errors.append(f"attempt {attempt}: {error}")
 
+        # Non-overload errors on a pro model: don't use extra attempts
+        if is_pro_model and error_type != "overload" and attempt >= max_attempts:
+            break
+
         # Don't sleep after the last attempt
-        if attempt < max_attempts:
-            error_type = _classify_error(error)
+        if attempt < effective_max:
             if error_type == "rate_limit":
                 retry_delay = 65
             elif error_type == "overload":
-                retry_delay = 5 * (2 ** (attempt - 1))  # 5s, 10s, 20s …
+                if is_pro_model:
+                    # Pro: longer backoff with cap — 10s, 20s, 40s, 80s, 120s
+                    retry_delay = min(10 * (2 ** (attempt - 1)), 120)
+                else:
+                    # Default: 5s, 10s, 20s
+                    retry_delay = 5 * (2 ** (attempt - 1))
+                # Add jitter (0-25%) to avoid thundering herd
+                retry_delay = retry_delay * (1 + random.uniform(0, 0.25))
             else:
                 retry_delay = 3
 
             logger.warning(
-                "[%s] Attempt %d/%d failed (%s, error=%r) for prompt %r — retrying in %ds",
-                model_key, attempt, max_attempts, error_type, error, prompt[:100], retry_delay,
+                "[%s] Attempt %d/%d failed (%s, error=%r) for prompt %r — retrying in %.0fs",
+                model_key, attempt, effective_max, error_type, error, prompt[:100], retry_delay,
             )
             await asyncio.sleep(retry_delay)
 
     # All attempts failed — return a single descriptive error
-    final_error = f"Empty response from {display} API after {max_attempts} attempts ({'; '.join(errors)})"
+    final_error = f"Empty response from {display} API after {len(errors)} attempts ({'; '.join(errors)})"
     logger.error(
         "[%s] All %d attempts failed for prompt %r. Final error: %s",
-        model_key, max_attempts, prompt[:100], final_error,
+        model_key, len(errors), prompt[:100], final_error,
     )
     return {
         "response_text": None,

@@ -16,7 +16,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 // Mirrored from middleware.ts — paths that don't require authentication
-const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/team/accept'];
+const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/team/accept', '/terms', '/privacy', '/methodology'];
 
 // Set/clear the JS-accessible session flag that Next.js middleware reads.
 // (The httponly clarity_token is set by the backend; this companion cookie

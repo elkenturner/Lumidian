@@ -156,6 +156,34 @@ PLATFORM_SPECS: dict[str, dict] = {
         "disclaimer": None,
         "posting_tip": "Post directly to X.",
     },
+    "linkedin_reply": {
+        "format": "thread_reply",
+        "word_range": (30, 120),
+        "tone": "professional, helpful, concise — a knowledgeable peer contributing to the conversation",
+        "rules": [
+            "2 to 5 sentences — add a specific insight, not generic agreement",
+            "Reference the original post's point and build on it with concrete experience or data",
+            "Mention the brand only if it directly addresses the discussion topic",
+            "No hashtags, no self-promotion, no 'great post!' openers",
+            "Write as a professional sharing expertise, not a brand account",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Reply directly to the LinkedIn post or comment.",
+    },
+    "x_reply": {
+        "format": "thread_reply",
+        "word_range": (10, 50),
+        "tone": "sharp, direct, conversational — every character counts",
+        "rules": [
+            "MUST be under 280 characters — hard limit",
+            "One clear point that adds to the conversation",
+            "Mention the brand only if it directly answers a question",
+            "No hashtags, no engagement bait",
+            "Write like a knowledgeable person replying, not a brand account",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Reply directly to the tweet.",
+    },
 }
 
 ALL_PLATFORMS = list(PLATFORM_SPECS.keys())

@@ -206,7 +206,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             if not query:
                 continue
 
-            questions = search_quora_questions(
+            questions = await search_quora_questions(
                 query=query,
                 num_results=10,
                 cache_key=prompt.id,

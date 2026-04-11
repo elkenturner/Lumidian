@@ -187,10 +187,11 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
         draft = await generate_opportunity_draft(db=db, opportunity_id=opportunity_id)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    except Exception as exc:
+    except Exception:
+        logger.exception("opportunity draft generation failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Draft generation failed: {exc}",
+            detail="Draft generation failed. Please try again.",
         )
 
     from app.services.analytics_service import log_event

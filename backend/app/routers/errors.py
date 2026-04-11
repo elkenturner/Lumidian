@@ -17,12 +17,22 @@ router = APIRouter(prefix="/errors", tags=["errors"])
 logger = logging.getLogger(__name__)
 
 
+from pydantic import field_validator
+
+
 class ClientErrorReport(BaseModel):
     message: str
     stack: str | None = None
     component_stack: str | None = None
     url: str | None = None
     user_agent: str | None = None
+
+    @field_validator("message", "stack", "component_stack", "url", "user_agent", mode="before")
+    @classmethod
+    def truncate_fields(cls, v):
+        if isinstance(v, str) and len(v) > 10_000:
+            return v[:10_000] + "...[truncated]"
+        return v
 
 
 @router.post("/client", response_class=Response)

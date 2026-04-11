@@ -10,7 +10,9 @@ Error handling:
 In all cases refresh_brand_website_context() returns False on failure, True on success.
 """
 
+import ipaddress
 import logging
+import socket
 from datetime import UTC
 from urllib.parse import urlparse
 
@@ -22,16 +24,35 @@ JINA_BASE = "https://r.jina.ai/"
 MAX_CHARS = 12_000  # truncate to avoid storing huge blobs
 
 
+def _is_private_host(hostname: str) -> bool:
+    """Check if a hostname resolves to a private/reserved IP address."""
+    try:
+        addr_info = socket.getaddrinfo(hostname, None)
+        for _, _, _, _, sockaddr in addr_info:
+            ip = ipaddress.ip_address(sockaddr[0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+                return True
+    except (socket.gaierror, ValueError):
+        pass
+    return False
+
+
 def _validate_url(url: str) -> str:
     """
     Normalise and basic-validate a URL.
     Returns the (possibly normalised) URL, or raises ValueError.
+    Blocks private/internal IPs to prevent SSRF.
     """
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
     parsed = urlparse(url)
     if not parsed.netloc:
         raise ValueError(f"Invalid URL — no host: {url!r}")
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Invalid URL scheme: {parsed.scheme!r}")
+    hostname = parsed.hostname or ""
+    if _is_private_host(hostname):
+        raise ValueError(f"URLs pointing to private/internal addresses are not allowed")
     return url
 
 

@@ -28,7 +28,7 @@ import httpx
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -187,6 +187,16 @@ class RegisterRequest(BaseModel):
     email: str
     password: str
     name: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not v or "@" not in v or "." not in v.split("@")[-1]:
+            raise ValueError("Invalid email address")
+        if len(v) > 255:
+            raise ValueError("Email too long")
+        return v
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -584,12 +594,13 @@ async def forgot_password(request: ForgotPasswordRequest, http_req: Request, db:
             .values(used=True)
         )
 
+        import hashlib
         token_value = secrets.token_urlsafe(48)
-        token_hash = hash_password(token_value)  # store bcrypt hash, not raw token
+        token_hash = hashlib.sha256(token_value.encode()).hexdigest()
         expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=1)
         reset_token = PasswordResetToken(
             user_id=user.id,
-            token=token_hash,   # hashed
+            token=token_hash,   # SHA-256 hash (token is high-entropy, bcrypt unnecessary)
             expires_at=expires_at,
         )
         db.add(reset_token)
@@ -617,19 +628,18 @@ async def reset_password(request: ResetPasswordRequest, http_req: Request, db: D
     _rate_check(http_req.client.host if http_req.client else "unknown", _reset_attempts, _MAX_RESET)
     _validate_password(request.new_password)
 
-    # Tokens are stored as bcrypt hashes — find all unexpired, unused tokens and verify
+    # Direct lookup by SHA-256 hash of the submitted token
+    import hashlib
+    token_hash = hashlib.sha256(request.token.encode()).hexdigest()
     now_lookup = datetime.now(UTC).replace(tzinfo=None)
-    candidates_result = await db.execute(
+    candidate_result = await db.execute(
         select(PasswordResetToken).where(
+            PasswordResetToken.token == token_hash,
             PasswordResetToken.used == False,
             PasswordResetToken.expires_at > now_lookup,
         )
     )
-    reset_token = None
-    for candidate in candidates_result.scalars().all():
-        if verify_password(request.token, candidate.token):
-            reset_token = candidate
-            break
+    reset_token = candidate_result.scalar_one_or_none()
 
     if not reset_token:
         logger.warning("invalid password reset token attempt")

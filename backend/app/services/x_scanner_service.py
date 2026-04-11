@@ -147,7 +147,7 @@ def invalidate_cache(key: int) -> None:
 
 # ── Serper search ──────────────────────────────────────────────────────────────
 
-def _search_x_posts(
+async def _search_x_posts(
     query: str,
     num_results: int = 10,
     cache_key: int | None = None,
@@ -174,8 +174,8 @@ def _search_x_posts(
         return []
 
     try:
-        with httpx.Client(timeout=8.0) as client:
-            resp = client.post(
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
                 _SERPER_URL,
                 headers={
                     "X-API-KEY": api_key,
@@ -367,7 +367,7 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             if not query:
                 continue
 
-            posts = _search_x_posts(
+            posts = await _search_x_posts(
                 query=query,
                 num_results=10,
                 cache_key=prompt.id,

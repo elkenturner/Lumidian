@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, LineChart, PenLine, Settings, User, ChevronUp } from 'lucide-react';
+import { LayoutDashboard, LineChart, PenLine, Settings, User, ChevronUp, LogOut, Shield } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { BrandProvider } from '@/contexts/BrandContext';
@@ -16,7 +16,7 @@ const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> 
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.bgColor, text: v.color }])
 );
 
-const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email'];
+const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/methodology'];
 
 /* ── Premium animated report-running banner ─────────────────────────────────── */
 function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ model: string; score: number }>; isMobile: boolean }) {
@@ -371,6 +371,42 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
+          {user?.is_admin && (
+            <Link
+              href="/admin"
+              aria-label="Admin"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                flex: 1,
+                padding: '8px 0',
+                color: pathname === '/admin' ? 'var(--accent-light)' : 'var(--text-faint)',
+                textDecoration: 'none',
+                fontSize: 10,
+                fontWeight: pathname === '/admin' ? 600 : 500,
+                position: 'relative',
+                minHeight: 48,
+              }}
+            >
+              {pathname === '/admin' && (
+                <span style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 20,
+                  height: 2,
+                  borderRadius: 1,
+                  background: 'var(--accent-light)',
+                }} />
+              )}
+              <Shield size={20} strokeWidth={pathname === '/admin' ? 2.2 : 1.75} />
+              <span>Admin</span>
+            </Link>
+          )}
         </nav>
       )}
     </>

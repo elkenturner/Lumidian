@@ -243,13 +243,18 @@ async def _query_perplexity(prompt: str, brand_name: str, model_version: str = "
 
 # ── Gemini ────────────────────────────────────────────────────────────────────
 
+import threading
+
 _gemini_client = None  # Module-level singleton — avoids per-request httpx lifecycle issues
+_gemini_lock = threading.Lock()
 
 def _get_gemini_client():
     global _gemini_client
     if _gemini_client is None:
-        from google import genai
-        _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+        with _gemini_lock:
+            if _gemini_client is None:  # double-checked locking
+                from google import genai
+                _gemini_client = genai.Client(api_key=GEMINI_API_KEY)
     return _gemini_client
 
 

@@ -273,7 +273,7 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
         logger.exception("create_draft: unhandled error for brand_id=%d", brand_id)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Draft generation failed: {exc}",
+            detail="Draft generation failed. Please try again.",
         )
 
     return ContentDraftSchema.model_validate(draft)
@@ -672,9 +672,10 @@ async def create_gap_draft(brand_id: int, request: CreateDraftRequest, db: DbDep
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     except Exception as exc:
+        logger.exception("generate_now: draft generation failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Draft generation failed: {exc}",
+            detail="Draft generation failed. Please try again.",
         )
 
     return ContentDraftSchema.model_validate(draft)

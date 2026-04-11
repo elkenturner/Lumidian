@@ -916,8 +916,7 @@ export interface BillingStatus {
   prompt_limit: number;
   brand_limits: { standard: number; pitch: number };
   is_admin: boolean;
-  stripe_customer_id: string | null;
-  stripe_subscription_id: string | null;
+  has_payment_method: boolean;
 }
 
 export interface BillingUsage {

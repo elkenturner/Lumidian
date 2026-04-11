@@ -847,8 +847,9 @@ export default function SettingsPage() {
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   {(() => {
                     const limit = brand.brand_type === 'pitch' ? 10 : (user?.prompt_limit ?? 25);
-                    const color = brand.prompts.length >= limit ? 'var(--danger)' : brand.prompts.length >= limit * 0.8 ? 'var(--warning)' : 'var(--text-muted)';
-                    return <span style={{ color }}>{brand.prompts.length}/{limit} prompts</span>;
+                    const isUnlimited = limit >= 99999;
+                    const color = isUnlimited ? 'var(--text-muted)' : brand.prompts.length >= limit ? 'var(--danger)' : brand.prompts.length >= limit * 0.8 ? 'var(--warning)' : 'var(--text-muted)';
+                    return <span style={{ color }}>{brand.prompts.length}{isUnlimited ? '' : `/${limit}`} prompts</span>;
                   })()}
                 </p>
               </div>
@@ -1002,6 +1003,24 @@ export default function SettingsPage() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Delete brand — only on General tab */}
+          <div className="mt-8 pt-5 border-t border-[rgba(255,255,255,0.06)]">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-[var(--text-secondary)]">Delete brand</p>
+                <p className="text-xs text-[var(--text-faint)] mt-0.5">Permanently removes this brand and all its tracking data</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDeleteBrandConfirm(true)}
+                className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--danger)] border border-[var(--border-subtle)] hover:border-red-900/40 rounded-lg px-3 py-1.5 transition-colors shrink-0"
+              >
+                <Trash2 size={12} />
+                Delete brand
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1291,25 +1310,6 @@ export default function SettingsPage() {
         </div>
       )}
 
-      {/* Delete brand — visible but not alarming */}
-      {brand && (
-        <div className="mt-8 pt-5 border-t border-[rgba(255,255,255,0.06)]">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-[var(--text-secondary)]">Delete brand</p>
-              <p className="text-xs text-[var(--text-faint)] mt-0.5">Permanently removes this brand and all its tracking data</p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowDeleteBrandConfirm(true)}
-              className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--danger)] border border-[var(--border-subtle)] hover:border-red-900/40 rounded-lg px-3 py-1.5 transition-colors shrink-0"
-            >
-              <Trash2 size={12} />
-              Delete brand
-            </button>
-          </div>
-        </div>
-      )}
       {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </motion.div>
   );

@@ -70,7 +70,9 @@ async def test_connect_unsupported_platform(client):
         json={"platform": "tiktok", "credentials": {"token": "abc"}},
     )
     assert resp.status_code == 422
-    assert "Unsupported platform" in resp.json()["detail"]
+    detail = resp.json()["detail"]
+    # Pydantic validator returns list of errors with "platform must be one of" message
+    assert any("platform must be one of" in str(e.get("msg", "")) for e in detail)
 
 
 async def test_connect_update_existing(client):

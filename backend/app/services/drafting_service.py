@@ -1089,8 +1089,8 @@ async def auto_draft_top_gaps(
                 try:
                     _keywords = extract_keywords(prompt.text)
                     if _keywords:
-                        _questions = await asyncio.to_thread(
-                            search_quora_questions, _keywords, 5, prompt.id
+                        _questions = await search_quora_questions(
+                            _keywords, 5, prompt.id
                         )
                 except Exception as _qe:
                     logger.debug(

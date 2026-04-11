@@ -368,6 +368,11 @@ async def update_brand(brand_id: int, payload: BrandUpdate, db: DbDep, user: Cur
         brand.name = payload.name
 
     if payload.tier is not None:
+        if not user.is_admin:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Brand tier cannot be changed directly. Upgrade your subscription instead.",
+            )
         brand.tier = payload.tier
 
     if payload.website_url is not None:
@@ -593,6 +598,7 @@ async def remove_competitor(brand_id: int, competitor_id: int, db: DbDep, user: 
 @router.post("/{brand_id}/suggest-prompts", response_model=list[str])
 async def suggest_prompts(brand_id: int, db: DbDep, user: CurrentUser):
     """Use Claude to generate 12-15 diverse tracking prompt suggestions for a brand."""
+    check_rate_limit(user.id, limit=5)
     from app.models import BrandProfile as BrandProfileModel
 
     brand = await _get_brand_or_404(db, brand_id, user)
@@ -671,9 +677,10 @@ The goal is to find queries where a user is researching a problem or category, a
             suggestions = _json.loads(text)
         return [s for s in suggestions if isinstance(s, str)][:15]
     except Exception as exc:
+        logger.exception("suggest_prompts failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Suggestion generation failed: {exc}",
+            detail="Suggestion generation failed. Please try again.",
         )
 
 
@@ -753,6 +760,7 @@ class _SuggestPreviewReq(_BaseModel):
 @router.post("/suggest-prompts-preview", response_model=list[str])
 async def suggest_prompts_preview(payload: _SuggestPreviewReq, db: DbDep, user: CurrentUser):
     """Generate tracking prompt suggestions from just a brand name (for onboarding wizard)."""
+    check_rate_limit(user.id, limit=5)
     api_key = _os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         raise HTTPException(
@@ -790,9 +798,10 @@ Generate category queries, comparison queries, problem-seeking queries, and buyi
         suggestions = _json.loads(m.group() if m else text)
         return [s for s in suggestions if isinstance(s, str)][:12]
     except Exception as exc:
+        logger.exception("suggest_prompts_preview failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Suggestion generation failed: {exc}",
+            detail="Suggestion generation failed. Please try again.",
         )
 
 
@@ -1088,5 +1097,5 @@ async def get_quora_questions(
 
     from app.services.quora_search_service import extract_keywords, search_quora_questions
     keywords = extract_keywords(prompt.text)
-    questions = search_quora_questions(keywords, num_results=5, cache_key=prompt_id)
+    questions = await search_quora_questions(keywords, num_results=5, cache_key=prompt_id)
     return {"questions": questions}

@@ -41,6 +41,7 @@ interface TrendChartProps {
 }
 
 interface ChartPoint {
+  ts: number;
   shortDate: string;
   formattedDate: string;
   score: number;
@@ -51,12 +52,13 @@ interface ChartPoint {
 
 interface TooltipProps {
   active?: boolean;
-  payload?: Array<{ dataKey: string; value: number; color: string }>;
-  label?: string;
+  payload?: Array<{ dataKey: string; value: number; color: string; payload?: ChartPoint }>;
+  label?: number;
 }
 
-function CustomTooltip({ active, payload, label }: TooltipProps) {
+function CustomTooltip({ active, payload }: TooltipProps) {
   if (!active || !payload?.length) return null;
+  const dateLabel = payload[0]?.payload?.formattedDate ?? '';
   const avg = payload.find((p) => p.dataKey === 'score');
   const models = payload.filter((p) => p.dataKey !== 'score' && p.value != null);
   return (
@@ -70,7 +72,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps) {
       boxShadow: '0 8px 32px rgba(0,0,0,0.50), 0 0 0 1px rgba(95,126,166,0.06)',
       minWidth: 155,
     }}>
-      <p style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 8, fontWeight: 500 }}>{label}</p>
+      <p style={{ fontSize: 11, color: 'var(--text-faint)', marginBottom: 8, fontWeight: 500 }}>{dateLabel}</p>
       {avg && (
         <p style={{
           fontSize: 14,
@@ -125,9 +127,11 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
         return parseUTCISO(point.completed_at) >= cutoff;
       })
       .map((point) => {
+        const dt = parseUTCISO(point.completed_at);
         const pt: ChartPoint = {
-          formattedDate: format(parseUTCISO(point.completed_at), 'MMM d, yyyy'),
-          shortDate: format(parseUTCISO(point.completed_at), 'MMM d'),
+          ts: dt.getTime(),
+          formattedDate: format(dt, 'MMM d, yyyy'),
+          shortDate: format(dt, 'MMM d'),
           score: Math.round(point.score),
           total_mentions: point.total_mentions,
           total_queries: point.total_queries,
@@ -139,6 +143,19 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
         return pt;
       });
   }, [data, timeframe]);
+
+  // Deduplicate ticks so "Apr 8" doesn't repeat when multiple runs land on the same day
+  const uniqueDateTicks = useMemo(() => {
+    const seen = new Set<string>();
+    const ticks: number[] = [];
+    for (const pt of chartData) {
+      if (!seen.has(pt.shortDate)) {
+        seen.add(pt.shortDate);
+        ticks.push(pt.ts);
+      }
+    }
+    return ticks;
+  }, [chartData]);
 
   const activeModels = MODEL_LINES.filter((ml) =>
     chartData.some((pt) => pt[ml.key] != null)
@@ -224,7 +241,11 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
 
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(95,126,166,0.07)" vertical={false} />
             <XAxis
-              dataKey="shortDate"
+              dataKey="ts"
+              type="number"
+              domain={['dataMin', 'dataMax']}
+              ticks={uniqueDateTicks}
+              tickFormatter={(v: number) => format(new Date(v), 'MMM d')}
               tick={{ fill: 'var(--text-faint)', fontSize: 11 }}
               axisLine={{ stroke: 'rgba(95,126,166,0.10)' }}
               tickLine={false}
@@ -263,7 +284,7 @@ const TrendChart = memo(function TrendChart({ data }: TrendChartProps) {
               const last = chartData[chartData.length - 1];
               return (
                 <ReferenceDot
-                  x={last.shortDate}
+                  x={last.ts}
                   y={last.score}
                   r={5}
                   fill="var(--accent-light)"

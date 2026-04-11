@@ -145,7 +145,7 @@ async def accept_invite(token: str, db: DbDep, user: CurrentUser):
     if user.email.lower() != member.invited_email.lower():
         raise HTTPException(
             status_code=403,
-            detail=f"This invitation was sent to {member.invited_email}. Please log in with that account.",
+            detail="This invitation was sent to a different email address. Please log in with the correct account.",
         )
 
     # Block accepting if already a member of another team

@@ -69,6 +69,18 @@ class BrandCreate(BaseModel):
         v = v.strip()
         if not v:
             raise ValueError("name cannot be empty")
+        if len(v) > 255:
+            raise ValueError("name must be 255 characters or fewer")
+        return v
+
+    @field_validator("prompts")
+    @classmethod
+    def validate_prompts(cls, v: list[str]) -> list[str]:
+        if len(v) > 100:
+            raise ValueError("Too many prompts (max 100)")
+        for i, p in enumerate(v):
+            if len(p) > 2000:
+                raise ValueError(f"Prompt {i+1} is too long (max 2000 characters)")
         return v
 
 
@@ -358,6 +370,13 @@ class UpdateDraftRequest(BaseModel):
     status: str | None = None
     platform_guidelines_applied: str | None = None
 
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str | None) -> str | None:
+        if v is not None and v not in ("draft", "approved", "posted", "dismissed"):
+            raise ValueError("status must be one of: draft, approved, posted, dismissed")
+        return v
+
 
 class PostDraftRequest(BaseModel):
     post_url: str | None = None
@@ -365,8 +384,16 @@ class PostDraftRequest(BaseModel):
 
 
 class ConnectAccountRequest(BaseModel):
-    platform: str
+    platform: str = Field(..., max_length=50)
     credentials: dict
+
+    @field_validator("platform")
+    @classmethod
+    def validate_platform(cls, v: str) -> str:
+        allowed = {"reddit", "quora", "linkedin", "x", "medium", "wikipedia"}
+        if v not in allowed:
+            raise ValueError(f"platform must be one of {sorted(allowed)}")
+        return v
 
 
 class UpdateContentSettingsRequest(BaseModel):
@@ -667,6 +694,16 @@ class TeamMemberResponse(BaseModel):
 class InviteTeamMemberRequest(BaseModel):
     email: str
 
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not v or "@" not in v or "." not in v.split("@")[-1]:
+            raise ValueError("Invalid email address")
+        if len(v) > 255:
+            raise ValueError("Email too long")
+        return v
+
 
 # ── Health ────────────────────────────────────────────────────────────────────
 
@@ -679,8 +716,18 @@ class HealthResponse(BaseModel):
 # ── Onboarding ────────────────────────────────────────────────────────────────
 
 class FetchWebsiteContextRequest(BaseModel):
-    url: str
+    url: str = Field(..., max_length=2000)
     brand_name: str = ""
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("URL is required")
+        if not v.startswith(("http://", "https://")):
+            v = f"https://{v}"
+        return v
 
 
 class FetchWebsiteContextResponse(BaseModel):

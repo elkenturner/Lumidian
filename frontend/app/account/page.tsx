@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Shield,
   CheckCircle2,
+  LogOut,
 } from 'lucide-react';
 import {
   getBillingStatus,
@@ -53,7 +54,7 @@ function InitialsAvatar({ name, email }: { name?: string | null; email?: string 
 }
 
 export default function AccountPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const router = useRouter();
 
   const [billing, setBilling] = useState<BillingStatus | null>(null);
@@ -210,6 +211,15 @@ export default function AccountPage() {
               </button>
             </div>
           </section>
+
+          {/* Sign out */}
+          <button
+            onClick={async () => { await logout(); router.push('/login'); }}
+            className="w-full flex items-center justify-center gap-2 text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-3.5 transition-colors cursor-pointer"
+          >
+            <LogOut size={14} />
+            Sign out
+          </button>
 
           {/* Delete account */}
           <section className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-5">

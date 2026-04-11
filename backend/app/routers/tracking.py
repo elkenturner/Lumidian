@@ -568,6 +568,9 @@ async def trigger_prompt_run(
     """
     from app.models import Prompt
 
+    require_active_subscription(user)
+    check_rate_limit(user.id, limit=3)
+
     brand = await get_brand_for_user(brand_id, db, user)
     require_brand_active(brand, user)
 

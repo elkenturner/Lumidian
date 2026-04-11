@@ -324,7 +324,7 @@ async def _auto_draft_sweep() -> None:
                         BrandContentSettings.enabled == True,
                     )
                 )
-                has_enabled = settings_result.scalar_one_or_none() is not None
+                has_enabled = settings_result.scalars().first() is not None
 
             if not has_enabled:
                 continue
@@ -343,10 +343,9 @@ async def _auto_draft_sweep() -> None:
 async def _sqlite_backup_sweep() -> None:
     """
     Daily SQLite backup (02:00 UTC).
-    Copies the .db file to backend/backups/ with a timestamp filename.
+    Uses VACUUM INTO for a consistent snapshot safe during concurrent writes.
     Keeps the last 7 backups and deletes older ones automatically.
     """
-    import shutil
     from datetime import datetime
     from pathlib import Path
 
@@ -369,25 +368,16 @@ async def _sqlite_backup_sweep() -> None:
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     backup_file = backup_dir / f"clarity_ai_{timestamp}.db"
 
-    try:
-        shutil.copy2(db_path, backup_file)
-        logger.info("SQLite backup created: %s", backup_file)
-    except Exception:
-        logger.exception("SQLite backup failed — could not copy file")
-        return
-
-    # Verify backup integrity
+    # Use VACUUM INTO for a consistent backup (safe during concurrent writes)
     import sqlite3 as _sqlite3
     try:
-        conn = _sqlite3.connect(str(backup_file))
-        result = conn.execute("PRAGMA integrity_check").fetchone()
+        conn = _sqlite3.connect(str(db_path))
+        conn.execute(f"VACUUM INTO '{backup_file}'")
         conn.close()
-        if result and result[0] == "ok":
-            logger.info("Backup integrity check passed: %s", backup_file)
-        else:
-            logger.warning("Backup integrity check FAILED for %s: %s", backup_file, result)
+        logger.info("SQLite backup created (VACUUM INTO): %s", backup_file)
     except Exception:
-        logger.exception("Backup integrity check could not run for %s", backup_file)
+        logger.exception("SQLite backup failed")
+        return
 
     # Prune: keep only the 7 most recent backups
     backups = sorted(backup_dir.glob("clarity_ai_*.db"), key=lambda p: p.stat().st_mtime, reverse=True)

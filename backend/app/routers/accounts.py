@@ -28,12 +28,15 @@ router = APIRouter(tags=["accounts"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
-SUPPORTED_PLATFORMS = {"reddit", "quora", "medium", "wikipedia"}
+SUPPORTED_PLATFORMS = {"reddit", "quora", "medium", "wikipedia", "linkedin", "x"}
 
 
-async def _get_account_or_404(db: AsyncSession, platform: str) -> AccountConnection:
+async def _get_account_or_404(db: AsyncSession, user_id: int, platform: str) -> AccountConnection:
     result = await db.execute(
-        select(AccountConnection).where(AccountConnection.platform == platform)
+        select(AccountConnection).where(
+            AccountConnection.user_id == user_id,
+            AccountConnection.platform == platform,
+        )
     )
     account = result.scalar_one_or_none()
     if account is None:
@@ -48,9 +51,11 @@ async def _get_account_or_404(db: AsyncSession, platform: str) -> AccountConnect
 
 @router.get("/accounts", response_model=list[AccountConnectionSchema])
 async def list_accounts(db: DbDep, user: CurrentUser):
-    """Return all account connections."""
+    """Return all account connections for the current user."""
     result = await db.execute(
-        select(AccountConnection).order_by(AccountConnection.platform)
+        select(AccountConnection)
+        .where(AccountConnection.user_id == user.id)
+        .order_by(AccountConnection.platform)
     )
     accounts = result.scalars().all()
     return [AccountConnectionSchema.model_validate(a) for a in accounts]
@@ -61,7 +66,7 @@ async def list_accounts(db: DbDep, user: CurrentUser):
 @router.post("/accounts/connect", response_model=AccountConnectionSchema, status_code=status.HTTP_200_OK)
 async def connect_account(request: ConnectAccountRequest, db: DbDep, user: CurrentUser):
     """
-    Connect or update an account connection.
+    Connect or update an account connection for the current user.
 
     If an existing record exists for the platform it is updated; otherwise a
     new one is created.  Credentials are stored as a raw JSON string.
@@ -73,7 +78,10 @@ async def connect_account(request: ConnectAccountRequest, db: DbDep, user: Curre
         )
 
     result = await db.execute(
-        select(AccountConnection).where(AccountConnection.platform == request.platform)
+        select(AccountConnection).where(
+            AccountConnection.user_id == user.id,
+            AccountConnection.platform == request.platform,
+        )
     )
     account: AccountConnection | None = result.scalar_one_or_none()
 
@@ -90,6 +98,7 @@ async def connect_account(request: ConnectAccountRequest, db: DbDep, user: Curre
 
     if account is None:
         account = AccountConnection(
+            user_id=user.id,
             platform=request.platform,
             status="connected",
             credentials=credentials_json,
@@ -119,7 +128,7 @@ async def connect_account(request: ConnectAccountRequest, db: DbDep, user: Curre
 @router.delete("/accounts/{platform}", status_code=status.HTTP_204_NO_CONTENT)
 async def disconnect_account(platform: str, db: DbDep, user: CurrentUser):
     """Disconnect an account (clears credentials, sets status to disconnected)."""
-    account = await _get_account_or_404(db, platform)
+    account = await _get_account_or_404(db, user.id, platform)
     account.status = "disconnected"
     account.credentials = None
     account.display_name = None
@@ -135,7 +144,7 @@ async def disconnect_account(platform: str, db: DbDep, user: CurrentUser):
 @router.get("/accounts/{platform}", response_model=AccountConnectionSchema)
 async def get_account(platform: str, db: DbDep, user: CurrentUser):
     """Return status of a specific account connection."""
-    account = await _get_account_or_404(db, platform)
+    account = await _get_account_or_404(db, user.id, platform)
     return AccountConnectionSchema.model_validate(account)
 
 

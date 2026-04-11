@@ -461,7 +461,7 @@ def _clean_title(title: str) -> str:
     return title
 
 
-def _search_reddit_posts(
+async def _search_reddit_posts(
     query: str,
     num_results: int = 10,
     cache_key: int | None = None,
@@ -487,8 +487,8 @@ def _search_reddit_posts(
         return []
 
     try:
-        with httpx.Client(timeout=10.0) as client:
-            resp = client.post(
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(
                 _SERPER_URL,
                 headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
                 json={"q": f"{query} reddit", "num": 25},
@@ -685,12 +685,12 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
         for prompt in priority:
             query = _build_search_query(prompt.text)
-            results = _search_reddit_posts(query, num_results=10, cache_key=prompt.id)
+            results = await _search_reddit_posts(query, num_results=10, cache_key=prompt.id)
             for r in results:
                 all_candidates.append((r, prompt.id))
 
         # Brand-name search (no cache)
-        for r in _search_reddit_posts(brand.name, num_results=10):
+        for r in await _search_reddit_posts(brand.name, num_results=10):
             all_candidates.append((r, None))
 
         # Deduplicate by URL across all queries

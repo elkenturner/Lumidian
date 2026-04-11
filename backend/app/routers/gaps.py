@@ -16,7 +16,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, get_brand_for_user
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, require_active_subscription, require_brand_active
 from app.models import ContentGap, Prompt, TrackingRun
 from app.schemas import ContentGapResponse
 
@@ -119,7 +119,10 @@ async def gap_summary(brand_id: int, db: DbDep, user: CurrentUser):
 @router.post("/{brand_id}/refresh", status_code=status.HTTP_202_ACCEPTED)
 async def refresh_gaps(brand_id: int, db: DbDep, user: CurrentUser):
     """Trigger gap analysis on the latest completed run for this brand."""
-    await get_brand_for_user(brand_id, db, user)
+    require_active_subscription(user)
+    check_rate_limit(user.id, limit=3)
+    brand = await get_brand_for_user(brand_id, db, user)
+    require_brand_active(brand, user)
 
     run_result = await db.execute(
         select(TrackingRun)

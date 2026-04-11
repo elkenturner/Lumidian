@@ -10,7 +10,7 @@ because search_quora_questions is imported inside scan_brand_opportunities at ca
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, AsyncMock
 
 import pytest
 
@@ -235,7 +235,7 @@ async def test_scan_deduplication(tmp_db):
     assert count2 == 0  # already stored on first call
 
 
-def test_search_quora_passes_date_field():
+async def test_search_quora_passes_date_field():
     """search_quora_questions must include the 'date' field from Serper results."""
     import app.services.quora_search_service as svc
 
@@ -253,13 +253,14 @@ def test_search_quora_passes_date_field():
     }
     fake_response.raise_for_status = MagicMock()
 
+    mock_client_instance = AsyncMock()
+    mock_client_instance.post.return_value = fake_response
+
     with patch.dict("os.environ", {"SERPER_API_KEY": "fake-key"}), \
-         patch("httpx.Client") as mock_client:
-        mock_client.return_value.__enter__ = MagicMock(return_value=MagicMock(
-            post=MagicMock(return_value=fake_response)
-        ))
-        mock_client.return_value.__exit__ = MagicMock(return_value=False)
-        results = svc.search_quora_questions("saas tool", num_results=5)
+         patch("httpx.AsyncClient") as mock_client:
+        mock_client.return_value.__aenter__ = AsyncMock(return_value=mock_client_instance)
+        mock_client.return_value.__aexit__ = AsyncMock(return_value=False)
+        results = await svc.search_quora_questions("saas tool", num_results=5)
 
     assert len(results) == 1
     assert "date" in results[0]

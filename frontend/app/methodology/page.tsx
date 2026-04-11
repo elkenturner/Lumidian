@@ -79,8 +79,8 @@ export default function MethodologyPage() {
           <div
             className="rounded-xl p-5 sm:p-6 border"
             style={{
-              background: 'rgba(34, 197, 94, 0.04)',
-              borderColor: 'rgba(34, 197, 94, 0.15)',
+              background: 'var(--success-muted)',
+              borderColor: 'color-mix(in srgb, var(--success) 15%, transparent)',
             }}
           >
             <div className="flex items-center gap-2.5 mb-3">
@@ -442,10 +442,20 @@ export default function MethodologyPage() {
         </div>
       </section>
 
+      {/* Back to top */}
+      <div className="mt-12 text-center">
+        <a
+          href="#overview"
+          className="text-[11px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors"
+        >
+          ↑ Back to top
+        </a>
+      </div>
+
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* FOOTER                                                                */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <div className="mt-16 pt-6 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px] text-[var(--text-faint)]">
+      <div className="mt-6 pt-6 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px] text-[var(--text-faint)]">
         <p>&copy; 2026 Lumidian. All rights reserved.</p>
         <div className="flex gap-4">
           <Link href="/terms" className="hover:text-[var(--text-muted)] transition-colors">Terms</Link>

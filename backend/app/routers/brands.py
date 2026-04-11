@@ -751,10 +751,13 @@ async def fetch_website_context_endpoint(
 from pydantic import BaseModel as _BaseModel
 
 
+from pydantic import Field as _Field
+
+
 class _SuggestPreviewReq(_BaseModel):
-    name: str
-    description: str = ""
-    website_context: str = ""
+    name: str = _Field(..., max_length=255)
+    description: str = _Field("", max_length=2000)
+    website_context: str = _Field("", max_length=10_000)
 
 
 @router.post("/suggest-prompts-preview", response_model=list[str])

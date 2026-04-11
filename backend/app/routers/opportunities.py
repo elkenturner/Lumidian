@@ -328,12 +328,15 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
             status_code=status.HTTP_409_CONFLICT,
             detail="A scan is already running for this brand. Please wait for it to finish.",
         )
-
-    # Log before firing so the event counts immediately on the next quota check
-    await log_event("manual_scan_triggered", {"brand_id": brand_id}, brand_id=brand_id)
-
-    # Add to scanning state before starting so the banner appears immediately
+    # Reserve slot immediately to prevent races across awaits
     _state.scanning_brands.add(brand_id)
+
+    try:
+        # Log before firing so the event counts immediately on the next quota check
+        await log_event("manual_scan_triggered", {"brand_id": brand_id}, brand_id=brand_id)
+    except Exception:
+        _state.scanning_brands.discard(brand_id)
+        raise
 
     async def _scan_with_state_cleanup(bid: int, tier: str | None, admin: bool = False):
         try:

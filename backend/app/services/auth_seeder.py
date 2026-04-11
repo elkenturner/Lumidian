@@ -26,6 +26,14 @@ async def seed_admin_user() -> None:
         )
         return
 
+    if len(ADMIN_PASSWORD) < 12:
+        logger.error(
+            "ADMIN_PASSWORD is too short (%d chars) — must be at least 12 characters. "
+            "Skipping admin seed for security.",
+            len(ADMIN_PASSWORD),
+        )
+        return
+
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(User).where(User.email == ADMIN_EMAIL))
         user = result.scalar_one_or_none()

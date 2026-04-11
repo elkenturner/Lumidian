@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC
+from datetime import UTC, datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -184,15 +184,21 @@ async def admin_list_users(db: DbDep, user: CurrentUser):
     else:
         brands_by_user = {}
 
+    # Batch-fetch last active time per user (avoids N+1 queries)
+    last_active_map: dict[int, datetime | None] = {}
+    if user_rows:
+        la_result = await db.execute(
+            select(Brand.user_id, func.max(TrackingRun.created_at).label("last_active"))
+            .join(TrackingRun, TrackingRun.brand_id == Brand.id)
+            .where(Brand.user_id.in_([r.id for r in user_rows]))
+            .group_by(Brand.user_id)
+        )
+        for la_row in la_result.all():
+            last_active_map[la_row.user_id] = la_row.last_active
+
     users_data = []
     for row in user_rows:
-        # Last active = latest tracking run
-        last_run_result = await db.execute(
-            select(func.max(TrackingRun.created_at))
-            .join(Brand, TrackingRun.brand_id == Brand.id)
-            .where(Brand.user_id == row.id)
-        )
-        last_active = last_run_result.scalar_one_or_none()
+        last_active = last_active_map.get(row.id)
         user_brands = brands_by_user.get(row.id, [])
         users_data.append({
             "id": row.id,

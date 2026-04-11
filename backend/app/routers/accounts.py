@@ -74,7 +74,7 @@ async def connect_account(request: ConnectAccountRequest, db: DbDep, user: Curre
     if request.platform not in SUPPORTED_PLATFORMS:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unsupported platform '{request.platform}'. Must be one of {sorted(SUPPORTED_PLATFORMS)}",
+            detail=f"Unsupported platform. Must be one of {sorted(SUPPORTED_PLATFORMS)}",
         )
 
     result = await db.execute(

@@ -38,6 +38,12 @@ def _get_resend_key() -> str:
     return ""
 
 
+# Set API key once at import time (avoids repeated global mutation)
+_resend_key = _get_resend_key()
+if _resend_key:
+    resend.api_key = _resend_key
+
+
 # ── Internal send primitive ───────────────────────────────────────────────────
 
 def _send(to: str, subject: str, body: str) -> None:
@@ -47,10 +53,7 @@ def _send(to: str, subject: str, body: str) -> None:
     Uses Resend HTTP API if an API key is available; otherwise logs to console.
     Raises on failure so callers can catch and log as non-fatal.
     """
-    api_key = _get_resend_key()
-
-    if api_key:
-        resend.api_key = api_key
+    if _resend_key:
         from_addr = _FROM or "Lumidian <noreply@lumidian.ai>"
 
         resend.Emails.send({

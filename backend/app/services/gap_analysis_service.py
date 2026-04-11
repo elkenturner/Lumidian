@@ -247,9 +247,7 @@ async def run_gap_analysis(brand_id: int, run_id: int) -> list[int]:
                 from app.services.quora_search_service import extract_keywords, search_quora_questions
                 keywords = extract_keywords(prompt.text)
                 if keywords:
-                    questions = await asyncio.to_thread(
-                        search_quora_questions, keywords, 5, prompt_id
-                    )
+                    questions = await search_quora_questions(keywords, 5, prompt_id)
                     if questions:
                         quora_questions_json = json.dumps(questions)
             except Exception as _qe:

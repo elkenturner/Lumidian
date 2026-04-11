@@ -83,7 +83,7 @@ export default function NewBrandPage() {
   const promptLimit = brandChoice ? PROMPT_LIMITS[brandChoice] : 10;
 
   // Map user choice to API brand_type
-  const apiBrandType = brandChoice === 'pitch' ? 'pitch' : 'standard';
+  const apiBrandType = brandChoice === 'starter' ? 'standard' as const : (brandChoice ?? undefined);
 
   function handleSelectType(choice: BrandChoice) {
     setBrandChoice(choice);

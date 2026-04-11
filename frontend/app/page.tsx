@@ -204,15 +204,15 @@ const HOW_STEPS = [
 ];
 
 const COMPARISON_FEATURES = [
-  { label: 'Standard brands', free: '0', starter: '1', pro: '2' },
-  { label: 'Pitch decks', free: '1', starter: '1', pro: '3' },
+  { label: 'Brands', free: '1 (30-day)', starter: '1', pro: '2' },
   { label: 'Prompts per brand', free: '10', starter: '25', pro: '100' },
   { label: 'Manual runs per day', free: '1', starter: '3', pro: 'Unlimited' },
-  { label: 'AI models monitored', free: '4', starter: '4', pro: '4' },
+  { label: 'AI models monitored', free: '4', starter: '4', pro: '4 (enhanced)' },
   { label: 'Daily tracking', free: true, starter: true, pro: true },
   { label: 'Visibility score & report', free: true, starter: true, pro: true },
   { label: 'Content Hub & drafting', free: false, starter: true, pro: true },
-  { label: 'Custom draft requests', free: '—', starter: '10/week', pro: '25/week' },
+  { label: 'Content drafts', free: '—', starter: 'Unlimited', pro: 'Unlimited' },
+  { label: 'LinkedIn & X drafts', free: false, starter: false, pro: true },
   { label: 'Gap analysis', free: false, starter: true, pro: true },
   { label: 'Brand profile & voice', free: false, starter: true, pro: true },
   { label: 'Reddit scanner', free: false, starter: true, pro: true },

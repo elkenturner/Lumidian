@@ -74,7 +74,7 @@ export interface Brand {
   name: string;
   slug: string;
   tier: 'basic' | 'standard' | 'premium';
-  brand_type: 'standard' | 'pitch';
+  brand_type: 'standard' | 'pitch' | 'pro';
   pitch_expires_at: string | null;
   prompt_count: number;
   website_url?: string | null;
@@ -240,7 +240,7 @@ export async function getBrand(id: number): Promise<BrandDetail> {
 export async function createBrand(data: {
   name: string;
   tier: string;
-  brand_type?: 'standard' | 'pitch';
+  brand_type?: 'standard' | 'pitch' | 'pro';
   prompts: string[];
   website_url?: string;
 }): Promise<BrandDetail> {
@@ -691,7 +691,7 @@ export interface BrandWithStats {
   name: string;
   slug: string;
   tier: 'basic' | 'standard' | 'premium';
-  brand_type: 'standard' | 'pitch';
+  brand_type: 'standard' | 'pitch' | 'pro';
   pitch_expires_at: string | null;
   prompt_count: number;
   overall_score: number | null;

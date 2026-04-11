@@ -30,7 +30,7 @@ function SectionDivider() {
 
 export default function MethodologyPage() {
   return (
-    <div className="px-4 sm:px-8 py-8 sm:py-12 max-w-3xl">
+    <div className="px-4 sm:px-8 lg:px-12 py-8 sm:py-12 max-w-4xl mx-auto">
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* HERO / INTRO                                                          */}
@@ -39,18 +39,20 @@ export default function MethodologyPage() {
         <SectionLabel>Methodology</SectionLabel>
 
         <h1
-          className="text-3xl sm:text-4xl font-extrabold text-[var(--text-primary)] tracking-tight leading-[1.15]"
+          className="text-3xl sm:text-[2.5rem] font-extrabold text-[var(--text-primary)] tracking-tight leading-[1.1]"
         >
-          How we measure your brand&apos;s AI visibility
+          How we measure your brand&apos;s
+          <br />
+          <span style={{ color: 'var(--accent-light)' }}>AI visibility</span>
         </h1>
 
-        <div className="mt-6 space-y-4 text-[15px] text-[var(--text-secondary)] leading-relaxed">
+        <div className="mt-8 space-y-4 text-[15px] sm:text-base text-[var(--text-secondary)] leading-[1.7]">
           <p>
             Lumidian queries each AI model directly and measures how often your
             brand appears in their responses. No scraping, no proxies — the same
             APIs that power ChatGPT, Claude, Perplexity, and Gemini.
           </p>
-          <p>
+          <p className="text-[var(--text-muted)]">
             Transparency matters. If you&apos;re going to act on a visibility score, you
             should know exactly how it&apos;s calculated, what it represents, and what
             can move it. This page explains every part of the process.
@@ -233,14 +235,20 @@ export default function MethodologyPage() {
 
               {/* Formula display */}
               <div
-                className="mt-3 rounded-lg px-4 py-3 font-mono text-[13px] border"
+                className="mt-3 rounded-lg px-5 py-4 font-mono text-sm sm:text-base border text-center tracking-wide"
                 style={{
                   background: 'var(--bg-raised)',
-                  borderColor: 'var(--border-subtle)',
-                  color: 'var(--text-secondary)',
+                  borderColor: 'var(--accent-border)',
+                  color: 'var(--accent-light)',
                 }}
               >
-                Score = (queries with mention / total queries) &times; 100
+                <span className="text-[var(--text-muted)]">Score</span>{' '}
+                <span className="text-[var(--text-faint)]">=</span>{' '}
+                <span className="text-[var(--text-secondary)]">(mentions</span>{' '}
+                <span className="text-[var(--text-faint)]">/</span>{' '}
+                <span className="text-[var(--text-secondary)]">total queries)</span>{' '}
+                <span className="text-[var(--text-faint)]">&times;</span>{' '}
+                <span style={{ color: 'var(--accent-light)' }}>100</span>
               </div>
             </div>
           </li>
@@ -300,10 +308,11 @@ export default function MethodologyPage() {
 
         <div className="space-y-4">
           <div
-            className="rounded-xl p-5 border"
+            className="rounded-xl p-5 border-l-2 border border-l-[var(--accent)]"
             style={{
               background: 'var(--bg-raised)',
               borderColor: 'var(--border-subtle)',
+              borderLeftColor: 'var(--accent)',
             }}
           >
             <p className="text-sm font-semibold text-[var(--text-primary)] mb-1.5">
@@ -317,10 +326,11 @@ export default function MethodologyPage() {
           </div>
 
           <div
-            className="rounded-xl p-5 border"
+            className="rounded-xl p-5 border-l-2 border border-l-[var(--success)]"
             style={{
               background: 'var(--bg-raised)',
               borderColor: 'var(--border-subtle)',
+              borderLeftColor: 'var(--success)',
             }}
           >
             <p className="text-sm font-semibold text-[var(--text-primary)] mb-1.5">
@@ -334,10 +344,11 @@ export default function MethodologyPage() {
           </div>
 
           <div
-            className="rounded-xl p-5 border"
+            className="rounded-xl p-5 border-l-2 border"
             style={{
               background: 'var(--bg-raised)',
               borderColor: 'var(--border-subtle)',
+              borderLeftColor: 'var(--accent-light)',
             }}
           >
             <p className="text-sm font-semibold text-[var(--text-primary)] mb-1.5">

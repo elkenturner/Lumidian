@@ -37,3 +37,4 @@ backend/logs/
 frontend/tsconfig.tsbuildinfo
 .github/workflows/
 .superpowers/
+.worktrees/

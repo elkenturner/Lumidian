@@ -114,6 +114,8 @@ async def lifespan(app: FastAPI):
     logger.info("Scheduler stopped. Goodbye.")
 
 
+_is_production = os.getenv("ENVIRONMENT") == "production"
+
 app = FastAPI(
     title="Lumidian",
     description=(
@@ -122,9 +124,9 @@ app = FastAPI(
     ),
     version="1.0.0",
     lifespan=lifespan,
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
-    openapi_url="/api/openapi.json",
+    docs_url=None if _is_production else "/api/docs",
+    redoc_url=None if _is_production else "/api/redoc",
+    openapi_url=None if _is_production else "/api/openapi.json",
 )
 
 # ── Global exception handler ──────────────────────────────────────────────────
@@ -151,6 +153,23 @@ app.add_middleware(
 )
 
 from starlette.middleware.base import BaseHTTPMiddleware
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Add standard security headers to all responses."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if _is_production:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 _SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 _CSRF_EXEMPT_PREFIXES = ("/api/billing/webhook",)
@@ -203,7 +222,7 @@ app.include_router(support_router.router, prefix="/api")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
-@app.get("/api/health", response_model=HealthResponse, tags=["health"])
+@app.api_route("/api/health", methods=["GET", "HEAD"], response_model=HealthResponse, tags=["health"])
 async def health():
     return HealthResponse(
         status="ok",

@@ -163,13 +163,17 @@ async def billing_usage(user: Annotated[User, Depends(get_current_user)], db: Db
 
     manual_run_limit = DAILY_RUN_LIMITS.get(tier, 1) if not is_admin else None
 
-    # Total prompts across all standard brands
+    # Pro users create "pro" brand_type; starter users create "standard".
+    # Count the effective type for the user's tier.
+    effective_brand_type = "pro" if tier == "pro" else "standard"
+
+    # Total prompts across all brands of the effective type
     prompt_count_result = await db.execute(
         sa_select(func.count(Prompt.id)).where(
             Prompt.brand_id.in_(
                 sa_select(Brand.id).where(
                     Brand.user_id == user.id,
-                    Brand.brand_type == "standard",
+                    Brand.brand_type == effective_brand_type,
                 )
             )
         )
@@ -192,7 +196,7 @@ async def billing_usage(user: Annotated[User, Depends(get_current_user)], db: Db
         "manual_run_limit": manual_run_limit,
         "prompt_count": prompt_count,
         "prompt_limit": prompt_limit,
-        "standard_brand_count": brand_counts.get("standard", 0),
+        "standard_brand_count": brand_counts.get(effective_brand_type, 0),
         "standard_brand_limit": brand_limits["standard"],
         "pitch_brand_count": brand_counts.get("pitch", 0),
         "pitch_brand_limit": brand_limits["pitch"],

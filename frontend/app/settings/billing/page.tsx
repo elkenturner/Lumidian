@@ -10,10 +10,9 @@ import { logError } from '@/lib/utils/errors';
 const TIER_FEATURES: Record<string, string[]> = {
   starter: [
     '1 standard brand',
-    '1 pitch deck (30-day)',
     '25 tracked prompts per brand',
     '3 manual runs per day',
-    '10 custom draft requests per week',
+    'Unlimited content drafts',
     '10 manual opportunity scans per week',
     '5 competitors tracked per brand',
     '1 additional team member',
@@ -22,14 +21,14 @@ const TIER_FEATURES: Record<string, string[]> = {
   ],
   pro: [
     '2 pro brands',
-    '3 pitch decks (30-day each)',
     '100 tracked prompts per brand',
     'Unlimited manual runs',
-    '25 custom draft requests per week',
+    'Unlimited content drafts',
+    'LinkedIn & X content drafts',
     '25 manual opportunity scans per week',
     '15 competitors tracked per brand',
     '3 additional team members',
-    '4 AI models tracked',
+    '4 AI models tracked (enhanced)',
     'Priority support',
   ],
 };

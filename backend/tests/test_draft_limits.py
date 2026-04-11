@@ -73,7 +73,7 @@ def test_tier_draft_caps():
     """Draft queue caps scale with tier: free=5, starter=10, pro=20."""
     from app.services.drafting_service import get_draft_cap
     assert get_draft_cap(None) == 5
-    assert get_draft_cap("starter") == 10
+    assert get_draft_cap("starter") == 20
     assert get_draft_cap("pro") == 20
     assert get_draft_cap(None, brand_type="pitch") == 5
 

@@ -1,6 +1,6 @@
 """
 Tests for _onboarding_post_process:
-  - Calls auto_draft_top_gaps with tier-aware max_gaps (free=5, starter=10, pro=20)
+  - Calls auto_draft_top_gaps with tier-aware max_gaps (free=5, starter=20, pro=20)
   - Then scans Reddit and Quora (via asyncio.gather)
   - Manages state.generating_brands and state.scanning_brands correctly
   - Does NOT fire for non-onboarding run types
@@ -87,8 +87,8 @@ async def test_onboarding_post_process_pro_gets_20():
     assert captured["source"] == "onboarding"
 
 
-async def test_onboarding_post_process_starter_gets_10():
-    """Starter user gets max_gaps=10 during onboarding."""
+async def test_onboarding_post_process_starter_gets_20():
+    """Starter user gets max_gaps=20 during onboarding."""
     from app.services.tracking_service import _onboarding_post_process
 
     brand_id = await _create_brand_with_tier("starter")
@@ -105,7 +105,7 @@ async def test_onboarding_post_process_starter_gets_10():
     ):
         await _onboarding_post_process(brand_id=brand_id)
 
-    assert captured["max_gaps"] == 10
+    assert captured["max_gaps"] == 20
 
 
 async def test_onboarding_post_process_free_gets_5():

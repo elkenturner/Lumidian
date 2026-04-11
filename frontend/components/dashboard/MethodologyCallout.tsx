@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { X, Lightbulb } from 'lucide-react';
 import Link from 'next/link';
 import { easings } from '@/lib/motion';
@@ -14,17 +14,23 @@ interface MethodologyCalloutProps {
 
 export default function MethodologyCallout({ visible }: MethodologyCalloutProps) {
   const [dismissed, setDismissed] = useState(true); // default hidden until we check
+  const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
-    setDismissed(localStorage.getItem(STORAGE_KEY) === '1');
+    try {
+      setDismissed(localStorage.getItem(STORAGE_KEY) === '1');
+    } catch {}
   }, []);
 
   const handleDismiss = () => {
-    localStorage.setItem(STORAGE_KEY, '1');
+    try { localStorage.setItem(STORAGE_KEY, '1'); } catch {}
     setDismissed(true);
   };
 
   const show = visible && !dismissed;
+
+  const enterDuration = prefersReducedMotion ? 0 : 0.35;
+  const exitDuration = prefersReducedMotion ? 0 : 0.2;
 
   return (
     <AnimatePresence>
@@ -36,13 +42,13 @@ export default function MethodologyCallout({ visible }: MethodologyCalloutProps)
             opacity: 1,
             height: 'auto',
             marginBottom: 16,
-            transition: { duration: 0.35, ease: easings.out },
+            transition: { duration: enterDuration, ease: easings.out },
           }}
           exit={{
             opacity: 0,
             height: 0,
             marginBottom: 0,
-            transition: { duration: 0.2, ease: easings.out },
+            transition: { duration: exitDuration, ease: easings.out },
           }}
           style={{ overflow: 'hidden' }}
         >

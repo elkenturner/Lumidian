@@ -177,7 +177,7 @@ async def _get_draft_for_user(db: AsyncSession, draft_id: int, user) -> ContentD
 # ── Platform guidelines ───────────────────────────────────────────────────────
 
 @router.get("/guidelines/{platform}", tags=["content"])
-async def get_platform_guidelines(platform: str):
+async def get_platform_guidelines(platform: str, user: CurrentUser):
     """Return platform guidelines and disclaimer for a given platform."""
     if platform not in PLATFORM_GUIDELINES:
         raise HTTPException(

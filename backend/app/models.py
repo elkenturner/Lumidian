@@ -67,6 +67,7 @@ class User(Base):
     email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default='1')
     email_verification_code: Mapped[str | None] = mapped_column(String(255), nullable=True)
     email_verification_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 # ── System-wide key-value settings ───────────────────────────────────────────
@@ -134,7 +135,7 @@ class Prompt(Base):
     __tablename__ = "prompts"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    brand_id: Mapped[int] = mapped_column(Integer, ForeignKey("brands.id"), nullable=False, index=True)
+    brand_id: Mapped[int] = mapped_column(Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     # Label for display — "standard" | "pitch". Does not change tracking behaviour.
     prompt_type: Mapped[str] = mapped_column(String(20), nullable=False, default="standard")
@@ -150,7 +151,7 @@ class TrackingRun(Base):
     __tablename__ = "tracking_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    brand_id: Mapped[int] = mapped_column(Integer, ForeignKey("brands.id"), nullable=False, index=True)
+    brand_id: Mapped[int] = mapped_column(Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
     status: Mapped[str] = mapped_column(
         SAEnum(RunStatusEnum, values_callable=lambda obj: [e.value for e in obj]),
         nullable=False,
@@ -191,10 +192,10 @@ class QueryResult(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     tracking_run_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("tracking_runs.id"), nullable=False, index=True
+        Integer, ForeignKey("tracking_runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
     prompt_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("prompts.id"), nullable=False, index=True
+        Integer, ForeignKey("prompts.id", ondelete="CASCADE"), nullable=False, index=True
     )
     model: Mapped[str] = mapped_column(
         SAEnum(ModelEnum, values_callable=lambda obj: [e.value for e in obj]),
@@ -217,7 +218,7 @@ class RunModelScore(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     tracking_run_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("tracking_runs.id"), nullable=False, index=True
+        Integer, ForeignKey("tracking_runs.id", ondelete="CASCADE"), nullable=False, index=True
     )
     model: Mapped[str] = mapped_column(
         SAEnum(ModelEnum, values_callable=lambda obj: [e.value for e in obj]),

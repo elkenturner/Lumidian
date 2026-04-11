@@ -313,6 +313,8 @@ async def run_migrations():
         "ALTER TABLE tracking_runs ADD COLUMN error_message TEXT",
         # 2026-04-10: Add user_id to account_connections for multi-tenancy
         "ALTER TABLE account_connections ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
+        # 2026-04-10: Add password_changed_at for session invalidation after password change
+        "ALTER TABLE users ADD COLUMN password_changed_at DATETIME",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

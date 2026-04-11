@@ -13,6 +13,9 @@ POST /api/auth/google              — (legacy) exchange Google ID token for ses
 """
 from __future__ import annotations
 
+import base64
+import hashlib
+import json
 import logging
 import os
 import re
@@ -133,6 +136,7 @@ def _validate_password(password: str) -> None:
 def create_token(user_id: int) -> str:
     payload = {
         "sub": str(user_id),
+        "iat": datetime.now(UTC),
         "exp": datetime.now(UTC) + timedelta(days=7),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -369,6 +373,9 @@ async def google_auth(request: GoogleAuthRequest, response: Response, db: DbDep)
             detail="Google account does not have a verified email address.",
         )
 
+    # Only auto-link if Google confirms the email is verified
+    google_email_verified = id_info.get("email_verified", False)
+
     # Find or create user
     result = await db.execute(select(User).where(User.google_id == google_id))
     user = result.scalar_one_or_none()
@@ -378,6 +385,11 @@ async def google_auth(request: GoogleAuthRequest, response: Response, db: DbDep)
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         if user:
+            if not google_email_verified:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Cannot link account: Google email is not verified.",
+                )
             user.google_id = google_id
         else:
             user = User(
@@ -385,7 +397,7 @@ async def google_auth(request: GoogleAuthRequest, response: Response, db: DbDep)
                 google_id=google_id,
                 name=name,
                 is_admin=(email in _ADMIN_EMAILS),
-                email_verified=True,
+                email_verified=google_email_verified,
             )
             db.add(user)
 
@@ -409,7 +421,7 @@ def _google_redirect_uri() -> str:
 
 
 @router.get("/google/url")
-async def google_auth_url(redirect_to: str = "/dashboard"):
+async def google_auth_url(response: Response, redirect_to: str = "/dashboard"):
     """Return the Google OAuth authorization URL. Frontend redirects the user there."""
     client_id = os.getenv("GOOGLE_CLIENT_ID", "")
     if not client_id:
@@ -417,17 +429,33 @@ async def google_auth_url(redirect_to: str = "/dashboard"):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Google OAuth not configured. Set GOOGLE_CLIENT_ID in environment.",
         )
+    # Generate CSRF token and encode state as JSON with redirect path
+    csrf_token = secrets.token_urlsafe(32)
+    state_payload = json.dumps({"csrf": csrf_token, "redirect": redirect_to})
+    state_b64 = base64.urlsafe_b64encode(state_payload.encode()).decode()
+
     params = {
         "client_id": client_id,
         "redirect_uri": _google_redirect_uri(),
         "response_type": "code",
         "scope": "openid email profile",
-        # state carries where to send the user after login; simple for dev use
-        "state": redirect_to,
+        "state": state_b64,
         "access_type": "online",
         "prompt": "select_account",  # always show account chooser
     }
     url = "https://accounts.google.com/o/oauth2/v2/auth?" + urllib.parse.urlencode(params)
+
+    # Store CSRF token hash in httpOnly cookie (5-minute lifetime)
+    _COOKIE_SECURE_LOCAL = os.getenv("ENVIRONMENT", "development").lower() == "production"
+    response.set_cookie(
+        "oauth_csrf",
+        hashlib.sha256(csrf_token.encode()).hexdigest(),
+        httponly=True,
+        secure=_COOKIE_SECURE_LOCAL,
+        samesite="lax",
+        max_age=300,
+        path="/",
+    )
     return {"url": url}
 
 
@@ -445,7 +473,32 @@ async def google_auth_callback(
     set auth cookies, and redirect to the app.
     """
     frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    redirect_to = _safe_redirect_path(state)
+
+    # Parse state and verify CSRF token
+    redirect_to = "/dashboard"
+    if state:
+        try:
+            state_payload = json.loads(base64.urlsafe_b64decode(state))
+            csrf_token = state_payload.get("csrf", "")
+            redirect_to = _safe_redirect_path(state_payload.get("redirect"))
+
+            stored_hash = request.cookies.get("oauth_csrf", "")
+            expected_hash = hashlib.sha256(csrf_token.encode()).hexdigest()
+            if not stored_hash or not secrets.compare_digest(stored_hash, expected_hash):
+                logger.warning("google_callback: CSRF state mismatch")
+                return RedirectResponse(
+                    f"{frontend_url}/login?error=csrf_mismatch", status_code=302
+                )
+        except (json.JSONDecodeError, ValueError, KeyError):
+            logger.warning("google_callback: malformed state parameter")
+            return RedirectResponse(
+                f"{frontend_url}/login?error=invalid_state", status_code=302
+            )
+    else:
+        logger.warning("google_callback: missing state parameter")
+        return RedirectResponse(
+            f"{frontend_url}/login?error=missing_state", status_code=302
+        )
 
     # Google signalled an error (e.g. user cancelled)
     if error:
@@ -514,6 +567,9 @@ async def google_auth_callback(
             f"{frontend_url}/login?error=no_email", status_code=302
         )
 
+    # Only auto-link if Google confirms the email is verified
+    google_email_verified = id_info.get("email_verified", False)
+
     # Find or create user — same logic as POST /google
     result = await db.execute(select(User).where(User.google_id == google_sub))
     user = result.scalar_one_or_none()
@@ -521,6 +577,10 @@ async def google_auth_callback(
         result = await db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
         if user:
+            if not google_email_verified:
+                return RedirectResponse(
+                    f"{frontend_url}/login?error=google_email_not_verified", status_code=302
+                )
             user.google_id = google_sub
         else:
             user = User(
@@ -528,7 +588,7 @@ async def google_auth_callback(
                 google_id=google_sub,
                 name=name,
                 is_admin=(email in _ADMIN_EMAILS),
-                email_verified=True,
+                email_verified=google_email_verified,
             )
             db.add(user)
     await db.commit()
@@ -561,6 +621,9 @@ async def google_auth_callback(
         max_age=COOKIE_MAX_AGE,
         path="/",
     )
+
+    # Clear the CSRF cookie
+    redirect_response.delete_cookie("oauth_csrf", path="/")
 
     from app.services.analytics_service import log_event
     await log_event("user_google_login", {}, user_id=user.id)
@@ -652,6 +715,7 @@ async def reset_password(request: ResetPasswordRequest, http_req: Request, db: D
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
 
     user.password_hash = hash_password(request.new_password)
+    user.password_changed_at = datetime.now(UTC).replace(tzinfo=None)
     reset_token.used = True
     await db.commit()
 
@@ -783,6 +847,7 @@ async def admin_reset_password(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     user.password_hash = hash_password(request.new_password)
+    user.password_changed_at = datetime.now(UTC).replace(tzinfo=None)
     await db.commit()
 
     logger.info("Admin %s reset password for user %s", current_user.email, email)

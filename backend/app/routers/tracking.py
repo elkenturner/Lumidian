@@ -464,18 +464,25 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
             )
             competitors = comps_result.scalars().all()
             if competitors:
+                import re as _re
+                def _normalize_text(text: str) -> str:
+                    return _re.sub(r"[^a-z0-9]", "", text.lower())
+
                 comp_rows = []
                 for qr in query_results:
                     if not qr.response_text:
                         continue
+                    response_norm = _normalize_text(qr.response_text)
                     for comp in competitors:
+                        exact = comp.name.lower() in qr.response_text.lower()
+                        fuzzy = _normalize_text(comp.name) in response_norm
                         comp_rows.append(CompetitorMention(
                             tracking_run_id=run_id,
                             competitor_id=comp.id,
                             prompt_id=qr.prompt_id,
                             model=qr.model,
                             run_number=qr.run_number,
-                            mentioned=comp.name.lower() in qr.response_text.lower(),
+                            mentioned=exact or fuzzy,
                         ))
                 for cm in comp_rows:
                     comp_db.add(cm)
@@ -698,7 +705,7 @@ async def _background_prompt_run(
 
             model_stats = {m: {"total_queries": 0, "total_mentions": 0} for m in SUPPORTED_MODELS}
             for qr in query_results:
-                if not qr.response_text:
+                if qr.error:
                     continue
                 model_stats[qr.model]["total_queries"] += 1
                 if qr.mentioned:

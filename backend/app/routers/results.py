@@ -265,10 +265,11 @@ async def get_prompts_overview(brand_id: int, db: DbDep, user: CurrentUser):
 
     prompt_ids = [p.id for p in prompts]
 
-    # Get PromptRunScore data per prompt
+    # Get PromptRunScore data per prompt (last 90 days)
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=90)
     scores_result = await db.execute(
         select(PromptRunScore)
-        .where(PromptRunScore.brand_id == brand_id)
+        .where(PromptRunScore.brand_id == brand_id, PromptRunScore.created_at >= cutoff)
         .order_by(PromptRunScore.created_at.desc())
     )
     all_scores = scores_result.scalars().all()
@@ -587,11 +588,12 @@ async def get_prompt_detail(
         for e in events
     ]
 
-    # Drafts targeting this prompt
+    # Drafts targeting this prompt (most recent 100)
     drafts_result = await db.execute(
         select(ContentDraft)
         .where(ContentDraft.brand_id == brand_id, ContentDraft.prompt_id == prompt_id)
         .order_by(ContentDraft.created_at.desc())
+        .limit(100)
     )
     drafts = drafts_result.scalars().all()
 

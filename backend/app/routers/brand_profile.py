@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, get_brand_for_user
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user
 from app.models import Brand, BrandProfile
 from app.schemas import AiFillProfileResponse, BrandProfileResponse, BrandProfileUpdate, Publication
 
@@ -174,6 +174,8 @@ async def ai_fill_profile(brand_id: int, db: DbDep, user: CurrentUser):
     Scan the brand's website and return AI-generated suggestions for profile fields.
     Does NOT save anything — the frontend applies suggestions and user saves manually.
     """
+    check_rate_limit(user.id, limit=3)
+
     import json
     import os
 

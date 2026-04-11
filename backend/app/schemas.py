@@ -85,9 +85,9 @@ class BrandCreate(BaseModel):
 
 
 class BrandUpdate(BaseModel):
-    name: str | None = None
+    name: str | None = Field(None, max_length=255)
     tier: str | None = None
-    website_url: str | None = None
+    website_url: str | None = Field(None, max_length=2000)
 
     @field_validator("tier")
     @classmethod
@@ -365,10 +365,10 @@ class GenerateNowRequest(BaseModel):
 
 
 class UpdateDraftRequest(BaseModel):
-    title: str | None = None
-    content_text: str | None = None
+    title: str | None = Field(None, max_length=500)
+    content_text: str | None = Field(None, max_length=50_000)
     status: str | None = None
-    platform_guidelines_applied: str | None = None
+    platform_guidelines_applied: str | None = Field(None, max_length=10_000)
 
     @field_validator("status")
     @classmethod
@@ -379,8 +379,8 @@ class UpdateDraftRequest(BaseModel):
 
 
 class PostDraftRequest(BaseModel):
-    post_url: str | None = None
-    platform_post_id: str | None = None
+    post_url: str | None = Field(None, max_length=2000)
+    platform_post_id: str | None = Field(None, max_length=255)
 
 
 class ConnectAccountRequest(BaseModel):
@@ -421,7 +421,7 @@ class ContentAttributionSummary(BaseModel):
 # ── Competitor schemas ────────────────────────────────────────────────────────
 
 class CompetitorCreate(BaseModel):
-    name: str
+    name: str = Field(..., max_length=255)
 
     @field_validator("name")
     @classmethod

@@ -72,7 +72,7 @@ Copy `backend/.env.example` → `backend/.env`. **`JWT_SECRET` (≥32 chars) is 
 ### Stack
 - **Backend:** Python 3.11+, FastAPI 0.115, SQLAlchemy 2.0 (async), SQLite + aiosqlite, APScheduler, bcrypt, PyJWT, Stripe, ReportLab, pyotp
 - **Frontend:** Next.js 15, React 18, TypeScript (strict), Tailwind CSS, Radix UI, Recharts, Axios, date-fns, lucide-react
-- **LLM providers:** OpenAI (gpt-4.1-mini), Anthropic (claude-haiku-4-5-20251001), Google GenAI (gemini-2.5-flash), Perplexity (sonar)
+- **LLM providers:** OpenAI (gpt-4.1-mini), Anthropic (claude-haiku-4-5-20251001), Google GenAI (gemini-2.5-flash default, gemini-2.5-pro for paid subscribers), Perplexity (sonar default, sonar-pro for paid subscribers)
 
 ### Backend Layout
 ```
@@ -136,11 +136,12 @@ frontend/
 | `/verify-email` | 6-digit code email verification |
 | `/team/accept` | Team invite acceptance |
 | `/dashboard` | Home — all brands + stats |
-| `/tracker` | Brand list |
+| `/tracker` | Redirects to `/settings` (consolidated) |
 | `/tracker/new` | Create brand wizard |
-| `/tracker/[brandId]` | Brand config, prompts, run now, scores, trend |
-| `/tracker/[brandId]/profile` | Brand knowledge base editor |
-| `/results/[brandId]` | Full query results + response transcripts |
+| `/tracker/[brandId]` | Redirects to `/settings` (consolidated) |
+| `/tracker/[brandId]/profile` | Redirects to `/settings` Brand Profile tab |
+| `/results/[brandId]` | Redirects to `/dashboard` (consolidated) |
+| `/methodology` | How we measure AI visibility |
 | `/content` | Content drafts dashboard |
 | `/content/[brandId]` | Brand-specific drafts, opportunities, gaps |
 | `/reports` | PDF report history |

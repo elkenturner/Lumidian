@@ -55,7 +55,10 @@ export default function VisibilityChart({
         <div>
           <p className="text-[13px] font-medium text-[var(--text-secondary)] flex items-center">
             Visibility Score
-            <HelpTooltip text="Percentage of AI responses that mention your brand when answering your tracked prompts. A higher score means AI models are more aware of your brand." />
+            <HelpTooltip
+                text="Percentage of AI responses that mention your brand across all tracked prompts and models. Combines Live Search (real-time web) and AI Index (training data) scores."
+                href="/methodology#scoring"
+              />
           </p>
           {loadingAnalytics ? (
             <div className="h-14 w-28 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-2" />

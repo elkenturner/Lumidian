@@ -42,6 +42,22 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 # avoid unbounded growth.
 _brand_run_locks: dict[int, asyncio.Lock] = {}
 
+# Cancellation events — set when a run is cancelled so in-flight queries
+# can bail out early instead of retrying for minutes.
+_cancel_events: dict[int, asyncio.Event] = {}
+
+
+def get_cancel_event(run_id: int) -> asyncio.Event:
+    """Return (or create) a cancellation Event for the given run."""
+    if run_id not in _cancel_events:
+        _cancel_events[run_id] = asyncio.Event()
+    return _cancel_events[run_id]
+
+
+def cleanup_cancel_event(run_id: int) -> None:
+    """Remove a cancellation Event to free memory."""
+    _cancel_events.pop(run_id, None)
+
 
 def _get_brand_lock(brand_id: int) -> asyncio.Lock:
     """Return (or create) an asyncio.Lock for the given brand."""
@@ -203,6 +219,8 @@ async def _background_run_with_id(run_id: int, brand_id: int) -> None:
                     await err_db.commit()
         except Exception:
             logger.exception("Failed to mark run %d as failed", run_id)
+    finally:
+        cleanup_cancel_event(run_id)
 
 
 async def _log_run_events(
@@ -366,10 +384,11 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
     runs_per_prompt = TIER_RUNS.get(brand_tier, TIER_RUNS["basic"])
     semaphore = asyncio.Semaphore(10)
+    cancel_evt = get_cancel_event(run_id)
 
     async def _bounded_query(prompt_id: int, prompt_text: str, model: str, run_number: int):
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_pro)
+            result = await query_model(model, prompt_text, brand_name, pro=is_pro, cancel_event=cancel_evt)
         return QueryResult(
             tracking_run_id=run_id,
             prompt_id=prompt_id,
@@ -859,6 +878,40 @@ async def get_run_status(run_id: int, db: DbDep, user: CurrentUser):
         )
     await get_brand_for_user(run.brand_id, db, user)
     return TrackingRunStatus.model_validate(run)
+
+
+# ── Cancel a running tracking run ─────────────────────────────────────────────
+
+@router.post("/run/{run_id}/cancel", status_code=status.HTTP_200_OK)
+async def cancel_run(run_id: int, db: DbDep, user: CurrentUser):
+    """Force-cancel a running or pending tracking run."""
+    from datetime import datetime
+
+    run = await db.get(TrackingRun, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Tracking run not found")
+
+    await get_brand_for_user(run.brand_id, db, user)
+
+    if run.status not in ("pending", "running"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Run is already {run.status}, cannot cancel.",
+        )
+
+    # Signal any in-flight queries to stop retrying
+    cancel_evt = get_cancel_event(run_id)
+    cancel_evt.set()
+
+    run.status = "failed"
+    run.error_message = "Cancelled by user"
+    run.completed_at = datetime.now(UTC).replace(tzinfo=None)
+    await db.commit()
+
+    cleanup_cancel_event(run_id)
+    logger.info("User %d cancelled tracking run %d", user.id, run_id)
+
+    return {"detail": "Run cancelled", "run_id": run_id}
 
 
 @router.get("/background-status")

@@ -28,6 +28,7 @@ import {
   getRecentRuns,
   triggerRun,
   getRunStatus,
+  cancelRun,
   triggerScan,
   getCompetitors,
   getBrandProfile,
@@ -314,6 +315,18 @@ export default function DashboardPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  async function handleCancelRun() {
+    if (activeRunId === null) return;
+    try {
+      await cancelRun(activeRunId);
+      setActiveRunId(null);
+      setToast({ message: 'Run cancelled.', type: 'info' });
+      if (selectedBrandId) loadData(selectedBrandId);
+    } catch (err) {
+      setToast({ message: parseApiError(err), type: 'error' });
+    }
+  }
+
   async function handleRunReport() {
     if (!selectedBrandId || triggering) return;
     const runStatus = overview?.latest_run?.status;
@@ -584,6 +597,7 @@ export default function DashboardPage() {
         onOpenPromptModal={() => setPromptModalOpen(true)}
         onRefresh={() => selectedBrandId && loadData(selectedBrandId)}
         onRunReport={handleRunReport}
+        onCancelRun={handleCancelRun}
         onUpgradeClick={() => { setUpgradeModalReason("You've used your 1 daily report run. Upgrade to run reports any time."); setUpgradeModalOpen(true); }}
       />
 

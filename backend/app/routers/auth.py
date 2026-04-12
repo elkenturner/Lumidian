@@ -319,8 +319,10 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     from app.services.analytics_service import log_event
     await log_event("user_registered", {"plan": user.subscription_tier}, user_id=user.id)
 
-    from app.services.email_service import send_email_background, send_email_verification
-    send_email_background(send_email_verification, email=user.email, name=user.name, code=verification_code)
+    from app.services.email_service import send_email_awaited, send_email_verification
+    email_ok = await send_email_awaited(send_email_verification, email=user.email, name=user.name, code=verification_code)
+    if not email_ok:
+        logger.error("Registration verification email failed for %s", user.email)
 
     return {"email": email, "needs_verification": True}
 
@@ -606,8 +608,25 @@ async def google_auth_callback(
                     "grant_type": "authorization_code",
                 },
             )
-            token_resp.raise_for_status()
-            token_data = token_resp.json()
+            if token_resp.status_code != 200:
+                logger.error(
+                    "google_callback: token exchange returned HTTP %s — %s",
+                    token_resp.status_code,
+                    token_resp.text[:500],
+                )
+                return RedirectResponse(
+                    f"{frontend_url}/login?error=token_exchange_failed", status_code=302
+                )
+            try:
+                token_data = token_resp.json()
+            except (ValueError, json.JSONDecodeError):
+                logger.error(
+                    "google_callback: token response was not valid JSON — %s",
+                    token_resp.text[:500],
+                )
+                return RedirectResponse(
+                    f"{frontend_url}/login?error=token_exchange_failed", status_code=302
+                )
     except Exception as exc:
         logger.error("google_callback: token exchange failed — %s", exc)
         return RedirectResponse(
@@ -748,8 +767,10 @@ async def forgot_password(request: ForgotPasswordRequest, http_req: Request, db:
         frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
         reset_link = f"{frontend_url}/reset-password?token={token_value}"  # raw token in URL
 
-        from app.services.email_service import send_email_background, send_password_reset_email
-        send_email_background(send_password_reset_email, email=user.email, name=user.name, reset_link=reset_link)
+        from app.services.email_service import send_email_awaited, send_password_reset_email
+        email_ok = await send_email_awaited(send_password_reset_email, email=user.email, name=user.name, reset_link=reset_link)
+        if not email_ok:
+            logger.error("Password reset email failed for %s", user.email)
 
     return {"message": "If that email is registered, a reset link has been sent."}
 
@@ -908,13 +929,15 @@ async def resend_verification(
     user.email_verification_expires_at = code_expires_at
     await db.commit()
 
-    from app.services.email_service import send_email_background, send_email_verification
-    send_email_background(
+    from app.services.email_service import send_email_awaited, send_email_verification
+    email_ok = await send_email_awaited(
         send_email_verification,
         email=user.email,
         name=user.name,
         code=verification_code,
     )
+    if not email_ok:
+        logger.error("Resend verification email failed for %s", user.email)
 
     return {"message": "If that email is pending verification, a new code has been sent."}
 

@@ -90,6 +90,7 @@ async def _classify_batch_claude(
         resp = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=256,
+            timeout=15.0,
             system=(
                 f'Classify how {safe_brand} is described in each AI response. '
                 'Return ONLY a JSON array with one label per item. '

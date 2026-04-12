@@ -9,6 +9,7 @@ Results are cached in-process for 24 hours per cache key to preserve quota.
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -90,30 +91,61 @@ async def search_quora_questions(
         )
         return []
 
-    try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
-            resp = await client.post(
-                _SERPER_URL,
-                headers={
-                    "X-API-KEY": api_key,
-                    "Content-Type": "application/json",
-                },
-                json={"q": f"site:quora.com {query}", "num": 20},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-    except httpx.HTTPStatusError as exc:
+    _TRANSIENT_CODES = {429, 500, 502, 503}
+    _MAX_ATTEMPTS = 2
+    _RETRY_DELAY = 2.0  # seconds
+
+    data = None
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
-            error_body = exc.response.json()
-        except Exception:
-            error_body = exc.response.text
-        logger.error(
-            "quora_search: HTTP %s from Serper.dev — response: %s",
-            exc.response.status_code, error_body,
-        )
-        return []
-    except Exception as exc:
-        logger.error("quora_search: request failed — %s", exc)
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    _SERPER_URL,
+                    headers={
+                        "X-API-KEY": api_key,
+                        "Content-Type": "application/json",
+                    },
+                    json={"q": f"site:quora.com {query}", "num": 20},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                break  # success
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            try:
+                error_body = exc.response.json()
+            except Exception:
+                error_body = exc.response.text
+
+            if status_code in _TRANSIENT_CODES and attempt < _MAX_ATTEMPTS:
+                logger.warning(
+                    "quora_search: HTTP %s from Serper (attempt %d/%d), retrying in %.0fs — %s",
+                    status_code, attempt, _MAX_ATTEMPTS, _RETRY_DELAY, error_body,
+                )
+                await asyncio.sleep(_RETRY_DELAY)
+                continue
+
+            logger.error(
+                "quora_search: HTTP %s from Serper (attempt %d/%d, giving up) — %s",
+                status_code, attempt, _MAX_ATTEMPTS, error_body,
+            )
+            return []
+        except Exception as exc:
+            if attempt < _MAX_ATTEMPTS:
+                logger.warning(
+                    "quora_search: request failed (attempt %d/%d), retrying in %.0fs — %s",
+                    attempt, _MAX_ATTEMPTS, _RETRY_DELAY, exc,
+                )
+                await asyncio.sleep(_RETRY_DELAY)
+                continue
+
+            logger.error(
+                "quora_search: request failed (attempt %d/%d, giving up) — %s",
+                attempt, _MAX_ATTEMPTS, exc,
+            )
+            return []
+
+    if data is None:
         return []
 
     items = data.get('organic', [])

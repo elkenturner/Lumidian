@@ -212,7 +212,7 @@ JWT issued with 7-day expiry, stored in httpOnly `clarity_token` cookie. Compani
 ### Tier-Based Query Counts
 | Tier | Runs per prompt per model |
 |------|--------------------------|
-| basic | 3 |
+| basic | 5 |
 | standard | 5 |
 | premium | 5 |
 

@@ -370,11 +370,12 @@ async def test_password_reset_end_to_end(client, db_session):
 
     captured_link = {}
 
-    def mock_send_bg(fn, **kwargs):
+    async def mock_send_awaited(fn, **kwargs):
         if "reset_link" in kwargs:
             captured_link["url"] = kwargs["reset_link"]
+        return True
 
-    with patch("app.services.email_service.send_email_background", side_effect=mock_send_bg):
+    with patch("app.services.email_service.send_email_awaited", side_effect=mock_send_awaited):
         await client.post("/api/auth/forgot-password", json={"email": "e2ereset@example.com"})
 
     assert "url" in captured_link, "Reset link was not captured"

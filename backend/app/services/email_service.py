@@ -42,6 +42,8 @@ def _get_resend_key() -> str:
 _resend_key = _get_resend_key()
 if _resend_key:
     resend.api_key = _resend_key
+    # Set a 10-second timeout (default is 30s) to prevent email sends from blocking
+    resend.default_http_client = resend.RequestsClient(timeout=10)
 
 
 # ── Internal send primitive ───────────────────────────────────────────────────
@@ -89,6 +91,29 @@ def _send(to: str, subject: str, body: str) -> None:
 
 # Strong reference set — prevents GC from collecting background email tasks
 _background_tasks: set[asyncio.Task] = set()
+
+
+async def send_email_awaited(fn, *args, **kwargs) -> bool:
+    """
+    Run a synchronous email function in a thread-pool executor and AWAIT it.
+
+    Use for critical emails (verification, password reset) where the calling
+    endpoint needs to know if delivery failed so it can return an error to
+    the user.
+
+    Returns True on success, False on failure.
+    """
+    import functools
+
+    loop = asyncio.get_running_loop()
+    try:
+        logger.info("Awaited email starting (%s)", fn.__name__)
+        await loop.run_in_executor(None, functools.partial(fn, *args, **kwargs))
+        logger.info("Awaited email completed (%s)", fn.__name__)
+        return True
+    except Exception as exc:
+        logger.error("Awaited email failed (%s): %s", fn.__name__, exc, exc_info=True)
+        return False
 
 
 def send_email_background(fn, *args, **kwargs) -> None:

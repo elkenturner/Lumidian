@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
-import { getBrands, Brand } from '@/lib/api';
+import { getBrands, Brand, parseApiError } from '@/lib/api';
 
 const STORAGE_KEY = 'clarity_active_brand_id';
 
@@ -11,6 +11,7 @@ interface BrandContextValue {
   activeBrand: Brand | null;
   setActiveBrandId: (id: number) => void;
   loading: boolean;
+  error: string | null;
   refetch: () => void;
 }
 
@@ -20,6 +21,7 @@ const BrandContext = createContext<BrandContextValue>({
   activeBrand: null,
   setActiveBrandId: () => {},
   loading: true,
+  error: null,
   refetch: () => {},
 });
 
@@ -27,8 +29,10 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [activeBrandId, setActiveBrandIdState] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchBrands = useCallback(() => {
+    setError(null);
     getBrands()
       .then((b) => {
         setBrands(b);
@@ -47,7 +51,10 @@ export function BrandProvider({ children }: { children: ReactNode }) {
           return b[0]?.id ?? null;
         });
       })
-      .catch((err) => { console.error('[BrandContext] Failed to load brands:', err); })
+      .catch((err) => {
+        console.error('[BrandContext] Failed to load brands:', err);
+        setError(parseApiError(err, 'Failed to load brands. Please try again.'));
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -61,7 +68,7 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const activeBrand = brands.find((b) => b.id === activeBrandId) ?? null;
 
   return (
-    <BrandContext.Provider value={{ brands, activeBrandId, activeBrand, setActiveBrandId, loading, refetch: fetchBrands }}>
+    <BrandContext.Provider value={{ brands, activeBrandId, activeBrand, setActiveBrandId, loading, error, refetch: fetchBrands }}>
       {children}
     </BrandContext.Provider>
   );

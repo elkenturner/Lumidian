@@ -7,13 +7,38 @@ const api = axios.create({
     'ngrok-skip-browser-warning': 'true',
   },
   withCredentials: true,
+  timeout: 30_000,
 });
+
+// ── 401 response interceptor ─────────────────────────────────────────────────
+// When a session expires, redirect to /login automatically.
+// Skip redirect for /auth/me (AuthContext handles it) and /auth/logout (expected).
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (
+      error?.response?.status === 401 &&
+      typeof window !== 'undefined'
+    ) {
+      const url: string = error.config?.url ?? '';
+      const isAuthMe = url.includes('/auth/me');
+      const isAuthLogout = url.includes('/auth/logout');
+
+      if (!isAuthMe && !isAuthLogout) {
+        // Clear the JS-readable session cookie so middleware stops treating user as logged-in
+        document.cookie = 'clarity_session=; path=/; max-age=0';
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  },
+);
 
 // ── Error parsing ─────────────────────────────────────────────────────────────
 // Extracts the human-readable message from an Axios error response.
 // Falls back to the provided default if the server didn't send a detail field.
 export function parseApiError(err: unknown, fallback = 'Something went wrong. Please try again.'): string {
-  const e = err as { response?: { status?: number; data?: { detail?: string } } };
+  const e = err as { response?: { status?: number; data?: { detail?: string } }; request?: unknown };
   const detail = e?.response?.data?.detail;
   if (detail) return detail;
   const status = e?.response?.status;
@@ -22,6 +47,8 @@ export function parseApiError(err: unknown, fallback = 'Something went wrong. Pl
   if (status === 429) return 'You\'ve hit a usage limit. Please wait or upgrade your plan.';
   if (status === 403) return 'You don\'t have permission to do that.';
   if (status === 404) return 'Not found.';
+  // Network error: request was sent but no response received (offline, DNS failure, timeout)
+  if (!e?.response && e?.request) return 'Network error — please check your connection and try again.';
   return fallback;
 }
 

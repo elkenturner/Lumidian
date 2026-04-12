@@ -75,6 +75,7 @@ export interface Brand {
   slug: string;
   tier: 'basic' | 'standard' | 'premium';
   brand_type: 'standard' | 'pitch' | 'pro';
+  prompt_limit: number;
   pitch_expires_at: string | null;
   prompt_count: number;
   website_url?: string | null;
@@ -693,6 +694,7 @@ export interface BrandWithStats {
   slug: string;
   tier: 'basic' | 'standard' | 'premium';
   brand_type: 'standard' | 'pitch' | 'pro';
+  prompt_limit: number;
   pitch_expires_at: string | null;
   prompt_count: number;
   overall_score: number | null;

@@ -9,6 +9,7 @@ import {
   Loader2,
   RefreshCw,
   PauseCircle,
+  XCircle,
 } from 'lucide-react';
 import BrandAvatar from '@/components/BrandAvatar';
 
@@ -30,6 +31,7 @@ interface DashboardHeaderProps {
   onRefresh: () => void;
   onRunReport: () => void;
   onUpgradeClick: () => void;
+  onCancelRun?: () => void;
 }
 
 export default function DashboardHeader({
@@ -44,6 +46,7 @@ export default function DashboardHeader({
   onRefresh,
   onRunReport,
   onUpgradeClick,
+  onCancelRun,
 }: DashboardHeaderProps) {
   const isDisabled = triggering || isRunning || !selectedBrandId || isSubscriptionPaused;
 
@@ -109,6 +112,15 @@ export default function DashboardHeader({
                 <>
                   <Loader2 size={14} className="animate-spin" />
                   {isRunning ? 'Running...' : 'Starting...'}
+                  {isRunning && onCancelRun && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onCancelRun(); }}
+                      title="Cancel run"
+                      className="ml-1 p-0.5 rounded hover:bg-white/20 transition-colors"
+                    >
+                      <XCircle size={14} />
+                    </button>
+                  )}
                 </>
               ) : isAtRunLimit ? (
                 <>

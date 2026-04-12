@@ -321,6 +321,11 @@ export async function getRunStatus(runId: number): Promise<TrackingRun> {
   return res.data;
 }
 
+export async function cancelRun(runId: number): Promise<void> {
+  await api.post(`/tracking/run/${runId}/cancel`);
+  invalidateCache('/tracking/runs/');
+}
+
 export async function getRecentRuns(brandId: number): Promise<TrackingRun[]> {
   return dedupedGet<TrackingRun[]>(`/tracking/runs/${brandId}`);
 }

@@ -360,7 +360,7 @@ async def run_migrations():
         logger.info("Data fix: synced brand types/limits with user tiers")
 
 
-async def cleanup_stale_runs(max_age_minutes: int = 30):
+async def cleanup_stale_runs(max_age_minutes: int = 15):
     """Mark tracking runs stuck in pending/running for > max_age_minutes as failed.
 
     Called on startup to clear runs that never completed (e.g., server crash).
@@ -391,7 +391,7 @@ async def cleanup_stale_runs(max_age_minutes: int = 30):
             logger.info("Marked %d stale tracking runs as failed: %s", len(stale_ids), stale_ids)
 
 
-async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_minutes: int = 30) -> None:
+async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_minutes: int = 15) -> None:
     """Auto-fail tracking runs stuck in pending/running for a specific brand.
 
     Called inline from endpoints that check for active runs, so a stuck run

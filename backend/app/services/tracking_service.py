@@ -223,6 +223,13 @@ async def run_tracking(
     # ── 3. Execute queries ───────────────────────────────────────────────────
     semaphore = asyncio.Semaphore(MAX_CONCURRENT)
 
+    # Import cancel event support for cooperative cancellation
+    try:
+        from app.routers.tracking import get_cancel_event
+        cancel_evt = get_cancel_event(run_id)
+    except Exception:
+        cancel_evt = None
+
     async def _bounded_query(
         prompt_id: int,
         prompt_text: str,
@@ -230,7 +237,7 @@ async def run_tracking(
         run_number: int,
     ) -> QueryResult:
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_pro)
+            result = await query_model(model, prompt_text, brand_name, pro=is_pro, cancel_event=cancel_evt)
         response_text = result.get("response_text")
         error = result.get("error")
 

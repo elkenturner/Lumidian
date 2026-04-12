@@ -389,3 +389,29 @@ async def cleanup_stale_runs(max_age_minutes: int = 30):
         await db.commit()
         if stale_ids:
             logger.info("Marked %d stale tracking runs as failed: %s", len(stale_ids), stale_ids)
+
+
+async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_minutes: int = 30) -> None:
+    """Auto-fail tracking runs stuck in pending/running for a specific brand.
+
+    Called inline from endpoints that check for active runs, so a stuck run
+    doesn't permanently block user actions (prompt edits, new tracking runs).
+    """
+    from datetime import datetime, timedelta
+
+    from sqlalchemy import update
+
+    from app.models import TrackingRun
+
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=max_age_minutes)
+    result = await db.execute(
+        update(TrackingRun)
+        .where(
+            TrackingRun.brand_id == brand_id,
+            TrackingRun.status.in_(["pending", "running"]),
+            TrackingRun.created_at < cutoff,
+        )
+        .values(status="failed")
+    )
+    if result.rowcount > 0:
+        logger.warning("Auto-failed %d stale run(s) for brand %d", result.rowcount, brand_id)

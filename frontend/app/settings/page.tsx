@@ -555,6 +555,10 @@ export default function SettingsPage() {
           }
         })
         .catch((err) => console.warn('[Settings] Prompt mini-run failed to start:', err));
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setSaveError(e?.response?.data?.detail || 'Failed to add prompt.');
+      setTimeout(() => setSaveError(null), 5000);
     } finally {
       setAddingPrompt(false);
     }
@@ -618,6 +622,10 @@ export default function SettingsPage() {
       const comp = await addCompetitor(brandId, trimmed);
       setCompetitors((prev) => [...prev, comp]);
       setNewCompetitorName('');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setSaveError(e?.response?.data?.detail || 'Failed to add competitor.');
+      setTimeout(() => setSaveError(null), 5000);
     } finally {
       setAddingCompetitor(false);
     }
@@ -629,6 +637,10 @@ export default function SettingsPage() {
     try {
       await removeCompetitor(brandId, competitorId);
       setCompetitors((prev) => prev.filter((c) => c.id !== competitorId));
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setSaveError(e?.response?.data?.detail || 'Failed to remove competitor.');
+      setTimeout(() => setSaveError(null), 5000);
     } finally {
       setDeletingCompetitorId(null);
     }

@@ -19,7 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.database import get_db
+from app.database import fail_stale_runs_for_brand, get_db
 from app.dependencies import (
     CurrentUser,
     check_rate_limit,
@@ -115,7 +115,8 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
     # preventing two rapid requests from both passing the concurrency check.
     brand_lock = _get_brand_lock(brand_id)
     async with brand_lock:
-        # Block concurrent runs: reject if this brand already has a pending/running run
+        # Auto-fail stale runs before checking for active ones
+        await fail_stale_runs_for_brand(db, brand_id)
         active_run_result = await db.execute(
             select(func.count(TrackingRun.id)).where(
                 TrackingRun.brand_id == brand_id,
@@ -624,7 +625,8 @@ async def trigger_prompt_run(
     # Acquire per-brand lock to make the active-run check + insert atomic
     brand_lock = _get_brand_lock(brand_id)
     async with brand_lock:
-        # Block concurrent runs for this brand
+        # Auto-fail stale runs before checking for active ones
+        await fail_stale_runs_for_brand(db, brand_id)
         from sqlalchemy import func as sa_func
         active_run_result = await db.execute(
             select(sa_func.count(TrackingRun.id)).where(
@@ -873,6 +875,10 @@ async def get_background_status(db: DbDep, user: CurrentUser):
 
     if not user_brand_ids:
         return {"report_running": False, "drafts_generating": False, "scanning": False, "model_scores": []}
+
+    # Auto-fail stale runs so the UI doesn't report phantom "running" state
+    for bid in user_brand_ids:
+        await fail_stale_runs_for_brand(db, bid)
 
     # Check for active tracking runs in the DB
     running_result = await db.execute(

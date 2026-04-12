@@ -24,7 +24,7 @@ export default function TeamAcceptPage() {
 
     if (!user) {
       // Not logged in — redirect to login, then back here
-      router.replace(`/login?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      router.replace(`/login?from=${encodeURIComponent(window.location.pathname + window.location.search)}`);
       return;
     }
 

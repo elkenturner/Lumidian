@@ -359,7 +359,7 @@ def _classify_error(error: str) -> str:
     return "other"
 
 
-async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 3, model_version: str = "") -> dict:
+async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 3, model_version: str = "", cancel_event: asyncio.Event | None = None) -> dict:
     """
     Call handler(prompt, brand_name, model_version) and retry with backoff.
 
@@ -370,6 +370,8 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
           Pro models:     5 attempts, 10s → 20s → 40s → 80s → 120s (capped)
       - other: 3s flat backoff
       - api_key_not_configured / auth: no retry (permanent)
+
+    If cancel_event is provided and set, retries stop immediately.
     """
     display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
     is_pro_model = "pro" in model_version.lower() if model_version else False
@@ -379,6 +381,10 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
     errors: list[str] = []
 
     for attempt in range(1, effective_max + 1):
+        # Check for cancellation before each attempt
+        if cancel_event is not None and cancel_event.is_set():
+            return {"response_text": None, "mentioned": False, "latency_ms": 0, "error": "cancelled"}
+
         result = await handler(prompt, brand_name, model_version)
 
         # Successful response — return immediately
@@ -430,7 +436,16 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
                 "[%s] Attempt %d/%d failed (%s, error=%r) for prompt %r — retrying in %.0fs",
                 model_key, attempt, effective_max, error_type, error, prompt[:100], retry_delay,
             )
-            await asyncio.sleep(retry_delay)
+            # Use cancellable wait instead of plain sleep
+            if cancel_event is not None:
+                try:
+                    await asyncio.wait_for(cancel_event.wait(), timeout=retry_delay)
+                    # Event was set — run was cancelled, bail out
+                    return {"response_text": None, "mentioned": False, "latency_ms": 0, "error": "cancelled"}
+                except asyncio.TimeoutError:
+                    pass  # Normal — cancel wasn't requested, continue retrying
+            else:
+                await asyncio.sleep(retry_delay)
 
     # All attempts failed — return a single descriptive error
     final_error = f"Empty response from {display} API after {len(errors)} attempts ({'; '.join(errors)})"
@@ -446,7 +461,7 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
     }
 
 
-async def query_model(model: str, prompt: str, brand_name: str, pro: bool = False) -> dict:
+async def query_model(model: str, prompt: str, brand_name: str, pro: bool = False, cancel_event: asyncio.Event | None = None) -> dict:
     """
     Query a single LLM model with the given prompt.
 
@@ -455,6 +470,7 @@ async def query_model(model: str, prompt: str, brand_name: str, pro: bool = Fals
         prompt:     The text prompt to send.
         brand_name: The brand name to check for in the response.
         pro:        Whether the user has a Pro subscription (selects upgraded models).
+        cancel_event: Optional asyncio.Event; if set, retries stop immediately.
 
     Returns:
         {
@@ -474,4 +490,4 @@ async def query_model(model: str, prompt: str, brand_name: str, pro: bool = Fals
         }
 
     model_version = _get_model_version(model, pro)
-    return await _with_retry(handler, prompt, brand_name, model, model_version=model_version)
+    return await _with_retry(handler, prompt, brand_name, model, model_version=model_version, cancel_event=cancel_event)

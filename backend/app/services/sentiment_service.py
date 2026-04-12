@@ -85,11 +85,13 @@ async def _classify_batch_claude(
         import anthropic
 
         client = anthropic.AsyncAnthropic(api_key=api_key)
+        import json as _json
+        safe_brand = _json.dumps(brand_name)  # escape for safe embedding in prompt
         resp = await client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=256,
             system=(
-                f'Classify how "{brand_name}" is described in each AI response. '
+                f'Classify how {safe_brand} is described in each AI response. '
                 'Return ONLY a JSON array with one label per item. '
                 'Each label must be exactly "positive", "neutral", or "negative". '
                 'Example output: ["positive","neutral","negative"]'
@@ -98,7 +100,7 @@ async def _classify_batch_claude(
                 {
                     "role": "user",
                     "content": (
-                        f"Classify the sentiment toward {brand_name} in each response:\n\n"
+                        f"Classify the sentiment toward {safe_brand} in each response:\n\n"
                         + items_text
                     ),
                 }

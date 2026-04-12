@@ -474,6 +474,18 @@ async def post_draft(
     draft.posted_at = now
     draft.updated_at = now
 
+    # Snapshot visibility at time of posting (if not already set by router)
+    if draft.visibility_at_post is None and draft.brand_id:
+        latest_run_res = await db.execute(
+            select(TrackingRun)
+            .where(TrackingRun.brand_id == draft.brand_id, TrackingRun.status == "completed")
+            .order_by(TrackingRun.completed_at.desc())
+            .limit(1)
+        )
+        latest_run = latest_run_res.scalar_one_or_none()
+        if latest_run and latest_run.overall_score is not None:
+            draft.visibility_at_post = round(latest_run.overall_score, 1)
+
     # Create ContentPost record
     content_post = ContentPost(
         draft_id=draft_id,

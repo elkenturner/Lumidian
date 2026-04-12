@@ -39,8 +39,8 @@ _PERPLEXITY_SEM = asyncio.Semaphore(2)
 _CLAUDE_SEM = asyncio.Semaphore(3)
 
 # Gemini rate-limit guard: Google returns 503 UNAVAILABLE when flooded.
-# 3 concurrent slots prevent us from overwhelming the API during tracking runs.
-_GEMINI_SEM = asyncio.Semaphore(3)
+# 2 concurrent slots (like Perplexity) reduce burst pressure on the API.
+_GEMINI_SEM = asyncio.Semaphore(2)
 
 
 # Human-readable display names for each model (used in placeholder messages)
@@ -364,6 +364,7 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
     Retry strategy by error type:
       - rate_limit (429, quota): 65s flat backoff (wait for quota reset)
       - overload (503, timeout): 3 attempts, 5s → 10s backoff + jitter
+        For Gemini pro: falls back to flash on retry instead of retrying pro
       - other: 3s flat backoff
       - api_key_not_configured / auth: no retry (permanent)
 
@@ -372,12 +373,19 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
     display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
     errors: list[str] = []
 
+    # Track whether we've fallen back to a lighter model for overload errors
+    active_model_version = model_version
+    _FALLBACK_MODELS = {
+        "gemini-2.5-pro": "gemini-2.5-flash",
+        "sonar-pro": "sonar",
+    }
+
     for attempt in range(1, max_attempts + 1):
         # Check for cancellation before each attempt
         if cancel_event is not None and cancel_event.is_set():
             return {"response_text": None, "mentioned": False, "latency_ms": 0, "error": "cancelled"}
 
-        result = await handler(prompt, brand_name, model_version)
+        result = await handler(prompt, brand_name, active_model_version)
 
         # Successful response — return immediately
         if result.get("response_text") and not result.get("error"):
@@ -403,6 +411,15 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
 
         error_type = _classify_error(error)
         errors.append(f"attempt {attempt}: {error}")
+
+        # On overload, fall back to a lighter model if available
+        if error_type == "overload" and active_model_version in _FALLBACK_MODELS:
+            fallback = _FALLBACK_MODELS[active_model_version]
+            logger.info(
+                "[%s] %s overloaded — falling back to %s for prompt %r",
+                model_key, active_model_version, fallback, prompt[:100],
+            )
+            active_model_version = fallback
 
         # Don't sleep after the last attempt
         if attempt < max_attempts:

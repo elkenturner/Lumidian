@@ -376,9 +376,10 @@ export async function getResponses(
 export async function getDrafts(
   brandId: number,
   platform?: string,
-  status?: string
+  status?: string,
+  pageSize = 100
 ): Promise<ContentDraft[]> {
-  const params: Record<string, string> = {};
+  const params: Record<string, string | number> = { page_size: pageSize };
   if (platform) params.platform = platform;
   if (status) params.status = status;
   const res = await api.get<ContentDraft[]>(`/content/${brandId}/drafts`, { params });
@@ -411,8 +412,8 @@ export async function updateDraft(
 export async function postDraft(
   draftId: number,
   data: { post_url?: string }
-): Promise<ContentDraft> {
-  const res = await api.post<ContentDraft>(`/content/draft/${draftId}/post`, data);
+): Promise<{ id: number; draft_id: number; platform: string; post_url: string | null; posted_at: string | null }> {
+  const res = await api.post(`/content/draft/${draftId}/post`, data);
   return res.data;
 }
 

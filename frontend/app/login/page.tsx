@@ -78,6 +78,10 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await verify2fa(challengeToken, totpCode.trim());
+      // Set session cookie before refresh() — it checks for this cookie
+      // and returns early if missing (same pattern as verify-email page)
+      const secure = window.location.protocol === 'https:' ? '; secure' : '';
+      document.cookie = `clarity_session=1; path=/; max-age=604800; samesite=lax${secure}`;
       await refresh();
       router.push(from);
     } catch (err: unknown) {

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ── Prompt schemas ────────────────────────────────────────────────────────────
 
@@ -121,12 +121,19 @@ class BrandDetail(BaseModel):
     tier: str
     brand_type: str = "standard"
     pitch_expires_at: datetime | None = None
+    prompt_count: int = 0
     website_url: str | None = None
     created_at: datetime
     updated_at: datetime
     prompts: list[PromptResponse] = []
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def _fill_prompt_count(self) -> "BrandDetail":
+        if self.prompt_count == 0 and self.prompts:
+            self.prompt_count = len(self.prompts)
+        return self
 
 
 # ── TrackingRun schemas ───────────────────────────────────────────────────────
@@ -373,8 +380,8 @@ class UpdateDraftRequest(BaseModel):
     @field_validator("status")
     @classmethod
     def validate_status(cls, v: str | None) -> str | None:
-        if v is not None and v not in ("draft", "approved", "posted", "dismissed"):
-            raise ValueError("status must be one of: draft, approved, posted, dismissed")
+        if v is not None and v not in ("draft", "approved", "posted", "failed"):
+            raise ValueError("status must be one of: draft, approved, posted, failed")
         return v
 
 

@@ -417,7 +417,7 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
         )
         prompt_count = prompt_count_result.scalar_one() or 1
 
-        tier_runs = {"basic": 3, "standard": 5, "premium": 5}
+        tier_runs = {"basic": 5, "standard": 5, "premium": 5}
         runs_per_prompt = tier_runs.get(brand.tier, 5) if brand else 5
         total_queries = prompt_count * 4 * runs_per_prompt  # 4 models
         # ~8 effective concurrent queries, ~3s each

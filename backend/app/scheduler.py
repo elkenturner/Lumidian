@@ -94,10 +94,13 @@ async def _run_all_brands(schedule_slot: str) -> None:
 
     from sqlalchemy import select
 
-    from app.database import AsyncSessionLocal
+    from app.database import AsyncSessionLocal, cleanup_stale_runs
     from app.models import Brand
 
     logger.info("Scheduler: starting %s sweep", schedule_slot)
+
+    # Clean up any runs stuck from previous sweeps before starting new ones
+    await cleanup_stale_runs()
 
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Brand))

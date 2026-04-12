@@ -34,8 +34,8 @@ export default function VerifyEmailPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const trimmed = code.replace(/\s/g, '');
-    if (trimmed.length !== 6 || !/^\d{6}$/.test(trimmed)) {
-      setError('Please enter the 6-digit code from your email.');
+    if (trimmed.length !== 8 || !/^\d{8}$/.test(trimmed)) {
+      setError('Please enter the 8-digit code from your email.');
       return;
     }
     setLoading(true);
@@ -101,7 +101,7 @@ export default function VerifyEmailPage() {
             <>
               <h1 className="text-2xl font-bold text-[#f8fafc] mb-1">Check your email</h1>
               <p className="text-sm text-[#94a3b8] mb-6">
-                We sent a 6-digit code to{' '}
+                We sent an 8-digit code to{' '}
                 <strong className="text-[#f8fafc]">{email}</strong>.
                 Enter it below to verify your account.
               </p>
@@ -127,10 +127,10 @@ export default function VerifyEmailPage() {
                     id="verification-code"
                     type="text"
                     inputMode="numeric"
-                    maxLength={6}
+                    maxLength={8}
                     value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="000000"
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                    placeholder="00000000"
                     autoFocus
                     className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 text-3xl md:text-2xl text-center font-mono tracking-[0.3em] text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#5f7ea6] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
                   />
@@ -138,7 +138,7 @@ export default function VerifyEmailPage() {
 
                 <button
                   type="submit"
-                  disabled={loading || code.length !== 6}
+                  disabled={loading || code.length !== 8}
                   className="w-full flex items-center justify-center gap-2 bg-[#5f7ea6] hover:bg-[#4a6a90] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 transition-colors min-h-[48px]"
                 >
                   {loading && <Loader2 size={15} className="animate-spin" />}

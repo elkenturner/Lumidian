@@ -22,7 +22,8 @@ const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-passwo
 // (The httponly clarity_token is set by the backend; this companion cookie
 //  lets the middleware know a session exists without reading the token.)
 function setSessionCookie() {
-  document.cookie = 'clarity_session=1; path=/; max-age=604800; samesite=lax';
+  const secure = window.location.protocol === 'https:' ? '; secure' : '';
+  document.cookie = `clarity_session=1; path=/; max-age=604800; samesite=lax${secure}`;
 }
 function clearSessionCookie() {
   document.cookie = 'clarity_session=; path=/; max-age=0';

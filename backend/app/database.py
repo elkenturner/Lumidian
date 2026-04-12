@@ -323,6 +323,14 @@ async def run_migrations():
             created_at REAL NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_rate_limits_key_endpoint ON rate_limits(key, endpoint, created_at)",
+        # 2026-04-11: Stripe webhook idempotency — prevent duplicate event processing on retries
+        """CREATE TABLE IF NOT EXISTS processed_webhook_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stripe_event_id TEXT NOT NULL UNIQUE,
+            event_type TEXT NOT NULL,
+            processed_at DATETIME NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_processed_webhook_events_stripe_id ON processed_webhook_events(stripe_event_id)",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

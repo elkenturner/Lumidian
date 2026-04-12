@@ -264,13 +264,20 @@ async def run_tracking(
         query_results: list[QueryResult] = await asyncio.gather(*tasks)
     except Exception as exc:
         logger.exception("Fatal error during query gathering for run %d", run_id)
-        async with AsyncSessionLocal() as db:
-            run = await db.get(TrackingRun, run_id)
-            if run:
-                run.status = "failed"
-                run.error_message = str(exc)
-                run.completed_at = _utcnow()
-                await db.commit()
+        try:
+            async with AsyncSessionLocal() as db:
+                run = await db.get(TrackingRun, run_id)
+                if run:
+                    run.status = "failed"
+                    run.error_message = str(exc)
+                    run.completed_at = _utcnow()
+                    await db.commit()
+        except Exception as inner_exc:
+            logger.critical(
+                "CRITICAL: Failed to mark run %d as failed after query gathering error — "
+                "run may be stuck in 'running' state. Original error: %s, Cleanup error: %s",
+                run_id, exc, inner_exc,
+            )
         raise
 
     # ── 4 & 5. Persist results and compute scores ────────────────────────────
@@ -339,25 +346,39 @@ async def run_tracking(
                 overall_queries,
             )
         except Exception as exc:
-            await db.rollback()
+            try:
+                await db.rollback()
+            except Exception:
+                logger.warning("Rollback also failed for run %d", run_id)
             logger.exception("Error persisting results for run %d", run_id)
-            # Mark run as failed in a clean session
-            async with AsyncSessionLocal() as err_db:
-                run = await err_db.get(TrackingRun, run_id)
-                if run:
-                    run.status = "failed"
-                    run.error_message = f"DB error: {exc}"
-                    run.completed_at = _utcnow()
-                    await err_db.commit()
+            # Mark run as failed in a clean session — wrap in its own
+            # try/except so the run never stays stuck in "running" state.
+            try:
+                async with AsyncSessionLocal() as err_db:
+                    run = await err_db.get(TrackingRun, run_id)
+                    if run:
+                        run.status = "failed"
+                        run.error_message = f"DB error: {exc}"
+                        run.completed_at = _utcnow()
+                        await err_db.commit()
+            except Exception as inner_exc:
+                logger.critical(
+                    "CRITICAL: Failed to mark run %d as failed — run may be stuck in 'running' state. "
+                    "Original error: %s, Cleanup error: %s",
+                    run_id, exc, inner_exc,
+                )
             raise
 
     # ── 6. Classify sentiment for mentioned responses ────────────────────────
+    _post_processing_warnings: list[str] = []
+
     logger.info("Scheduled run %d complete — starting sentiment classification", run_id)
     try:
         from app.services.sentiment_service import classify_sentiments_for_run
 
         await classify_sentiments_for_run(list(query_results), brand_name)
     except Exception as exc:
+        _post_processing_warnings.append(f"sentiment: {exc}")
         logger.warning(
             "Sentiment classification failed for run %d (non-fatal): %s", run_id, exc
         )
@@ -400,6 +421,7 @@ async def run_tracking(
                     len(comp_mention_rows), run_id,
                 )
     except Exception as exc:
+        _post_processing_warnings.append(f"competitor_detection: {exc}")
         logger.warning(
             "Competitor detection failed for run %d (non-fatal): %s", run_id, exc
         )
@@ -417,6 +439,7 @@ async def run_tracking(
                     run_id,
                 )
     except Exception as exc:
+        _post_processing_warnings.append(f"attribution: {exc}")
         # Attribution failure is non-fatal; the run itself already completed.
         logger.warning(
             "Attribution calculation failed for run %d (non-fatal): %s", run_id, exc
@@ -459,6 +482,7 @@ async def run_tracking(
                 await attr_db.commit()
                 logger.info("Updated %d draft attributions for run %d", len(attributions), run_id)
     except Exception as exc:
+        _post_processing_warnings.append(f"draft_attribution: {exc}")
         logger.warning("Draft attribution update failed for run %d (non-fatal): %s", run_id, exc)
 
     # ── 8. Run content gap analysis ──────────────────────────────────────────
@@ -471,6 +495,7 @@ async def run_tracking(
             "Gap analysis complete: %d gaps identified for run %d", len(gap_ids), run_id
         )
     except Exception as exc:
+        _post_processing_warnings.append(f"gap_analysis: {exc}")
         logger.warning(
             "Gap analysis failed for run %d (non-fatal): %s", run_id, exc
         )
@@ -489,6 +514,7 @@ async def run_tracking(
         if new_scores:
             await _log_score_change_events(brand_id, run_id, new_scores)
     except Exception as exc:
+        _post_processing_warnings.append(f"score_events: {exc}")
         logger.warning("Score change event logging failed for run %d (non-fatal): %s", run_id, exc)
 
     # ── 9b. Onboarding post-processing pipeline ──────────────────────────────
@@ -546,12 +572,13 @@ async def run_tracking(
 
                 await notif_db.commit()
     except Exception as exc:
+        _post_processing_warnings.append(f"notifications: {exc}")
         logger.warning("Notification creation failed for run %d (non-fatal): %s", run_id, exc)
 
     # ── 9. Send report-ready email ────────────────────────────────────────────
     try:
         from app.models import User as UserModel
-        from app.services.email_service import send_report_ready_email
+        from app.services.email_service import send_email_background, send_report_ready_email
 
         async with AsyncSessionLocal() as email_db:
             brand_result = await email_db.execute(
@@ -565,7 +592,8 @@ async def run_tracking(
                 owner = user_result.scalar_one_or_none()
                 if owner:
                     final_score = (overall_mentions / overall_queries * 100.0) if overall_queries > 0 else 0.0
-                    send_report_ready_email(
+                    send_email_background(
+                        send_report_ready_email,
                         email=owner.email,
                         name=owner.name,
                         brand_name=brand_name,
@@ -573,7 +601,23 @@ async def run_tracking(
                         run_id=run_id,
                     )
     except Exception as exc:
+        _post_processing_warnings.append(f"email: {exc}")
         logger.warning("Report-ready email failed for run %d (non-fatal): %s", run_id, exc)
+
+    # Persist post-processing warnings so partial failures are visible
+    if _post_processing_warnings:
+        try:
+            async with AsyncSessionLocal() as warn_db:
+                run = await warn_db.get(TrackingRun, run_id)
+                if run:
+                    run.error_message = "Post-processing warnings: " + "; ".join(_post_processing_warnings)
+                    await warn_db.commit()
+            logger.warning(
+                "Run %d completed with %d post-processing warning(s): %s",
+                run_id, len(_post_processing_warnings), "; ".join(_post_processing_warnings),
+            )
+        except Exception as exc:
+            logger.warning("Failed to persist post-processing warnings for run %d: %s", run_id, exc)
 
     return run_id
 

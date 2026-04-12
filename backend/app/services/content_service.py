@@ -301,7 +301,7 @@ async def generate_draft(
     quora_question_title: str | None = None,
 ) -> ContentDraft:
     """
-    Generate a content draft using Claude (claude-haiku-4-5-20251001).
+    Generate a content draft using Claude (claude-sonnet-4-6).
 
     1. Load brand info.
     2. If no prompt_id, find the lowest-scoring prompt automatically.

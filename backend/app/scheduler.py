@@ -587,6 +587,10 @@ async def _visibility_alert_sweep() -> None:
             if not user:
                 continue
 
+            # Skip unverified emails — don't send alerts to addresses the user hasn't confirmed
+            if not getattr(user, "email_verified", True):
+                continue
+
             try:
                 send_visibility_alert_email(
                     email=user.email,
@@ -659,6 +663,9 @@ async def _pitch_expiry_sweep() -> None:
             user_result = await db.execute(select(User).where(User.id == brand.user_id))
             user = user_result.scalar_one_or_none()
             if user is None:
+                continue
+            # Skip unverified emails — don't send alerts to addresses the user hasn't confirmed
+            if not getattr(user, "email_verified", True):
                 continue
             try:
                 send_pitch_expiry_warning_email(

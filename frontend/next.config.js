@@ -15,7 +15,7 @@ const nextConfig = {
   async headers() {
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+      "script-src 'self' 'unsafe-inline' blob:",
       "worker-src 'self' blob:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https:",
@@ -24,6 +24,7 @@ const nextConfig = {
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+      "upgrade-insecure-requests",
     ].join('; ');
 
     return [

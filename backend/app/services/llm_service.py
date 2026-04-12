@@ -348,10 +348,14 @@ SUPPORTED_MODELS = list(_DISPATCHERS.keys())
 def _classify_error(error: str) -> str:
     """Classify an error string for retry strategy."""
     e = error.lower()
-    if "401" in e or "unauthorized" in e or "invalid api key" in e or "invalid_api_key" in e:
-        return "auth"  # permanent — bad API key
+    # Check rate-limit indicators FIRST — Perplexity returns HTTP 401 for
+    # quota exhaustion ('insufficient_quota'), which must not be treated as a
+    # permanent auth failure.  Checking quota/rate keywords before the generic
+    # "401" guard ensures mid-run quota hits are retried with backoff.
     if "429" in e or "rate_limit" in e or "rate limit" in e or "insufficient_quota" in e:
         return "rate_limit"
+    if "401" in e or "unauthorized" in e or "invalid api key" in e or "invalid_api_key" in e:
+        return "auth"  # permanent — bad API key
     if "503" in e or "unavailable" in e or "overloaded" in e or "timed out" in e:
         return "overload"
     return "other"

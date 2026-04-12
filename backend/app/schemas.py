@@ -105,6 +105,7 @@ class BrandSummary(BaseModel):
     slug: str
     tier: str
     brand_type: str = "standard"
+    prompt_limit: int = 25
     pitch_expires_at: datetime | None = None
     prompt_count: int
     website_url: str | None = None
@@ -120,6 +121,7 @@ class BrandDetail(BaseModel):
     slug: str
     tier: str
     brand_type: str = "standard"
+    prompt_limit: int = 25
     pitch_expires_at: datetime | None = None
     prompt_count: int = 0
     website_url: str | None = None
@@ -631,6 +633,7 @@ class BrandWithStats(BaseModel):
     slug: str
     tier: str
     brand_type: str = "standard"
+    prompt_limit: int = 25
     pitch_expires_at: datetime | None = None
     prompt_count: int
     overall_score: float | None = None

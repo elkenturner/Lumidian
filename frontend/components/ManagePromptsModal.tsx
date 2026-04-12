@@ -58,6 +58,9 @@ export function ManagePromptsModal({
       const updated = localPrompts.filter((p) => p.id !== promptId);
       setLocalPrompts(updated);
       onChanged(updated);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setAddError(e?.response?.data?.detail || 'Failed to delete prompt.');
     } finally {
       setDeletingId(null);
     }

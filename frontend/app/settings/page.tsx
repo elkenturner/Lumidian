@@ -568,6 +568,11 @@ export default function SettingsPage() {
       setBrand((prev) =>
         prev ? { ...prev, prompts: prev.prompts.filter((p: Prompt) => p.id !== promptId), prompt_count: prev.prompt_count - 1 } : null
       );
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      const msg = e?.response?.data?.detail || 'Failed to delete prompt.';
+      setSaveError(msg);
+      setTimeout(() => setSaveError(null), 5000);
     } finally {
       setDeletingPromptId(null);
     }

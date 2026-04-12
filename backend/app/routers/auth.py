@@ -32,7 +32,7 @@ import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, field_validator
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -59,21 +59,22 @@ def _safe_redirect_path(state: str | None) -> str:
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-# ── In-memory rate limiter ─────────────────────────────────────────────────────
-# Stores per-IP attempt timestamps; pruned on each check (no background task needed).
-_login_attempts: dict = defaultdict(list)
-_register_attempts: dict = defaultdict(list)
+# ── Rate limiting (DB-backed, survives restarts) ─────────────────────────────
 _RATE_WINDOW = 60.0     # sliding 1-minute window
 _MAX_LOGIN = 10         # 10 attempts / minute / IP
 _MAX_REGISTER = 5       # 5 attempts / minute / IP
-_verify_attempts: dict = defaultdict(list)
-_resend_attempts: dict = defaultdict(list)
 _MAX_VERIFY = 10        # 10 attempts / minute / IP
 _MAX_RESEND = 3         # 3 attempts / minute / IP (prevent email flooding)
-_totp_setup_attempts: dict = defaultdict(list)
 _MAX_TOTP_SETUP = 5     # 5 setups / minute / user_id
-_reset_attempts: dict = defaultdict(list)
 _MAX_RESET = 5          # 5 attempts / minute / IP
+
+# In-memory fallback stores — used by tests and as fallback when no DB session
+_login_attempts: dict = defaultdict(list)
+_register_attempts: dict = defaultdict(list)
+_verify_attempts: dict = defaultdict(list)
+_resend_attempts: dict = defaultdict(list)
+_totp_setup_attempts: dict = defaultdict(list)
+_reset_attempts: dict = defaultdict(list)
 
 
 def _get_client_ip(request: Request) -> str:
@@ -86,7 +87,51 @@ def _get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+async def _rate_check_db(key: str, endpoint: str, limit: int, db) -> None:
+    """DB-backed rate check. Counts recent entries in the rate_limits table.
+    Falls back to in-memory check if the table doesn't exist (e.g. in tests)."""
+    now = time.time()
+    cutoff = now - _RATE_WINDOW
+
+    try:
+        result = await db.execute(
+            text("SELECT COUNT(*) FROM rate_limits WHERE key = :key AND endpoint = :ep AND created_at > :cutoff"),
+            {"key": key, "ep": endpoint, "cutoff": cutoff},
+        )
+        count = result.scalar()
+        if count >= limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many requests — please try again later.",
+            )
+        await db.execute(
+            text("INSERT INTO rate_limits (key, endpoint, created_at) VALUES (:key, :ep, :now)"),
+            {"key": key, "ep": endpoint, "now": now},
+        )
+        # Prune old entries periodically (~1% of requests)
+        import random
+        if random.random() < 0.01:
+            await db.execute(
+                text("DELETE FROM rate_limits WHERE created_at < :cutoff"),
+                {"cutoff": cutoff},
+            )
+        await db.flush()
+    except Exception as e:
+        if "no such table" in str(e):
+            # Fallback to in-memory (tests or pre-migration)
+            _fallback_stores = {
+                "register": _register_attempts, "login": _login_attempts,
+                "verify": _verify_attempts, "resend": _resend_attempts,
+                "reset": _reset_attempts, "totp_setup": _totp_setup_attempts,
+            }
+            store = _fallback_stores.get(endpoint, _login_attempts)
+            _rate_check(key, store, limit)
+        else:
+            raise
+
+
 def _rate_check(ip: str, store: dict, limit: int) -> None:
+    """In-memory rate check fallback (used by tests)."""
     now = time.monotonic()
     cutoff = now - _RATE_WINDOW
     store[ip] = [t for t in store[ip] if t > cutoff]
@@ -204,9 +249,13 @@ class RegisterRequest(BaseModel):
 
     @field_validator("name")
     @classmethod
-    def validate_name_length(cls, v: str | None) -> str | None:
-        if v is not None and len(v) > 100:
+    def validate_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if len(v) > 100:
             raise ValueError("Name must be 100 characters or fewer")
+        if re.search(r"[<>]", v):
+            raise ValueError("Name contains invalid characters")
         return v
 
     @field_validator("email")
@@ -217,13 +266,19 @@ class RegisterRequest(BaseModel):
             raise ValueError("Invalid email address")
         if len(v) > 255:
             raise ValueError("Email too long")
+        # Reject HTML/script tags in email
+        if re.search(r"[<>]", v):
+            raise ValueError("Invalid email address")
+        # Basic email format: local part + @ + domain
+        if not re.match(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$", v):
+            raise ValueError("Invalid email address")
         return v
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
 async def register(body: RegisterRequest, http_req: Request, response: Response, db: DbDep):
     request = body
-    _rate_check(_get_client_ip(http_req), _register_attempts, _MAX_REGISTER)
+    await _rate_check_db(_get_client_ip(http_req), "register", _MAX_REGISTER, db)
     email = request.email.strip().lower()
 
     _validate_password(request.password)
@@ -285,7 +340,7 @@ def create_challenge_token(user_id: int) -> str:
 
 @router.post("/login")
 async def login(body: LoginRequest, http_req: Request, response: Response, db: DbDep):
-    _rate_check(_get_client_ip(http_req), _login_attempts, _MAX_LOGIN)
+    await _rate_check_db(_get_client_ip(http_req), "login", _MAX_LOGIN, db)
     request = body
     email = request.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
@@ -660,7 +715,7 @@ async def forgot_password(request: ForgotPasswordRequest, http_req: Request, db:
     Generate a 1-hour password reset token and log the reset link to console.
     Always returns 200 to avoid user enumeration.
     """
-    _rate_check(_get_client_ip(http_req), _reset_attempts, _MAX_RESET)
+    await _rate_check_db(_get_client_ip(http_req), "reset", _MAX_RESET, db)
     email = request.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
@@ -705,7 +760,7 @@ class ResetPasswordRequest(BaseModel):
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
 async def reset_password(request: ResetPasswordRequest, http_req: Request, db: DbDep):
     """Validate reset token and update user's password."""
-    _rate_check(_get_client_ip(http_req), _reset_attempts, _MAX_RESET)
+    await _rate_check_db(_get_client_ip(http_req), "reset", _MAX_RESET, db)
     _validate_password(request.new_password)
 
     # Direct lookup by SHA-256 hash of the submitted token
@@ -754,7 +809,7 @@ async def verify_email(
 ):
     """Validate the 6-digit code and mark the user's email as verified.
     No auth cookie required — uses email + code for identification."""
-    _rate_check(_get_client_ip(http_req), _verify_attempts, _MAX_VERIFY)
+    await _rate_check_db(_get_client_ip(http_req), "verify", _MAX_VERIFY, db)
 
     email = body.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
@@ -809,7 +864,7 @@ async def resend_verification(
 ):
     """Generate a fresh 6-digit code and resend the verification email.
     No auth cookie required — uses email for identification."""
-    _rate_check(_get_client_ip(http_req), _resend_attempts, _MAX_RESEND)
+    await _rate_check_db(_get_client_ip(http_req), "resend", _MAX_RESEND, db)
 
     email = body.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
@@ -883,7 +938,7 @@ async def setup_2fa(
     Returns the provisioning URI and a base64-encoded QR code PNG.
     2FA is NOT enabled yet — the user must confirm with /2fa/enable.
     """
-    _rate_check(str(current_user.id), _totp_setup_attempts, _MAX_TOTP_SETUP)
+    await _rate_check_db(str(current_user.id), "totp_setup", _MAX_TOTP_SETUP, db)
     import base64
     import io
 
@@ -985,7 +1040,7 @@ async def verify_2fa(
     Validates the challenge token (issued by /login) and the TOTP code,
     then sets auth cookies and returns the user.
     """
-    _rate_check(_get_client_ip(http_req), _login_attempts, _MAX_LOGIN)
+    await _rate_check_db(_get_client_ip(http_req), "login", _MAX_LOGIN, db)
     import pyotp
 
     # Decode and validate challenge token

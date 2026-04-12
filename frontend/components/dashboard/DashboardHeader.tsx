@@ -8,6 +8,7 @@ import {
   Play,
   Loader2,
   RefreshCw,
+  PauseCircle,
 } from 'lucide-react';
 import BrandAvatar from '@/components/BrandAvatar';
 
@@ -24,6 +25,7 @@ interface DashboardHeaderProps {
   triggering: boolean;
   isRunning: boolean;
   isAtRunLimit: boolean;
+  isSubscriptionPaused?: boolean;
   onOpenPromptModal: () => void;
   onRefresh: () => void;
   onRunReport: () => void;
@@ -37,11 +39,14 @@ export default function DashboardHeader({
   triggering,
   isRunning,
   isAtRunLimit,
+  isSubscriptionPaused,
   onOpenPromptModal,
   onRefresh,
   onRunReport,
   onUpgradeClick,
 }: DashboardHeaderProps) {
+  const isDisabled = triggering || isRunning || !selectedBrandId || isSubscriptionPaused;
+
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
       <div className="flex items-center gap-3">
@@ -81,34 +86,54 @@ export default function DashboardHeader({
         </button>
         </div>
         <div className={`flex flex-col ${isMobile ? 'w-full' : 'items-end'} gap-1`}>
-          <button
-            onClick={isAtRunLimit ? onUpgradeClick : onRunReport}
-            disabled={triggering || isRunning || !selectedBrandId}
-            title={isAtRunLimit ? 'Daily run limit reached — resets at midnight UTC' : undefined}
-            className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-[background-color,box-shadow] duration-200 ${isMobile ? 'w-full justify-center' : ''} ${
-              isAtRunLimit
-                ? 'bg-[var(--accent-muted)] border border-[var(--accent-border)] text-[var(--text-faint)] cursor-default'
-                : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40 hover:shadow-xl'
-            }`}
-          >
-            {triggering || isRunning ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                {isRunning ? 'Running...' : 'Starting...'}
-              </>
-            ) : isAtRunLimit ? (
-              <>
-                <Zap size={14} className="text-[var(--accent)]/60" />
-                1 run / day
-              </>
-            ) : (
-              <>
-                <Play size={14} />
-                Run Report Now
-              </>
-            )}
-          </button>
-          {isAtRunLimit && (
+          {isSubscriptionPaused ? (
+            <Link
+              href="/settings/billing"
+              className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold bg-[#7f1d1d]/20 border border-[#991b1b]/40 text-[var(--danger-text)] hover:bg-[#7f1d1d]/30 transition-colors ${isMobile ? 'w-full justify-center' : ''}`}
+            >
+              <PauseCircle size={14} />
+              Tracking Paused
+            </Link>
+          ) : (
+            <button
+              onClick={isAtRunLimit ? onUpgradeClick : onRunReport}
+              disabled={isDisabled}
+              title={isAtRunLimit ? 'Daily run limit reached — resets at midnight UTC' : undefined}
+              className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-[background-color,box-shadow] duration-200 ${isMobile ? 'w-full justify-center' : ''} ${
+                isAtRunLimit
+                  ? 'bg-[var(--accent-muted)] border border-[var(--accent-border)] text-[var(--text-faint)] cursor-default'
+                  : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40 hover:shadow-xl'
+              }`}
+            >
+              {triggering || isRunning ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  {isRunning ? 'Running...' : 'Starting...'}
+                </>
+              ) : isAtRunLimit ? (
+                <>
+                  <Zap size={14} className="text-[var(--accent)]/60" />
+                  1 run / day
+                </>
+              ) : (
+                <>
+                  <Play size={14} />
+                  Run Report Now
+                </>
+              )}
+            </button>
+          )}
+          {isSubscriptionPaused ? (
+            <p className="text-[11px] text-[var(--danger)]/70">
+              Your subscription has ended.{' '}
+              <Link
+                href="/settings/billing"
+                className="text-[var(--danger-text)] hover:underline"
+              >
+                Upgrade to continue
+              </Link>
+            </p>
+          ) : isAtRunLimit ? (
             <p className="text-[11px] text-[var(--text-faint)]">
               Resets midnight UTC ·{' '}
               <button
@@ -118,7 +143,7 @@ export default function DashboardHeader({
                 Upgrade
               </button>
             </p>
-          )}
+          ) : null}
         </div>
       </div>
     </div>

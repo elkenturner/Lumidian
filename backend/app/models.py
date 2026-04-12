@@ -617,6 +617,16 @@ class ContentEvent(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
+class ProcessedWebhookEvent(Base):
+    """Tracks Stripe webhook event IDs to prevent duplicate processing on retries."""
+    __tablename__ = "processed_webhook_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    stripe_event_id: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
+    event_type: Mapped[str] = mapped_column(String(100), nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utcnow)
+
+
 class Notification(Base):
     __tablename__ = "notifications"
 

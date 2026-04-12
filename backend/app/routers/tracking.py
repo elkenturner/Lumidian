@@ -149,9 +149,9 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
         await db.refresh(tracking_run)
         run_id = tracking_run.id
 
-    # Clean up lock if no longer contended
-    if not brand_lock.locked():
-        _brand_run_locks.pop(brand_id, None)
+    # Lock persists in _brand_run_locks for the app lifetime — safe and
+    # avoids a TOCTOU race where another coroutine grabs the lock between
+    # our locked() check and the pop().
 
     # Fire-and-forget: the actual work happens in the background.
     # We use asyncio.create_task rather than BackgroundTasks so it runs
@@ -648,9 +648,9 @@ async def trigger_prompt_run(
         await db.refresh(tracking_run)
         run_id = tracking_run.id
 
-    # Clean up lock if no longer contended
-    if not brand_lock.locked():
-        _brand_run_locks.pop(brand_id, None)
+    # Lock persists in _brand_run_locks for the app lifetime — safe and
+    # avoids a TOCTOU race where another coroutine grabs the lock between
+    # our locked() check and the pop().
 
     is_pro = user.subscription_tier in ("starter", "pro")
     asyncio.create_task(

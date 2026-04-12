@@ -98,7 +98,7 @@ tests/
 | auth.py | /api/auth | Register, login, logout, OAuth, 2FA, password reset, email verify |
 | brands.py | /api/brands | Brand + prompt CRUD, competitor management, suggested prompts |
 | brand_profile.py | /api/brand_profile | Brand knowledge base (tone, publications, context) |
-| tracking.py | /api/tracking | Trigger & monitor tracking runs |
+| tracking.py | /api/tracking | Trigger, monitor & cancel tracking runs |
 | results.py | /api/results | Per-run analytics + raw query responses |
 | dashboard.py | /api/dashboard | SOV, sentiment, position, competitor overview |
 | content.py | /api/content | Drafts, posts, settings, platform guidelines, attribution |
@@ -174,7 +174,7 @@ No Alembic. Migrations are embedded in `database.py:run_migrations()` and applie
 | `BrandProfile` | id, brand_id FK (unique), company_description, key_stats, tone_of_voice, what_not_to_say, target_audience, approved_language, publications, internal_brand_context, website_context_last_fetched |
 | `ContentOpportunity` | id, brand_id FK, platform, thread_url, thread_title, subreddit, relevance_score, status (new/drafted/dismissed) |
 | `ContentGap` | id, brand_id FK, prompt_id FK, tracking_run_id FK, model, severity_score, opportunity_score, gap_score, competitor_mentions (JSON), platforms_lacking (JSON), quora_questions (JSON) |
-| `ContentDraft` | id, brand_id FK, prompt_id FK, opportunity_id FK, platform, status (draft/approved/posted), title, content_text, source (scheduled/manual), approved_at, posted_at |
+| `ContentDraft` | id, brand_id FK, prompt_id FK, opportunity_id FK, platform, status (draft/approved/posted/failed), title, content_text, source (onboarding/manual), approved_at, posted_at |
 | `ContentPost` | id, draft_id FK, platform, post_url, platform_post_id, posted_at |
 | `ContentAttribution` | id, content_post_id FK, tracking_run_id FK, brand_id FK, visibility_before, visibility_after, improvement_pct |
 | `DraftAttribution` | id, draft_id FK, brand_id FK, prompt_id FK, score_at_posting, current_score, delta, runs_since_posting |
@@ -234,7 +234,33 @@ In-memory `_rate_store` with per-user/per-endpoint tracking. Resets between test
 Missing LLM API key → placeholder response returned; user prompted to configure in settings.
 
 ### Pitch Brands
-Temporary brands (brand_type=pitch) expire 30 days after creation. Auto-cleaned at 06:00 UTC daily. Expiry warning emails sent beforehand.
+Free-only temporary brands (brand_type=pitch). Auto-upgraded to standard when user subscribes. Expire 30 days after creation. Auto-cleaned at 06:00 UTC daily. Expiry warning emails sent beforehand. Limited to 1 manual draft regen per week.
+
+### Content Draft Caps
+| Tier | Draft queue (unreviewed) | Scheduled queue (approved) |
+|------|--------------------------|----------------------------|
+| Free (pitch) | 5 | 10 |
+| Starter | 20 | 50 |
+| Pro | 20 | 100 |
+
+Caps defined in `routers/content.py` (`TIER_SCHEDULED_CAPS`) and `services/drafting_service.py` (`TIER_DRAFT_CAPS`). Frontend reads caps dynamically from `GET /api/content/{brand_id}/draft-status` — no hardcoded values in UI.
+
+### Content Drafting Flow
+Drafts are generated on brand creation (onboarding) and manually via "Regenerate Drafts". No recurring auto-draft job. Opportunity scanners (Reddit, Quora, LinkedIn, X) run weekly on Monday and are separate from drafting. Draft platforms: reddit, quora, medium, wikipedia, linkedin, x.
+
+### LLM Concurrency & Resilience
+Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Overall tracking concurrency: `MAX_CONCURRENT=10` in `tracking_service.py`. Model fallbacks on overload (503): `gemini-2.5-pro` → `gemini-2.5-flash`, `sonar-pro` → `sonar`. Rate limit errors get 65s retry delay. Auth errors (invalid API key) are not retried. Timeouts: Claude draft generation 30s, sentiment classification 15s, Reddit scanner relevance 10s.
+
+### Run Cancellation
+`POST /api/tracking/run/{run_id}/cancel` force-cancels stuck runs. Cancellation propagates to in-flight LLM queries via `asyncio.Event`, interrupting retry backoff sleeps immediately. Cancel events cleaned up in `tracking.py:cleanup_cancel_event()`. Stale runs auto-failed after 15 minutes (dynamic threshold based on brand size).
+
+### Security Hardening
+- Swagger/OpenAPI disabled in production (`openapi_url=None`)
+- IP-based rate limiting uses `X-Forwarded-For` header (Railway proxy)
+- Input validation: name length limits, HTML tag rejection, strict email regex
+- DB file permissions tightened to 600 in `start.sh`
+- Auth rate limits: 5 register/min/IP, 10 login/min/IP, 3 resend-verification/min/IP
+- Frontend: 30s Axios timeout, 401 interceptor auto-redirects to login
 
 ### Request Deduplication (frontend)
 `lib/api.ts` Axios client deduplicates concurrent GET requests by URL — a second identical in-flight GET returns the same promise rather than making a second network call.
@@ -265,7 +291,7 @@ All methods are typed. Key groups:
 
 - **Brands:** `getBrands`, `getBrand`, `createBrand`, `updateBrand`, `deleteBrand`, `getBrandsWithStats`, `refreshWebsiteContext`
 - **Prompts:** `addPrompt`, `deletePrompt`, `getSuggestedPrompts`, `getSuggestedPromptsPreview`
-- **Tracking:** `triggerRun`, `triggerPromptRun`, `getRunStatus`, `getRecentRuns`
+- **Tracking:** `triggerRun`, `triggerPromptRun`, `getRunStatus`, `getRecentRuns`, `cancelRun`
 - **Analytics:** `getOverview`, `getTrends`, `getResponses`, `getDashboardAnalytics`
 - **Competitors:** `getCompetitors`, `addCompetitor`, `removeCompetitor`, `getCompetitorAnalysis`
 - **Content:** `getDrafts`, `generateDraft`, `updateDraft`, `postDraft`, `deleteDraft`, `generateNow`, `getDraftStatus`

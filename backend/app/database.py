@@ -342,14 +342,14 @@ async def run_migrations():
                 # Column/table/index already exists — safe to ignore
                 pass
 
-    # ── One-time data fixes (idempotent) ─────────────────────────────────────
+    # ── Idempotent data fixes (run every startup) ────────────────────────────
     async with engine.begin() as conn:
-        # 2026-04-10: Upgrade pitch brands owned by paid users.
-        # Previously the Stripe webhook only converted standard→pro brands,
-        # leaving pitch brands stuck with pitch-level caps even after upgrade.
+        # Ensure brands match their owner's subscription tier.
+        # Catches pitch brands that weren't upgraded due to webhook race,
+        # AND brands where brand_type was changed but prompt_limit wasn't.
         await conn.execute(text("""
             UPDATE brands SET brand_type = 'pro', prompt_limit = 100
-            WHERE brand_type = 'pitch'
+            WHERE (brand_type != 'pro' OR prompt_limit != 100)
               AND user_id IN (SELECT id FROM users WHERE subscription_tier = 'pro')
         """))
         await conn.execute(text("""
@@ -357,7 +357,7 @@ async def run_migrations():
             WHERE brand_type = 'pitch'
               AND user_id IN (SELECT id FROM users WHERE subscription_tier = 'starter')
         """))
-        logger.info("Data fix: upgraded pitch brands for paid users")
+        logger.info("Data fix: synced brand types/limits with user tiers")
 
 
 async def cleanup_stale_runs(max_age_minutes: int = 30):

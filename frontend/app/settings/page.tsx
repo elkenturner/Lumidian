@@ -851,7 +851,7 @@ export default function SettingsPage() {
                 <h2 className="text-[15px] font-semibold text-[var(--text-primary)]">Tracking Prompts</h2>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">
                   {(() => {
-                    const limit = brand.brand_type === 'pitch' ? 10 : (user?.prompt_limit ?? 25);
+                    const limit = brand.prompt_limit ?? (user?.prompt_limit ?? 25);
                     const isUnlimited = limit >= 99999;
                     const color = isUnlimited ? 'var(--text-muted)' : brand.prompts.length >= limit ? 'var(--danger)' : brand.prompts.length >= limit * 0.8 ? 'var(--warning)' : 'var(--text-muted)';
                     return <span style={{ color }}>{brand.prompts.length}{isUnlimited ? '' : `/${limit}`} prompts</span>;

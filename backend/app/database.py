@@ -391,17 +391,38 @@ async def cleanup_stale_runs(max_age_minutes: int = 15):
             logger.info("Marked %d stale tracking runs as failed: %s", len(stale_ids), stale_ids)
 
 
-async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_minutes: int = 15) -> None:
+async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_minutes: int | None = None) -> None:
     """Auto-fail tracking runs stuck in pending/running for a specific brand.
 
     Called inline from endpoints that check for active runs, so a stuck run
     doesn't permanently block user actions (prompt edits, new tracking runs).
+
+    If max_age_minutes is None (default), the threshold is calculated
+    dynamically: estimated run time × 2, with a floor of 15 minutes.
+    This prevents killing legitimate long runs for large brands while still
+    catching stuck ones quickly for small brands.
     """
     from datetime import datetime, timedelta
 
-    from sqlalchemy import update
+    from sqlalchemy import func, select, update
 
-    from app.models import TrackingRun
+    from app.models import Brand, Prompt, TrackingRun
+
+    if max_age_minutes is None:
+        # Calculate expected run duration from prompt count + tier
+        brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
+        brand = brand_result.scalar_one_or_none()
+        prompt_count_result = await db.execute(
+            select(func.count(Prompt.id)).where(Prompt.brand_id == brand_id)
+        )
+        prompt_count = prompt_count_result.scalar_one() or 1
+
+        tier_runs = {"basic": 5, "standard": 10, "premium": 20}
+        runs_per_prompt = tier_runs.get(brand.tier, 5) if brand else 5
+        total_queries = prompt_count * 4 * runs_per_prompt  # 4 models
+        # ~8 effective concurrent queries, ~3s each
+        est_minutes = (total_queries / 8 * 3) / 60
+        max_age_minutes = max(15, int(est_minutes * 2))
 
     cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=max_age_minutes)
     result = await db.execute(
@@ -414,4 +435,4 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
         .values(status="failed")
     )
     if result.rowcount > 0:
-        logger.warning("Auto-failed %d stale run(s) for brand %d", result.rowcount, brand_id)
+        logger.warning("Auto-failed %d stale run(s) for brand %d (threshold: %d min)", result.rowcount, brand_id, max_age_minutes)

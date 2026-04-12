@@ -37,6 +37,18 @@ router = APIRouter(prefix="/tracking", tags=["tracking"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
+# Application-level locks to prevent concurrent run creation per brand.
+# Dict of brand_id -> asyncio.Lock.  Entries are cleaned up after use to
+# avoid unbounded growth.
+_brand_run_locks: dict[int, asyncio.Lock] = {}
+
+
+def _get_brand_lock(brand_id: int) -> asyncio.Lock:
+    """Return (or create) an asyncio.Lock for the given brand."""
+    if brand_id not in _brand_run_locks:
+        _brand_run_locks[brand_id] = asyncio.Lock()
+    return _brand_run_locks[brand_id]
+
 
 # ── Trigger manual run ────────────────────────────────────────────────────────
 
@@ -99,39 +111,47 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
                 detail=f"Pitch brands are limited to {DAILY_RUN_LIMITS_PITCH} manual run per day. Try again tomorrow.",
             )
 
-    # Block concurrent runs: reject if this brand already has a pending/running run
-    active_run_result = await db.execute(
-        select(func.count(TrackingRun.id)).where(
-            TrackingRun.brand_id == brand_id,
-            TrackingRun.status.in_(["pending", "running"]),
+    # Acquire per-brand lock to make the active-run check + insert atomic,
+    # preventing two rapid requests from both passing the concurrency check.
+    brand_lock = _get_brand_lock(brand_id)
+    async with brand_lock:
+        # Block concurrent runs: reject if this brand already has a pending/running run
+        active_run_result = await db.execute(
+            select(func.count(TrackingRun.id)).where(
+                TrackingRun.brand_id == brand_id,
+                TrackingRun.status.in_(["pending", "running"]),
+            )
         )
-    )
-    if (active_run_result.scalar_one() or 0) > 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A report is already running for this brand. Please wait for it to finish.",
-        )
+        if (active_run_result.scalar_one() or 0) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A report is already running for this brand. Please wait for it to finish.",
+            )
 
-    # Detect if this is the brand's first-ever run (triggers onboarding pipeline)
-    completed_runs_result = await db.execute(
-        select(func.count(TrackingRun.id)).where(
-            TrackingRun.brand_id == brand_id,
-            TrackingRun.status == "completed",
+        # Detect if this is the brand's first-ever run (triggers onboarding pipeline)
+        completed_runs_result = await db.execute(
+            select(func.count(TrackingRun.id)).where(
+                TrackingRun.brand_id == brand_id,
+                TrackingRun.status == "completed",
+            )
         )
-    )
-    is_first_run = (completed_runs_result.scalar_one() or 0) == 0
-    run_type = "onboarding" if is_first_run else "manual"
+        is_first_run = (completed_runs_result.scalar_one() or 0) == 0
+        run_type = "onboarding" if is_first_run else "manual"
 
-    # Pre-create the TrackingRun record so we can return its ID immediately.
-    tracking_run = TrackingRun(
-        brand_id=brand_id,
-        status="pending",
-        run_type=run_type,
-    )
-    db.add(tracking_run)
-    await db.commit()
-    await db.refresh(tracking_run)
-    run_id = tracking_run.id
+        # Pre-create the TrackingRun record so we can return its ID immediately.
+        tracking_run = TrackingRun(
+            brand_id=brand_id,
+            status="pending",
+            run_type=run_type,
+        )
+        db.add(tracking_run)
+        await db.commit()
+        await db.refresh(tracking_run)
+        run_id = tracking_run.id
+
+    # Clean up lock if no longer contended
+    if not brand_lock.locked():
+        _brand_run_locks.pop(brand_id, None)
 
     # Fire-and-forget: the actual work happens in the background.
     # We use asyncio.create_task rather than BackgroundTasks so it runs
@@ -418,14 +438,26 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
             await db.commit()
         except Exception as exc:
-            await db.rollback()
-            async with AsyncSessionLocal() as err_db:
-                run = await err_db.get(TrackingRun, run_id)
-                if run:
-                    run.status = "failed"
-                    run.error_message = f"DB error: {exc}"
-                    run.completed_at = utcnow()
-                    await err_db.commit()
+            try:
+                await db.rollback()
+            except Exception:
+                logger.warning("Rollback also failed for manual run %d", run_id)
+            # Mark run as failed in a clean session — wrap in its own
+            # try/except so the run never stays stuck in "running" state.
+            try:
+                async with AsyncSessionLocal() as err_db:
+                    run = await err_db.get(TrackingRun, run_id)
+                    if run:
+                        run.status = "failed"
+                        run.error_message = f"DB error: {exc}"
+                        run.completed_at = utcnow()
+                        await err_db.commit()
+            except Exception as inner_exc:
+                logger.critical(
+                    "CRITICAL: Failed to mark manual run %d as failed — run may be stuck in 'running' state. "
+                    "Original error: %s, Cleanup error: %s",
+                    run_id, exc, inner_exc,
+                )
             return
 
     # Classify sentiment after the main commit (non-fatal)
@@ -589,29 +621,36 @@ async def trigger_prompt_run(
     if prompt is None:
         raise HTTPException(status_code=404, detail="Prompt not found for this brand")
 
-    # Block concurrent runs for this brand
-    from sqlalchemy import func as sa_func
-    active_run_result = await db.execute(
-        select(sa_func.count(TrackingRun.id)).where(
-            TrackingRun.brand_id == brand_id,
-            TrackingRun.status.in_(["pending", "running"]),
+    # Acquire per-brand lock to make the active-run check + insert atomic
+    brand_lock = _get_brand_lock(brand_id)
+    async with brand_lock:
+        # Block concurrent runs for this brand
+        from sqlalchemy import func as sa_func
+        active_run_result = await db.execute(
+            select(sa_func.count(TrackingRun.id)).where(
+                TrackingRun.brand_id == brand_id,
+                TrackingRun.status.in_(["pending", "running"]),
+            )
         )
-    )
-    if (active_run_result.scalar_one() or 0) > 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="A report is already running for this brand. Please wait for it to finish.",
-        )
+        if (active_run_result.scalar_one() or 0) > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A report is already running for this brand. Please wait for it to finish.",
+            )
 
-    tracking_run = TrackingRun(
-        brand_id=brand_id,
-        status="pending",
-        run_type="prompt",
-    )
-    db.add(tracking_run)
-    await db.commit()
-    await db.refresh(tracking_run)
-    run_id = tracking_run.id
+        tracking_run = TrackingRun(
+            brand_id=brand_id,
+            status="pending",
+            run_type="prompt",
+        )
+        db.add(tracking_run)
+        await db.commit()
+        await db.refresh(tracking_run)
+        run_id = tracking_run.id
+
+    # Clean up lock if no longer contended
+    if not brand_lock.locked():
+        _brand_run_locks.pop(brand_id, None)
 
     is_pro = user.subscription_tier in ("starter", "pro")
     asyncio.create_task(
@@ -743,14 +782,26 @@ async def _background_prompt_run(
                 run_id, prompt_id, overall_score,
             )
         except Exception as exc:
-            await db.rollback()
-            async with AsyncSessionLocal() as err_db:
-                run = await err_db.get(TR, run_id)
-                if run:
-                    run.status = "failed"
-                    run.error_message = f"DB error: {exc}"
-                    run.completed_at = utcnow()
-                    await err_db.commit()
+            try:
+                await db.rollback()
+            except Exception:
+                logger.warning("Rollback also failed for prompt run %d", run_id)
+            # Mark run as failed in a clean session — wrap in its own
+            # try/except so the run never stays stuck in "running" state.
+            try:
+                async with AsyncSessionLocal() as err_db:
+                    run = await err_db.get(TR, run_id)
+                    if run:
+                        run.status = "failed"
+                        run.error_message = f"DB error: {exc}"
+                        run.completed_at = utcnow()
+                        await err_db.commit()
+            except Exception as inner_exc:
+                logger.critical(
+                    "CRITICAL: Failed to mark prompt run %d as failed — run may be stuck in 'running' state. "
+                    "Original error: %s, Cleanup error: %s",
+                    run_id, exc, inner_exc,
+                )
             logger.exception("Prompt run %d failed during DB write", run_id)
             return
 

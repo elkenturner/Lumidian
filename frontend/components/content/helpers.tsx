@@ -369,6 +369,15 @@ export function runQualityChecks(
 }
 
 // ── Simple markdown-to-html renderer for preview mode ───────────────────────
+//
+// SECURITY NOTE — escaping order matters:
+// 1. HTML entity escaping (&, <, >) MUST happen FIRST to neutralize any raw HTML
+//    in the input text. After this step, no user-supplied content can produce
+//    HTML tags or attributes.
+// 2. Markdown-to-HTML transforms (bold, italic, headings) run AFTER escaping,
+//    so only our controlled markup is injected — never user content as raw HTML.
+// 3. Paragraph/line-break transforms run last.
+// Do NOT reorder these steps or insert user content after step 1.
 
 export function renderPreviewHtml(text: string): string {
   return text

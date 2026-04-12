@@ -132,7 +132,7 @@ def send_email_background(fn, *args, **kwargs) -> None:
 # ── Public email functions ────────────────────────────────────────────────────
 
 def send_email_verification(email: str, name: str | None, code: str) -> None:
-    """Sent immediately after a new user registers — 6-digit code to verify email."""
+    """Sent immediately after a new user registers — 8-digit code to verify email."""
     display = name or email.split("@")[0]
 
     body = f"""\

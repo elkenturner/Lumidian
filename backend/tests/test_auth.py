@@ -524,7 +524,7 @@ async def test_2fa_verify_completes_login(client: httpx.AsyncClient):
 # ── Email verification endpoint tests ────────────────────────────────────────
 
 async def test_verify_email_with_valid_code(client: httpx.AsyncClient, db_session):
-    """Correct 6-digit code marks user as verified."""
+    """Correct verification code marks user as verified."""
     from sqlalchemy import text
 
     from app.routers.auth import hash_password
@@ -549,7 +549,7 @@ async def test_verify_email_with_valid_code(client: httpx.AsyncClient, db_sessio
 
 
 async def test_verify_email_with_wrong_code(client: httpx.AsyncClient):
-    """Wrong 6-digit code returns 400."""
+    """Wrong verification code returns 400."""
     email = "verify_bad@example.com"
     await register_user(client, email=email)
     resp = await client.post("/api/auth/verify-email", json={"email": email, "code": "000000"})

@@ -24,7 +24,10 @@ export default function LoginPage() {
   const [challengeToken, setChallengeToken] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState('');
 
-  const from = searchParams.get('from') || '/dashboard';
+  // Validate redirect target to prevent open redirects (e.g. /login?from=https://evil.com).
+  // Only allow relative paths that start with a single slash.
+  const rawFrom = searchParams.get('from') || '/dashboard';
+  const from = rawFrom.startsWith('/') && !rawFrom.startsWith('//') ? rawFrom : '/dashboard';
 
   useEffect(() => { document.title = 'Sign In — Lumidian'; }, []);
 

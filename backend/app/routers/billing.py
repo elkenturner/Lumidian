@@ -441,10 +441,26 @@ async def stripe_webhook(request: Request, db: DbDep):
 
     from sqlalchemy import select as sa_select
 
-    from app.models import User as UserModel
+    from app.models import ProcessedWebhookEvent, User as UserModel
 
     event_type = event.get("type", "")
+    event_id = event.get("id", "")
     data_obj = event.get("data", {}).get("object", {})
+
+    # ── Idempotency: skip already-processed events (Stripe retries on failure) ──
+    if event_id:
+        try:
+            already = await db.execute(
+                sa_select(ProcessedWebhookEvent.id).where(
+                    ProcessedWebhookEvent.stripe_event_id == event_id
+                )
+            )
+            if already.scalar_one_or_none() is not None:
+                logger.info("Skipping duplicate webhook event %s (%s)", event_id, event_type)
+                return {"received": True}
+        except Exception:
+            # Fail-open: if the dedup check itself fails, continue processing
+            logger.warning("Idempotency check failed for event %s, proceeding anyway", event_id, exc_info=True)
 
     if event_type == "checkout.session.completed":
         # Fires immediately when the user finishes checkout. Sets tier + active status.
@@ -471,7 +487,7 @@ async def stripe_webhook(request: Request, db: DbDep):
                 changed = True
             if changed:
                 user.updated_at = utcnow()
-                await db.commit()
+            await db.flush()
             logger.info(
                 "checkout.session.completed for user %s (customer=%s, subscription=%s)",
                 user.email, customer_id, sub_id,
@@ -507,7 +523,7 @@ async def stripe_webhook(request: Request, db: DbDep):
             elif sub_status not in ("trialing",):
                 user.subscription_trial_end = None
             user.updated_at = utcnow()
-            await db.commit()
+            await db.flush()
             if tier and tier != old_tier:
                 from app.services.analytics_service import log_event
                 await log_event(
@@ -527,7 +543,6 @@ async def stripe_webhook(request: Request, db: DbDep):
                     .values(brand_type="pro", prompt_limit=100)
                 )
                 if upgrade_result.rowcount > 0:
-                    await db.commit()
                     logger.info(
                         "Auto-upgraded %d brand(s) to pro for user %d",
                         upgrade_result.rowcount, user.id,
@@ -543,7 +558,6 @@ async def stripe_webhook(request: Request, db: DbDep):
                     .values(brand_type="standard", prompt_limit=25)
                 )
                 if upgrade_result.rowcount > 0:
-                    await db.commit()
                     logger.info(
                         "Auto-upgraded %d pitch brand(s) to standard for user %d",
                         upgrade_result.rowcount, user.id,
@@ -561,7 +575,7 @@ async def stripe_webhook(request: Request, db: DbDep):
             user.subscription_tier = None
             user.stripe_subscription_id = None
             user.updated_at = utcnow()
-            await db.commit()
+            await db.flush()
 
             # Downgrade pro brands back to standard so they don't retain
             # elevated prompt limits (100 → 25) after subscription cancellation.
@@ -575,7 +589,6 @@ async def stripe_webhook(request: Request, db: DbDep):
                     .values(brand_type="standard", prompt_limit=25, tier="standard")
                 )
                 if downgrade_result.rowcount > 0:
-                    await db.commit()
                     logger.info(
                         "Downgraded %d pro brand(s) to standard for user %d after cancellation",
                         downgrade_result.rowcount, user.id,
@@ -603,7 +616,7 @@ async def stripe_webhook(request: Request, db: DbDep):
         if user:
             user.subscription_status = "past_due"
             user.updated_at = utcnow()
-            await db.commit()
+            await db.flush()
             logger.warning(
                 "Payment failed for user %s (attempt %d). customer=%s",
                 user.email, attempt_count, customer_id,
@@ -615,4 +628,16 @@ async def stripe_webhook(request: Request, db: DbDep):
                 user_id=user.id,
             )
 
+    # ── Record event for idempotency + single atomic commit ──────────────────
+    if event_id:
+        try:
+            db.add(ProcessedWebhookEvent(
+                stripe_event_id=event_id,
+                event_type=event_type,
+                processed_at=utcnow(),
+            ))
+        except Exception:
+            logger.warning("Failed to record webhook event %s for idempotency", event_id, exc_info=True)
+
+    await db.commit()
     return {"received": True}

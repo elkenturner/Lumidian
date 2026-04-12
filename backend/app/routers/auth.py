@@ -67,6 +67,8 @@ _MAX_VERIFY = 10        # 10 attempts / minute / IP
 _MAX_RESEND = 3         # 3 attempts / minute / IP (prevent email flooding)
 _MAX_TOTP_SETUP = 5     # 5 setups / minute / user_id
 _MAX_RESET = 5          # 5 attempts / minute / IP
+_MAX_VERIFY_PER_EMAIL = 5   # 5 failed attempts per email, then lock for 15 minutes
+_VERIFY_LOCKOUT_SECS = 900  # 15-minute lockout after max failed attempts
 
 # In-memory fallback stores — used by tests and as fallback when no DB session
 _login_attempts: dict = defaultdict(list)
@@ -75,6 +77,8 @@ _verify_attempts: dict = defaultdict(list)
 _resend_attempts: dict = defaultdict(list)
 _totp_setup_attempts: dict = defaultdict(list)
 _reset_attempts: dict = defaultdict(list)
+# Per-email verification failure tracking: {email: (fail_count, first_fail_time)}
+_verify_email_failures: dict[str, tuple[int, float]] = {}
 
 
 def _get_client_ip(request: Request) -> str:
@@ -292,7 +296,7 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
         await db.delete(existing)
         await db.flush()
 
-    verification_code = f"{secrets.randbelow(1_000_000):06d}"
+    verification_code = f"{secrets.randbelow(100_000_000):08d}"
     code_hash = hash_password(verification_code)
     code_expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=24)
 
@@ -807,11 +811,24 @@ async def verify_email(
     http_req: Request,
     db: DbDep,
 ):
-    """Validate the 6-digit code and mark the user's email as verified.
+    """Validate the 8-digit code and mark the user's email as verified.
     No auth cookie required — uses email + code for identification."""
     await _rate_check_db(_get_client_ip(http_req), "verify", _MAX_VERIFY, db)
 
     email = body.email.strip().lower()
+
+    # Per-email brute-force protection: lock after N failed attempts
+    now_mono = time.monotonic()
+    fail_count, first_fail = _verify_email_failures.get(email, (0, 0.0))
+    if fail_count >= _MAX_VERIFY_PER_EMAIL:
+        if now_mono - first_fail < _VERIFY_LOCKOUT_SECS:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail="Too many failed attempts. Please wait 15 minutes before trying again.",
+            )
+        # Lockout expired — reset
+        _verify_email_failures.pop(email, None)
+
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
 
@@ -835,10 +852,19 @@ async def verify_email(
         )
 
     if not verify_password(body.code.strip(), user.email_verification_code):
+        # Track per-email failure
+        prev_count, prev_first = _verify_email_failures.get(email, (0, 0.0))
+        if prev_count == 0:
+            _verify_email_failures[email] = (1, now_mono)
+        else:
+            _verify_email_failures[email] = (prev_count + 1, prev_first)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid code. Please try again.",
         )
+
+    # Success — clear failure tracking for this email
+    _verify_email_failures.pop(email, None)
 
     user.email_verified = True
     user.email_verification_code = None
@@ -862,7 +888,7 @@ async def resend_verification(
     http_req: Request,
     db: DbDep,
 ):
-    """Generate a fresh 6-digit code and resend the verification email.
+    """Generate a fresh 8-digit code and resend the verification email.
     No auth cookie required — uses email for identification."""
     await _rate_check_db(_get_client_ip(http_req), "resend", _MAX_RESEND, db)
 
@@ -874,7 +900,7 @@ async def resend_verification(
     if not user or getattr(user, "email_verified", True):
         return {"message": "If that email is pending verification, a new code has been sent."}
 
-    verification_code = f"{secrets.randbelow(1_000_000):06d}"
+    verification_code = f"{secrets.randbelow(100_000_000):08d}"
     code_hash = hash_password(verification_code)
     code_expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=24)
 

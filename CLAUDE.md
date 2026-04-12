@@ -245,9 +245,11 @@ Temporary brands (brand_type=pitch) expire 30 days after creation. Auto-cleaned 
 
 | Time | Frequency | Job |
 |------|-----------|-----|
-| 02:00 | Daily | Reddit scanner + SQLite backup |
-| 02:30 | Daily | Quora scanner |
-| 03:00 | Weekly (Mon) | Auto-draft generation |
+| 02:00 | Daily | SQLite backup |
+| 03:15 | Weekly (Mon) | Reddit opportunity scanner |
+| 03:30 | Weekly (Mon) | Quora opportunity scanner |
+| 03:40 | Weekly (Mon) | LinkedIn opportunity scanner (Pro only) |
+| 03:50 | Weekly (Mon) | X opportunity scanner (Pro only) |
 | 04:00 | Monthly (1st) | Website context refresh via Jina |
 | 06:00 | Daily | Pitch expiry warnings & cleanup |
 | 08:00 | Daily | Morning visibility tracking sweep |

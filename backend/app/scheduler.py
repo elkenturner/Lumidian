@@ -7,11 +7,10 @@ Jobs:
   • 03:30 UTC Mon    — Quora opportunity scanner (weekly)
   • 03:40 UTC Mon    — LinkedIn opportunity scanner (weekly)
   • 03:50 UTC Mon    — X opportunity scanner (weekly)
-  • 03:00 UTC Mon    — Auto-draft scheduler (weekly on Monday)
   • 04:00 UTC, day 1 — Monthly website context refresh via Jina Reader
   • 06:00 UTC        — Pitch brand expiry: warn users 24 h before expiry, delete expired brands
   • 08:00 UTC        — Morning tracking sweep (once daily)
-  • 21:00 UTC        — Visibility drop alerts (email if score drops ≥ 15 pts vs previous run)
+  • 21:00 UTC        — Visibility drop alerts (email if score drops ≥ 10 pts vs previous run)
 
 Pitch brand lifecycle:
   - Created with pitch_expires_at = now + 30 days
@@ -305,63 +304,6 @@ async def _x_scanner_sweep() -> None:
     logger.info("Scheduler: weekly X scanner sweep complete")
 
 
-async def _auto_draft_sweep() -> None:
-    """
-    Weekly auto-draft job (03:00 UTC, Monday).
-    Skipped when the scheduler is paused.
-
-    Generates fresh drafts for every brand that has at least one enabled
-    platform in BrandContentSettings.
-    """
-    if await _is_scheduler_paused():
-        logger.info("Scheduler paused — skipping auto-draft sweep")
-        return
-
-    from sqlalchemy import select
-
-    from app.database import AsyncSessionLocal
-    from app.models import Brand, BrandContentSettings
-
-    logger.info("Scheduler: starting weekly auto-draft sweep")
-
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Brand))
-        brands = result.scalars().all()
-
-    paused_user_ids = await _get_paused_user_ids()
-
-    for brand in brands:
-        # Skip paused brands
-        if _is_brand_paused(brand, paused_user_ids):
-            logger.info(
-                "Scheduler: skipping paused brand %d (%s) in auto-draft sweep",
-                brand.id, brand.name,
-            )
-            continue
-
-        try:
-            async with AsyncSessionLocal() as db:
-                settings_result = await db.execute(
-                    select(BrandContentSettings).where(
-                        BrandContentSettings.brand_id == brand.id,
-                        BrandContentSettings.enabled == True,
-                    )
-                )
-                has_enabled = settings_result.scalars().first() is not None
-
-            if not has_enabled:
-                continue
-
-            logger.info("Scheduler: auto-drafting for brand %d (%s)", brand.id, brand.name)
-            asyncio.create_task(
-                _safe_auto_draft(brand.id),
-                name=f"auto-draft-{brand.id}",
-            )
-        except Exception:
-            logger.exception("Scheduler: auto-draft sweep error for brand %d", brand.id)
-
-    logger.info("Scheduler: auto-draft sweep dispatched")
-
 
 async def _sqlite_backup_sweep() -> None:
     """
@@ -490,26 +432,6 @@ async def _website_context_refresh_sweep() -> None:
 
     logger.info("Scheduler: website context refresh sweep complete")
 
-
-async def _safe_auto_draft(brand_id: int) -> None:
-    """
-    Weekly auto-draft wrapper. Deletes all existing 'draft' status drafts for
-    the brand before generating new ones (weekly refresh). Drafts in 'approved'
-    or 'posted' status are never touched.
-    """
-    from app.database import AsyncSessionLocal
-    from app.services.drafting_service import auto_draft_top_gaps
-
-    try:
-        async with AsyncSessionLocal() as db:
-            # clear_existing=True: weekly scheduler replaces pending drafts with fresh ones
-            drafts = await auto_draft_top_gaps(db=db, brand_id=brand_id, max_gaps=20, clear_existing=True, source="scheduled")
-        logger.info(
-            "Scheduler: auto-draft created %d drafts for brand_id=%d (weekly refresh)",
-            len(drafts), brand_id,
-        )
-    except Exception:
-        logger.exception("Scheduler: auto-draft failed for brand_id=%d", brand_id)
 
 
 async def _visibility_alert_sweep() -> None:
@@ -757,15 +679,6 @@ def start_scheduler() -> None:
         trigger=CronTrigger(day_of_week="mon", hour=3, minute=50, timezone="UTC"),
         id="x_scanner",
         name="X opportunity scanner (Monday 03:50 UTC)",
-        replace_existing=True,
-        misfire_grace_time=3600,
-    )
-
-    scheduler.add_job(
-        _auto_draft_sweep,
-        trigger=CronTrigger(day_of_week="mon", hour=3, minute=0, timezone="UTC"),
-        id="auto_draft",
-        name="Auto-draft scheduler (Monday 03:00 UTC)",
         replace_existing=True,
         misfire_grace_time=3600,
     )

@@ -57,12 +57,12 @@ from app.services.drafting_service import (
     get_draft_cap,
 )
 
-SCHEDULED_CAP = 20  # max approved/scheduled drafts queued at once (pro tier default)
+SCHEDULED_CAP = 100  # max approved/scheduled drafts queued at once (pro tier default)
 
 TIER_SCHEDULED_CAPS: dict[str | None, int] = {
-    None: 5, "": 5,
-    "starter": 10,
-    "pro": 20,
+    None: 10, "": 10,
+    "starter": 50,
+    "pro": 100,
 }
 
 logger = logging.getLogger(__name__)
@@ -378,9 +378,9 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
             )
             sched_count = sched_count_result.scalar_one_or_none() or 0
             brand_obj = await get_brand_for_user(draft.brand_id, db, user)
-            sched_cap = TIER_SCHEDULED_CAPS.get(user.subscription_tier, 5) if not user.is_admin else SCHEDULED_CAP
+            sched_cap = TIER_SCHEDULED_CAPS.get(user.subscription_tier, 10) if not user.is_admin else SCHEDULED_CAP
             if getattr(brand_obj, "brand_type", "standard") == "pitch":
-                sched_cap = 5
+                sched_cap = 10
             if sched_count >= sched_cap:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
@@ -614,9 +614,9 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
 
     tier = user.subscription_tier
     tier_draft_cap = get_draft_cap(tier, brand_obj.brand_type) if not user.is_admin else DRAFT_CAP
-    tier_sched_cap = TIER_SCHEDULED_CAPS.get(tier, 5) if not user.is_admin else SCHEDULED_CAP
+    tier_sched_cap = TIER_SCHEDULED_CAPS.get(tier, 10) if not user.is_admin else SCHEDULED_CAP
     if is_pitch:
-        tier_sched_cap = 5
+        tier_sched_cap = 10
 
     return {
         "draft_count": draft_count,

@@ -15,6 +15,7 @@ import {
   Loader2,
   Globe,
   Link2,
+  PauseCircle,
 } from 'lucide-react';
 import { logError } from '@/lib/utils/errors';
 import {
@@ -398,6 +399,7 @@ export default function DashboardPage() {
   const score = latestRun?.overall_score ?? null;
   const isRunning = activeRunId !== null || latestRun?.status === 'running' || latestRun?.status === 'pending' || globalReportRunning || (newBrandMode && newBrandStep !== 'done');
   const isFirstRun = isRunning && !analytics?.total_responses_analyzed && trends.length === 0;
+  const isSubscriptionPaused = !!user?.subscription_status && !['active', 'trialing'].includes(user.subscription_status);
 
   const sparkData = trends.map((p) => ({
     ...p,
@@ -630,6 +632,7 @@ export default function DashboardPage() {
         triggering={triggering}
         isRunning={isRunning}
         isAtRunLimit={isAtRunLimit}
+        isSubscriptionPaused={isSubscriptionPaused}
         onOpenPromptModal={() => setPromptModalOpen(true)}
         onRefresh={() => selectedBrandId && loadData(selectedBrandId)}
         onRunReport={handleRunReport}
@@ -684,14 +687,24 @@ export default function DashboardPage() {
               <p className="text-sm text-[var(--text-muted)] mb-6 leading-relaxed">
                 Run your first AI visibility report to see how often your brand appears across ChatGPT, Claude, Perplexity, and Gemini.
               </p>
-              <button
-                onClick={handleRunReport}
-                disabled={triggering || isRunning}
-                className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-6 py-3 text-sm font-semibold transition-colors shadow-lg shadow-[var(--accent)]/25"
-              >
-                {triggering || isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                {isRunning ? 'Running...' : 'Run First Report'}
-              </button>
+              {isSubscriptionPaused ? (
+                <Link
+                  href="/settings/billing"
+                  className="flex items-center gap-2 bg-[#7f1d1d]/20 border border-[#991b1b]/40 text-[var(--danger-text)] hover:bg-[#7f1d1d]/30 rounded-lg px-6 py-3 text-sm font-semibold transition-colors"
+                >
+                  <PauseCircle size={14} />
+                  Upgrade to Run Reports
+                </Link>
+              ) : (
+                <button
+                  onClick={handleRunReport}
+                  disabled={triggering || isRunning}
+                  className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-6 py-3 text-sm font-semibold transition-colors shadow-lg shadow-[var(--accent)]/25"
+                >
+                  {triggering || isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                  {isRunning ? 'Running...' : 'Run First Report'}
+                </button>
+              )}
             </div>
           )}
 

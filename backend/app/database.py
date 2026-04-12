@@ -315,6 +315,14 @@ async def run_migrations():
         "ALTER TABLE account_connections ADD COLUMN user_id INTEGER REFERENCES users(id) ON DELETE CASCADE",
         # 2026-04-10: Add password_changed_at for session invalidation after password change
         "ALTER TABLE users ADD COLUMN password_changed_at DATETIME",
+        # 2026-04-11: Persistent rate limiting — survives container restarts
+        """CREATE TABLE IF NOT EXISTS rate_limits (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            key TEXT NOT NULL,
+            endpoint TEXT NOT NULL,
+            created_at REAL NOT NULL
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_rate_limits_key_endpoint ON rate_limits(key, endpoint, created_at)",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

@@ -194,6 +194,15 @@ async def _background_run_with_id(run_id: int, brand_id: int) -> None:
         logger.exception(
             "Manual tracking run %d failed for brand %d", run_id, brand_id
         )
+        # Mark the run as failed so it doesn't block future runs forever
+        try:
+            async with AsyncSessionLocal() as err_db:
+                run = await err_db.get(TrackingRun, run_id)
+                if run and run.status in ("pending", "running"):
+                    run.status = "failed"
+                    await err_db.commit()
+        except Exception:
+            logger.exception("Failed to mark run %d as failed", run_id)
 
 
 async def _log_run_events(

@@ -212,9 +212,9 @@ JWT issued with 7-day expiry, stored in httpOnly `clarity_token` cookie. Compani
 ### Tier-Based Query Counts
 | Tier | Runs per prompt per model |
 |------|--------------------------|
-| basic | 5 |
-| standard | 10 |
-| premium | 20 |
+| basic | 3 |
+| standard | 5 |
+| premium | 5 |
 
 ### Visibility Score & Mention Detection
 Score = `(queries with mention) / (total queries) × 100`. Mention detection: case-insensitive substring check (`brand_name.lower() in response.lower()`) **plus** fuzzy normalized check (lowercase + strip non-alphanumeric). `mentioned = exact OR fuzzy`. Queries with errors are excluded from the denominator.

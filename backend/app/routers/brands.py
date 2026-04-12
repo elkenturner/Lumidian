@@ -29,7 +29,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, get_data_owner_id
-from app.models import Brand, CompetitorMention, Competitor, ContentAttribution, ContentDraft, Prompt, QueryResult, TrackingRun, User
+from app.models import Brand, CompetitorMention, Competitor, ContentAttribution, ContentDraft, ContentGap, DraftAttribution, Prompt, PromptRunScore, QueryResult, TrackingRun, User
 from app.schemas import (
     BrandCreate,
     BrandDetail,
@@ -513,8 +513,13 @@ async def delete_prompt(brand_id: int, prompt_id: int, db: DbDep, user: CurrentU
             detail=f"Prompt {prompt_id} not found for brand {brand_id}",
         )
     prompt_text = prompt.text
-    # Clean up related rows that reference this prompt (no ondelete cascade)
+    # Clean up all rows that reference this prompt before deleting it.
+    # Explicit deletes avoid relying on DB-level CASCADE which may differ
+    # between SQLite schemas created at different times.
     await db.execute(sa_delete(ContentAttribution).where(ContentAttribution.prompt_id == prompt_id))
+    await db.execute(sa_delete(PromptRunScore).where(PromptRunScore.prompt_id == prompt_id))
+    await db.execute(sa_delete(ContentGap).where(ContentGap.prompt_id == prompt_id))
+    await db.execute(sa_delete(DraftAttribution).where(DraftAttribution.prompt_id == prompt_id))
     await db.execute(sa_delete(CompetitorMention).where(CompetitorMention.prompt_id == prompt_id))
     await db.execute(sa_delete(QueryResult).where(QueryResult.prompt_id == prompt_id))
     await db.execute(sa_delete(ContentDraft).where(ContentDraft.prompt_id == prompt_id))

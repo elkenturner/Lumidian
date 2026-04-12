@@ -8,6 +8,7 @@ import {
   Edit2,
   Copy,
   Check,
+  CheckCircle2,
 } from 'lucide-react';
 import { updateDraft, ContentDraft, BrandProfile } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
@@ -23,12 +24,14 @@ export function WikipediaDraftCard({
   draft,
   brandName,
   profile,
+  onApprove,
   onDelete,
   onSaved,
 }: {
   draft: ContentDraft;
   brandName: string;
   profile: BrandProfile | null;
+  onApprove: (id: number) => Promise<void>;
   onDelete: (id: number) => void;
   onSaved: (d: ContentDraft) => void;
 }) {
@@ -41,6 +44,7 @@ export function WikipediaDraftCard({
   const [viewMode, setViewMode] = useState<'preview' | 'raw'>('preview');
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [approving, setApproving] = useState(false);
 
   const wikiFormat = hasEdited
     ? plainToWikiFormat(plainText, originalWiki, citations, brandName)
@@ -52,6 +56,17 @@ export function WikipediaDraftCard({
   function handlePlainChange(val: string) {
     setPlainText(val);
     setHasEdited(true);
+  }
+
+  async function handleApproveClick() {
+    setApproving(true);
+    try {
+      await onApprove(draft.id);
+    } catch {
+      // onApprove may re-throw on unexpected errors; spinner still clears via finally
+    } finally {
+      setApproving(false);
+    }
   }
 
   async function handleCopy() {
@@ -224,8 +239,17 @@ export function WikipediaDraftCard({
               Edit
             </button>
             <button
+              onClick={handleApproveClick}
+              disabled={approving}
+              className="flex items-center gap-1.5 text-xs bg-[color-mix(in_srgb,var(--success)_10%,transparent)] hover:bg-[color-mix(in_srgb,var(--success)_15%,transparent)] disabled:opacity-50 border border-[color-mix(in_srgb,var(--success)_25%,transparent)] text-[var(--success)] rounded-lg px-3 py-1.5 transition-colors"
+            >
+              {approving ? <Loader2 size={11} className="animate-spin" /> : <CheckCircle2 size={11} />}
+              {approving ? 'Approving…' : 'Approve'}
+            </button>
+            <button
               onClick={() => onDelete(draft.id)}
-              className="flex items-center gap-1.5 text-xs text-[var(--text-faint)] hover:text-[var(--danger)] rounded-lg px-3 py-1.5 transition-colors ml-auto"
+              disabled={approving}
+              className="flex items-center gap-1.5 text-xs text-[var(--text-faint)] hover:text-[var(--danger)] disabled:opacity-50 rounded-lg px-3 py-1.5 transition-colors ml-auto"
             >
               <Trash2 size={11} />
               Dismiss

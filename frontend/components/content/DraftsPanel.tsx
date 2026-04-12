@@ -128,6 +128,7 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
                 draft={d}
                 brandName={brandName}
                 profile={brandProfile}
+                onApprove={handleApprove}
                 onDelete={handleDelete}
                 onSaved={handleSaved}
               />

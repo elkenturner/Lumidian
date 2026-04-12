@@ -384,7 +384,7 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
             if sched_count >= sched_cap:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail=f"Scheduled queue is full ({sched_cap}/{sched_cap}). Mark some drafts as posted before approving more.",
+                    detail=f"Saved drafts queue is full ({sched_cap}/{sched_cap}). Mark some drafts as posted before approving more.",
                 )
             now = utcnow()
             draft.approved_at = now
@@ -482,6 +482,70 @@ async def delete_draft(draft_id: int, db: DbDep, user: CurrentUser):
         {"draft_id": draft_id, "platform": platform, "time_since_created_seconds": secs},
         brand_id=brand_id,
     )
+
+
+# ── Bulk approve ─────────────────────────────────────────────────────────────
+
+@router.post("/{brand_id}/drafts/approve-all")
+async def approve_all_drafts(
+    brand_id: int,
+    db: DbDep,
+    user: CurrentUser,
+    platform: str | None = Query(None, description="Only approve drafts for this platform"),
+):
+    """Bulk-approve all drafts (optionally filtered by platform) up to the tier cap."""
+    from sqlalchemy import func as sqlfunc
+
+    brand_obj = await get_brand_for_user(brand_id, db, user)
+
+    # Current scheduled count
+    sched_count_result = await db.execute(
+        select(sqlfunc.count(ContentDraft.id)).where(
+            ContentDraft.brand_id == brand_id,
+            ContentDraft.status == "approved",
+        )
+    )
+    sched_count = sched_count_result.scalar_one_or_none() or 0
+    sched_cap = TIER_SCHEDULED_CAPS.get(user.subscription_tier, 10) if not user.is_admin else SCHEDULED_CAP
+    if getattr(brand_obj, "brand_type", "standard") == "pitch":
+        sched_cap = 10
+
+    available = max(0, sched_cap - sched_count)
+    if available == 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Saved drafts queue is full ({sched_cap}/{sched_cap}). Mark some drafts as posted before approving more.",
+        )
+
+    # Fetch pending drafts
+    q = select(ContentDraft).where(
+        ContentDraft.brand_id == brand_id,
+        ContentDraft.status == "draft",
+    ).order_by(ContentDraft.created_at)
+    if platform:
+        q = q.where(ContentDraft.platform == platform)
+    result = await db.execute(q)
+    pending = list(result.scalars().all())
+
+    now = utcnow()
+    approved_count = 0
+    for draft in pending:
+        if approved_count >= available:
+            break
+        draft.status = "approved"
+        draft.approved_at = now
+        secs = int((now - draft.created_at).total_seconds()) if draft.created_at else None
+        draft.time_to_approve_seconds = secs
+        approved_count += 1
+
+    await db.commit()
+
+    skipped = len(pending) - approved_count
+    return {
+        "approved": approved_count,
+        "skipped": skipped,
+        "reason": f"Cap reached ({sched_cap})" if skipped > 0 else None,
+    }
 
 
 # ── Generate now (auto-draft top gaps) ───────────────────────────────────────

@@ -439,6 +439,7 @@ export async function updateDraft(
   data: { title?: string; content_text?: string; status?: string }
 ): Promise<ContentDraft> {
   const res = await api.put<ContentDraft>(`/content/draft/${draftId}`, data);
+  invalidateCache('/content/');
   return res.data;
 }
 
@@ -452,6 +453,18 @@ export async function postDraft(
 
 export async function deleteDraft(draftId: number): Promise<void> {
   await api.delete(`/content/draft/${draftId}`);
+  invalidateCache('/content/');
+}
+
+export async function approveAllDrafts(
+  brandId: number,
+  platform?: string
+): Promise<{ approved: number; skipped: number; reason: string | null }> {
+  const params: Record<string, string> = {};
+  if (platform && platform !== 'all') params.platform = platform;
+  const res = await api.post(`/content/${brandId}/drafts/approve-all`, null, { params });
+  invalidateCache('/content/');
+  return res.data;
 }
 
 export async function getContentSettings(brandId: number): Promise<BrandContentSettings[]> {

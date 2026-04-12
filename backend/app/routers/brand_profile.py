@@ -14,6 +14,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -163,7 +164,15 @@ async def update_brand_profile(brand_id: int, payload: BrandProfileUpdate, db: D
     if payload.publications is not None:
         profile.publications = json.dumps([p.model_dump() for p in payload.publications])
 
-    await db.commit()
+    try:
+        await db.commit()
+    except OperationalError as exc:
+        if "database is locked" in str(exc):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="A background task is running. Please wait a moment and try again.",
+            ) from exc
+        raise
     await db.refresh(profile)
     return _profile_to_response(profile)
 

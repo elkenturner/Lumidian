@@ -121,8 +121,6 @@ export default function DashboardPage() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Pending single-prompt mini-runs: promptId → runId
-  const [pendingRuns, setPendingRuns] = useState<Map<number, number>>(new Map());
-  const pendingPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // UI state
   const [expandedPromptId, setExpandedPromptId] = useState<number | null>(null);
@@ -215,56 +213,6 @@ export default function DashboardPage() {
     onRefresh: handlePullRefresh,
     disabled: !isMobile || !selectedBrandId,
   });
-
-  // Load pending prompt mini-runs from localStorage on mount
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const key = 'pendingPromptRuns';
-    try {
-      const stored: Array<{ promptId: number; runId: number }> = JSON.parse(localStorage.getItem(key) ?? '[]');
-      if (stored.length > 0) {
-        setPendingRuns(new Map(stored.map(({ promptId, runId }) => [promptId, runId])));
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  // Poll pending mini-runs every 3s; refresh data and clean up when completed
-  useEffect(() => {
-    if (pendingRuns.size === 0) {
-      if (pendingPollRef.current) clearInterval(pendingPollRef.current);
-      return;
-    }
-    pendingPollRef.current = setInterval(async () => {
-      const completed: number[] = [];
-      await Promise.all(
-        Array.from(pendingRuns.entries()).map(async ([promptId, runId]) => {
-          try {
-            const run = await getRunStatus(runId);
-            if (run.status === 'completed' || run.status === 'failed') {
-              completed.push(promptId);
-            }
-          } catch { /* ignore */ }
-        })
-      );
-      if (completed.length > 0) {
-        setPendingRuns((prev) => {
-          const next = new Map(prev);
-          for (const pid of completed) next.delete(pid);
-          return next;
-        });
-        if (typeof window !== 'undefined') {
-          const key = 'pendingPromptRuns';
-          try {
-            const stored: Array<{ promptId: number; runId: number }> = JSON.parse(localStorage.getItem(key) ?? '[]');
-            const updated = stored.filter(({ promptId }) => !completed.includes(promptId));
-            localStorage.setItem(key, JSON.stringify(updated));
-          } catch { /* ignore */ }
-        }
-        if (selectedBrandId) loadData(selectedBrandId);
-      }
-    }, 3000);
-    return () => { if (pendingPollRef.current) clearInterval(pendingPollRef.current); };
-  }, [pendingRuns, selectedBrandId, loadData]);
 
   // Detect new brand onboarding flow
   useEffect(() => {

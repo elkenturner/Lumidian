@@ -414,6 +414,35 @@ async def cancel_subscription(
     return {"message": "Subscription will be canceled at the end of the current billing period"}
 
 
+# ── Brand upgrade helper (idempotent) ────────────────────────────────────────
+
+async def _upgrade_brands_for_tier(db: AsyncSession, user_id: int, tier: str) -> None:
+    """Upgrade a user's brands to match their subscription tier.
+
+    Idempotent — safe to call from multiple webhook events.
+    """
+    from sqlalchemy import update as sa_update
+
+    from app.models import Brand
+
+    if tier == "pro":
+        result = await db.execute(
+            sa_update(Brand)
+            .where(Brand.user_id == user_id, Brand.brand_type.in_(["standard", "pitch"]))
+            .values(brand_type="pro", prompt_limit=100)
+        )
+        if result.rowcount > 0:
+            logger.info("Auto-upgraded %d brand(s) to pro for user %d", result.rowcount, user_id)
+    elif tier == "starter":
+        result = await db.execute(
+            sa_update(Brand)
+            .where(Brand.user_id == user_id, Brand.brand_type == "pitch")
+            .values(brand_type="standard", prompt_limit=25)
+        )
+        if result.rowcount > 0:
+            logger.info("Auto-upgraded %d pitch brand(s) to standard for user %d", result.rowcount, user_id)
+
+
 # ── Webhook ───────────────────────────────────────────────────────────────────
 
 @router.post("/webhook")
@@ -488,6 +517,12 @@ async def stripe_webhook(request: Request, db: DbDep):
             if changed:
                 user.updated_at = utcnow()
             await db.flush()
+            # Upgrade brands to match the new tier (idempotent).
+            # This must happen here because checkout.session.completed fires
+            # before customer.subscription.created — if we only upgrade in
+            # the subscription handler, it sees old_tier == tier and skips.
+            if tier:
+                await _upgrade_brands_for_tier(db, user.id, tier)
             logger.info(
                 "checkout.session.completed for user %s (customer=%s, subscription=%s)",
                 user.email, customer_id, sub_id,
@@ -531,37 +566,10 @@ async def stripe_webhook(request: Request, db: DbDep):
                     {"old_plan": old_tier, "new_plan": tier},
                     user_id=user.id,
                 )
-            # Auto-upgrade brands when user upgrades their subscription
-            if tier == "pro" and tier != old_tier:
-                from sqlalchemy import update as sa_update
-
-                from app.models import Brand
-                # Upgrade standard AND pitch brands to pro
-                upgrade_result = await db.execute(
-                    sa_update(Brand)
-                    .where(Brand.user_id == user.id, Brand.brand_type.in_(["standard", "pitch"]))
-                    .values(brand_type="pro", prompt_limit=100)
-                )
-                if upgrade_result.rowcount > 0:
-                    logger.info(
-                        "Auto-upgraded %d brand(s) to pro for user %d",
-                        upgrade_result.rowcount, user.id,
-                    )
-            elif tier == "starter" and old_tier in (None, ""):
-                from sqlalchemy import update as sa_update
-
-                from app.models import Brand
-                # Upgrade pitch brands to standard on starter plan
-                upgrade_result = await db.execute(
-                    sa_update(Brand)
-                    .where(Brand.user_id == user.id, Brand.brand_type == "pitch")
-                    .values(brand_type="standard", prompt_limit=25)
-                )
-                if upgrade_result.rowcount > 0:
-                    logger.info(
-                        "Auto-upgraded %d pitch brand(s) to standard for user %d",
-                        upgrade_result.rowcount, user.id,
-                    )
+            # Upgrade brands to match tier (idempotent — safe even if
+            # checkout.session.completed already handled this).
+            if tier:
+                await _upgrade_brands_for_tier(db, user.id, tier)
 
     elif event_type == "customer.subscription.deleted":
         customer_id = data_obj.get("customer")

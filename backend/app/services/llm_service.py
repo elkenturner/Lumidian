@@ -39,9 +39,7 @@ _PERPLEXITY_SEM = asyncio.Semaphore(2)
 _CLAUDE_SEM = asyncio.Semaphore(3)
 
 # Gemini rate-limit guard: Google returns 503 UNAVAILABLE when flooded.
-# 3 concurrent slots prevent us from overwhelming the API during tracking runs
-# (which fire 50+ queries per model). Pro models (gemini-2.5-pro) are
-# especially prone to 503s under burst traffic.
+# 3 concurrent slots prevent us from overwhelming the API during tracking runs.
 _GEMINI_SEM = asyncio.Semaphore(3)
 
 
@@ -68,7 +66,7 @@ def _api_key_placeholder(model: str) -> dict:
     }
 
 TIER_RUNS = {
-    "basic": 3,
+    "basic": 5,
     "standard": 5,
     "premium": 5,
 }
@@ -365,22 +363,16 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
 
     Retry strategy by error type:
       - rate_limit (429, quota): 65s flat backoff (wait for quota reset)
-      - overload (503, timeout): exponential backoff with jitter
-          Default models: 3 attempts, 5s → 10s → 20s
-          Pro models:     5 attempts, 10s → 20s → 40s → 80s → 120s (capped)
+      - overload (503, timeout): 3 attempts, 5s → 10s backoff + jitter
       - other: 3s flat backoff
       - api_key_not_configured / auth: no retry (permanent)
 
     If cancel_event is provided and set, retries stop immediately.
     """
     display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
-    is_pro_model = "pro" in model_version.lower() if model_version else False
-
-    # Pro models get more attempts for overload errors since they're more prone to 503s
-    effective_max = 5 if is_pro_model else max_attempts
     errors: list[str] = []
 
-    for attempt in range(1, effective_max + 1):
+    for attempt in range(1, max_attempts + 1):
         # Check for cancellation before each attempt
         if cancel_event is not None and cancel_event.is_set():
             return {"response_text": None, "mentioned": False, "latency_ms": 0, "error": "cancelled"}
@@ -412,29 +404,21 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
         error_type = _classify_error(error)
         errors.append(f"attempt {attempt}: {error}")
 
-        # Non-overload errors on a pro model: don't use extra attempts
-        if is_pro_model and error_type != "overload" and attempt >= max_attempts:
-            break
-
         # Don't sleep after the last attempt
-        if attempt < effective_max:
+        if attempt < max_attempts:
             if error_type == "rate_limit":
                 retry_delay = 65
             elif error_type == "overload":
-                if is_pro_model:
-                    # Pro: longer backoff with cap — 10s, 20s, 40s, 80s, 120s
-                    retry_delay = min(10 * (2 ** (attempt - 1)), 120)
-                else:
-                    # Default: 5s, 10s, 20s
-                    retry_delay = 5 * (2 ** (attempt - 1))
-                # Add jitter (0-25%) to avoid thundering herd
+                # 5s → 10s backoff + jitter. If the API is 503-ing,
+                # waiting longer won't help — it's a capacity issue.
+                retry_delay = 5 * (2 ** (attempt - 1))
                 retry_delay = retry_delay * (1 + random.uniform(0, 0.25))
             else:
                 retry_delay = 3
 
             logger.warning(
                 "[%s] Attempt %d/%d failed (%s, error=%r) for prompt %r — retrying in %.0fs",
-                model_key, attempt, effective_max, error_type, error, prompt[:100], retry_delay,
+                model_key, attempt, max_attempts, error_type, error, prompt[:100], retry_delay,
             )
             # Use cancellable wait instead of plain sleep
             if cancel_event is not None:

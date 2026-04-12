@@ -46,7 +46,6 @@ import {
   getSuggestedPrompts,
   getSchedulerStatus,
   setSchedulerStatus,
-  triggerPromptRun,
   getTeamMembers,
   inviteTeamMember,
   removeTeamMember,
@@ -541,20 +540,6 @@ export default function SettingsPage() {
       const prompt = await addPrompt(brandId, trimmed);
       setBrand((prev) => prev ? { ...prev, prompts: [...prev.prompts, prompt], prompt_count: prev.prompt_count + 1 } : null);
       setNewPromptText('');
-      // Fire single-prompt run in background — does not block UI
-      triggerPromptRun(brandId, prompt.id)
-        .then(({ run_id }) => {
-          // Store in localStorage so dashboard can pick up the badge state
-          if (typeof window !== 'undefined') {
-            const key = 'pendingPromptRuns';
-            const existing: Array<{ promptId: number; runId: number }> = JSON.parse(
-              localStorage.getItem(key) ?? '[]'
-            );
-            existing.push({ promptId: prompt.id, runId: run_id });
-            localStorage.setItem(key, JSON.stringify(existing));
-          }
-        })
-        .catch((err) => console.warn('[Settings] Prompt mini-run failed to start:', err));
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
       setSaveError(e?.response?.data?.detail || 'Failed to add prompt.');

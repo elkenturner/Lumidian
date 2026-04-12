@@ -213,7 +213,7 @@ async def run_gap_analysis(brand_id: int, run_id: int) -> list[int]:
                 recency_score = 100.0  # Never had content → highest urgency
             else:
                 from datetime import timedelta
-                days_since = (_utcnow() - last_content).days
+                days_since = max(0, (_utcnow() - last_content).days)
                 # Caps at 30 days = score of 100
                 recency_score = min(100.0, days_since / 30.0 * 100.0)
 

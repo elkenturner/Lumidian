@@ -591,13 +591,12 @@ async def run_tracking(
                 )
                 owner = user_result.scalar_one_or_none()
                 if owner:
-                    final_score = (overall_mentions / overall_queries * 100.0) if overall_queries > 0 else 0.0
                     send_email_background(
                         send_report_ready_email,
                         email=owner.email,
                         name=owner.name,
                         brand_name=brand_name,
-                        overall_score=round(final_score, 1),
+                        overall_score=round(overall_score, 1),
                         run_id=run_id,
                     )
     except Exception as exc:

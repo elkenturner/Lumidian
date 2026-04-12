@@ -41,6 +41,7 @@ import {
   dismissOpportunity,
   draftOpportunity,
   generateNow,
+  approveAllDrafts,
   getDraftStatus,
   getDraftStatusFresh,
   getBrandProfile,
@@ -1784,7 +1785,7 @@ export default function ContentHubPage() {
 
   async function handleApprove(id: number) {
     if (draftStatus?.scheduled_queue_full) {
-      alert(`Scheduled queue is full (${draftStatus.scheduled_cap}/${draftStatus.scheduled_cap}). Mark some drafts as posted before approving more.`);
+      alert(`Saved drafts queue is full (${draftStatus.scheduled_cap}/${draftStatus.scheduled_cap}). Mark some drafts as posted before approving more.`);
       return;
     }
     try {
@@ -1794,13 +1795,32 @@ export default function ContentHubPage() {
       const rawDetail = err?.response?.data?.detail;
       const detail = typeof rawDetail === 'string' ? rawDetail : '';
       if (detail.includes('queue is full') || err?.response?.status === 409) {
-        alert(detail || 'Scheduled queue is full. Mark some drafts as posted first.');
+        alert(detail || 'Saved drafts queue is full. Mark some drafts as posted first.');
         return;
       }
       throw e;
     }
     if (selectedBrandId) loadAll(selectedBrandId);
     setToast({ message: 'Draft approved', type: 'success' });
+  }
+
+  async function handleApproveAll() {
+    if (!selectedBrandId) return;
+    const platform = draftPlatformFilter !== 'all' ? draftPlatformFilter : undefined;
+    const count = visibleDraftItems.length;
+    if (!confirm(`Approve ${count} draft${count !== 1 ? 's' : ''}?`)) return;
+    try {
+      const result = await approveAllDrafts(selectedBrandId, platform);
+      loadAll(selectedBrandId);
+      const msg = result.skipped > 0
+        ? `${result.approved} approved, ${result.skipped} skipped (queue cap reached)`
+        : `${result.approved} draft${result.approved !== 1 ? 's' : ''} approved`;
+      setToast({ message: msg, type: 'success' });
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      const detail = typeof err?.response?.data?.detail === 'string' ? err.response.data.detail : 'Failed to approve drafts';
+      setToast({ message: detail, type: 'error' });
+    }
   }
 
   async function handleMarkAsPosted(id: number) {
@@ -2085,7 +2105,7 @@ export default function ContentHubPage() {
   const TABS: { key: QueueTab; label: string }[] = [
     ...(oppScanEnabled ? [{ key: 'opportunities' as QueueTab, label: 'Live Opportunities' }] : []),
     { key: 'drafts', label: 'Drafts' },
-    { key: 'scheduled', label: 'Scheduled' },
+    { key: 'scheduled', label: 'Saved Drafts' },
     { key: 'posted', label: 'Posted' },
   ];
 
@@ -2126,7 +2146,7 @@ export default function ContentHubPage() {
             <li><span className="text-[var(--text-primary)] font-medium">Regenerate Drafts</span> — replaces all existing drafts with a fresh batch across your tracked prompts and platforms.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Live Opportunities</span> tab updates daily as Reddit and Quora are scanned overnight for threads matching your tracked prompts.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Drafts tab</span> — review, edit, and approve AI drafts before they go live.</li>
-            <li><span className="text-[var(--text-primary)] font-medium">Scheduled tab</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
+            <li><span className="text-[var(--text-primary)] font-medium">Saved Drafts tab</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Live Opportunities</span> — Reddit threads and Quora questions where a thoughtful reply could improve your brand&apos;s visibility.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Posted tab</span> — content that has been marked as posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Brand Settings</span> — control which platforms generate drafts and how frequently.</li>
@@ -2519,6 +2539,7 @@ export default function ContentHubPage() {
               pinnedDraftId={pinnedDraftId}
               handleGenerateNow={handleGenerateNow}
               handleApprove={handleApprove}
+              handleApproveAll={handleApproveAll}
               handleDelete={handleDelete}
               handleSaved={handleSaved}
               handleMarkAsPosted={handleMarkAsPosted}
@@ -2642,7 +2663,7 @@ export default function ContentHubPage() {
                   <>
                     {([
                       { label: 'Drafts', count: draftStatus.draft_count, cap: draftStatus.draft_cap },
-                      { label: 'Scheduled', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
+                      { label: 'Saved Drafts', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
                     ] as Array<{ label: string; count: number; cap: number }>).map(({ label, count, cap }) => {
                       const pct = cap > 0 ? count / cap : 0;
                       const barColor = 'var(--accent)';

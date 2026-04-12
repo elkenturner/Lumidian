@@ -73,6 +73,8 @@ export interface ContentTabPanelsProps {
   user: { subscription_tier?: string | null; is_admin?: boolean } | null;
   // Request Draft
   onRequestDraft?: () => void;
+  // Bulk actions
+  handleApproveAll?: () => Promise<void>;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

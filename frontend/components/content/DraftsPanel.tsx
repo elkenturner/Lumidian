@@ -7,6 +7,7 @@ import {
   Loader2,
   Zap,
   RefreshCw,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   EmptyState,
@@ -23,7 +24,7 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
     brands, selectedBrandId, draftItems, _disabledPlatforms, draftPlatformFilter,
     setDraftPlatformFilter, visibleDraftItems, pinnedDraftId, brandProfile, brandPrompts,
     postedItems, draftStatus, generating, reportRunning, handleGenerateNow, handleApprove,
-    handleDelete, handleSaved, setDraftItems, user, onRequestDraft,
+    handleDelete, handleSaved, setDraftItems, user, onRequestDraft, handleApproveAll,
   } = props;
 
   const selectedBrand = brands.find((b) => b.id === selectedBrandId);
@@ -56,15 +57,26 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
           ))}
         </div>
       ) : <div />}
-      {canRequestDraft && (
-        <button
-          onClick={onRequestDraft}
-          className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--accent-foreground)] transition-colors"
-        >
-          <span className="w-5 h-5 rounded-md bg-[rgba(95,126,166,0.08)] border border-[rgba(95,126,166,0.15)] flex items-center justify-center text-[var(--accent-foreground)]">+</span>
-          New draft
-        </button>
-      )}
+      <div className="flex items-center gap-3">
+        {handleApproveAll && visibleDraftItems.length > 0 && (
+          <button
+            onClick={handleApproveAll}
+            className="flex items-center gap-1.5 text-xs text-[var(--success)] hover:text-[color-mix(in_srgb,var(--success)_80%,white)] transition-colors"
+          >
+            <CheckCircle2 size={13} />
+            Approve All{draftPlatformFilter !== 'all' ? ` ${PLATFORM_DISPLAY[draftPlatformFilter] ?? draftPlatformFilter}` : ''}
+          </button>
+        )}
+        {canRequestDraft && (
+          <button
+            onClick={onRequestDraft}
+            className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--accent-foreground)] transition-colors"
+          >
+            <span className="w-5 h-5 rounded-md bg-[rgba(95,126,166,0.08)] border border-[rgba(95,126,166,0.15)] flex items-center justify-center text-[var(--accent-foreground)]">+</span>
+            New draft
+          </button>
+        )}
+      </div>
     </div>
   );
 
@@ -112,7 +124,7 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
       <div className="flex items-start gap-2 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg px-3 py-2.5">
         <RefreshCw size={12} className="text-[var(--text-faint)] flex-shrink-0 mt-0.5" />
         <p className="text-xs text-[var(--text-faint)]">
-          Unreviewed drafts are replaced when new drafts are generated. Move anything you want to keep to <span className="text-[var(--text-secondary)]">Scheduled</span> first.
+          Unreviewed drafts are replaced when new drafts are generated. Move anything you want to keep to <span className="text-[var(--text-secondary)]">Saved Drafts</span> first.
         </p>
       </div>
       <motion.div

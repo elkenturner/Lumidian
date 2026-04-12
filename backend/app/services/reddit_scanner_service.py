@@ -12,6 +12,7 @@ scan_all_brands()                  -> None  (runs for every brand)
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import math
 import os
@@ -202,6 +203,7 @@ async def _haiku_relevance_check(
             msg = await client.messages.create(
                 model="claude-haiku-4-5-20251001",
                 max_tokens=5,
+                timeout=10.0,
                 messages=[{"role": "user", "content": prompt}],
             )
             text = msg.content[0].text if msg.content else ""
@@ -486,27 +488,58 @@ async def _search_reddit_posts(
         )
         return []
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            resp = await client.post(
-                _SERPER_URL,
-                headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
-                json={"q": f"{query} reddit", "num": 25},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-    except httpx.HTTPStatusError as exc:
+    _TRANSIENT_CODES = {429, 500, 502, 503}
+    _MAX_ATTEMPTS = 2
+    _RETRY_DELAY = 2.0  # seconds
+
+    data = None
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
-            error_body = exc.response.json()
-        except Exception:
-            error_body = exc.response.text
-        logger.error(
-            "reddit_search: HTTP %s from Serper — %s",
-            exc.response.status_code, error_body,
-        )
-        return []
-    except Exception as exc:
-        logger.error("reddit_search: request failed — %s", exc)
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.post(
+                    _SERPER_URL,
+                    headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
+                    json={"q": f"{query} reddit", "num": 25},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                break  # success
+        except httpx.HTTPStatusError as exc:
+            status_code = exc.response.status_code
+            try:
+                error_body = exc.response.json()
+            except Exception:
+                error_body = exc.response.text
+
+            if status_code in _TRANSIENT_CODES and attempt < _MAX_ATTEMPTS:
+                logger.warning(
+                    "reddit_search: HTTP %s from Serper (attempt %d/%d), retrying in %.0fs — %s",
+                    status_code, attempt, _MAX_ATTEMPTS, _RETRY_DELAY, error_body,
+                )
+                await asyncio.sleep(_RETRY_DELAY)
+                continue
+
+            logger.error(
+                "reddit_search: HTTP %s from Serper (attempt %d/%d, giving up) — %s",
+                status_code, attempt, _MAX_ATTEMPTS, error_body,
+            )
+            return []
+        except Exception as exc:
+            if attempt < _MAX_ATTEMPTS:
+                logger.warning(
+                    "reddit_search: request failed (attempt %d/%d), retrying in %.0fs — %s",
+                    attempt, _MAX_ATTEMPTS, _RETRY_DELAY, exc,
+                )
+                await asyncio.sleep(_RETRY_DELAY)
+                continue
+
+            logger.error(
+                "reddit_search: request failed (attempt %d/%d, giving up) — %s",
+                attempt, _MAX_ATTEMPTS, exc,
+            )
+            return []
+
+    if data is None:
         return []
 
     items = data.get("organic", [])
@@ -590,6 +623,7 @@ Return ONLY a comma-separated list of subreddit names (without r/ prefix), nothi
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=100,
+            timeout=10.0,
             messages=[{"role": "user", "content": prompt}],
         )
         text = response.content[0].text if response.content else ""

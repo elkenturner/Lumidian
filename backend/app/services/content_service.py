@@ -378,6 +378,7 @@ async def generate_draft(
     response = await client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=2000,
+        timeout=30.0,
         messages=[{"role": "user", "content": claude_prompt}],
     )
     generated_text: str = response.content[0].text if response.content else ""

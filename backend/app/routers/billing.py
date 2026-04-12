@@ -101,6 +101,7 @@ def get_stripe():
             detail="Stripe not configured. Set STRIPE_SECRET_KEY in environment.",
         )
     _stripe.api_key = secret_key
+    _stripe.max_network_retries = 2
     return _stripe
 
 
@@ -256,7 +257,14 @@ async def create_checkout(
     # Create or retrieve Stripe customer
     customer_id = user.stripe_customer_id
     if not customer_id:
-        customer = stripe.Customer.create(email=user.email, name=user.name or user.email)
+        try:
+            customer = stripe.Customer.create(email=user.email, name=user.name or user.email)
+        except stripe.error.APIConnectionError as exc:
+            logger.error("Stripe connection error during Customer.create: %s", exc)
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Payment service temporarily unavailable. Please try again.")
+        except stripe.error.RateLimitError as exc:
+            logger.warning("Stripe rate limit during Customer.create: %s", exc)
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests to payment service. Please wait a moment and try again.")
         customer_id = customer.id
         user.stripe_customer_id = customer_id
         user.updated_at = utcnow()
@@ -275,7 +283,14 @@ async def create_checkout(
         },
     )
 
-    session = stripe.checkout.Session.create(**session_kwargs)
+    try:
+        session = stripe.checkout.Session.create(**session_kwargs)
+    except stripe.error.APIConnectionError as exc:
+        logger.error("Stripe connection error during checkout.Session.create: %s", exc)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Payment service temporarily unavailable. Please try again.")
+    except stripe.error.RateLimitError as exc:
+        logger.warning("Stripe rate limit during checkout.Session.create: %s", exc)
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests to payment service. Please wait a moment and try again.")
     return {"checkout_url": session.url}
 
 
@@ -299,10 +314,17 @@ async def customer_portal(
     if not user.stripe_customer_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No billing account found")
     stripe = get_stripe()
-    session = stripe.billing_portal.Session.create(
-        customer=user.stripe_customer_id,
-        return_url=request.return_url,
-    )
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=user.stripe_customer_id,
+            return_url=request.return_url,
+        )
+    except stripe.error.APIConnectionError as exc:
+        logger.error("Stripe connection error during portal.Session.create: %s", exc)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Payment service temporarily unavailable. Please try again.")
+    except stripe.error.RateLimitError as exc:
+        logger.warning("Stripe rate limit during portal.Session.create: %s", exc)
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests to payment service. Please wait a moment and try again.")
     return {"portal_url": session.url}
 
 
@@ -356,6 +378,12 @@ async def change_plan(
         )
     except HTTPException:
         raise
+    except stripe.error.APIConnectionError as exc:
+        logger.error("Stripe connection error during plan switch: %s", exc)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Payment service temporarily unavailable. Please try again.")
+    except stripe.error.RateLimitError as exc:
+        logger.warning("Stripe rate limit during plan switch: %s", exc)
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests to payment service. Please wait a moment and try again.")
     except Exception as exc:
         logger.exception("Plan switch failed")
         raise HTTPException(
@@ -397,6 +425,12 @@ async def cancel_subscription(
             user.stripe_subscription_id,
             cancel_at_period_end=True,
         )
+    except stripe.error.APIConnectionError as exc:
+        logger.error("Stripe connection error during subscription cancellation: %s", exc)
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Payment service temporarily unavailable. Please try again.")
+    except stripe.error.RateLimitError as exc:
+        logger.warning("Stripe rate limit during subscription cancellation: %s", exc)
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests to payment service. Please wait a moment and try again.")
     except Exception as exc:
         logger.exception("Subscription cancellation failed")
         raise HTTPException(

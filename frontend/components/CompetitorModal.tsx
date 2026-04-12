@@ -22,6 +22,7 @@ export function CompetitorModal({
   const [newName, setNewName] = useState('');
   const [adding, setAdding] = useState(false);
   const [removingId, setRemovingId] = useState<number | null>(null);
+  const [error, setError] = useState('');
 
   // Build a map of name -> mention_rate from last run analytics
   const rateByName = new Map(competitorStats.filter((s) => !s.is_primary).map((s) => [s.name.toLowerCase(), s.mention_rate]));
@@ -29,12 +30,16 @@ export function CompetitorModal({
   async function handleAdd() {
     if (!newName.trim()) return;
     setAdding(true);
+    setError('');
     try {
       const c = await addCompetitor(brandId, newName.trim());
       const updated = [...local, c];
       setLocal(updated);
       setNewName('');
       onChanged(updated);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e?.response?.data?.detail || 'Failed to add competitor.');
     } finally {
       setAdding(false);
     }
@@ -42,11 +47,15 @@ export function CompetitorModal({
 
   async function handleRemove(id: number) {
     setRemovingId(id);
+    setError('');
     try {
       await removeCompetitor(brandId, id);
       const updated = local.filter((c) => c.id !== id);
       setLocal(updated);
       onChanged(updated);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setError(e?.response?.data?.detail || 'Failed to remove competitor.');
     } finally {
       setRemovingId(null);
     }
@@ -93,6 +102,7 @@ export function CompetitorModal({
         </div>
 
         <div className="space-y-2">
+          {error && <p className="text-xs text-[var(--danger)]">{error}</p>}
           <div className="flex gap-2">
             <input
               type="text"

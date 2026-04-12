@@ -167,6 +167,8 @@ function DraftCard({
       });
       onSaved(updated);
       setEditing(false);
+    } catch {
+      alert('Failed to save draft. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -583,6 +585,8 @@ function WikipediaDraftCard({
       const updated = await updateDraft(draft.id, { content_text: wikiFormat });
       onSaved(updated);
       setEditing(false);
+    } catch {
+      alert('Failed to save draft. Please try again.');
     } finally {
       setSaving(false);
     }

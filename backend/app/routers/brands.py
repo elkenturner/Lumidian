@@ -27,7 +27,7 @@ from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.database import get_db
+from app.database import fail_stale_runs_for_brand, get_db
 from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, get_data_owner_id
 from app.models import Brand, CompetitorMention, Competitor, ContentAttribution, ContentDraft, ContentGap, DraftAttribution, Prompt, PromptRunScore, QueryResult, TrackingRun, User
 from app.schemas import (
@@ -52,25 +52,6 @@ router = APIRouter(prefix="/brands", tags=["brands"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
-_STALE_RUN_MINUTES = 30
-
-
-async def _fail_stale_runs(db: AsyncSession, brand_id: int) -> None:
-    """Auto-fail tracking runs stuck in pending/running for > 30 minutes."""
-    from sqlalchemy import update as sa_update
-
-    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=_STALE_RUN_MINUTES)
-    result = await db.execute(
-        sa_update(TrackingRun)
-        .where(
-            TrackingRun.brand_id == brand_id,
-            TrackingRun.status.in_(["pending", "running"]),
-            TrackingRun.created_at < cutoff,
-        )
-        .values(status="failed")
-    )
-    if result.rowcount > 0:
-        logger.warning("Auto-failed %d stale run(s) for brand %d", result.rowcount, brand_id)
 
 
 def _slugify(name: str) -> str:
@@ -442,7 +423,7 @@ async def add_prompt(
     brand_obj = await get_brand_for_user(brand_id, db, user)
 
     # Auto-fail stale runs before checking, then block only on genuinely active runs
-    await _fail_stale_runs(db, brand_id)
+    await fail_stale_runs_for_brand(db, brand_id)
     active_run = await db.execute(
         select(TrackingRun.id).where(
             TrackingRun.brand_id == brand_id,
@@ -512,7 +493,7 @@ async def delete_prompt(brand_id: int, prompt_id: int, db: DbDep, user: CurrentU
     await get_brand_for_user(brand_id, db, user)
 
     # Auto-fail stale runs before checking, then block only on genuinely active runs
-    await _fail_stale_runs(db, brand_id)
+    await fail_stale_runs_for_brand(db, brand_id)
     active_run = await db.execute(
         select(TrackingRun.id).where(
             TrackingRun.brand_id == brand_id,

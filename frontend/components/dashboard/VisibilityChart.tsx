@@ -64,7 +64,7 @@ export default function VisibilityChart({
             <div className="h-14 w-28 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-2" />
           ) : (
             <>
-              <p className="text-5xl md:text-6xl font-bold text-[var(--text-primary)] mt-1 leading-none">
+              <p className="text-4xl sm:text-5xl md:text-6xl font-bold text-[var(--text-primary)] mt-1 leading-none">
                 {score != null ? `${animatedScore}%` : 'N/A'}
               </p>
               {scoreDelta !== null && (

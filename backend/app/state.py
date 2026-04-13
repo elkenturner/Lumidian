@@ -13,4 +13,4 @@ generating_brands: set[int] = set()
 """Brand IDs currently generating content drafts."""
 
 scanning_brands: set[int] = set()
-"""Brand IDs currently being scanned for Reddit/Quora opportunities."""
+"""Brand IDs currently being scanned for live opportunities."""

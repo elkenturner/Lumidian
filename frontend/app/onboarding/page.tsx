@@ -223,7 +223,7 @@ export default function OnboardingPage() {
                   onKeyDown={(e) => e.key === 'Enter' && handleStep1()}
                   placeholder="Your brand name"
                   autoFocus
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
+                  className="mobile-input w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
               </div>
               <div>
@@ -233,7 +233,7 @@ export default function OnboardingPage() {
                   value={websiteUrl}
                   onChange={(e) => setWebsiteUrl(e.target.value)}
                   placeholder="https://yourcompany.com"
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
+                  className="mobile-input w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-3 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
                 <p className="text-xs text-[var(--text-faint)] mt-1">We&apos;ll use this to improve content draft quality.</p>
               </div>
@@ -284,7 +284,7 @@ export default function OnboardingPage() {
                   value={p}
                   onChange={(e) => updatePrompt(i, e.target.value)}
                   placeholder={i === 0 ? `What is ${brandName}?` : 'Add another prompt…'}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
+                  className="mobile-input w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-default)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] transition-[border-color,box-shadow]"
                 />
               ))}
               <div className="flex items-center justify-between px-1 pt-1">
@@ -302,17 +302,17 @@ export default function OnboardingPage() {
                 </span>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={() => setStep(1)}
-                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[var(--border-default)] text-[var(--text-secondary)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+                className="w-full sm:w-auto flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[var(--border-default)] text-[var(--text-secondary)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={handleStep2}
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+                className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : null}
                 Continue
@@ -338,17 +338,17 @@ export default function OnboardingPage() {
                 />
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={() => setStep(2)}
-                className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[var(--border-default)] text-[var(--text-secondary)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+                className="w-full sm:w-auto flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.09)] border border-[var(--border-default)] text-[var(--text-secondary)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
               >
                 Back
               </button>
               <button
                 onClick={handleStep3}
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
+                className="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-4 py-2.5 text-sm font-medium transition-colors"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : null}
                 {saving ? 'Setting up…' : 'Go to Dashboard'}

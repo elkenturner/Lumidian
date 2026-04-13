@@ -103,6 +103,10 @@ async def lifespan(app: FastAPI):
     from app.services.auth_seeder import seed_admin_user
     await seed_admin_user()
 
+    # One-shot: activate test accounts (remove after deploy)
+    from app.services.seed_test_accounts import activate_test_accounts
+    await activate_test_accounts()
+
     logger.info("Starting background scheduler...")
     start_scheduler()
 

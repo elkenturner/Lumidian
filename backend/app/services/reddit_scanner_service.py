@@ -97,19 +97,13 @@ _STOP = frozenset("""
     recently previously currently generally specifically
 """.split())
 
-# ── Query-time stop words (too generic to make a good Reddit search query) ────
-# These words appear in completely unrelated contexts and flood results.
-# Distinct from _STOP (scoring-time): a word can be scored but not searched.
+# ── Query-time stop words ────────────────────────────────────────────────────
+# Minimal set of words too generic to help even within site:reddit.com results.
+# Domain-specific terms (capital, invest, startup, etc.) are intentionally kept —
+# they are valid search terms when scoped to Reddit via site:reddit.com.
 QUERY_STOP: frozenset[str] = frozenset({
-    "capital", "raise", "raises", "raised", "service", "services",
-    "platform", "platforms", "advisory", "advisor", "advisors",
-    "company", "companies", "business", "businesses",
-    "fund", "funds", "funding", "help", "best", "top",
-    "use", "using", "used", "invest", "investor", "investors",
-    "market", "markets", "money", "growth", "scale",
-    "solution", "solutions", "provider", "providers",
-    "startup", "startups", "enterprise", "product", "products",
-    "strategy", "strategies", "need", "needs", "want", "wants",
+    "help", "best", "top", "use", "using", "used",
+    "need", "needs", "want", "wants",
     "find", "choose", "choosing", "getting", "making",
 })
 
@@ -133,8 +127,9 @@ def _build_search_query(prompt_text: str) -> str:
     Extract the most search-effective terms from a prompt.
 
     - Detects multi-word regulatory/technical phrases and quotes them for exact match.
-    - Strips generic finance/SaaS words (QUERY_STOP) that cause false-positive results.
-    - Returns top-3 remaining specific keywords joined with spaces.
+    - Strips only truly generic filler words (QUERY_STOP); domain-specific terms are
+      kept since site:reddit.com scoping prevents false positives from other sites.
+    - Returns up to 5 remaining terms joined with spaces.
     - Falls back to raw prompt text if nothing survives filtering.
     """
     lower = prompt_text.lower()
@@ -158,7 +153,6 @@ def _build_search_query(prompt_text: str) -> str:
     ]
 
     # Compose: up to 2 quoted phrases + enough single words to reach 5 terms total
-    # (raised from 3 — without site:reddit.com, more terms help Serper return relevant results)
     parts = quoted[:2] + words[:max(0, 5 - len(quoted[:2]))]
 
     return " ".join(parts) if parts else prompt_text
@@ -375,10 +369,9 @@ def _score_thread(
     matches = sum(1 for w in prompt_words if _word_matches(w, combined))
     relevance = min(1.0, matches / len(prompt_words))
 
-    # Hard minimum: at least 40% keyword overlap AND at least 2 matches
-    # (relaxed from 45%/3 — without site:reddit.com, Serper relevance ranking
-    # and the Haiku gate provide additional quality filtering)
-    if relevance < 0.40 or matches < 2:
+    # Need at least 2 keyword matches (aligned with LinkedIn/X/Quora scanners).
+    # The Haiku relevance gate provides additional quality filtering.
+    if matches < 2:
         return 0.0
 
     # Recency — graduated, no hard cutoff (old evergreen threads still score)
@@ -499,7 +492,7 @@ async def _search_reddit_posts(
                 resp = await client.post(
                     _SERPER_URL,
                     headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
-                    json={"q": f"{query} reddit", "num": 25},
+                    json={"q": f"site:reddit.com {query}", "num": 25},
                 )
                 resp.raise_for_status()
                 data = resp.json()

@@ -3,10 +3,6 @@ APScheduler-based scheduler for Lumidian.
 
 Jobs:
   • 02:00 UTC        — SQLite backup (daily)
-  • 03:15 UTC Mon    — Reddit opportunity scanner (weekly)
-  • 03:30 UTC Mon    — Quora opportunity scanner (weekly)
-  • 03:40 UTC Mon    — LinkedIn opportunity scanner (weekly)
-  • 03:50 UTC Mon    — X opportunity scanner (weekly)
   • 04:00 UTC, day 1 — Monthly website context refresh via Jina Reader
   • 06:00 UTC        — Pitch brand expiry: warn users 24 h before expiry, delete expired brands
   • 08:00 UTC        — Morning tracking sweep (once daily)
@@ -156,155 +152,6 @@ async def _safe_run(brand_id: int, schedule_slot: str) -> None:
             )
 
 
-async def _reddit_scanner_sweep() -> None:
-    """Weekly Reddit scan for all brands (03:15 UTC, Monday)."""
-    if await _is_scheduler_paused():
-        logger.info("Scheduler paused — skipping Reddit scanner sweep")
-        return
-
-    from sqlalchemy import select
-
-    from app import state
-    from app.database import AsyncSessionLocal
-    from app.models import Brand
-    from app.services.reddit_scanner_service import scan_brand_opportunities
-
-    logger.info("Scheduler: starting weekly Reddit scanner sweep")
-
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Brand))
-        brands = result.scalars().all()
-
-    paused_user_ids = await _get_paused_user_ids()
-
-    for brand in brands:
-        if _is_brand_paused(brand, paused_user_ids):
-            logger.info("Scheduler: skipping paused brand %d in Reddit sweep", brand.id)
-            continue
-        state.scanning_brands.add(brand.id)
-        try:
-            await scan_brand_opportunities(brand.id)
-        except Exception:
-            logger.exception("Reddit scanner failed for brand_id=%d", brand.id)
-        finally:
-            state.scanning_brands.discard(brand.id)
-
-    logger.info("Scheduler: weekly Reddit scanner sweep complete")
-
-
-async def _quora_scanner_sweep() -> None:
-    """Weekly Quora scan for all brands (03:30 UTC, Monday)."""
-    if await _is_scheduler_paused():
-        logger.info("Scheduler paused — skipping Quora scanner sweep")
-        return
-
-    from sqlalchemy import select
-
-    from app import state
-    from app.database import AsyncSessionLocal
-    from app.models import Brand
-    from app.services.quora_scanner_service import scan_brand_opportunities
-
-    logger.info("Scheduler: starting weekly Quora scanner sweep")
-
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(select(Brand))
-        brands = result.scalars().all()
-
-    paused_user_ids = await _get_paused_user_ids()
-
-    for brand in brands:
-        if _is_brand_paused(brand, paused_user_ids):
-            logger.info("Scheduler: skipping paused brand %d in Quora sweep", brand.id)
-            continue
-        state.scanning_brands.add(brand.id)
-        try:
-            await scan_brand_opportunities(brand.id)
-        except Exception:
-            logger.exception("Quora scanner failed for brand_id=%d", brand.id)
-        finally:
-            state.scanning_brands.discard(brand.id)
-
-    logger.info("Scheduler: weekly Quora scanner sweep complete")
-
-
-async def _linkedin_scanner_sweep() -> None:
-    """Weekly LinkedIn scan for all brands (03:40 UTC, Monday)."""
-    if await _is_scheduler_paused():
-        logger.info("Scheduler paused — skipping LinkedIn scanner sweep")
-        return
-
-    from sqlalchemy import select
-
-    from app import state
-    from app.database import AsyncSessionLocal
-    from app.models import Brand, User
-    from app.services.linkedin_scanner_service import scan_brand_opportunities
-
-    logger.info("Scheduler: starting weekly LinkedIn scanner sweep")
-
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(Brand).join(User, Brand.user_id == User.id).where(User.subscription_tier == "pro")
-        )
-        brands = result.scalars().all()
-
-    paused_user_ids = await _get_paused_user_ids()
-
-    for brand in brands:
-        if _is_brand_paused(brand, paused_user_ids):
-            logger.info("Scheduler: skipping paused brand %d in LinkedIn sweep", brand.id)
-            continue
-        state.scanning_brands.add(brand.id)
-        try:
-            await scan_brand_opportunities(brand.id)
-        except Exception:
-            logger.exception("LinkedIn scanner failed for brand_id=%d", brand.id)
-        finally:
-            state.scanning_brands.discard(brand.id)
-
-    logger.info("Scheduler: weekly LinkedIn scanner sweep complete")
-
-
-async def _x_scanner_sweep() -> None:
-    """Weekly X scan for all brands (03:50 UTC, Monday)."""
-    if await _is_scheduler_paused():
-        logger.info("Scheduler paused — skipping X scanner sweep")
-        return
-
-    from sqlalchemy import select
-
-    from app import state
-    from app.database import AsyncSessionLocal
-    from app.models import Brand, User
-    from app.services.x_scanner_service import scan_brand_opportunities
-
-    logger.info("Scheduler: starting weekly X scanner sweep")
-
-    async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            select(Brand).join(User, Brand.user_id == User.id).where(User.subscription_tier == "pro")
-        )
-        brands = result.scalars().all()
-
-    paused_user_ids = await _get_paused_user_ids()
-
-    for brand in brands:
-        if _is_brand_paused(brand, paused_user_ids):
-            logger.info("Scheduler: skipping paused brand %d in X sweep", brand.id)
-            continue
-        state.scanning_brands.add(brand.id)
-        try:
-            await scan_brand_opportunities(brand.id)
-        except Exception:
-            logger.exception("X scanner failed for brand_id=%d", brand.id)
-        finally:
-            state.scanning_brands.discard(brand.id)
-
-    logger.info("Scheduler: weekly X scanner sweep complete")
-
-
-
 async def _sqlite_backup_sweep() -> None:
     """
     Daily SQLite backup (02:00 UTC).
@@ -431,7 +278,6 @@ async def _website_context_refresh_sweep() -> None:
             logger.exception("Website context refresh failed for brand %d", brand.id)
 
     logger.info("Scheduler: website context refresh sweep complete")
-
 
 
 async def _visibility_alert_sweep() -> None:
@@ -645,42 +491,6 @@ def start_scheduler() -> None:
         name="Morning tracking sweep (08:00 UTC)",
         replace_existing=True,
         misfire_grace_time=300,
-    )
-
-    scheduler.add_job(
-        _reddit_scanner_sweep,
-        trigger=CronTrigger(day_of_week="mon", hour=3, minute=15, timezone="UTC"),
-        id="reddit_scanner",
-        name="Reddit opportunity scanner (Monday 03:15 UTC)",
-        replace_existing=True,
-        misfire_grace_time=3600,
-    )
-
-    scheduler.add_job(
-        _quora_scanner_sweep,
-        trigger=CronTrigger(day_of_week="mon", hour=3, minute=30, timezone="UTC"),
-        id="quora_scanner",
-        name="Quora opportunity scanner (Monday 03:30 UTC)",
-        replace_existing=True,
-        misfire_grace_time=3600,
-    )
-
-    scheduler.add_job(
-        _linkedin_scanner_sweep,
-        trigger=CronTrigger(day_of_week="mon", hour=3, minute=40, timezone="UTC"),
-        id="linkedin_scanner",
-        name="LinkedIn opportunity scanner (Monday 03:40 UTC)",
-        replace_existing=True,
-        misfire_grace_time=3600,
-    )
-
-    scheduler.add_job(
-        _x_scanner_sweep,
-        trigger=CronTrigger(day_of_week="mon", hour=3, minute=50, timezone="UTC"),
-        id="x_scanner",
-        name="X opportunity scanner (Monday 03:50 UTC)",
-        replace_existing=True,
-        misfire_grace_time=3600,
     )
 
     scheduler.add_job(

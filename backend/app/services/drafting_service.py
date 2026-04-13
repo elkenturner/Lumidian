@@ -994,12 +994,13 @@ async def auto_draft_top_gaps(
         resolved for s in enabled_settings
         if (resolved := resolve_platform_key(s.platform)) in CONTENT_PLATFORMS
     ]
-    # Check if user explicitly disabled any platforms (settings exist but some are off)
+    # Check if user explicitly disabled any platforms (some settings exist with enabled=False)
     all_settings_result = await db.execute(
         select(BrandContentSettings).where(BrandContentSettings.brand_id == brand_id)
     )
-    all_settings_count = len(list(all_settings_result.scalars().all()))
-    has_disabled_platforms = all_settings_count > 0 and len(enabled_platforms) < len(CONTENT_PLATFORMS)
+    all_settings = list(all_settings_result.scalars().all())
+    disabled_count = sum(1 for s in all_settings if not s.enabled)
+    has_disabled_platforms = disabled_count > 0
 
     if not enabled_platforms:
         enabled_platforms = ["reddit", "quora"]
@@ -1011,9 +1012,11 @@ async def auto_draft_top_gaps(
     if has_disabled_platforms:
         # User explicitly disabled platforms — keep per-platform allocation constant
         # so remaining platforms don't inflate to fill the gap.
-        n_all_combos = len(ordered_prompts) * len(CONTENT_PLATFORMS)
+        total_settings = len(all_settings)
+        enabled_count = total_settings - disabled_count
+        n_all_combos = len(ordered_prompts) * total_settings
         per_combo_cap = max(3, math.ceil(max_gaps / n_all_combos)) if n_all_combos else max_gaps
-        effective_max = math.ceil(max_gaps * len(enabled_platforms) / len(CONTENT_PLATFORMS))
+        effective_max = math.ceil(max_gaps * enabled_count / total_settings) if total_settings else max_gaps
     else:
         # No explicit disabling — fill normally
         per_combo_cap = max(3, math.ceil(max_gaps / n_combos)) if n_combos else max_gaps

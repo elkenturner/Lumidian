@@ -19,7 +19,7 @@ A SaaS dashboard that helps brands track and improve their visibility in AI-gene
 - **Scheduled runs**: Automatic daily tracking
 - **Manual runs**: "Run Report Now" button with real-time status polling
 - **Content Hub**: AI-generated drafts to close visibility gaps
-- **Reddit/Quora Opportunities**: Find threads where your brand can contribute
+- **Live Opportunities**: Find Reddit, Quora, LinkedIn, and X threads where your brand can contribute
 
 ---
 

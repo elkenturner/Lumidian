@@ -635,7 +635,7 @@ async def _onboarding_post_process(brand_id: int) -> None:
     Fired as a background asyncio.create_task after gap analysis completes.
     Steps run in order; each is non-fatal:
       1. Generate initial content drafts (count depends on user tier)
-      2. Scan Reddit + Quora for live opportunities (parallel)
+      2. Scan for live opportunities (parallel)
 
     state.generating_brands and state.scanning_brands are updated so
     AppShell's background-status banners reflect each phase.
@@ -672,7 +672,7 @@ async def _onboarding_post_process(brand_id: int) -> None:
     finally:
         state.generating_brands.discard(brand_id)
 
-    # ── Step 2: Live opportunity scan (Reddit + Quora in parallel) ───────────
+    # ── Step 2: Live opportunity scan (in parallel) ──────────────────────────
     state.scanning_brands.add(brand_id)
     try:
         await asyncio.gather(

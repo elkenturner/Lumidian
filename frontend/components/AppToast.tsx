@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { useIsMobile } from '@/hooks/useIsMobile';
 
 export type ToastType = 'success' | 'error' | 'info';
 
@@ -30,6 +31,7 @@ const styles: Record<ToastType, { wrapper: string; icon: JSX.Element }> = {
 };
 
 export function AppToast({ message, type, onDismiss }: AppToastProps) {
+  const isMobile = useIsMobile();
   const { wrapper, icon } = styles[type];
   const [phase, setPhase] = useState<'enter' | 'visible' | 'exit'>('enter');
 
@@ -55,7 +57,8 @@ export function AppToast({ message, type, onDismiss }: AppToastProps) {
       role="alert"
       aria-live="assertive"
       aria-atomic="true"
-      className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium max-w-sm ${wrapper} ${phaseClass}`}
+      className={`fixed left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium max-w-[calc(100vw-32px)] sm:max-w-sm ${wrapper} ${phaseClass}`}
+      style={isMobile ? { top: 60 } : { bottom: 24 }}
     >
       {icon}
       <span className="flex-1">{message}</span>

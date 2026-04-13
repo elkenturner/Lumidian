@@ -535,7 +535,10 @@ body {
 
 /* Mobile input zoom prevention */
 @media (max-width: 767px) {
-  .mobile-input {
+  .mobile-input,
+  .mobile-input input,
+  .mobile-input textarea,
+  .mobile-input select {
     font-size: 16px !important;
   }
 }
@@ -583,4 +586,42 @@ body {
   transform: translateY(8px);
   opacity: 0;
   transition: transform 200ms var(--ease-out), opacity 200ms var(--ease-out);
+}
+
+/* ── Mobile scroll tabs ──────────────────────────────────────────────────── */
+.mobile-scroll-tabs {
+  display: flex;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  gap: 4px;
+}
+.mobile-scroll-tabs::-webkit-scrollbar {
+  display: none;
+}
+.mobile-scroll-tabs > * {
+  flex-shrink: 0;
+}
+
+/* ── Mobile touch targets & bottom sheet animations ─────────────────────── */
+@media (max-width: 767px) {
+  .btn {
+    min-height: 44px;
+  }
+
+  /* Bottom sheet animation */
+  @keyframes slideUpSheet {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  @keyframes slideDownSheet {
+    from { transform: translateY(0); }
+    to { transform: translateY(100%); }
+  }
+  .sheet-enter {
+    animation: slideUpSheet 0.35s var(--ease-drawer) forwards;
+  }
+  .sheet-exit {
+    animation: slideDownSheet 0.2s var(--ease-out) forwards;
+  }
 }

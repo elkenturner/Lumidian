@@ -99,19 +99,19 @@ export function OpportunityCard({
         )}
       </div>
 
-      <div className="flex items-center gap-2 pt-1">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
         <button
           onClick={handleDraft}
           disabled={drafting || queueFull}
           title={queueFull ? 'Draft queue full — approve or dismiss drafts to make room' : undefined}
-          className="flex items-center gap-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-1.5 transition-colors"
+          className="flex items-center gap-1.5 text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg px-3 py-1.5 transition-colors min-h-[44px] sm:min-h-0"
         >
           {drafting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
           {drafting ? 'Drafting…' : queueFull ? 'Queue full' : 'Draft Reply'}
         </button>
         <button
           onClick={() => onDismiss(opp.id)}
-          className="flex items-center gap-1.5 text-xs text-[var(--danger)]/70 hover:text-[var(--danger)] rounded-lg px-3 py-1.5 transition-colors ml-auto"
+          className="flex items-center gap-1.5 text-xs text-[var(--danger)]/70 hover:text-[var(--danger)] rounded-lg px-3 py-1.5 transition-colors sm:ml-auto min-h-[44px] sm:min-h-0"
         >
           <X size={11} />
           Dismiss

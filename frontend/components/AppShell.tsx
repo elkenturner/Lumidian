@@ -3,14 +3,17 @@
 import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, LineChart, PenLine, Settings, User, ChevronUp, LogOut, Shield } from 'lucide-react';
+import { LayoutDashboard, LineChart, PenLine, Settings, Shield, Bell, BellRing, ChevronDown, X, Plus, Check } from 'lucide-react';
 import Sidebar from '@/components/Sidebar';
 import ErrorBoundary from '@/components/ErrorBoundary';
-import { BrandProvider } from '@/contexts/BrandContext';
+import { BrandProvider, useBrand } from '@/contexts/BrandContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { getBackgroundStatus } from '@/lib/api';
+import { getBackgroundStatus, getNotifications, markAllNotificationsRead, AppNotification } from '@/lib/api';
 import { MODEL_ORDER, MODEL_CONFIG as MODEL_CONFIG_SHARED } from '@/lib/constants/models';
 import ModelIcon from '@/components/ModelIcon';
+import NotificationPanel from '@/components/NotificationPanel';
+import BrandAvatar from '@/components/BrandAvatar';
+import LumidianLogo from '@/components/LumidianLogo';
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.bgColor, text: v.color }])
@@ -146,11 +149,573 @@ function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ m
 
 const MOBILE_NAV = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Settings',  href: '/settings',  icon: Settings },
   { label: 'Reports',   href: '/reports',   icon: LineChart },
   { label: 'Content',   href: '/content',   icon: PenLine },
-  { label: 'Account',   href: '/account',   icon: User },
+  { label: 'Settings',  href: '/settings',  icon: Settings },
 ];
+
+/* ── Mobile Header ──────────────────────────────────────────────────────────── */
+function MobileHeader({
+  activeBrand,
+  onBrandTap,
+  notifications,
+  unreadCount,
+  notifOpen,
+  onNotifToggle,
+  onMarkAllRead,
+  onNotifClose,
+  user,
+}: {
+  activeBrand: { name: string; website_url?: string | null } | null;
+  onBrandTap: () => void;
+  notifications: AppNotification[];
+  unreadCount: number;
+  notifOpen: boolean;
+  onNotifToggle: () => void;
+  onMarkAllRead: () => void;
+  onNotifClose: () => void;
+  user: { name?: string | null; email?: string } | null;
+}) {
+  const userInitial = (user?.name?.[0] || user?.email?.[0] || '?').toUpperCase();
+
+  return (
+    <>
+      <header
+        style={{
+          position: 'sticky',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: 48,
+          zIndex: 50,
+          background: 'rgba(8,12,20,0.97)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '0 12px',
+        }}
+      >
+        {/* Left: logo */}
+        <Link href="/dashboard" style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+          <LumidianLogo size={24} />
+        </Link>
+
+        {/* Center: brand switcher tap target */}
+        {activeBrand && (
+          <button
+            onClick={onBrandTap}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px 8px',
+              borderRadius: 8,
+              maxWidth: 200,
+            }}
+          >
+            <BrandAvatar name={activeBrand.name} websiteUrl={activeBrand.website_url} size={20} />
+            <span
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                maxWidth: 180,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {activeBrand.name}
+            </span>
+            <ChevronDown size={14} style={{ color: 'var(--text-faint)', flexShrink: 0 }} />
+          </button>
+        )}
+
+        {/* Right: notification bell + user avatar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+          <button
+            onClick={onNotifToggle}
+            aria-label="Notifications"
+            style={{
+              position: 'relative',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              background: notifOpen ? 'rgba(255,255,255,0.08)' : 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-muted)',
+            }}
+          >
+            {unreadCount > 0 ? <BellRing size={18} /> : <Bell size={18} />}
+            {unreadCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  width: 7,
+                  height: 7,
+                  borderRadius: '50%',
+                  background: 'var(--accent)',
+                  border: '1.5px solid rgba(8,12,20,0.97)',
+                }}
+              />
+            )}
+          </button>
+          <Link
+            href="/account"
+            aria-label="Account"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 28,
+              height: 28,
+              borderRadius: '50%',
+              background: 'rgba(95,126,166,0.2)',
+              color: 'var(--text-secondary)',
+              fontSize: 11,
+              fontWeight: 700,
+              textDecoration: 'none',
+              flexShrink: 0,
+            }}
+          >
+            {userInitial}
+          </Link>
+        </div>
+      </header>
+
+      {/* Notification panel as bottom sheet overlay on mobile */}
+      {notifOpen && (
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 199, background: 'rgba(0,0,0,0.5)' }}
+          onClick={onNotifClose}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200 }}
+          >
+            <div
+              ref={(el) => {
+                if (el) {
+                  const child = el.firstElementChild as HTMLElement;
+                  if (child) {
+                    child.style.position = 'static';
+                    child.style.width = '100%';
+                    child.style.maxHeight = 'none';
+                    child.style.bottom = 'auto';
+                    child.style.left = 'auto';
+                    child.style.border = 'none';
+                    child.style.boxShadow = 'none';
+                    child.style.borderRadius = '0';
+                  }
+                }
+              }}
+            >
+              <NotificationPanel
+                notifications={notifications}
+                unreadCount={unreadCount}
+                panelLeft={0}
+                onMarkAllRead={onMarkAllRead}
+                onClose={onNotifClose}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+/* ── Brand Switcher Bottom Sheet ────────────────────────────────────────────── */
+function BrandSwitcherSheet({
+  brands,
+  activeBrandId,
+  onSelectBrand,
+  onClose,
+}: {
+  brands: Array<{ id: number; name: string; website_url?: string | null; tier?: string; brand_type?: string }>;
+  activeBrandId: number | null;
+  onSelectBrand: (id: number) => void;
+  onClose: () => void;
+}) {
+  const tierLabel = (tier?: string, brandType?: string) => {
+    if (brandType === 'pitch') return 'Pitch';
+    if (!tier) return null;
+    const map: Record<string, string> = { basic: 'Free', standard: 'Starter', premium: 'Pro' };
+    return map[tier] || tier;
+  };
+
+  return (
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}
+    >
+      <div
+        className="sheet-enter"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          maxHeight: '70vh',
+          background: 'rgba(10,14,24,0.97)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          border: '1px solid rgba(255,255,255,0.08)',
+          borderBottom: 'none',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Drag handle */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+          <div style={{ width: 32, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.15)' }} />
+        </div>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px 12px' }}>
+          <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>Your brands</span>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: 4 }}
+            aria-label="Close brand switcher"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Brand list */}
+        <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 8, scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+          {brands.map((brand) => {
+            const isActive = brand.id === activeBrandId;
+            return (
+              <button
+                key={brand.id}
+                onClick={() => { onSelectBrand(brand.id); onClose(); }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  width: '100%',
+                  height: 52,
+                  padding: '0 16px',
+                  background: isActive ? 'rgba(95,126,166,0.08)' : 'transparent',
+                  border: 'none',
+                  borderLeft: isActive ? '2px solid var(--accent)' : '2px solid transparent',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background 0.15s ease',
+                }}
+              >
+                <BrandAvatar name={brand.name} websiteUrl={brand.website_url} size={28} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{
+                    fontSize: 13,
+                    fontWeight: isActive ? 600 : 500,
+                    color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    {brand.name}
+                  </div>
+                  {(brand.tier || brand.brand_type === 'pitch') && (
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 500,
+                      color: brand.brand_type === 'pitch'
+                        ? 'var(--warning)'
+                        : brand.tier === 'premium'
+                          ? 'var(--accent-foreground)'
+                          : 'var(--text-faint)',
+                      marginTop: 1,
+                      display: 'block',
+                    }}>
+                      {tierLabel(brand.tier, brand.brand_type)}
+                    </span>
+                  )}
+                </div>
+                {isActive && <Check size={16} style={{ color: 'var(--accent)', flexShrink: 0 }} />}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Add brand link */}
+        <Link
+          href="/tracker/new"
+          onClick={onClose}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            height: 48,
+            padding: '0 16px',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
+            color: 'var(--accent-light)',
+            fontSize: 13,
+            fontWeight: 500,
+            textDecoration: 'none',
+          }}
+        >
+          <Plus size={16} />
+          Add new brand
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/* ── AppShellInner (rendered inside BrandProvider to access useBrand) ──────── */
+function AppShellInner({
+  isMobile,
+  sidebarExpanded,
+  setSidebarExpanded,
+  reportRunning,
+  draftsGenerating,
+  scanning,
+  modelScores,
+  user,
+  children,
+}: {
+  isMobile: boolean;
+  sidebarExpanded: boolean;
+  setSidebarExpanded: (v: boolean) => void;
+  reportRunning: boolean;
+  draftsGenerating: boolean;
+  scanning: boolean;
+  modelScores: Array<{ model: string; score: number }>;
+  user: { name?: string | null; email?: string; is_admin?: boolean } | null;
+  children: React.ReactNode;
+}) {
+  const pathname = usePathname();
+  const { brands, activeBrandId, setActiveBrandId, activeBrand } = useBrand();
+  const [brandSwitcherOpen, setBrandSwitcherOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch notifications periodically on mobile
+  useEffect(() => {
+    if (!isMobile || !user) return;
+    let cancelled = false;
+
+    const fetchNotifs = async () => {
+      try {
+        const resp = await getNotifications();
+        if (!cancelled) {
+          setNotifications(resp.notifications);
+          setUnreadCount(resp.unread_count);
+        }
+      } catch { /* silent */ }
+    };
+
+    fetchNotifs();
+    const timer = setInterval(fetchNotifs, 30_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [isMobile, user]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      const resp = await markAllNotificationsRead();
+      setNotifications(resp.notifications);
+      setUnreadCount(resp.unread_count);
+    } catch { /* silent */ }
+  };
+
+  return (
+    <>
+      {/* Fixed slate base background */}
+      <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-base)', zIndex: -2 }} />
+
+      {/* Desktop sidebar — hidden on mobile */}
+      {!isMobile && (
+        <Sidebar expanded={sidebarExpanded} onExpandedChange={setSidebarExpanded} />
+      )}
+
+      {/* Mobile header */}
+      {isMobile && (
+        <MobileHeader
+          activeBrand={activeBrand}
+          onBrandTap={() => setBrandSwitcherOpen(true)}
+          notifications={notifications}
+          unreadCount={unreadCount}
+          notifOpen={notifOpen}
+          onNotifToggle={() => setNotifOpen((v) => !v)}
+          onMarkAllRead={handleMarkAllRead}
+          onNotifClose={() => setNotifOpen(false)}
+          user={user}
+        />
+      )}
+
+      {/* Brand switcher bottom sheet */}
+      {isMobile && brandSwitcherOpen && (
+        <BrandSwitcherSheet
+          brands={brands}
+          activeBrandId={activeBrandId}
+          onSelectBrand={setActiveBrandId}
+          onClose={() => setBrandSwitcherOpen(false)}
+        />
+      )}
+
+      <main
+        className="min-h-screen relative"
+        style={{
+          marginLeft: isMobile ? 0 : (sidebarExpanded ? 220 : 56),
+          marginBottom: isMobile ? 72 : 0,
+          transition: 'margin-left 0.2s ease',
+          zIndex: 0,
+        }}
+      >
+        {/* Global status banners — written by dashboard/content pages via localStorage */}
+        {reportRunning && <ReportRunningBanner modelScores={modelScores} isMobile={isMobile} />}
+        {draftsGenerating && (
+          <div style={{
+            background: 'rgba(16,185,129,0.06)',
+            borderBottom: '1px solid rgba(16,185,129,0.18)',
+            padding: isMobile ? '6px 12px' : '8px 28px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
+            <span style={{ fontSize: 12, color: 'var(--success-text)', fontWeight: 600 }}>Drafts generating</span>
+            <span style={{ fontSize: 12, color: 'var(--success)' }}>— writing new content drafts for your top visibility gaps.</span>
+          </div>
+        )}
+        {scanning && (
+          <div style={{
+            background: 'rgba(6,182,212,0.06)',
+            borderBottom: '1px solid rgba(6,182,212,0.18)',
+            padding: isMobile ? '6px 12px' : '8px 28px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#06b6d4', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
+            <span style={{ fontSize: 12, color: '#67e8f9', fontWeight: 600 }}>Scanning live opportunities</span>
+            <span style={{ fontSize: 12, color: '#06b6d4' }}>— finding relevant discussions on Reddit and Quora.</span>
+          </div>
+        )}
+        {children}
+      </main>
+
+      {/* Mobile bottom navigation */}
+      {isMobile && (
+        <nav
+          aria-label="Main navigation"
+          className="safe-bottom"
+          style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
+            background: 'rgba(8,12,20,0.97)',
+            backdropFilter: 'blur(24px)',
+            WebkitBackdropFilter: 'blur(24px)',
+            borderTop: '1px solid rgba(255,255,255,0.08)',
+            display: 'flex',
+            alignItems: 'stretch',
+            justifyContent: 'space-around',
+            paddingTop: 6,
+            paddingBottom: 6,
+            paddingLeft: 4,
+            paddingRight: 4,
+          }}
+        >
+          {MOBILE_NAV.map(({ label, href, icon: Icon }) => {
+            const isActive = pathname === href || pathname.startsWith(href + '/');
+            return (
+              <Link
+                key={href}
+                href={href}
+                aria-label={label}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                  flex: 1,
+                  padding: '8px 0',
+                  color: isActive ? 'var(--accent-light)' : 'var(--text-faint)',
+                  textDecoration: 'none',
+                  fontSize: 10,
+                  fontWeight: isActive ? 600 : 500,
+                  position: 'relative',
+                  minHeight: 48,
+                }}
+              >
+                {isActive && (
+                  <span style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 20,
+                    height: 2,
+                    borderRadius: 1,
+                    background: 'var(--accent-light)',
+                  }} />
+                )}
+                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.75} />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
+          {user?.is_admin && (
+            <Link
+              href="/admin"
+              aria-label="Admin"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 2,
+                flex: 1,
+                padding: '8px 0',
+                color: pathname === '/admin' ? 'var(--accent-light)' : 'var(--text-faint)',
+                textDecoration: 'none',
+                fontSize: 10,
+                fontWeight: pathname === '/admin' ? 600 : 500,
+                position: 'relative',
+                minHeight: 48,
+              }}
+            >
+              {pathname === '/admin' && (
+                <span style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 20,
+                  height: 2,
+                  borderRadius: 1,
+                  background: 'var(--accent-light)',
+                }} />
+              )}
+              <Shield size={20} strokeWidth={pathname === '/admin' ? 2.2 : 1.75} />
+              <span>Admin</span>
+            </Link>
+          )}
+        </nav>
+      )}
+    </>
+  );
+}
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -258,159 +823,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ErrorBoundary>
-    <BrandProvider>
-    <>
-      {/* Fixed slate base background */}
-      <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-base)', zIndex: -2 }} />
-
-      {/* Desktop sidebar — hidden on mobile */}
-      {!isMobile && (
-        <Sidebar expanded={sidebarExpanded} onExpandedChange={setSidebarExpanded} />
-      )}
-
-      <main
-        className="min-h-screen relative"
-        style={{
-          marginLeft: isMobile ? 0 : (sidebarExpanded ? 220 : 56),
-          marginBottom: isMobile ? 72 : 0,
-          transition: 'margin-left 0.2s ease',
-          zIndex: 0,
-        }}
-      >
-        {/* Global status banners — written by dashboard/content pages via localStorage */}
-        {reportRunning && <ReportRunningBanner modelScores={modelScores} isMobile={isMobile} />}
-        {draftsGenerating && (
-          <div style={{
-            background: 'rgba(16,185,129,0.06)',
-            borderBottom: '1px solid rgba(16,185,129,0.18)',
-            padding: isMobile ? '6px 12px' : '8px 28px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
-            <span style={{ fontSize: 12, color: 'var(--success-text)', fontWeight: 600 }}>Drafts generating</span>
-            <span style={{ fontSize: 12, color: 'var(--success)' }}>— writing new content drafts for your top visibility gaps.</span>
-          </div>
-        )}
-        {scanning && (
-          <div style={{
-            background: 'rgba(6,182,212,0.06)',
-            borderBottom: '1px solid rgba(6,182,212,0.18)',
-            padding: isMobile ? '6px 12px' : '8px 28px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#06b6d4', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
-            <span style={{ fontSize: 12, color: '#67e8f9', fontWeight: 600 }}>Scanning live opportunities</span>
-            <span style={{ fontSize: 12, color: '#06b6d4' }}>— finding relevant discussions on Reddit and Quora.</span>
-
-          </div>
-        )}
-        {children}
-      </main>
-
-      {/* Mobile bottom navigation */}
-      {isMobile && (
-        <nav
-          aria-label="Main navigation"
-          className="safe-bottom"
-          style={{
-            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 50,
-            background: 'rgba(8,12,20,0.97)',
-            backdropFilter: 'blur(24px)',
-            WebkitBackdropFilter: 'blur(24px)',
-            borderTop: '1px solid rgba(255,255,255,0.08)',
-            display: 'flex',
-            alignItems: 'stretch',
-            justifyContent: 'space-around',
-            paddingTop: 6,
-            paddingBottom: 6,
-            paddingLeft: 4,
-            paddingRight: 4,
-          }}
+      <BrandProvider>
+        <AppShellInner
+          isMobile={isMobile}
+          sidebarExpanded={sidebarExpanded}
+          setSidebarExpanded={setSidebarExpanded}
+          reportRunning={reportRunning}
+          draftsGenerating={draftsGenerating}
+          scanning={scanning}
+          modelScores={modelScores}
+          user={user}
         >
-          {MOBILE_NAV.map(({ label, href, icon: Icon }) => {
-            const isActive = pathname === href || pathname.startsWith(href + '/');
-            return (
-              <Link
-                key={href}
-                href={href}
-                aria-label={label}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 2,
-                  flex: 1,
-                  padding: '8px 0',
-                  color: isActive ? 'var(--accent-light)' : 'var(--text-faint)',
-                  textDecoration: 'none',
-                  fontSize: 10,
-                  fontWeight: isActive ? 600 : 500,
-                  position: 'relative',
-                  minHeight: 48,
-                }}
-              >
-                {isActive && (
-                  <span style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 20,
-                    height: 2,
-                    borderRadius: 1,
-                    background: 'var(--accent-light)',
-                  }} />
-                )}
-                <Icon size={20} strokeWidth={isActive ? 2.2 : 1.75} />
-                <span>{label}</span>
-              </Link>
-            );
-          })}
-          {user?.is_admin && (
-            <Link
-              href="/admin"
-              aria-label="Admin"
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 2,
-                flex: 1,
-                padding: '8px 0',
-                color: pathname === '/admin' ? 'var(--accent-light)' : 'var(--text-faint)',
-                textDecoration: 'none',
-                fontSize: 10,
-                fontWeight: pathname === '/admin' ? 600 : 500,
-                position: 'relative',
-                minHeight: 48,
-              }}
-            >
-              {pathname === '/admin' && (
-                <span style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: 20,
-                  height: 2,
-                  borderRadius: 1,
-                  background: 'var(--accent-light)',
-                }} />
-              )}
-              <Shield size={20} strokeWidth={pathname === '/admin' ? 2.2 : 1.75} />
-              <span>Admin</span>
-            </Link>
-          )}
-        </nav>
-      )}
-    </>
-    </BrandProvider>
+          {children}
+        </AppShellInner>
+      </BrandProvider>
     </ErrorBoundary>
   );
 }

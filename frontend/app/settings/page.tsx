@@ -84,7 +84,7 @@ function AutoTextarea({ value, onChange, placeholder, className }: {
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={4}
-      className={className}
+      className={`mobile-input ${className ?? ''}`}
       style={{ overflow: 'hidden' }}
     />
   );
@@ -137,7 +137,7 @@ function EditableList({
           onChange={(e) => setInputVal(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }}
           placeholder={placeholder}
-          className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 transition-colors"
+          className="mobile-input flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 transition-colors"
         />
         <button
           onClick={addItem}
@@ -235,14 +235,14 @@ function PublicationsEditor({
             placeholder="DOI / URL"
             value={pub.url}
             onChange={(e) => update(idx, 'url', e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
+            className="mobile-input w-full px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
           />
           <input
             type="text"
             placeholder="Title"
             value={pub.title}
             onChange={(e) => update(idx, 'title', e.target.value)}
-            className="w-full px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
+            className="mobile-input w-full px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
           />
           <div className="flex gap-2">
             <input
@@ -250,14 +250,14 @@ function PublicationsEditor({
               placeholder="Publisher / journal"
               value={pub.publisher}
               onChange={(e) => update(idx, 'publisher', e.target.value)}
-              className="flex-1 px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
+              className="mobile-input flex-1 px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
             />
             <input
               type="text"
               placeholder="Year"
               value={pub.date}
               onChange={(e) => update(idx, 'date', e.target.value)}
-              className="w-20 px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
+              className="mobile-input w-20 px-2.5 py-1.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-md text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
             />
           </div>
         </div>
@@ -733,7 +733,7 @@ export default function SettingsPage() {
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl"
+      className="px-3 sm:px-8 py-4 sm:py-8 max-w-7xl"
     >
       {/* Header */}
       <div className="mb-6">
@@ -744,13 +744,16 @@ export default function SettingsPage() {
       </div>
 
       {/* Tab navigation */}
-      <div className="flex gap-1 border-b border-[var(--border-subtle)] mb-6">
+      <div
+        className="flex gap-1 border-b border-[var(--border-subtle)] mb-6 w-full sm:w-auto sticky top-[48px] sm:static z-10"
+        style={{ backdropFilter: 'blur(12px)' }}
+      >
         {(['general', 'profile', 'team'] as SettingsTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={clsx(
-              'px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-[3px] -mb-px transition-[color,background-color,border-color]',
+              'flex-1 sm:flex-initial px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-[3px] -mb-px transition-[color,background-color,border-color]',
               activeTab === tab
                 ? 'text-[var(--accent-foreground)] border-[var(--accent)] bg-[var(--accent-muted)]'
                 : 'text-[var(--text-muted)] border-transparent hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.03)]'
@@ -782,7 +785,7 @@ export default function SettingsPage() {
                   type="text"
                   value={editName}
                   onChange={(e) => setEditName(e.target.value)}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
+                  className="mobile-input w-full bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
                 />
               </div>
 
@@ -794,7 +797,7 @@ export default function SettingsPage() {
                     value={editWebsiteUrl}
                     onChange={(e) => setEditWebsiteUrl(e.target.value)}
                     placeholder="yourcompany.com"
-                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder-[var(--text-faint)]"
+                    className="mobile-input flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder-[var(--text-faint)]"
                   />
                   {refreshingContext && (
                     <span className="flex items-center gap-1.5 text-xs text-[var(--text-secondary)] whitespace-nowrap">
@@ -872,7 +875,7 @@ export default function SettingsPage() {
                 onChange={(e) => setNewPromptText(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddPrompt()}
                 placeholder="Enter a new prompt question..."
-                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder-[var(--text-faint)]"
+                className="mobile-input flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder-[var(--text-faint)]"
               />
               <button
                 onClick={handleAddPrompt}
@@ -967,7 +970,7 @@ export default function SettingsPage() {
                 onChange={(e) => setNewCompetitorName(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddCompetitor()}
                 placeholder="Enter competitor name..."
-                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder-[var(--text-faint)]"
+                className="mobile-input flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder-[var(--text-faint)]"
               />
               <button
                 onClick={handleAddCompetitor}
@@ -1115,7 +1118,7 @@ export default function SettingsPage() {
                 onChange={(e) => setToneOfVoice(e.target.value)}
                 placeholder="e.g. Professional but approachable. Confident without being arrogant…"
                 rows={3}
-                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
+                className="mobile-input w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
               />
             </SectionCard>
 
@@ -1141,7 +1144,7 @@ export default function SettingsPage() {
                 onChange={(e) => setTargetAudience(e.target.value)}
                 placeholder="e.g. Healthcare professionals and clinical researchers…"
                 rows={3}
-                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
+                className="mobile-input w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
               />
             </SectionCard>
 
@@ -1204,7 +1207,7 @@ export default function SettingsPage() {
                 onChange={(e) => setInviteEmail(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleInvite()}
                 placeholder="colleague@company.com"
-                className="flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
+                className="mobile-input flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
               />
               <button
                 onClick={handleInvite}

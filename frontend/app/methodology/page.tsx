@@ -30,7 +30,7 @@ function SectionDivider() {
 
 export default function MethodologyPage() {
   return (
-    <div className="px-4 sm:px-8 lg:px-12 py-8 sm:py-12 max-w-4xl mx-auto">
+    <div className="px-4 sm:px-8 lg:px-12 py-6 sm:py-12 max-w-4xl mx-auto">
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* HERO / INTRO                                                          */}

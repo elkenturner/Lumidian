@@ -307,11 +307,17 @@ def test_high_relevance_post_passes_new_threshold():
     score = _score_thread(title, "", prompt, _ts(3), num_comments=10, brand_name="CapCo")
     assert score >= 65.0
 
-def test_two_matches_now_scores_zero():
-    """Post with exactly 2 keyword matches returns 0 under new min-matches=3 rule."""
+def test_two_matches_scores_nonzero():
+    """Post with exactly 2 keyword matches now scores > 0 (aligned with other scanners)."""
     # title has exactly 2 words that appear in prompt (advisory, platform)
-    # "overview" is not in the prompt and not a stop word
     title = "advisory platform overview"
+    prompt = "what is the best reg a+ advisory platform for direct listings and capital"
+    score = _score_thread(title, "", prompt, _ts(1), num_comments=50, brand_name="CapCo")
+    assert score > 0.0
+
+def test_one_match_scores_zero():
+    """Post with only 1 keyword match returns 0."""
+    title = "random overview of nothing"
     prompt = "what is the best reg a+ advisory platform for direct listings and capital"
     score = _score_thread(title, "", prompt, _ts(1), num_comments=50, brand_name="CapCo")
     assert score == 0.0
@@ -324,12 +330,19 @@ def test_build_search_query_quotes_reg_a_plus():
     q = _build_search_query("what service will help me raise capital using Reg A+")
     assert '"reg a+"' in q.lower()
 
-def test_build_search_query_strips_generic_finance_words():
-    """Generic words like 'capital', 'raise', 'service' don't appear bare."""
-    q = _build_search_query("what service will help me raise capital using Reg A+")
+def test_build_search_query_strips_filler_words():
+    """Filler words like 'help', 'best', 'find' don't appear bare."""
+    q = _build_search_query("help me find the best Reg A+ platform")
     bare_words = q.lower().split()
-    for word in ("capital", "raise", "service", "help"):
+    for word in ("help", "best", "find"):
         assert word not in bare_words, f"'{word}' leaked into query: {q}"
+
+def test_build_search_query_keeps_domain_terms():
+    """Domain-specific terms like 'capital', 'raise' survive for site:reddit.com queries."""
+    q = _build_search_query("what service will help me raise capital using Reg A+")
+    bare_words = q.lower().replace('"', '').split()
+    # 'raise' and 'capital' should survive now (no longer in QUERY_STOP)
+    assert any(w in bare_words for w in ("raise", "capital", "service")), f"Domain terms stripped: {q}"
 
 def test_build_search_query_returns_nonempty():
     """Always returns something even for generic prompts."""

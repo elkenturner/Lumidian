@@ -82,7 +82,7 @@ export default function AccountPage() {
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl"
+      className="px-3 sm:px-8 py-4 sm:py-8 max-w-7xl"
     >
       <div className="mb-7">
         <h1 className="text-2xl font-bold text-[var(--text-primary)]">Account</h1>
@@ -230,7 +230,7 @@ export default function AccountPage() {
             {!showDeleteConfirm ? (
               <button
                 onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-1.5 text-xs text-[var(--text-faint)] hover:text-red-400 border border-[rgba(255,255,255,0.07)] hover:border-red-900/30 rounded-lg px-3 py-1.5 transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 text-xs text-[var(--text-faint)] hover:text-red-400 border border-[rgba(255,255,255,0.07)] hover:border-red-900/30 rounded-lg px-3 py-2.5 sm:py-1.5 min-h-[44px] sm:min-h-0 transition-colors cursor-pointer"
               >
                 <Trash2 size={11} />
                 Request deletion
@@ -245,7 +245,7 @@ export default function AccountPage() {
                   value={deleteInput}
                   onChange={(e) => setDeleteInput(e.target.value)}
                   placeholder="DELETE"
-                  className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] text-xs rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-[rgba(255,255,255,0.20)] placeholder-[var(--text-faint)]"
+                  className="mobile-input w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] text-xs rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-[rgba(255,255,255,0.20)] placeholder-[var(--text-faint)]"
                 />
                 <div className="flex gap-2">
                   <button

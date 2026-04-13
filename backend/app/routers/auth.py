@@ -819,6 +819,41 @@ async def reset_password(request: ResetPasswordRequest, http_req: Request, db: D
     return {"message": "Password updated successfully"}
 
 
+# ── Change password (authenticated) ──────────────────────────────────────────
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@router.post("/change-password", status_code=status.HTTP_200_OK)
+async def change_password(
+    body: ChangePasswordRequest,
+    db: DbDep,
+    current_user: Annotated[User, Depends(get_current_user)],
+):
+    """Authenticated password change — requires current password."""
+    if not current_user.password_hash:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Account uses social login. Set a password via the reset flow.",
+        )
+
+    if not verify_password(body.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Current password is incorrect.",
+        )
+
+    _validate_password(body.new_password)
+
+    current_user.password_hash = hash_password(body.new_password)
+    current_user.password_changed_at = datetime.now(UTC).replace(tzinfo=None)
+    await db.commit()
+
+    return {"message": "Password updated successfully"}
+
+
 # ── Email verification ────────────────────────────────────────────────────────
 
 class VerifyEmailRequest(BaseModel):

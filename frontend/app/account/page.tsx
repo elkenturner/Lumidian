@@ -20,6 +20,7 @@ import {
 import {
   getBillingStatus,
   BillingStatus,
+  changePassword,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { logError } from '@/lib/utils/errors';
@@ -61,6 +62,11 @@ export default function AccountPage() {
   const [billingLoading, setBillingLoading] = useState(true);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwMsg, setPwMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   useEffect(() => { document.title = 'Account \u2014 Lumidian'; }, []);
 
@@ -202,13 +208,66 @@ export default function AccountPage() {
                   Two-factor authentication not enabled
                 </div>
               )}
-              <button
-                onClick={() => router.push('/forgot-password')}
-                className="flex items-center gap-1.5 text-xs text-[var(--accent)] hover:text-[var(--accent-foreground)] transition-colors cursor-pointer"
-              >
-                <ArrowRight size={11} />
-                Change password
-              </button>
+              {!showPasswordForm ? (
+                <button
+                  onClick={() => { setShowPasswordForm(true); setPwMsg(null); }}
+                  className="flex items-center gap-1.5 text-xs text-[var(--accent)] hover:text-[var(--accent-foreground)] transition-colors cursor-pointer"
+                >
+                  <ArrowRight size={11} />
+                  Change password
+                </button>
+              ) : (
+                <div className="mt-1 space-y-2">
+                  <input
+                    type="password"
+                    value={currentPw}
+                    onChange={(e) => setCurrentPw(e.target.value)}
+                    placeholder="Current password"
+                    className="mobile-input w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[var(--accent)] placeholder-[var(--text-faint)]"
+                  />
+                  <input
+                    type="password"
+                    value={newPw}
+                    onChange={(e) => setNewPw(e.target.value)}
+                    placeholder="New password (min 8 chars)"
+                    className="mobile-input w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[var(--accent)] placeholder-[var(--text-faint)]"
+                  />
+                  {pwMsg && (
+                    <p className={`text-[11px] ${pwMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{pwMsg.text}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setShowPasswordForm(false); setCurrentPw(''); setNewPw(''); setPwMsg(null); }}
+                      className="flex-1 py-1.5 text-xs text-[var(--text-faint)] border border-[rgba(255,255,255,0.07)] rounded-lg hover:text-[var(--text-muted)] transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      disabled={pwSaving || !currentPw || !newPw}
+                      onClick={async () => {
+                        setPwSaving(true);
+                        setPwMsg(null);
+                        try {
+                          await changePassword(currentPw, newPw);
+                          setPwMsg({ text: 'Password updated.', ok: true });
+                          setCurrentPw('');
+                          setNewPw('');
+                          setTimeout(() => setShowPasswordForm(false), 1500);
+                        } catch (err: unknown) {
+                          const e = err as { response?: { data?: { detail?: string } } };
+                          setPwMsg({ text: e?.response?.data?.detail || 'Failed to update password.', ok: false });
+                        } finally {
+                          setPwSaving(false);
+                        }
+                      }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 text-xs text-[var(--accent-foreground)] bg-[rgba(95,126,166,0.15)] hover:bg-[rgba(95,126,166,0.25)] rounded-lg disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                    >
+                      {pwSaving && <Loader2 size={11} className="animate-spin" />}
+                      Save
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 

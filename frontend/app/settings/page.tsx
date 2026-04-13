@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { fadeIn, slideIn } from '@/lib/motion';
 import { useEffect, useState, useRef } from 'react';
 import { logError } from '@/lib/utils/errors';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   User,
@@ -26,6 +27,7 @@ import {
   BookOpen,
   Sparkles,
   Wand2,
+  FileText,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -1044,7 +1046,19 @@ export default function SettingsPage() {
       )}
 
       {/* ── PROFILE TAB ──────────────────────────────────────────────────────── */}
-      {activeTab === 'profile' && (
+      {activeTab === 'profile' && !brand && (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="w-14 h-14 bg-[rgba(95,126,166,0.08)] border border-[var(--border-subtle)] rounded-2xl flex items-center justify-center mb-4">
+            <FileText size={24} className="text-[var(--accent)]" />
+          </div>
+          <p className="text-sm font-semibold text-[var(--text-primary)] mb-1.5">No brand yet</p>
+          <p className="text-xs text-[var(--text-muted)] mb-5">Add your first brand to configure its profile.</p>
+          <Link href="/onboarding" className="inline-flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] bg-[var(--bg-raised)] border border-[var(--border-default)] hover:border-[var(--accent)] rounded-lg px-4 py-2.5 transition-colors">
+            Create a brand
+          </Link>
+        </div>
+      )}
+      {activeTab === 'profile' && brand && (
         <div>
           {profile && (
             <div className="mb-5 card" style={{ padding: 16 }}>

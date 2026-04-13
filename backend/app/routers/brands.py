@@ -750,6 +750,12 @@ async def fetch_website_context_endpoint(
                     }],
                 )
                 description = resp.content[0].text.strip()
+                # Guard against LLM refusal text leaking through
+                if description and any(
+                    description.lower().startswith(p)
+                    for p in ["i cannot", "i can't", "i'm unable", "sorry,", "unfortunately,", "i am unable", "based on the provided"]
+                ):
+                    description = None
         except Exception as exc:
             logger.warning("Description generation failed for %s (non-fatal): %s", payload.url, exc)
 

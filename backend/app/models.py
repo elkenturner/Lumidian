@@ -433,7 +433,7 @@ class BrandProfile(Base):
     brand: Mapped["Brand"] = relationship("Brand", back_populates="profile")
 
 
-# ── Content Opportunities (Reddit/Quora threads) ──────────────────────────────
+# ── Content Opportunities (Reddit/Quora/LinkedIn/X threads) ────────────────────
 
 class ContentOpportunity(Base):
     __tablename__ = "content_opportunities"

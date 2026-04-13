@@ -149,7 +149,7 @@ const FEATURES = [
   {
     icon: Sparkles,
     title: 'Auto-Draft Content',
-    desc: 'Platform-specific drafts generated for every gap — Reddit posts, Quora answers, Medium articles, and Wikipedia edits.',
+    desc: 'Platform-specific drafts generated for every gap — Reddit posts, Quora answers, LinkedIn articles, X threads, Medium articles, and Wikipedia edits.',
   },
   {
     icon: TrendingUp,
@@ -158,8 +158,8 @@ const FEATURES = [
   },
   {
     icon: MessageSquare,
-    title: 'Reddit & Quora Opportunities',
-    desc: 'Surface live threads and questions where your brand can contribute — scored by relevance.',
+    title: 'Live Opportunities',
+    desc: 'Surface live threads and discussions across Reddit, Quora, LinkedIn, and X where your brand can contribute — scored by relevance.',
   },
   {
     icon: Settings2,
@@ -199,7 +199,7 @@ const HOW_STEPS = [
   {
     n: '3',
     title: 'Close the Gaps',
-    desc: 'We generate targeted drafts for Reddit, Quora, Medium, and Wikipedia — each one aimed at prompts where your brand is missing. Review, edit, and post.',
+    desc: 'We generate targeted drafts for Reddit, Quora, LinkedIn, X, Medium, and Wikipedia — each one aimed at prompts where your brand is missing. Review, edit, and post.',
   },
 ];
 
@@ -229,7 +229,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'What kind of content does Lumidian draft?',
-    a: 'Lumidian generates Reddit posts, Quora answers, Medium articles, and Wikipedia edits — all targeted at prompts where your brand has low visibility. Every draft follows your brand voice guidelines.',
+    a: 'Lumidian generates Reddit posts, Quora answers, LinkedIn articles, X threads, Medium articles, and Wikipedia edits — all targeted at prompts where your brand has low visibility. Every draft follows your brand voice guidelines.',
   },
   {
     q: 'Is the content AI-generated or human-written?',

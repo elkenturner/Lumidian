@@ -7,7 +7,7 @@ Improvements over content_service.py:
 - Generates platform-appropriate content that addresses the *specific* gap
 - Enforces strict editorial style rules
 - Calculates an estimated visibility impact score for each draft
-- Supports opportunity-based drafting (reply to a specific Reddit/Quora thread)
+- Supports opportunity-based drafting (reply to a specific opportunity thread)
 
 Public API
 ----------
@@ -758,8 +758,8 @@ async def generate_opportunity_draft(
     opportunity_id: int,
 ) -> ContentDraft:
     """
-    Draft a reply to a specific Reddit/Quora opportunity thread.
-    The reply is short-form (reddit_reply format) and targets the thread directly.
+    Draft a reply to a specific opportunity thread.
+    The reply is short-form and targets the thread directly.
     """
     opp_result = await db.execute(
         select(ContentOpportunity).where(ContentOpportunity.id == opportunity_id)
@@ -994,29 +994,39 @@ async def auto_draft_top_gaps(
         resolved for s in enabled_settings
         if (resolved := resolve_platform_key(s.platform)) in CONTENT_PLATFORMS
     ]
+    # Check if user explicitly disabled any platforms (settings exist but some are off)
+    all_settings_result = await db.execute(
+        select(BrandContentSettings).where(BrandContentSettings.brand_id == brand_id)
+    )
+    all_settings_count = len(list(all_settings_result.scalars().all()))
+    has_disabled_platforms = all_settings_count > 0 and len(enabled_platforms) < len(CONTENT_PLATFORMS)
+
     if not enabled_platforms:
         enabled_platforms = ["reddit", "quora"]
 
-    # --- Compute per-combo cap so we can always fill max_gaps ---
-    # With few prompts/platforms the default cap of 3 per combo can't reach 20.
-    # Scale it up so total_combos × per_combo >= max_gaps, with a floor of 3.
-    n_combos = len(ordered_prompts) * len(enabled_platforms)
+    # --- Compute caps ---
     import math
-    per_combo_cap = max(3, math.ceil(max_gaps / n_combos)) if n_combos else max_gaps
+    n_combos = len(ordered_prompts) * len(enabled_platforms)
+
+    if has_disabled_platforms:
+        # User explicitly disabled platforms — keep per-platform allocation constant
+        # so remaining platforms don't inflate to fill the gap.
+        n_all_combos = len(ordered_prompts) * len(CONTENT_PLATFORMS)
+        per_combo_cap = max(3, math.ceil(max_gaps / n_all_combos)) if n_all_combos else max_gaps
+        effective_max = math.ceil(max_gaps * len(enabled_platforms) / len(CONTENT_PLATFORMS))
+    else:
+        # No explicit disabling — fill normally
+        per_combo_cap = max(3, math.ceil(max_gaps / n_combos)) if n_combos else max_gaps
+        effective_max = max_gaps
 
     # --- Generate: round-robin across platforms for equal distribution ---
-    # Cycles through all (prompt, platform) combinations repeatedly until
-    # max_gaps drafts are created or DRAFT_CAP is hit.
     created: list[ContentDraft] = []
     last_error: Exception | None = None  # track first hard failure for diagnostics
     n_platforms = len(enabled_platforms)
     n_prompts = len(ordered_prompts)
     prompt_idx = 0
     platform_idx = 0  # absolute index, wraps via modulo
-    # Safety limit: stop after enough retries to fill max_gaps even with failures.
-    # Floor of max_gaps * 3 ensures brands with few prompts/platforms still get
-    # adequate retry budget when some attempts fail due to API errors.
-    max_attempts = max(n_prompts * n_platforms * 3, max_gaps * 3)
+    max_attempts = max(n_prompts * n_platforms * 3, effective_max * 3)
     attempts = 0
     # Per-prompt Quora question index — cycles through results so multiple drafts
     # for the same prompt each target a different question.
@@ -1059,11 +1069,11 @@ async def auto_draft_top_gaps(
 
     BATCH_SIZE = 5
 
-    while len(created) < max_gaps and attempts < max_attempts:
+    while len(created) < effective_max and attempts < max_attempts:
         # ── Build a batch of up to BATCH_SIZE tasks ──────────────────────
         batch_tasks: list[tuple] = []  # (coroutine, prompt, platform)
 
-        while len(batch_tasks) < BATCH_SIZE and len(created) + len(batch_tasks) < max_gaps and attempts < max_attempts:
+        while len(batch_tasks) < BATCH_SIZE and len(created) + len(batch_tasks) < effective_max and attempts < max_attempts:
             platform = enabled_platforms[platform_idx % n_platforms]
             prompt = ordered_prompts[prompt_idx % n_prompts]
 

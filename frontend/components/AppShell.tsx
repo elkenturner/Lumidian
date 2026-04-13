@@ -14,6 +14,7 @@ import ModelIcon from '@/components/ModelIcon';
 import NotificationPanel from '@/components/NotificationPanel';
 import BrandAvatar from '@/components/BrandAvatar';
 import LumidianLogo from '@/components/LumidianLogo';
+import PlatformIcon from '@/components/PlatformIcon';
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.bgColor, text: v.color }])
@@ -139,6 +140,238 @@ function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ m
           height: 2,
           width: '100%',
           background: 'linear-gradient(90deg, transparent, rgba(95,126,166,0.5), rgba(168,85,247,0.5), transparent)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 2s linear infinite',
+        }}
+      />
+    </div>
+  );
+}
+
+/* ── Premium animated drafts-generating banner ────────────────────────────── */
+const DRAFT_PLATFORM_ITEMS = [
+  { key: 'reddit', label: 'Reddit', color: '#ff4500' },
+  { key: 'quora', label: 'Quora', color: '#b92b27' },
+  { key: 'medium', label: 'Medium', color: '#00ab6c' },
+  { key: 'wikipedia', label: 'Wikipedia', color: '#94a3b8' },
+  { key: 'linkedin', label: 'LinkedIn', color: '#0a66c2', proOnly: true },
+  { key: 'x', label: 'X', color: '#e7e9ea', proOnly: true },
+] as const;
+
+function DraftsGeneratingBanner({ isMobile, isPro }: { isMobile: boolean; isPro: boolean }) {
+  const platforms = DRAFT_PLATFORM_ITEMS.filter(p => !('proOnly' in p) || isPro);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    if (platforms.length <= 1) return;
+    const t = setInterval(() => setActiveIdx(i => (i + 1) % platforms.length), 2200);
+    return () => clearInterval(t);
+  }, [platforms.length]);
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'radial-gradient(ellipse at 20% 50%, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.02) 70%, transparent 100%)',
+        borderBottom: '1px solid rgba(16,185,129,0.18)',
+      }}
+    >
+      <div style={{
+        padding: isMobile ? '8px 12px' : '10px 28px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: isMobile ? 10 : 14,
+        flexWrap: 'wrap',
+      }}>
+        {/* Rotating platform logo */}
+        <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
+          {platforms.map((p, i) => (
+            <div
+              key={p.key}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 8,
+                background: `${p.color}15`,
+                border: `1px solid ${p.color}25`,
+                opacity: i === activeIdx ? 1 : 0,
+                transition: 'opacity 0.4s ease-in-out',
+              }}
+            >
+              <PlatformIcon platform={p.key} size={15} color={p.color} />
+              <span style={{ fontSize: 7, fontWeight: 700, color: p.color, lineHeight: 1, marginTop: 1 }}>
+                {p.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Text */}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600 }}>
+            Drafts generating
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>
+            — writing new content for your top visibility gaps
+          </span>
+        </div>
+
+        {/* Platform pills */}
+        {!isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {platforms.map(p => (
+              <span
+                key={p.key}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: '3px 8px',
+                  borderRadius: 9999,
+                  background: `${p.color}15`,
+                  color: p.color,
+                }}
+              >
+                <PlatformIcon platform={p.key} size={10} color={p.color} />
+                <span style={{ display: 'inline-flex', gap: 2 }}>
+                  <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', animation: 'pulse 1.4s ease-in-out infinite', animationDelay: '0s' }} />
+                  <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', animation: 'pulse 1.4s ease-in-out infinite', animationDelay: '0.2s' }} />
+                  <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', animation: 'pulse 1.4s ease-in-out infinite', animationDelay: '0.4s' }} />
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Shimmer bar */}
+      <div
+        style={{
+          height: 2,
+          width: '100%',
+          background: 'linear-gradient(90deg, transparent, rgba(16,185,129,0.5), rgba(52,211,153,0.5), transparent)',
+          backgroundSize: '200% 100%',
+          animation: 'shimmer 2s linear infinite',
+        }}
+      />
+    </div>
+  );
+}
+
+/* ── Premium animated scanning banner ─────────────────────────────────────── */
+const SCAN_PLATFORM_ITEMS = [
+  { key: 'reddit', label: 'Reddit', color: '#ff4500' },
+  { key: 'quora', label: 'Quora', color: '#b92b27' },
+  { key: 'linkedin', label: 'LinkedIn', color: '#0a66c2', proOnly: true },
+  { key: 'x', label: 'X', color: '#e7e9ea', proOnly: true },
+] as const;
+
+function ScanningBanner({ isMobile, isPro }: { isMobile: boolean; isPro: boolean }) {
+  const platforms = SCAN_PLATFORM_ITEMS.filter(p => !('proOnly' in p) || isPro);
+  const [activeIdx, setActiveIdx] = useState(0);
+
+  useEffect(() => {
+    if (platforms.length <= 1) return;
+    const t = setInterval(() => setActiveIdx(i => (i + 1) % platforms.length), 2200);
+    return () => clearInterval(t);
+  }, [platforms.length]);
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'radial-gradient(ellipse at 20% 50%, rgba(6,182,212,0.08) 0%, rgba(6,182,212,0.02) 70%, transparent 100%)',
+        borderBottom: '1px solid rgba(6,182,212,0.18)',
+      }}
+    >
+      <div style={{
+        padding: isMobile ? '8px 12px' : '10px 28px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: isMobile ? 10 : 14,
+        flexWrap: 'wrap',
+      }}>
+        {/* Rotating platform logo */}
+        <div style={{ position: 'relative', width: 32, height: 32, flexShrink: 0 }}>
+          {platforms.map((p, i) => (
+            <div
+              key={p.key}
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 8,
+                background: `${p.color}15`,
+                border: `1px solid ${p.color}25`,
+                opacity: i === activeIdx ? 1 : 0,
+                transition: 'opacity 0.4s ease-in-out',
+              }}
+            >
+              <PlatformIcon platform={p.key} size={15} color={p.color} />
+              <span style={{ fontSize: 7, fontWeight: 700, color: p.color, lineHeight: 1, marginTop: 1 }}>
+                {p.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Text */}
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600 }}>
+            Scanning live opportunities
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>
+            — finding relevant discussions across platforms
+          </span>
+        </div>
+
+        {/* Platform pills */}
+        {!isMobile && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {platforms.map(p => (
+              <span
+                key={p.key}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: '3px 8px',
+                  borderRadius: 9999,
+                  background: `${p.color}15`,
+                  color: p.color,
+                }}
+              >
+                <PlatformIcon platform={p.key} size={10} color={p.color} />
+                <span style={{ display: 'inline-flex', gap: 2 }}>
+                  <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', animation: 'pulse 1.4s ease-in-out infinite', animationDelay: '0s' }} />
+                  <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', animation: 'pulse 1.4s ease-in-out infinite', animationDelay: '0.2s' }} />
+                  <span style={{ width: 3, height: 3, borderRadius: '50%', background: 'currentColor', animation: 'pulse 1.4s ease-in-out infinite', animationDelay: '0.4s' }} />
+                </span>
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Shimmer bar */}
+      <div
+        style={{
+          height: 2,
+          width: '100%',
+          background: 'linear-gradient(90deg, transparent, rgba(6,182,212,0.5), rgba(34,211,238,0.5), transparent)',
           backgroundSize: '200% 100%',
           animation: 'shimmer 2s linear infinite',
         }}
@@ -500,7 +733,7 @@ function AppShellInner({
   draftsGenerating: boolean;
   scanning: boolean;
   modelScores: Array<{ model: string; score: number }>;
-  user: { name?: string | null; email?: string; is_admin?: boolean } | null;
+  user: { name?: string | null; email?: string; is_admin?: boolean; subscription_tier?: string | null } | null;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -584,34 +817,8 @@ function AppShellInner({
       >
         {/* Global status banners — written by dashboard/content pages via localStorage */}
         {reportRunning && <ReportRunningBanner modelScores={modelScores} isMobile={isMobile} />}
-        {draftsGenerating && (
-          <div style={{
-            background: 'rgba(16,185,129,0.06)',
-            borderBottom: '1px solid rgba(16,185,129,0.18)',
-            padding: isMobile ? '6px 12px' : '8px 28px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--success)', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
-            <span style={{ fontSize: 12, color: 'var(--success-text)', fontWeight: 600 }}>Drafts generating</span>
-            <span style={{ fontSize: 12, color: 'var(--success)' }}>— writing new content drafts for your top visibility gaps.</span>
-          </div>
-        )}
-        {scanning && (
-          <div style={{
-            background: 'rgba(6,182,212,0.06)',
-            borderBottom: '1px solid rgba(6,182,212,0.18)',
-            padding: isMobile ? '6px 12px' : '8px 28px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-          }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#06b6d4', display: 'inline-block', animation: 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' }} />
-            <span style={{ fontSize: 12, color: '#67e8f9', fontWeight: 600 }}>Scanning live opportunities</span>
-            <span style={{ fontSize: 12, color: '#06b6d4' }}>— finding relevant discussions on Reddit and Quora.</span>
-          </div>
-        )}
+        {draftsGenerating && <DraftsGeneratingBanner isMobile={isMobile} isPro={user?.subscription_tier === 'pro' || !!user?.is_admin} />}
+        {scanning && <ScanningBanner isMobile={isMobile} isPro={user?.subscription_tier === 'pro' || !!user?.is_admin} />}
         {children}
       </main>
 

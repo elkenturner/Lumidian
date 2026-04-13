@@ -103,7 +103,7 @@ tests/
 | dashboard.py | /api/dashboard | SOV, sentiment, position, competitor overview |
 | content.py | /api/content | Drafts, posts, settings, platform guidelines, attribution |
 | gaps.py | /api/gaps | Content gap analysis |
-| opportunities.py | /api/opportunities | Reddit/Quora opportunity management |
+| opportunities.py | /api/opportunities | Reddit/Quora/LinkedIn/X opportunity management |
 | analytics.py | /api/analytics | Event tracking |
 | reports.py | /api/reports | PDF generation + history |
 | billing.py | /api/billing | Stripe subscriptions, portal, webhooks |
@@ -246,7 +246,7 @@ Free-only temporary brands (brand_type=pitch). Auto-upgraded to standard when us
 Caps defined in `routers/content.py` (`TIER_SCHEDULED_CAPS`) and `services/drafting_service.py` (`TIER_DRAFT_CAPS`). Frontend reads caps dynamically from `GET /api/content/{brand_id}/draft-status` — no hardcoded values in UI.
 
 ### Content Drafting Flow
-Drafts are generated on brand creation (onboarding) and manually via "Regenerate Drafts". No recurring auto-draft job. Opportunity scanners (Reddit, Quora, LinkedIn, X) run weekly on Monday and are separate from drafting. Draft platforms: reddit, quora, medium, wikipedia, linkedin, x.
+Drafts are generated on brand creation (onboarding) and manually via "Regenerate Drafts". No recurring auto-draft job. Opportunity scanning is fully manual/on-demand (triggered by user or during onboarding) and is separate from drafting. Draft platforms: reddit, quora, medium, wikipedia, linkedin, x.
 
 ### LLM Concurrency & Resilience
 Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Overall tracking concurrency: `MAX_CONCURRENT=10` in `tracking_service.py`. Model fallbacks on overload (503): `gemini-2.5-pro` → `gemini-2.5-flash`, `sonar-pro` → `sonar`. Rate limit errors get 65s retry delay. Auth errors (invalid API key) are not retried. Timeouts: Claude draft generation 30s, sentiment classification 15s, Reddit scanner relevance 10s.
@@ -272,10 +272,6 @@ Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Over
 | Time | Frequency | Job |
 |------|-----------|-----|
 | 02:00 | Daily | SQLite backup |
-| 03:15 | Weekly (Mon) | Reddit opportunity scanner |
-| 03:30 | Weekly (Mon) | Quora opportunity scanner |
-| 03:40 | Weekly (Mon) | LinkedIn opportunity scanner (Pro only) |
-| 03:50 | Weekly (Mon) | X opportunity scanner (Pro only) |
 | 04:00 | Monthly (1st) | Website context refresh via Jina |
 | 06:00 | Daily | Pitch expiry warnings & cleanup |
 | 08:00 | Daily | Morning visibility tracking sweep |

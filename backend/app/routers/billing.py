@@ -62,10 +62,9 @@ TEAM_MEMBER_LIMITS: dict = {
     "starter": 1,
     "pro": 3,
 }
-# Weekly manual opp-scan limits per brand.
-# Free users only get the weekly auto-scan; manual re-scans require a paid plan.
+# Weekly manual opp-scan limits per brand (on-demand only, no auto-scans).
 WEEKLY_SCAN_LIMITS: dict = {
-    None: 0, "": 0,
+    None: 2, "": 2,
     "starter": 10,
     "pro": 25,
 }

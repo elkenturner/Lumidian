@@ -34,7 +34,7 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
 
   const oppPlatforms = ['reddit', 'quora', 'linkedin', 'x'];
   const oppFilterBar = oppPlatforms.length >= 2 ? (
-    <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 mb-4 self-start">
+    <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 mb-4 self-start overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
       <button
         onClick={() => setOppPlatformFilter('all')}
         className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${oppPlatformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}

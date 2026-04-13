@@ -471,7 +471,7 @@ export function DraftCard({
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             rows={8}
-            className="w-full bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none font-mono"
+            className="w-full bg-[var(--bg-raised)] border border-[var(--border-subtle)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none font-mono mobile-input"
           />
           <div className="flex gap-2">
             <button
@@ -517,7 +517,7 @@ export function DraftCard({
       )}
 
       {!editing && (
-        <div className="flex items-center gap-2 pt-1 flex-wrap">
+        <div className="flex items-center gap-2 pt-1 flex-wrap [&>button]:min-h-[44px] [&>button]:sm:min-h-0">
           <button
             onClick={() => setEditing(true)}
             aria-label="Edit draft"

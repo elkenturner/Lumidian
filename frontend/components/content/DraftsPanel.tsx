@@ -39,10 +39,10 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
   const filterBar = (
     <div className="flex items-center justify-between mb-4">
       {draftPlatforms.length >= 2 ? (
-        <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 self-start">
+        <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 self-start overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
           <button
             onClick={() => setDraftPlatformFilter('all')}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${draftPlatformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+            className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-[color,background-color] ${draftPlatformFilter === 'all' ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
           >
             All
           </button>
@@ -50,7 +50,7 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
             <button
               key={p}
               onClick={() => setDraftPlatformFilter(draftPlatformFilter === p ? 'all' : p)}
-              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${draftPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
+              className={`px-2.5 py-1.5 rounded-md text-xs font-medium transition-[color,background-color] ${draftPlatformFilter === p ? 'bg-[var(--bg-card)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'}`}
             >
               {PLATFORM_DISPLAY[p] ?? p}
             </button>

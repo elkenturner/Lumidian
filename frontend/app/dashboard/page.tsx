@@ -478,7 +478,7 @@ export default function DashboardPage() {
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl"
+      className="px-3 sm:px-8 py-4 sm:py-8 max-w-7xl"
       style={isMobile ? { overflowY: 'auto', minHeight: '100vh' } : undefined}
     >
       {/* Pull-to-refresh indicator */}

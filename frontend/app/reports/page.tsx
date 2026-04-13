@@ -290,13 +290,13 @@ export default function ReportsPage() {
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="px-4 sm:px-8 py-6 sm:py-8 max-w-7xl"
+      className="px-3 sm:px-8 py-4 sm:py-8 max-w-7xl"
     >
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)]">Reports</h1>
-          <p className="text-[13px] text-[var(--text-muted)] mt-1.5">Per-prompt visibility breakdown by AI model</p>
+          <h1 className="text-lg sm:text-2xl font-bold text-[var(--text-primary)]">Reports</h1>
+          <p className="hidden sm:block text-[13px] text-[var(--text-muted)] mt-1.5">Per-prompt visibility breakdown by AI model</p>
         </div>
         <div className={`flex ${isMobile ? 'flex-col w-full' : 'items-center'} gap-2 md:gap-3`}>
           {responses.length > 0 && (
@@ -314,7 +314,7 @@ export default function ReportsPage() {
               <button
                 onClick={downloadPDF}
                 disabled={exportingPDF}
-                className={`flex items-center gap-2 bg-[rgba(95,126,166,0.10)] hover:bg-[rgba(95,126,166,0.16)] border border-[rgba(95,126,166,0.25)] text-[var(--accent-light)] hover:text-[var(--accent-light)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
+                className={`w-full sm:w-auto flex items-center gap-2 bg-[rgba(95,126,166,0.10)] hover:bg-[rgba(95,126,166,0.16)] border border-[rgba(95,126,166,0.25)] text-[var(--accent-light)] hover:text-[var(--accent-light)] rounded-lg px-3 py-2 transition-colors text-xs font-medium disabled:opacity-60 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
                 title="Export as PDF"
               >
                 {exportingPDF

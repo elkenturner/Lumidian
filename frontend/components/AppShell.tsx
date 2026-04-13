@@ -305,13 +305,15 @@ function MobileHeader({
             onClick={(e) => e.stopPropagation()}
             style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200 }}
           >
-            <NotificationPanel
-              notifications={notifications}
-              unreadCount={unreadCount}
-              panelLeft={0}
-              onMarkAllRead={onMarkAllRead}
-              onClose={onNotifClose}
-            />
+            <div className="[&>div]:!static [&>div]:!w-full [&>div]:!max-h-none [&>div]:!border-0 [&>div]:!shadow-none [&>div]:!rounded-none [&>div]:!backdrop-blur-none">
+              <NotificationPanel
+                notifications={notifications}
+                unreadCount={unreadCount}
+                panelLeft={0}
+                onMarkAllRead={onMarkAllRead}
+                onClose={onNotifClose}
+              />
+            </div>
           </div>
         </div>
       )}

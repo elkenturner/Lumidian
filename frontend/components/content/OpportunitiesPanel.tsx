@@ -13,6 +13,7 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
   const {
     opportunities, visibleOpportunities, oppPlatformFilter, setOppPlatformFilter,
     handleDraftOpportunity, handleDismissOpportunity, draftStatus, setOppHelpOpen,
+    _disabledPlatforms,
   } = props;
 
   const header = (
@@ -32,7 +33,7 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
     </>
   );
 
-  const oppPlatforms = ['reddit', 'quora', 'linkedin', 'x'];
+  const oppPlatforms = ['reddit', 'quora', 'linkedin', 'x'].filter((p) => !_disabledPlatforms.has(p));
   const oppFilterBar = oppPlatforms.length >= 2 ? (
     <div className="flex items-center gap-1 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-0.5 mb-4 self-start overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
       <button
@@ -60,7 +61,7 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
         <EmptyState
           icon={<Radio size={26} className="text-[var(--accent-foreground)]" />}
           title="No live opportunities"
-          description="Reddit and Quora are scanned daily. Check back after the next scan or run a tracking report to generate fresh prompts."
+          description="Reddit, Quora, LinkedIn, and X are scanned weekly. Check back after the next scan or run a tracking report to generate fresh prompts."
         />
       </>
     );

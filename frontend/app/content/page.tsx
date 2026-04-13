@@ -1647,7 +1647,7 @@ export default function ContentHubPage() {
   const tabCounts = {
     drafts: draftItems.filter((d) => !_disabledPlatforms.has(d.platform)).length,
     scheduled: scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform)).length,
-    opportunities: opportunities.length,
+    opportunities: opportunities.filter((o) => !_disabledPlatforms.has(o.platform)).length,
     posted: postedItems.length,
   };
 
@@ -1994,8 +1994,8 @@ export default function ContentHubPage() {
       const deadline = Date.now() + 60_000; // 60s timeout
       const scanStart = Date.now();
       // Reddit scanner makes 7 HTTP queries (each with 1s sleep) + sequential Haiku
-      // checks — total ~20-35s. Quora finishes faster (~5-10s). We must wait for
-      // Reddit before declaring the scan done, otherwise we show only Quora results.
+      // checks — total ~20-35s. Other scanners finish faster (~5-10s). We must wait
+      // for all scanners before declaring the scan done.
       const SCAN_MIN_MS = 28_000; // don't declare done until at least 28s have elapsed
       let prevCount = -1; // -1 sentinel so first poll never starts a stableStreak
       let stableStreak = 0;
@@ -2037,7 +2037,7 @@ export default function ContentHubPage() {
         prevCount = count;
 
         // Stable for 5 consecutive polls (10 seconds) = done
-        // Requires 5 matches to ensure both Reddit and Quora scanners have finished
+        // Requires 5 matches to ensure all platform scanners have finished
         if (stableStreak >= 5) {
           setOpportunities(ops);
           setScanning(false);
@@ -2050,7 +2050,7 @@ export default function ContentHubPage() {
             setToast({
               message: promptCount <= 3
                 ? `No opportunities found. Add more prompts to expand the search.`
-                : `No matching threads found on Reddit or Quora right now.`,
+                : `No matching threads found right now.`,
               type: 'info'
             });
           } else if (promptCount <= 3) {
@@ -2093,17 +2093,16 @@ export default function ContentHubPage() {
   }
 
   // Filter drafts to only show enabled platforms + active platform filter
-  const oppScanEnabled = !_disabledPlatforms.has('reddit') || !_disabledPlatforms.has('quora');
   const visibleDraftItems = draftItems.filter(
     (d) => !_disabledPlatforms.has(d.platform) && (draftPlatformFilter === 'all' || d.platform === draftPlatformFilter)
   );
   const visibleScheduledItems = scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform));
   const visibleOpportunities = opportunities.filter(
-    (o) => oppPlatformFilter === 'all' || o.platform === oppPlatformFilter
+    (o) => !_disabledPlatforms.has(o.platform) && (oppPlatformFilter === 'all' || o.platform === oppPlatformFilter)
   );
 
   const TABS: { key: QueueTab; label: string }[] = [
-    ...(oppScanEnabled ? [{ key: 'opportunities' as QueueTab, label: 'Live Opportunities' }] : []),
+    { key: 'opportunities' as QueueTab, label: 'Live Opportunities' },
     { key: 'drafts', label: 'Drafts' },
     { key: 'scheduled', label: 'Saved Drafts' },
     { key: 'posted', label: 'Posted' },
@@ -2141,10 +2140,10 @@ export default function ContentHubPage() {
       {/* Help modals */}
       {hubHelpOpen && (
         <HelpModal title="How Content Hub works" onClose={() => setHubHelpOpen(false)}>
-          <p>Content Hub generates AI drafts for your brand and surfaces Reddit and Quora threads where you can contribute.</p>
+          <p>Content Hub generates AI drafts for your brand and surfaces live threads across Reddit, Quora, LinkedIn, and X where you can contribute.</p>
           <ul className="space-y-2 mt-2">
             <li><span className="text-[var(--text-primary)] font-medium">Regenerate Drafts</span> — replaces all existing drafts with a fresh batch across your tracked prompts and platforms.</li>
-            <li><span className="text-[var(--text-primary)] font-medium">Live Opportunities</span> tab updates daily as Reddit and Quora are scanned overnight for threads matching your tracked prompts.</li>
+            <li><span className="text-[var(--text-primary)] font-medium">Live Opportunities</span> tab updates weekly as Reddit, Quora, LinkedIn, and X are scanned for threads matching your tracked prompts.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Drafts tab</span> — review, edit, and approve AI drafts before they go live.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Saved Drafts tab</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Posted tab</span> — content that has been marked as posted.</li>
@@ -2154,7 +2153,7 @@ export default function ContentHubPage() {
       )}
       {oppHelpOpen && (
         <HelpModal title="Live Opportunities" onClose={() => setOppHelpOpen(false)}>
-          <p>Reddit threads and Quora questions where your brand can meaningfully contribute.</p>
+          <p>Threads and discussions across Reddit, Quora, LinkedIn, and X where your brand can meaningfully contribute.</p>
           <p>Scanners search for content matching your tracked prompts. Only results with a relevance score of 40+ are shown.</p>
           <ul className="space-y-2 mt-2">
             <li><span className="text-[var(--text-primary)] font-medium">Relevance score</span> — how closely the thread or question matches your tracked prompts, based on keyword overlap, recency, and engagement.</li>
@@ -2605,7 +2604,7 @@ export default function ContentHubPage() {
                             )}
                           </button>
                           <p className="text-xs text-[var(--text-faint)] mt-2 text-center">
-                            {scanning ? 'Scanning Reddit & Quora for new opportunities…' : 'Replaces all opportunities with a fresh scan'}
+                            {scanning ? 'Scanning for new opportunities…' : 'Replaces all opportunities with a fresh scan'}
                           </p>
                         </>
                       ) : (

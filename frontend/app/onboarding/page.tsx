@@ -14,11 +14,18 @@ import {
   normaliseWebsiteUrl,
   triggerRun,
 } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { logError } from '@/lib/utils/errors';
 type Step = 1 | 2 | 3;
 
+const TIER_BRAND_TYPE: Record<string, 'standard' | 'pitch' | 'pro'> = {
+  starter: 'standard',
+  pro: 'pro',
+};
+
 export default function OnboardingPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [step, setStep] = useState<Step>(1);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -92,10 +99,11 @@ export default function OnboardingPage() {
       // 1. Create brand with prompts
       const validPrompts = prompts.filter((p) => p.trim());
       const normalisedUrl = normaliseWebsiteUrl(websiteUrl);
+      const brandType = TIER_BRAND_TYPE[user?.subscription_tier ?? ''] ?? 'pitch' as const;
       const brand = await createBrand({
         name: brandName.trim(),
         tier: 'basic',
-        brand_type: 'pitch',
+        brand_type: brandType,
         prompts: validPrompts.length > 0 ? validPrompts : [],
         website_url: normalisedUrl ?? undefined,
       });
@@ -212,7 +220,7 @@ export default function OnboardingPage() {
         {step === 1 && (
           <div>
             <h2 className="text-xl font-bold text-[var(--text-primary)] mb-1">What&apos;s your brand?</h2>
-            <p className="text-sm text-[var(--text-muted)] mb-6">We&apos;ll track how AI models mention your brand and generate a pitch deck with your visibility data. Free for 30 days.</p>
+            <p className="text-sm text-[var(--text-muted)] mb-6">We&apos;ll track how AI models mention your brand and generate a pitch deck with your visibility data.{!user?.subscription_tier && ' Free for 30 days.'}</p>
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Brand Name</label>

@@ -916,6 +916,11 @@ export async function authLogout(): Promise<void> {
   await api.post('/auth/logout');
 }
 
+export async function changePassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+  const res = await api.post<{ message: string }>('/auth/change-password', { current_password: currentPassword, new_password: newPassword });
+  return res.data;
+}
+
 export async function authVerifyEmail(email: string, code: string): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>('/auth/verify-email', { email, code });
   return res.data;

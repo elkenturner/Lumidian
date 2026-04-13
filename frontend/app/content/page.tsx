@@ -2147,7 +2147,6 @@ export default function ContentHubPage() {
             <li><span className="text-[var(--text-primary)] font-medium">Live Opportunities</span> tab updates daily as Reddit and Quora are scanned overnight for threads matching your tracked prompts.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Drafts tab</span> — review, edit, and approve AI drafts before they go live.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Saved Drafts tab</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
-            <li><span className="text-[var(--text-primary)] font-medium">Live Opportunities</span> — Reddit threads and Quora questions where a thoughtful reply could improve your brand&apos;s visibility.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Posted tab</span> — content that has been marked as posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Brand Settings</span> — control which platforms generate drafts and how frequently.</li>
           </ul>

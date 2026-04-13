@@ -509,17 +509,21 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Usage indicator (non-admin, Starter plan) — compact inline */}
-      {usage && !user?.is_admin && usage.manual_run_limit !== null && (
+      {/* Usage indicator (non-admin) — compact inline */}
+      {usage && !user?.is_admin && (
         <div className="flex items-center gap-3 text-[10px] text-[var(--text-faint)] mb-4">
           <span className="flex items-center gap-1.5">
             <span className="text-[var(--text-muted)]">{totalPrompts} prompt{totalPrompts !== 1 ? 's' : ''}</span>
           </span>
-          <span className="text-[var(--bg-elevated)]">&middot;</span>
-          <span className="flex items-center gap-1.5">
-            <span className="text-[var(--text-muted)]">Runs today</span>
-            <span className="font-semibold tabular-nums text-[var(--text-secondary)]">{usage.manual_runs_today}/{usage.manual_run_limit}</span>
-          </span>
+          {usage.manual_run_limit !== null && (
+            <>
+              <span className="text-[var(--bg-elevated)]">&middot;</span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-[var(--text-muted)]">Runs today</span>
+                <span className="font-semibold tabular-nums text-[var(--text-secondary)]">{usage.manual_runs_today}/{usage.manual_run_limit}</span>
+              </span>
+            </>
+          )}
         </div>
       )}
 

@@ -305,7 +305,23 @@ function MobileHeader({
             onClick={(e) => e.stopPropagation()}
             style={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200 }}
           >
-            <div className="[&>div]:!static [&>div]:!w-full [&>div]:!max-h-none [&>div]:!border-0 [&>div]:!shadow-none [&>div]:!rounded-none [&>div]:!backdrop-blur-none">
+            <div
+              ref={(el) => {
+                if (el) {
+                  const child = el.firstElementChild as HTMLElement;
+                  if (child) {
+                    child.style.position = 'static';
+                    child.style.width = '100%';
+                    child.style.maxHeight = 'none';
+                    child.style.bottom = 'auto';
+                    child.style.left = 'auto';
+                    child.style.border = 'none';
+                    child.style.boxShadow = 'none';
+                    child.style.borderRadius = '0';
+                  }
+                }
+              }}
+            >
               <NotificationPanel
                 notifications={notifications}
                 unreadCount={unreadCount}
@@ -333,7 +349,8 @@ function BrandSwitcherSheet({
   onSelectBrand: (id: number) => void;
   onClose: () => void;
 }) {
-  const tierLabel = (tier?: string) => {
+  const tierLabel = (tier?: string, brandType?: string) => {
+    if (brandType === 'pitch') return 'Pitch';
     if (!tier) return null;
     const map: Record<string, string> = { basic: 'Free', standard: 'Starter', premium: 'Pro' };
     return map[tier] || tier;
@@ -417,15 +434,19 @@ function BrandSwitcherSheet({
                   }}>
                     {brand.name}
                   </div>
-                  {brand.tier && (
+                  {(brand.tier || brand.brand_type === 'pitch') && (
                     <span style={{
                       fontSize: 10,
                       fontWeight: 500,
-                      color: 'var(--text-faint)',
+                      color: brand.brand_type === 'pitch'
+                        ? 'var(--warning)'
+                        : brand.tier === 'premium'
+                          ? 'var(--accent-foreground)'
+                          : 'var(--text-faint)',
                       marginTop: 1,
                       display: 'block',
                     }}>
-                      {tierLabel(brand.tier)}
+                      {tierLabel(brand.tier, brand.brand_type)}
                     </span>
                   )}
                 </div>

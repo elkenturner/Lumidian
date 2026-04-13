@@ -19,7 +19,7 @@ export default function DonutDomains({ domains }: DonutDomainsProps) {
   };
 
   return (
-    <div className="flex items-center gap-5 flex-1 min-h-0">
+    <div className="flex items-center gap-5 flex-1 min-h-0 max-w-full sm:max-w-none">
       {/* Modern Donut */}
       <div className="relative flex-shrink-0" style={{ width: 110, height: 110 }}>
         <PieChart width={110} height={110}>

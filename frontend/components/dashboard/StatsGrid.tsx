@@ -47,7 +47,7 @@ export default function StatsGrid({ totalPrompts, daysSinceFirst, publishedCount
         <motion.div
           key={label}
           variants={staggerChild}
-          className={`card-hover bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-xl px-4 py-4 flex items-center gap-3 ${isMobile ? 'min-w-[160px]' : ''}`}
+          className={`card-hover bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-xl px-4 py-4 flex items-center gap-3 ${isMobile ? 'min-w-[170px]' : ''}`}
           style={{ borderTopColor: borderTop, borderTopWidth: 2 }}
         >
           <div

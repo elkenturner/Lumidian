@@ -162,7 +162,7 @@ async def dismiss_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser)
 )
 async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     """
-    Generate a reply draft for a specific Reddit/Quora thread opportunity.
+    Generate a reply draft for a specific opportunity thread.
     Uses the dynamic drafting engine with full BrandProfile context.
     """
     check_rate_limit(user.id, limit=10)  # 10 opportunity drafts per minute per user
@@ -205,7 +205,7 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
 
 
 async def _scan_and_log(brand_id: int, user_tier: str | None = None, is_admin: bool = False) -> None:
-    """Run Reddit, Quora, LinkedIn, and X scanners in parallel, then log the scan_completed event."""
+    """Run all applicable scanners for a brand in parallel, then log the scan_completed event."""
     from app.database import AsyncSessionLocal
     from app.services import quora_scanner_service, reddit_scanner_service
     from app.services.analytics_service import log_event
@@ -252,12 +252,12 @@ async def _scan_and_log(brand_id: int, user_tier: str | None = None, is_admin: b
 @router.post("/{brand_id}/scan", status_code=status.HTTP_202_ACCEPTED)
 async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     """
-    Trigger an on-demand Reddit + Quora scan for a brand (fire-and-forget).
+    Trigger an on-demand opportunity scan for a brand (fire-and-forget).
     Returns immediately; scan runs in the background.
 
-    Free users are blocked (they receive the automatic weekly scan instead).
-    Starter: 10 manual scans per 7-day rolling window.
-    Pro: 25 manual scans per 7-day rolling window.
+    Free: 2 scans per 7-day rolling window.
+    Starter: 10 scans per 7-day rolling window.
+    Pro: 25 scans per 7-day rolling window.
     Admins: unlimited.
     """
     from datetime import datetime, timedelta
@@ -279,10 +279,7 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
         if scan_limit == 0:
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail=(
-                    "Manual opportunity scans are available on Starter and Pro plans. "
-                    "Your brand will be scanned automatically each week."
-                ),
+                detail="Opportunity scanning is not available for your current plan.",
             )
         week_ago = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
         used_result = await db.execute(
@@ -346,6 +343,6 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
 
     asyncio.create_task(
         _scan_with_state_cleanup(brand_id, user.subscription_tier, admin=user.is_admin),
-        name=f"reddit-scan-{brand_id}",
+        name=f"opportunity-scan-{brand_id}",
     )
     return {"message": f"Scan started for brand {brand_id}", "brand_id": brand_id}

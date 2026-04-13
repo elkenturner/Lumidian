@@ -2487,7 +2487,7 @@ export default function ContentHubPage() {
           {/* ── Left panel (70%) — Content Queue ────────────────────────────── */}
           <div className="flex-1 min-w-0">
             {/* Tab bar */}
-            <div className="flex gap-1 mb-5">
+            <div className="flex gap-1 mb-5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
               {TABS.map((tab) => (
                 <button
                   key={tab.key}

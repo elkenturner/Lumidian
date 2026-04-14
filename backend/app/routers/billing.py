@@ -245,7 +245,7 @@ def _validate_redirect_url(url: str) -> str:
 
 
 class CheckoutRequest(BaseModel):
-    tier: str  # 'starter' | 'pro'
+    tier: str  # 'basic' | 'starter' | 'pro'
     success_url: str = ""
     cancel_url: str = ""
 
@@ -269,7 +269,11 @@ async def create_checkout(
 ):
     if request.tier not in TIER_PRICES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid tier")
-    price_id = TIER_PRICES[request.tier]
+    # Re-read from env at request time so runtime patches (tests, Railway env
+    # var injection) take effect even after the module-level TIER_PRICES was
+    # computed at import time.
+    env_key = f"STRIPE_{request.tier.upper()}_PRICE_ID"
+    price_id = os.getenv(env_key, "") or TIER_PRICES.get(request.tier, "")
     if not price_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -355,7 +359,7 @@ async def customer_portal(
 # ── Change plan ───────────────────────────────────────────────────────────────
 
 class ChangePlanRequest(BaseModel):
-    tier: str  # 'starter' | 'pro'
+    tier: str  # 'basic' | 'starter' | 'pro'
 
 
 @router.post("/change-plan")
@@ -491,6 +495,14 @@ async def _upgrade_brands_for_tier(db: AsyncSession, user_id: int, tier: str) ->
         )
         if result.rowcount > 0:
             logger.info("Auto-upgraded %d brand(s) to pro for user %d", result.rowcount, user_id)
+    elif tier == "basic":
+        result = await db.execute(
+            sa_update(Brand)
+            .where(Brand.user_id == user_id, Brand.brand_type == "pitch")
+            .values(brand_type="standard", prompt_limit=15)
+        )
+        if result.rowcount > 0:
+            logger.info("Auto-upgraded %d pitch brand(s) to standard (basic) for user %d", result.rowcount, user_id)
     elif tier == "starter":
         result = await db.execute(
             sa_update(Brand)

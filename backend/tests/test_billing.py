@@ -331,3 +331,13 @@ async def test_webhook_checkout_completed_sets_active_tier(client: httpx.AsyncCl
     assert data["subscription_tier"] == "starter", f"Expected starter, got {data['subscription_tier']}"
     assert data["subscription_status"] == "active", f"Expected active, got {data['subscription_status']}"
     assert data.get("subscription_trial_end") is None, "Trial end must be None after paid checkout"
+
+
+async def test_billing_usage_basic_tier(client: httpx.AsyncClient):
+    """Basic-tier user gets correct run limit (2) and prompt limit (15)."""
+    await register_and_login(client, email="billing_basic_usage@example.com", subscription_tier="basic")
+    resp = await client.get("/api/billing/usage")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["manual_run_limit"] == 2
+    assert data["prompt_limit"] == 15

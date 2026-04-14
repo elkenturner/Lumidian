@@ -236,11 +236,22 @@ Missing LLM API key → placeholder response returned; user prompted to configur
 ### Pitch Brands
 Free-only temporary brands (brand_type=pitch). Auto-upgraded to standard when user subscribes. Expire 30 days after creation. Auto-cleaned at 06:00 UTC daily. Expiry warning emails sent beforehand. Limited to 1 manual draft regen per week.
 
+### Tier Naming Convention
+Internal database keys differ from UI display names. See `TIER_DISPLAY_NAMES` in `billing.py` for the canonical mapping.
+
+| Internal key | Display name | Price |
+|-------------|-------------|-------|
+| `None` | Free | $0 |
+| `"basic"` | Starter | $100/mo |
+| `"starter"` | Growth | $300/mo |
+| `"pro"` | Pro | $500/mo |
+
 ### Content Draft Caps
 | Tier | Draft queue (unreviewed) | Scheduled queue (approved) |
 |------|--------------------------|----------------------------|
 | Free (pitch) | 5 | 10 |
-| Starter | 20 | 50 |
+| Starter (basic) | 10 | 25 |
+| Growth (starter) | 20 | 50 |
 | Pro | 20 | 100 |
 
 Caps defined in `routers/content.py` (`TIER_SCHEDULED_CAPS`) and `services/drafting_service.py` (`TIER_DRAFT_CAPS`). Frontend reads caps dynamically from `GET /api/content/{brand_id}/draft-status` — no hardcoded values in UI.

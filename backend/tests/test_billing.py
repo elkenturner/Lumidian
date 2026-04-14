@@ -181,6 +181,101 @@ async def test_billing_status_basic_tier_brand_limits(client: httpx.AsyncClient)
     assert data["brand_limits"]["pitch"] == 0
 
 
+async def test_webhook_checkout_completed_basic_tier(client: httpx.AsyncClient):
+    """checkout.session.completed with tier=basic upgrades pitch brand to standard with prompt_limit=15."""
+    import json
+
+    import stripe as _stripe
+
+    await register_and_login(client, email="billing_basic_wh@example.com", subscription_tier=None)
+
+    # Create a pitch brand (free-tier users can only create pitch brands)
+    resp = await client.post("/api/brands", json={
+        "name": "BasicTestBrand",
+        "brand_type": "pitch",
+        "website_url": "https://example.com",
+        "prompts": ["test prompt"],
+    })
+    assert resp.status_code == 201
+    brand_id = resp.json()["id"]
+
+    customer_id = "cus_basic_webhook"
+
+    from sqlalchemy import update
+
+    from app.database import AsyncSessionLocal
+    from app.models import User
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            update(User)
+            .where(User.email == "billing_basic_wh@example.com")
+            .values(stripe_customer_id=customer_id)
+        )
+        await db.commit()
+
+    payload = {
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "customer": customer_id,
+                "subscription": "sub_basic_test",
+                "metadata": {"tier": "basic", "user_id": "1"},
+            }
+        },
+    }
+    body = json.dumps(payload).encode()
+
+    with patch.dict("os.environ", {
+        "STRIPE_SECRET_KEY": "sk_test_fake",
+        "STRIPE_WEBHOOK_SECRET": "whsec_test_secret",
+    }):
+        with patch.object(_stripe.Webhook, "construct_event", return_value=payload):
+            resp = await client.post(
+                "/api/billing/webhook",
+                content=body,
+                headers={
+                    "stripe-signature": "t=1,v1=fake",
+                    "content-type": "application/json",
+                },
+            )
+
+    assert resp.status_code == 200
+
+    # Verify brand was upgraded
+    from app.models import Brand
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import select
+        result = await db.execute(select(Brand).where(Brand.id == brand_id))
+        brand = result.scalar_one()
+        assert brand.brand_type == "standard"
+        assert brand.prompt_limit == 15
+
+
+async def test_create_checkout_basic_tier(client: httpx.AsyncClient):
+    """create-checkout accepts 'basic' as a valid tier."""
+    from unittest.mock import MagicMock
+
+    await register_and_login(client, email="billing_basic_co@example.com")
+
+    mock_customer = MagicMock()
+    mock_customer.id = "cus_basic_co"
+    mock_session = MagicMock()
+    mock_session.url = "https://checkout.stripe.com/pay/cs_basic"
+
+    with (
+        patch("stripe.Customer.create", return_value=mock_customer),
+        patch("stripe.checkout.Session.create", return_value=mock_session),
+    ):
+        with patch.dict("os.environ", {"STRIPE_BASIC_PRICE_ID": "price_test_basic"}):
+            resp = await client.post(
+                "/api/billing/create-checkout",
+                json={"tier": "basic"},
+            )
+
+    assert resp.status_code == 200
+    assert "checkout_url" in resp.json()
+
+
 async def test_webhook_checkout_completed_sets_active_tier(client: httpx.AsyncClient):
     """checkout.session.completed webhook must set subscription_tier and status='active'."""
     import json

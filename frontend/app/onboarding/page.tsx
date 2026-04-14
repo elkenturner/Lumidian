@@ -18,7 +18,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { logError } from '@/lib/utils/errors';
 type Step = 1 | 2 | 3;
 
+// Internal subscription tier key → brand type created during onboarding.
+// "basic" = Starter ($100), "starter" = Growth ($300), "pro" = Pro ($500).
 const TIER_BRAND_TYPE: Record<string, 'standard' | 'pitch' | 'pro'> = {
+  basic: 'standard',
   starter: 'standard',
   pro: 'pro',
 };

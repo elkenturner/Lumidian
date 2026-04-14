@@ -34,14 +34,17 @@ TIER_PRICES = {
     "starter": os.getenv("STRIPE_STARTER_PRICE_ID", ""),
     "pro": os.getenv("STRIPE_PRO_PRICE_ID", ""),
 }
-# Brand limits per tier: {"standard": N, "pitch": M}
-# 999 = effectively unlimited (frontend hides usage bars at >= 999)
-BRAND_LIMITS = {
-    None: {"standard": 0, "pitch": 1},       # free: 1 pitch deck, no standard brands
-    "": {"standard": 0, "pitch": 1},
-    "starter": {"standard": 1, "pitch": 0},
-    "pro": {"standard": 2, "pitch": 0},
-}
+def _brand_limits_for_api(tier: str | None) -> dict[str, int]:
+    """Derive {standard, pitch} brand limits from BRAND_TYPE_LIMITS.
+
+    The API uses "standard" to mean paid brand slots (standard or pro brand_type)
+    and "pitch" for free trial brand slots.
+    """
+    type_limits = BRAND_TYPE_LIMITS.get(tier, BRAND_TYPE_LIMITS[None])
+    return {
+        "standard": type_limits.get("standard", 0) + type_limits.get("pro", 0),
+        "pitch": type_limits.get("pitch", 0),
+    }
 # Manual run limits per tier (per day, UTC). None = unlimited.
 # Only free-plan users (no subscription_tier) are limited to 1 run/day.
 DAILY_RUN_LIMITS: dict = {
@@ -110,7 +113,7 @@ def get_stripe():
 async def billing_status(user: Annotated[User, Depends(get_current_user)]):
     from datetime import datetime
     limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier or "", 10)
-    brand_limits = BRAND_LIMITS.get(user.subscription_tier or "", BRAND_LIMITS[None])
+    brand_limits = _brand_limits_for_api(user.subscription_tier)
     trial_end_dt = getattr(user, "subscription_trial_end", None)
     trial_end = trial_end_dt.isoformat() if trial_end_dt else None
     # Days remaining in trial (None when not in trial or no end date stored)
@@ -188,7 +191,7 @@ async def billing_usage(user: Annotated[User, Depends(get_current_user)], db: Db
     brand_counts = {row[0]: row[1] for row in brand_counts_result.all()}
 
     prompt_limit = 999999 if is_admin else TIER_LIMITS.get(tier, 10)
-    brand_limits = BRAND_LIMITS.get(tier, BRAND_LIMITS[None])
+    brand_limits = _brand_limits_for_api(tier)
 
     return {
         "manual_runs_today": manual_runs_today,

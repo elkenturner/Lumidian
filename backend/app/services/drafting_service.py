@@ -158,6 +158,7 @@ DRAFT_CAP = 20  # default / max cap (pro tier)
 
 TIER_DRAFT_CAPS: dict[str | None, int] = {
     None: 5, "": 5,
+    "basic": 10,
     "starter": 20,
     "pro": 20,
 }

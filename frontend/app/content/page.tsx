@@ -2143,7 +2143,7 @@ export default function ContentHubPage() {
           <p>Content Hub generates AI drafts for your brand and surfaces live threads across Reddit, Quora, LinkedIn, and X where you can contribute.</p>
           <ul className="space-y-2 mt-2">
             <li><span className="text-[var(--text-primary)] font-medium">Regenerate Drafts</span> — replaces all existing drafts with a fresh batch across your tracked prompts and platforms.</li>
-            <li><span className="text-[var(--text-primary)] font-medium">Live Opportunities</span> tab updates weekly as Reddit, Quora, LinkedIn, and X are scanned for threads matching your tracked prompts.</li>
+            <li><span className="text-[var(--text-primary)] font-medium">Live Opportunities</span> tab shows threads across Reddit, Quora, LinkedIn, and X matching your tracked prompts. Use &quot;Scan for Opportunities&quot; to refresh.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Drafts tab</span> — review, edit, and approve AI drafts before they go live.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Saved Drafts tab</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Posted tab</span> — content that has been marked as posted.</li>
@@ -2160,7 +2160,7 @@ export default function ContentHubPage() {
             <li><span className="text-[var(--text-primary)] font-medium">Draft Reply</span> — generates an AI reply using your brand voice guidelines.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Dismiss</span> — removes the opportunity from this list.</li>
           </ul>
-          <p className="text-[var(--text-muted)] text-xs mt-2">Scanners run automatically every night at 2:00 AM UTC.</p>
+          <p className="text-[var(--text-muted)] text-xs mt-2">Use &quot;Scan for Opportunities&quot; to search for new threads on demand.</p>
         </HelpModal>
       )}
 

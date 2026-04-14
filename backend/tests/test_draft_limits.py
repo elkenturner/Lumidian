@@ -182,6 +182,21 @@ async def test_auto_draft_fills_queue_to_max_gaps():
     assert len(drafts) == 20, f"Expected 20 drafts but got {len(drafts)}"
 
 
+async def test_draft_status_basic_tier_caps(client):
+    """Basic tier should have draft_cap=10 and scheduled_cap=25."""
+    from tests.conftest import create_brand, register_and_login
+
+    await register_and_login(client, email="draft_basic@example.com", subscription_tier="basic")
+    brand = await create_brand(client, name="DraftBasicBrand")
+    resp = await client.get(f"/api/content/{brand['id']}/draft-status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["draft_cap"] == 10
+    assert data["scheduled_cap"] == 25
+    # basic is a paid tier, so show_upgrade should be False
+    assert data["show_upgrade"] is False
+
+
 async def test_auto_draft_dynamic_combo_cap_fills_queue():
     """With dynamic per-combo cap, 2 prompts × 2 platforms should still reach 20.
     The cap scales to ceil(20 / 4) = 5 per combo, so 4 × 5 = 20."""

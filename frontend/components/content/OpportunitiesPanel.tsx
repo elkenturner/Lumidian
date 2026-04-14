@@ -61,7 +61,7 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
         <EmptyState
           icon={<Radio size={26} className="text-[var(--accent-foreground)]" />}
           title="No live opportunities"
-          description="Reddit, Quora, LinkedIn, and X are scanned weekly. Check back after the next scan or run a tracking report to generate fresh prompts."
+          description="Use &quot;Scan for Opportunities&quot; to find threads on Reddit, Quora, LinkedIn, and X matching your tracked prompts."
         />
       </>
     );

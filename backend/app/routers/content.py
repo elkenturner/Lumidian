@@ -61,6 +61,7 @@ SCHEDULED_CAP = 100  # max approved/scheduled drafts queued at once (pro tier de
 
 TIER_SCHEDULED_CAPS: dict[str | None, int] = {
     None: 10, "": 10,
+    "basic": 25,
     "starter": 50,
     "pro": 100,
 }
@@ -114,7 +115,7 @@ async def _check_weekly_manual_draft_limit(
     for paid tiers.
     """
     is_pitch = getattr(brand, "brand_type", "standard") == "pitch"
-    if not is_pitch and subscription_tier in ("starter", "pro"):
+    if not is_pitch and subscription_tier in ("basic", "starter", "pro"):
         return 999  # unlimited for paid users
 
     from datetime import datetime, timedelta
@@ -693,7 +694,7 @@ async def get_draft_status(brand_id: int, db: DbDep, user: CurrentUser):
         "generating": brand_id in _state.generating_brands,
         "weekly_drafts_remaining": weekly_drafts_remaining,
         "weekly_drafts_limit": weekly_drafts_limit,
-        "show_upgrade": not user.is_admin and tier not in ("starter", "pro"),
+        "show_upgrade": not user.is_admin and tier not in ("basic", "starter", "pro"),
     }
 
 

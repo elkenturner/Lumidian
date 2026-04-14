@@ -161,6 +161,26 @@ async def test_create_checkout_session_carries_tier_metadata(client: httpx.Async
     assert session_meta.get("tier") == "starter", "Session metadata must include tier"
 
 
+async def test_billing_status_basic_tier(client: httpx.AsyncClient):
+    """Basic-tier user ($100 Starter) gets correct prompt_limit of 15."""
+    await register_and_login(client, email="billing_basic@example.com", subscription_tier="basic")
+    resp = await client.get("/api/billing/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["subscription_tier"] == "basic"
+    assert data["prompt_limit"] == 15
+
+
+async def test_billing_status_basic_tier_brand_limits(client: httpx.AsyncClient):
+    """Basic tier gets 1 standard brand, 0 pitch, 0 pro."""
+    await register_and_login(client, email="billing_basic_brands@example.com", subscription_tier="basic")
+    resp = await client.get("/api/billing/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["brand_limits"]["standard"] == 1
+    assert data["brand_limits"]["pitch"] == 0
+
+
 async def test_webhook_checkout_completed_sets_active_tier(client: httpx.AsyncClient):
     """checkout.session.completed webhook must set subscription_tier and status='active'."""
     import json

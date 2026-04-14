@@ -29,8 +29,26 @@ router = APIRouter(prefix="/billing", tags=["billing"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
-TIER_LIMITS = {"starter": 25, "pro": 100}
+# ── Tier display names ───────────────────────────────────────────────────────
+# Internal key → user-facing name.
+# IMPORTANT: Internal keys are stored in the database (subscription_tier),
+# Stripe metadata, and throughout the codebase. The "starter" key predates
+# the current naming — it displays as "Growth" in the UI.
+# Do NOT rename internal keys without a data migration.
+TIER_DISPLAY_NAMES: dict[str | None, str] = {
+    None: "Free",
+    "": "Free",
+    "basic": "Starter",      # $100/mo — entry-level paid tier
+    "starter": "Growth",     # $300/mo — formerly called "Starter" in the UI
+    "pro": "Pro",            # $500/mo
+}
+
+# Canonical tier ordering for UI rendering (lowest → highest).
+TIER_ORDER: list[str | None] = [None, "basic", "starter", "pro"]
+
+TIER_LIMITS = {"basic": 15, "starter": 25, "pro": 100}
 TIER_PRICES = {
+    "basic": os.getenv("STRIPE_BASIC_PRICE_ID", ""),
     "starter": os.getenv("STRIPE_STARTER_PRICE_ID", ""),
     "pro": os.getenv("STRIPE_PRO_PRICE_ID", ""),
 }
@@ -46,28 +64,31 @@ def _brand_limits_for_api(tier: str | None) -> dict[str, int]:
         "pitch": type_limits.get("pitch", 0),
     }
 # Manual run limits per tier (per day, UTC). None = unlimited.
-# Only free-plan users (no subscription_tier) are limited to 1 run/day.
 DAILY_RUN_LIMITS: dict = {
     None: 1,
     "": 1,
+    "basic": 2,
     "starter": 3,
     "pro": None,  # unlimited
 }
 # Competitor tracking limits per brand (across all brands, enforced at add time)
 COMPETITOR_LIMITS: dict = {
     None: 3, "": 3,
+    "basic": 3,
     "starter": 5,
     "pro": 15,
 }
 # Team member seat limits (total invited/accepted members per account owner)
 TEAM_MEMBER_LIMITS: dict = {
     None: 0, "": 0,
+    "basic": 0,
     "starter": 1,
     "pro": 3,
 }
 # Weekly manual opp-scan limits per brand (on-demand only, no auto-scans).
 WEEKLY_SCAN_LIMITS: dict = {
     None: 2, "": 2,
+    "basic": 5,
     "starter": 10,
     "pro": 25,
 }
@@ -83,6 +104,7 @@ PROMPT_LIMITS: dict[str, int] = {
 BRAND_TYPE_LIMITS: dict = {
     None: {"pitch": 1, "standard": 0, "pro": 0},
     "": {"pitch": 1, "standard": 0, "pro": 0},
+    "basic": {"pitch": 0, "standard": 1, "pro": 0},
     "starter": {"pitch": 0, "standard": 1, "pro": 0},
     "pro": {"pitch": 0, "standard": 0, "pro": 2},
 }

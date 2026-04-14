@@ -122,10 +122,16 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
     router.push('/');
   }
 
+  // Internal key → display name. "starter" key = "Growth" in the UI.
+  const SIDEBAR_TIER_NAMES: Record<string, string> = {
+    basic: 'Starter',
+    starter: 'Growth',
+    pro: 'Pro',
+  };
   const planLabel = user?.is_admin
     ? 'Admin'
     : user?.subscription_tier
-      ? user.subscription_tier.charAt(0).toUpperCase() + user.subscription_tier.slice(1)
+      ? SIDEBAR_TIER_NAMES[user.subscription_tier] || user.subscription_tier.charAt(0).toUpperCase() + user.subscription_tier.slice(1)
       : 'Free';
 
   return (
@@ -365,7 +371,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                       PAST DUE
                     </span>
                   )}
-                  {!user?.is_admin && (!user?.subscription_tier || user.subscription_tier === 'starter') && (
+                  {!user?.is_admin && (!user?.subscription_tier || user.subscription_tier === 'basic' || user.subscription_tier === 'starter') && (
                     <Link
                       href="/settings/billing"
                       className="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-[var(--accent)]/20 text-[var(--accent-light)] border border-[var(--accent)]/30 hover:bg-[var(--accent)]/30 transition-colors leading-none whitespace-nowrap"

@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import LumidianLogo from '@/components/LumidianLogo';
 import BrandAvatar from '@/components/BrandAvatar';
+import { TIER_DISPLAY_NAMES } from '@/lib/tiers';
 
 interface NavItem {
   label: string;
@@ -122,16 +123,10 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
     router.push('/');
   }
 
-  // Internal key → display name. "starter" key = "Growth" in the UI.
-  const SIDEBAR_TIER_NAMES: Record<string, string> = {
-    basic: 'Starter',
-    starter: 'Growth',
-    pro: 'Pro',
-  };
   const planLabel = user?.is_admin
     ? 'Admin'
     : user?.subscription_tier
-      ? SIDEBAR_TIER_NAMES[user.subscription_tier] || user.subscription_tier.charAt(0).toUpperCase() + user.subscription_tier.slice(1)
+      ? TIER_DISPLAY_NAMES[user.subscription_tier] || user.subscription_tier.charAt(0).toUpperCase() + user.subscription_tier.slice(1)
       : 'Free';
 
   return (

@@ -20,6 +20,7 @@ import {
   Activity,
 } from 'lucide-react';
 import LumidianLogo from '@/components/LumidianLogo';
+import { TIER_DISPLAY_NAMES, TIER_PRICES } from '@/lib/tiers';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ANIMATION HOOKS
@@ -775,12 +776,11 @@ function PricingCell({ value }: { value: string | boolean }) {
 function PricingSection() {
   const [mobileTier, setMobileTier] = useState<'free' | 'basic' | 'starter' | 'pro'>('pro');
 
-  // Internal key → display name. "starter" key predates current naming — shows as "Growth".
   const tierMeta: Record<string, { name: string; price: string }> = {
     free: { name: 'Free Plan', price: '$0' },
-    basic: { name: 'Starter Plan', price: '$100/mo' },
-    starter: { name: 'Growth Plan', price: '$300/mo' },
-    pro: { name: 'Pro Plan', price: '$500/mo' },
+    basic: { name: `${TIER_DISPLAY_NAMES.basic} Plan`, price: `${TIER_PRICES.basic}/mo` },
+    starter: { name: `${TIER_DISPLAY_NAMES.starter} Plan`, price: `${TIER_PRICES.starter}/mo` },
+    pro: { name: `${TIER_DISPLAY_NAMES.pro} Plan`, price: `${TIER_PRICES.pro}/mo` },
   };
 
   return (

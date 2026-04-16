@@ -12,6 +12,8 @@ import PromptImpactTimeline from '@/components/PromptImpactTimeline';
 import PromptInsightCard from '@/components/PromptInsightCard';
 import { logError } from '@/lib/utils/errors';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import ResponseText from '@/components/ui/ResponseText';
+import { useBrand } from '@/contexts/BrandContext';
 
 export default function PromptDetailPage() {
   const params = useParams();
@@ -22,6 +24,9 @@ export default function PromptDetailPage() {
 
   const [data, setData] = useState<PromptDetailData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const { brands } = useBrand();
+  const brandName = brands.find((b) => b.id === brandId)?.name ?? '';
 
   useEffect(() => {
     document.title = 'Prompt Detail — Lumidian';
@@ -217,9 +222,14 @@ export default function PromptDetailPage() {
                     </span>
                   </div>
                   {resp.response_text && (
-                    <div className="px-4 py-3 text-xs text-[var(--text-secondary)] leading-relaxed max-h-32 overflow-y-auto">
-                      {resp.response_text.slice(0, 500)}
-                      {resp.response_text.length > 500 && '…'}
+                    <div className="px-4 py-3 max-h-32 overflow-y-auto">
+                      <ResponseText
+                        text={resp.response_text}
+                        brandName={brandName}
+                        competitors={data.competitors.map((c) => c.name)}
+                        maxLength={500}
+                        className="text-xs text-[var(--text-secondary)]"
+                      />
                     </div>
                   )}
                 </div>

@@ -1102,6 +1102,120 @@ export async function adminGenerateDraft(brandId: number): Promise<{ brand_id: n
   return res.data;
 }
 
+export interface AdminUserDetail {
+  id: number;
+  email: string;
+  name: string | null;
+  subscription_tier: string | null;
+  subscription_status: string | null;
+  trial_end: string | null;
+  email_verified: boolean;
+  is_paused: boolean;
+  is_admin: boolean;
+  created_at: string | null;
+  stripe_customer_id: string | null;
+  google_id: string | null;
+  totp_enabled: boolean;
+  brand_count: number;
+  total_runs: number;
+  total_drafts: number;
+  last_active: string | null;
+}
+
+export interface AdminEditUserPayload {
+  subscription_tier?: string | null;
+  subscription_status?: string | null;
+  trial_end?: string | null;
+  email_verified?: boolean;
+  is_paused?: boolean;
+  name?: string;
+}
+
+export interface AdminBrandDetail {
+  id: number;
+  name: string;
+  slug: string;
+  tier: string;
+  brand_type: string;
+  website_url: string | null;
+  latest_score: number | null;
+  prompts: { id: number; text: string; prompt_type: string }[];
+  competitors: { id: number; name: string; website_url: string | null }[];
+}
+
+export interface AdminUserRun {
+  id: number;
+  brand_id: number;
+  brand_name: string;
+  status: string;
+  run_type: string;
+  overall_score: number | null;
+  total_queries: number | null;
+  total_mentions: number | null;
+  created_at: string | null;
+  completed_at: string | null;
+}
+
+export async function adminGetUser(userId: number): Promise<AdminUserDetail> {
+  const res = await api.get<AdminUserDetail>(`/admin/users/${userId}`);
+  return res.data;
+}
+
+export async function adminEditUser(userId: number, payload: AdminEditUserPayload): Promise<AdminUserDetail> {
+  const res = await api.patch<AdminUserDetail>(`/admin/users/${userId}`, payload);
+  return res.data;
+}
+
+export async function adminGetUserRuns(userId: number): Promise<AdminUserRun[]> {
+  const res = await api.get<AdminUserRun[]>(`/admin/users/${userId}/runs`);
+  return res.data;
+}
+
+export async function adminGetUserBrands(userId: number): Promise<AdminBrandDetail[]> {
+  const res = await api.get<AdminBrandDetail[]>(`/admin/users/${userId}/brands`);
+  return res.data;
+}
+
+export async function adminEditBrand(brandId: number, payload: { name?: string; slug?: string; tier?: string; brand_type?: string; website_url?: string }): Promise<{ brand_id: number; updated: string[] }> {
+  const res = await api.patch<{ brand_id: number; updated: string[] }>(`/admin/brands/${brandId}`, payload);
+  return res.data;
+}
+
+export async function adminAddPrompt(brandId: number, text: string, promptType = 'standard'): Promise<{ id: number; text: string; prompt_type: string }> {
+  const res = await api.post<{ id: number; text: string; prompt_type: string }>(`/admin/brands/${brandId}/prompts`, { text, prompt_type: promptType });
+  return res.data;
+}
+
+export async function adminEditPrompt(promptId: number, text: string): Promise<{ id: number; text: string; prompt_type: string }> {
+  const res = await api.patch<{ id: number; text: string; prompt_type: string }>(`/admin/prompts/${promptId}`, { text });
+  return res.data;
+}
+
+export async function adminDeletePrompt(promptId: number): Promise<{ prompt_id: number; deleted: boolean }> {
+  const res = await api.delete<{ prompt_id: number; deleted: boolean }>(`/admin/prompts/${promptId}`);
+  return res.data;
+}
+
+export async function adminAddCompetitor(brandId: number, name: string, websiteUrl?: string): Promise<{ id: number; name: string; website_url: string | null }> {
+  const res = await api.post<{ id: number; name: string; website_url: string | null }>(`/admin/brands/${brandId}/competitors`, { name, website_url: websiteUrl });
+  return res.data;
+}
+
+export async function adminDeleteCompetitor(competitorId: number): Promise<{ competitor_id: number; deleted: boolean }> {
+  const res = await api.delete<{ competitor_id: number; deleted: boolean }>(`/admin/competitors/${competitorId}`);
+  return res.data;
+}
+
+export async function adminImpersonate(userId: number): Promise<{ admin_token: string; target_user_id: number; target_user_email: string }> {
+  const res = await api.post<{ admin_token: string; target_user_id: number; target_user_email: string }>(`/admin/impersonate/${userId}`);
+  return res.data;
+}
+
+export async function adminExitImpersonation(adminToken: string): Promise<{ restored: boolean; admin_user_id: number }> {
+  const res = await api.post<{ restored: boolean; admin_user_id: number }>('/admin/exit-impersonation', { admin_token: adminToken });
+  return res.data;
+}
+
 export async function exportReportPDF(brandId: number, days = 0): Promise<void> {
   const res = await api.get(`/reports/${brandId}/export`, { responseType: 'blob', params: days > 0 ? { days } : undefined });
   const blob = new Blob([res.data], { type: 'application/pdf' });

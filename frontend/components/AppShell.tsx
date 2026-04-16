@@ -15,6 +15,7 @@ import NotificationPanel from '@/components/NotificationPanel';
 import BrandAvatar from '@/components/BrandAvatar';
 import LumidianLogo from '@/components/LumidianLogo';
 import PlatformIcon from '@/components/PlatformIcon';
+import ImpersonationBanner from '@/components/admin/ImpersonationBanner';
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.bgColor, text: v.color }])
@@ -815,6 +816,7 @@ function AppShellInner({
           zIndex: 0,
         }}
       >
+        <ImpersonationBanner />
         {/* Global status banners — written by dashboard/content pages via localStorage */}
         {reportRunning && <ReportRunningBanner modelScores={modelScores} isMobile={isMobile} />}
         {draftsGenerating && <DraftsGeneratingBanner isMobile={isMobile} isPro={user?.subscription_tier === 'pro' || !!user?.is_admin} />}

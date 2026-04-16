@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import {
   Users, Activity, BarChart2, Zap, Loader2, RefreshCw,
   Shield, Clock, PauseCircle, PlayCircle, Trash2, FileText, ChevronDown, ChevronUp,
@@ -44,13 +45,14 @@ function StatusBadge({ status }: { status: string }) {
 
 function TierBadge({ tier }: { tier: string | null }) {
   if (!tier) return <span className="text-[var(--text-faint)] text-[10px]">free</span>;
+  const DISPLAY: Record<string, string> = { basic: 'Starter', starter: 'Growth', pro: 'Pro' };
   const cls = tier === 'pro'
     ? 'bg-[var(--accent)]/20 text-[var(--accent-foreground)] border-[var(--accent)]/30'
     : tier === 'starter'
     ? 'bg-[rgba(255,255,255,0.08)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
     : 'bg-[rgba(255,255,255,0.04)] text-[var(--text-faint)] border-[rgba(255,255,255,0.06)]';
   return (
-    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${cls}`}>{tier}</span>
+    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${cls}`}>{DISPLAY[tier] ?? tier}</span>
   );
 }
 
@@ -234,7 +236,12 @@ export default function AdminPage() {
                       <div className="flex items-center gap-1.5">
                         {u.is_admin && <Shield size={11} className="text-[var(--accent-foreground)] shrink-0" />}
                         {u.is_paused && <PauseCircle size={11} className="text-[var(--warning)] shrink-0" />}
-                        <span className="text-[var(--text-primary)] font-medium">{u.email}</span>
+                        <Link
+                          href={`/admin/users/${u.id}`}
+                          className="text-[var(--text-primary)] font-medium hover:text-[var(--accent)] transition-colors"
+                        >
+                          {u.email}
+                        </Link>
                       </div>
                       {u.name && <div className="text-[var(--text-faint)] mt-0.5">{u.name}</div>}
                       {u.last_active && (

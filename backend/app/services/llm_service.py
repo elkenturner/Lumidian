@@ -50,9 +50,10 @@ class _RatePacer:
             self._last = time.monotonic()
 
 
-# Perplexity: 1 concurrent + paced to 20 RPM (1 every 3s).
-# Perplexity has the tightest quota; this prevents mid-run 429 cascades.
-_PERPLEXITY_SEM = asyncio.Semaphore(1)
+# Perplexity: 2 concurrent + paced to 20 RPM (1 every 3s).
+# The pacer is the primary rate guard; the semaphore just caps in-flight
+# requests so we overlap response waits without exceeding RPM.
+_PERPLEXITY_SEM = asyncio.Semaphore(2)
 _PERPLEXITY_PACER = _RatePacer(20)
 
 # Claude rate-limit guard: Anthropic enforces 50 req/min on claude-haiku.

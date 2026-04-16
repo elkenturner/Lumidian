@@ -81,7 +81,11 @@ export default function AccountPage() {
   const subStatus = billing?.subscription_status ?? null;
   const isBlocked = subStatus !== null && BLOCKED_STATUSES.has(subStatus) && !billing?.is_admin;
   const isAdmin = billing?.is_admin || user?.is_admin;
-  const tierLabel = currentTier === 'starter' ? 'Starter \u2014 $300/mo' : currentTier === 'pro' ? 'Pro \u2014 $500/mo' : 'Free';
+  // Internal key → display label. "starter" key predates current naming — shows as "Growth".
+  const tierLabel = currentTier === 'basic' ? 'Starter \u2014 $100/mo'
+    : currentTier === 'starter' ? 'Growth \u2014 $300/mo'
+    : currentTier === 'pro' ? 'Pro \u2014 $500/mo'
+    : 'Free';
 
   return (
     <motion.div

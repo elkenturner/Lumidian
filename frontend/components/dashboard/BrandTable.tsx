@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DashboardAnalytics } from '@/lib/api';
-import { MODEL_CONFIG, stripMarkdown } from './helpers';
+import { MODEL_CONFIG } from './helpers';
+import ResponseText from '@/components/ui/ResponseText';
 
 interface BrandTableProps {
   analytics: DashboardAnalytics | null;
@@ -131,19 +132,25 @@ export default function BrandTable({
                     </div>
                   </div>
                   {conv.response_preview && (
-                    <p className="text-xs text-[var(--text-faint)] leading-relaxed line-clamp-2">
-                      {(() => {
-                        const clean = stripMarkdown(conv.response_preview);
-                        return clean.length > 120 ? clean.slice(0, 120) + '\u2026' : clean;
-                      })()}
-                    </p>
+                    <div className="line-clamp-2">
+                      <ResponseText
+                        text={conv.response_preview}
+                        brandName={analytics?.brand_name ?? ''}
+                        competitors={analytics?.competitor_comparison.map((c) => c.name) ?? []}
+                        maxLength={120}
+                        className="text-xs text-[var(--text-faint)]"
+                      />
+                    </div>
                   )}
                 </button>
                 {expandedConvId === conv.id && conv.response_text && (
                   <div className="px-5 pb-4 pt-3 border-t border-[var(--accent-border)] bg-[var(--accent-muted)]">
-                    <p className="text-xs sm:text-sm text-[var(--text-muted)] leading-relaxed whitespace-pre-wrap">
-                      {conv.response_text}
-                    </p>
+                    <ResponseText
+                      text={conv.response_text}
+                      brandName={analytics?.brand_name ?? ''}
+                      competitors={analytics?.competitor_comparison.map((c) => c.name) ?? []}
+                      className="text-xs sm:text-sm text-[var(--text-muted)]"
+                    />
                   </div>
                 )}
               </div>

@@ -585,7 +585,7 @@ function BrandSwitcherSheet({
   const tierLabel = (tier?: string, brandType?: string) => {
     if (brandType === 'pitch') return 'Pitch';
     if (!tier) return null;
-    const map: Record<string, string> = { basic: 'Free', standard: 'Starter', premium: 'Pro' };
+    const map: Record<string, string> = { basic: 'Free', standard: 'Standard', premium: 'Pro' };
     return map[tier] || tier;
   };
 

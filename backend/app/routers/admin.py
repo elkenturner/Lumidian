@@ -21,7 +21,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 import jwt
-from dateutil.parser import isoparse
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlalchemy import func, select
@@ -517,7 +516,7 @@ async def admin_edit_user(user_id: int, body: AdminEditUser, db: DbDep, user: Cu
             if new_val == "" or new_val is None:
                 parsed: datetime | None = None
             else:
-                parsed = isoparse(new_val).replace(tzinfo=None)
+                parsed = datetime.fromisoformat(new_val).replace(tzinfo=None)
             logger.info(
                 "Admin %s updated user %d trial_end: %s → %s",
                 user.email, user_id, old_val, parsed,

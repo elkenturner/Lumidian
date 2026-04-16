@@ -977,39 +977,6 @@ async def resend_verification(
     return {"message": "If that email is pending verification, a new code has been sent."}
 
 
-# ── Admin: reset any user's password ──────────────────────────────────────────
-
-class AdminResetPasswordRequest(BaseModel):
-    email: str
-    new_password: str
-
-
-@router.post("/admin/reset-password", status_code=status.HTTP_200_OK)
-async def admin_reset_password(
-    request: AdminResetPasswordRequest,
-    db: DbDep,
-    current_user: Annotated[User, Depends(get_current_user)],
-):
-    """Admin-only: directly reset any user's password without a reset token."""
-    if not current_user.is_admin:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
-
-    _validate_password(request.new_password)
-
-    email = request.email.strip().lower()
-    result = await db.execute(select(User).where(User.email == email))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-
-    user.password_hash = hash_password(request.new_password)
-    user.password_changed_at = datetime.now(UTC).replace(tzinfo=None)
-    await db.commit()
-
-    logger.info("Admin %s reset password for user %s", current_user.email, email)
-    return {"message": f"Password reset successfully for {email}"}
-
-
 # ── Two-Factor Authentication (TOTP) ──────────────────────────────────────────
 
 @router.post("/2fa/setup")

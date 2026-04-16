@@ -7,7 +7,29 @@ import { getBillingStatus, createCheckoutSession, createPortalSession, cancelSub
 import { useAuth } from '@/contexts/AuthContext';
 import { logError } from '@/lib/utils/errors';
 
+// ── Tier display names ──────────────────────────────────────────────────────
+// Internal key → user-facing name.
+// IMPORTANT: Internal keys ("basic", "starter", "pro") are stored in the
+// database and Stripe metadata. The "starter" key predates the current naming
+// — it displays as "Growth" in the UI. Do NOT rename internal keys without a
+// data migration.
+const TIER_DISPLAY_NAMES: Record<string, string> = {
+  basic: 'Starter',     // $100/mo — entry-level paid tier
+  starter: 'Growth',    // $300/mo — formerly "Starter" in the UI
+  pro: 'Pro',           // $500/mo
+};
+
 const TIER_FEATURES: Record<string, string[]> = {
+  basic: [
+    '1 standard brand',
+    '15 tracked prompts per brand',
+    '2 manual runs per day',
+    'Content drafts (10 queued)',
+    '5 manual opportunity scans per week',
+    '3 competitors tracked per brand',
+    '4 AI models tracked',
+    'Email support',
+  ],
   starter: [
     '1 standard brand',
     '25 tracked prompts per brand',
@@ -150,7 +172,7 @@ export default function BillingPage() {
           <CheckCircle2 size={16} className="text-[var(--success)] flex-shrink-0" />
           <p className="text-sm text-[var(--success)] font-medium">
             {currentTier
-              ? `${currentTier.charAt(0).toUpperCase() + currentTier.slice(1)} plan activated — you now have full access.`
+              ? `${TIER_DISPLAY_NAMES[currentTier] ?? (currentTier.charAt(0).toUpperCase() + currentTier.slice(1))} plan activated — you now have full access.`
               : 'Subscription activated! Your plan has been updated.'}
           </p>
         </div>
@@ -202,7 +224,7 @@ export default function BillingPage() {
               <div>
                 <p className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-1">Current Plan</p>
                 <p className="text-xl font-bold text-[var(--text-primary)]">
-                  {isAdmin ? 'Admin (Unlimited)' : currentTier ? `${currentTier.charAt(0).toUpperCase() + currentTier.slice(1)} Plan` : 'Free Plan'}
+                  {isAdmin ? 'Admin (Unlimited)' : currentTier ? `${TIER_DISPLAY_NAMES[currentTier] ?? (currentTier.charAt(0).toUpperCase() + currentTier.slice(1))} Plan` : 'Free Plan'}
                 </p>
                 {status?.subscription_status && (
                   <p className={`text-xs mt-1 ${status.subscription_status === 'active' ? 'text-[var(--success)]' : 'text-[var(--warning)]'}`}>
@@ -224,7 +246,7 @@ export default function BillingPage() {
                   </p>
                 </div>
                 <p className="text-xs text-[var(--text-faint)]">
-                  {currentTier === 'starter' ? '25 prompts per brand' : currentTier === 'pro' ? '100 prompts per brand' : '10 prompts on free plan — upgrade for more'}
+                  {currentTier === 'basic' ? '15 prompts per brand' : currentTier === 'starter' ? '25 prompts per brand' : currentTier === 'pro' ? '100 prompts per brand' : '10 prompts on free plan — upgrade for more'}
                 </p>
               </div>
             )}
@@ -262,12 +284,16 @@ export default function BillingPage() {
 
           {/* Plan options */}
           {!isAdmin && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {(['starter', 'pro'] as const).map((tier) => {
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(['basic', 'starter', 'pro'] as const).map((tier) => {
                 const isCurrent = currentTier === tier;
-                const price = tier === 'starter' ? '$300' : '$500';
-                const isUpgrade = tier === 'pro' && currentTier === 'starter';
-                const isDowngrade = tier === 'starter' && currentTier === 'pro';
+                const price = tier === 'basic' ? '$100' : tier === 'starter' ? '$300' : '$500';
+                const displayName = TIER_DISPLAY_NAMES[tier] || tier;
+                const tierRank = { basic: 0, starter: 1, pro: 2 } as const;
+                const currentRank = currentTier ? tierRank[currentTier as keyof typeof tierRank] ?? -1 : -1;
+                const thisRank = tierRank[tier];
+                const isUpgrade = thisRank > currentRank && currentRank >= 0;
+                const isDowngrade = thisRank < currentRank;
 
                 return (
                   <div
@@ -277,7 +303,7 @@ export default function BillingPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide">{tier}</p>
+                      <p className="text-sm font-semibold text-[var(--text-secondary)] uppercase tracking-wide">{displayName}</p>
                       {isCurrent && (
                         <span className="text-xs bg-[var(--accent)]/20 text-[var(--accent-foreground)] px-2 py-0.5 rounded-full font-medium">Current</span>
                       )}
@@ -309,7 +335,7 @@ export default function BillingPage() {
                         } disabled:opacity-50`}
                       >
                         {upgrading === tier ? <Loader2 size={13} className="animate-spin" /> : null}
-                        {upgrading === tier ? 'Redirecting\u2026' : isUpgrade ? 'Upgrade to Pro' : isDowngrade ? 'Switch to Starter' : 'Subscribe'}
+                        {upgrading === tier ? 'Redirecting\u2026' : isUpgrade ? `Upgrade to ${displayName}` : isDowngrade ? `Switch to ${displayName}` : 'Subscribe'}
                       </button>
                     )}
                   </div>

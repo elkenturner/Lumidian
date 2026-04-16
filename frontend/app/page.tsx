@@ -204,23 +204,23 @@ const HOW_STEPS = [
 ];
 
 const COMPARISON_FEATURES = [
-  { label: 'Brands', free: '1 (30-day)', starter: '1', pro: '2' },
-  { label: 'Prompts per brand', free: '10', starter: '25', pro: '100' },
-  { label: 'Manual runs per day', free: '1', starter: '3', pro: 'Unlimited' },
-  { label: 'AI models monitored', free: '4', starter: '4', pro: '4 (enhanced)' },
-  { label: 'Daily tracking', free: true, starter: true, pro: true },
-  { label: 'Visibility score & report', free: true, starter: true, pro: true },
-  { label: 'Content Hub & drafting', free: true, starter: true, pro: true },
-  { label: 'Content drafts', free: '5', starter: 'Unlimited', pro: 'Unlimited' },
-  { label: 'LinkedIn & X drafts', free: false, starter: false, pro: true },
-  { label: 'Gap analysis', free: true, starter: true, pro: true },
-  { label: 'Brand profile & voice', free: true, starter: true, pro: true },
-  { label: 'Opportunity scanner', free: '2/week', starter: '10/week', pro: '25/week' },
-  { label: 'Trend charts', free: true, starter: true, pro: true },
-  { label: 'Email alerts', free: true, starter: true, pro: true },
-  { label: 'Competitors per brand', free: '3', starter: '5', pro: '15' },
-  { label: 'Team members', free: '—', starter: '1', pro: '3' },
-  { label: 'Support', free: 'Community', starter: 'Email', pro: 'Priority' },
+  { label: 'Brands', free: '1 (30-day)', basic: '1', starter: '1', pro: '2' },
+  { label: 'Prompts per brand', free: '10', basic: '15', starter: '25', pro: '100' },
+  { label: 'Manual runs per day', free: '1', basic: '2', starter: '3', pro: 'Unlimited' },
+  { label: 'AI models monitored', free: '4', basic: '4', starter: '4', pro: '4 (enhanced)' },
+  { label: 'Daily tracking', free: true, basic: true, starter: true, pro: true },
+  { label: 'Visibility score & report', free: true, basic: true, starter: true, pro: true },
+  { label: 'Content Hub & drafting', free: true, basic: true, starter: true, pro: true },
+  { label: 'Content drafts', free: '5', basic: '10', starter: 'Unlimited', pro: 'Unlimited' },
+  { label: 'LinkedIn & X drafts', free: false, basic: false, starter: false, pro: true },
+  { label: 'Gap analysis', free: true, basic: true, starter: true, pro: true },
+  { label: 'Brand profile & voice', free: true, basic: true, starter: true, pro: true },
+  { label: 'Opportunity scanner', free: '2/week', basic: '5/week', starter: '10/week', pro: '25/week' },
+  { label: 'Trend charts', free: true, basic: true, starter: true, pro: true },
+  { label: 'Email alerts', free: true, basic: true, starter: true, pro: true },
+  { label: 'Competitors per brand', free: '3', basic: '3', starter: '5', pro: '15' },
+  { label: 'Team members', free: '—', basic: '—', starter: '1', pro: '3' },
+  { label: 'Support', free: 'Community', basic: 'Email', starter: 'Email', pro: 'Priority' },
 ];
 
 const FAQ_ITEMS = [
@@ -773,11 +773,13 @@ function PricingCell({ value }: { value: string | boolean }) {
 }
 
 function PricingSection() {
-  const [mobileTier, setMobileTier] = useState<'free' | 'starter' | 'pro'>('pro');
+  const [mobileTier, setMobileTier] = useState<'free' | 'basic' | 'starter' | 'pro'>('pro');
 
+  // Internal key → display name. "starter" key predates current naming — shows as "Growth".
   const tierMeta: Record<string, { name: string; price: string }> = {
     free: { name: 'Free Plan', price: '$0' },
-    starter: { name: 'Starter Plan', price: '$300/mo' },
+    basic: { name: 'Starter Plan', price: '$100/mo' },
+    starter: { name: 'Growth Plan', price: '$300/mo' },
     pro: { name: 'Pro Plan', price: '$500/mo' },
   };
 
@@ -807,6 +809,7 @@ function PricingSection() {
                   <th className="text-left text-sm font-semibold text-[#f8fafc] p-3 md:p-4 rounded-tl-xl sticky left-0 bg-[#1e293b] z-10">Feature</th>
                   <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Free</th>
                   <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Starter</th>
+                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Growth</th>
                   <th className="text-center text-sm font-semibold text-[#f8fafc] p-4 rounded-tr-xl bg-[rgba(95,126,166,0.2)] border-b-2 border-[#5f7ea6]">
                     Pro
                   </th>
@@ -820,6 +823,7 @@ function PricingSection() {
                   >
                     <td className="text-sm text-[#f8fafc] p-3 md:p-4 sticky left-0 z-10" style={{ background: i % 2 === 0 ? '#0f172a' : '#020617' }}>{row.label}</td>
                     <td className="text-center p-4"><PricingCell value={row.free} /></td>
+                    <td className="text-center p-4"><PricingCell value={row.basic} /></td>
                     <td className="text-center p-4"><PricingCell value={row.starter} /></td>
                     <td className="text-center p-4 bg-[rgba(95,126,166,0.05)] border-l border-r border-[rgba(95,126,166,0.2)]">
                       <PricingCell value={row.pro} />
@@ -836,7 +840,7 @@ function PricingSection() {
           <div className="md:hidden">
             {/* Tabs */}
             <div className="flex gap-2 mb-6 bg-[#0f172a] rounded-full p-1 border border-[rgba(51,65,85,0.5)]">
-              {(['free', 'starter', 'pro'] as const).map((tier) => (
+              {(['free', 'basic', 'starter', 'pro'] as const).map((tier) => (
                 <button
                   key={tier}
                   onClick={() => setMobileTier(tier)}
@@ -846,7 +850,7 @@ function PricingSection() {
                       : 'text-[#94a3b8] hover:text-white'
                   }`}
                 >
-                  {tier.charAt(0).toUpperCase() + tier.slice(1)}
+                  {tierMeta[tier].name.replace(' Plan', '')}
                 </button>
               ))}
             </div>

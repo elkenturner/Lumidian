@@ -41,6 +41,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MODEL_ORDER, MODEL_CONFIG as MODEL_CONFIG_SHARED, getModelConfig } from '@/lib/constants/models';
 import { parseUTCISO } from '@/lib/utils/formatting';
 import { useIsMobile } from '@/hooks/useIsMobile';
+import ResponseText from '@/components/ui/ResponseText';
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.mutedBg, text: v.color }])
@@ -51,15 +52,6 @@ function getModelCfg(model: string) {
   return { label: cfg.label, bg: cfg.mutedBg, text: cfg.color, key: cfg.key };
 }
 
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/^#+\s+/gm, '')
-    .replace(/\*\*(.+?)\*\*/g, '$1')
-    .replace(/\*(.+?)\*/g, '$1')
-    .replace(/\[(\d+)\]/g, '')
-    .replace(/\n+/g, ' ')
-    .trim();
-}
 
 interface PromptGroup {
   promptId: number;
@@ -638,9 +630,12 @@ export default function ReportsPage() {
                                   </Badge>
                                 </div>
                                 {r.response_text ? (
-                                  <p className="text-xs text-[var(--text-muted)] leading-relaxed whitespace-pre-line">
-                                    {stripMarkdown(r.response_text)}
-                                  </p>
+                                  <ResponseText
+                                    text={r.response_text}
+                                    brandName={selectedBrand?.name ?? ''}
+                                    competitors={competitorAnalysis?.overall.competitors.map((c) => c.name) ?? []}
+                                    className="text-xs text-[var(--text-muted)]"
+                                  />
                                 ) : (
                                   <p className="text-xs text-[var(--text-faint)] italic">No response text</p>
                                 )}

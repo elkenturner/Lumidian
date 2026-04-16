@@ -50,7 +50,7 @@ async def invite_team_member(request: InviteTeamMemberRequest, db: DbDep, user: 
         if limit == 0:
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail="Team members require a Starter or Pro plan.",
+                detail="Team members require a paid plan.",
             )
         # Count only active seats: accepted members + non-expired pending invites
         now = _utcnow_naive()

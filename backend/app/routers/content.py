@@ -226,7 +226,7 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
     if not user.is_admin and not user.subscription_tier:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Content drafting requires a Starter or Pro plan. Upgrade to unlock this feature.",
+            detail="Content drafting requires a paid plan. Upgrade to unlock this feature.",
         )
     check_rate_limit(user.id, limit=10)  # burst guard (per minute)
     brand = await get_brand_for_user(brand_id, db, user)
@@ -561,7 +561,7 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
     if not user.is_admin and not user.subscription_tier:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="On-demand draft generation is available on Starter and Pro plans. Upgrade to unlock this feature.",
+            detail="On-demand draft generation is available on paid plans. Upgrade to unlock this feature.",
         )
     check_rate_limit(user.id, limit=2)  # burst guard (per minute)
 
@@ -709,7 +709,7 @@ async def create_gap_draft(brand_id: int, request: CreateDraftRequest, db: DbDep
     if not user.is_admin and not user.subscription_tier:
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Content drafting requires a Starter or Pro plan. Upgrade to unlock this feature.",
+            detail="Content drafting requires a paid plan. Upgrade to unlock this feature.",
         )
     brand = await get_brand_for_user(brand_id, db, user)
     require_brand_active(brand, user)

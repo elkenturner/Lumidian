@@ -274,9 +274,9 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                           }`}>
                             {brand.brand_type === 'pitch'
                               ? 'Pitch'
-                              : (user?.subscription_tier === 'pro' || user?.is_admin)
+                              : brand.brand_type === 'pro'
                                 ? 'Pro'
-                                : 'Starter'}
+                                : 'Standard'}
                           </p>
                         </div>
                         {isActive && <Check size={12} className="flex-shrink-0 text-[var(--accent)]" />}

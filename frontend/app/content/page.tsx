@@ -2563,7 +2563,7 @@ export default function ContentHubPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-[var(--text-secondary)]">On-demand drafts</p>
-                    <p className="text-xs text-[var(--text-faint)] mt-1 leading-relaxed">Available on Starter and Pro plans. Drafts are generated automatically on free.</p>
+                    <p className="text-xs text-[var(--text-faint)] mt-1 leading-relaxed">Available on paid plans. Drafts are generated automatically on free.</p>
                   </div>
                   <Link
                     href="/settings/billing"

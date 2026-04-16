@@ -24,6 +24,7 @@ import {
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { logError } from '@/lib/utils/errors';
+import { tierLabel } from '@/lib/tiers';
 
 const BLOCKED_STATUSES = new Set(['canceled', 'past_due', 'unpaid']);
 
@@ -81,11 +82,7 @@ export default function AccountPage() {
   const subStatus = billing?.subscription_status ?? null;
   const isBlocked = subStatus !== null && BLOCKED_STATUSES.has(subStatus) && !billing?.is_admin;
   const isAdmin = billing?.is_admin || user?.is_admin;
-  // Internal key → display label. "starter" key predates current naming — shows as "Growth".
-  const tierLabel = currentTier === 'basic' ? 'Starter \u2014 $100/mo'
-    : currentTier === 'starter' ? 'Growth \u2014 $300/mo'
-    : currentTier === 'pro' ? 'Pro \u2014 $500/mo'
-    : 'Free';
+  const currentTierLabel = tierLabel(currentTier);
 
   return (
     <motion.div
@@ -151,7 +148,7 @@ export default function AccountPage() {
             ) : (
               <div>
                 <p className="text-lg font-bold text-[var(--text-primary)]">
-                  {tierLabel}
+                  {currentTierLabel}
                 </p>
                 {subStatus === 'canceling' && (
                   <p className="text-xs text-amber-400 mt-1.5">Cancels at end of billing period &mdash; access continues until then.</p>

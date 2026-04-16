@@ -7,17 +7,7 @@ import { getBillingStatus, createCheckoutSession, createPortalSession, cancelSub
 import { useAuth } from '@/contexts/AuthContext';
 import { logError } from '@/lib/utils/errors';
 
-// ── Tier display names ──────────────────────────────────────────────────────
-// Internal key → user-facing name.
-// IMPORTANT: Internal keys ("basic", "starter", "pro") are stored in the
-// database and Stripe metadata. The "starter" key predates the current naming
-// — it displays as "Growth" in the UI. Do NOT rename internal keys without a
-// data migration.
-const TIER_DISPLAY_NAMES: Record<string, string> = {
-  basic: 'Starter',     // $100/mo — entry-level paid tier
-  starter: 'Growth',    // $300/mo — formerly "Starter" in the UI
-  pro: 'Pro',           // $500/mo
-};
+import { TIER_DISPLAY_NAMES, TIER_PRICES } from '@/lib/tiers';
 
 const TIER_FEATURES: Record<string, string[]> = {
   basic: [
@@ -287,7 +277,7 @@ export default function BillingPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {(['basic', 'starter', 'pro'] as const).map((tier) => {
                 const isCurrent = currentTier === tier;
-                const price = tier === 'basic' ? '$100' : tier === 'starter' ? '$300' : '$500';
+                const price = TIER_PRICES[tier] || '$0';
                 const displayName = TIER_DISPLAY_NAMES[tier] || tier;
                 const tierRank = { basic: 0, starter: 1, pro: 2 } as const;
                 const currentRank = currentTier ? tierRank[currentTier as keyof typeof tierRank] ?? -1 : -1;

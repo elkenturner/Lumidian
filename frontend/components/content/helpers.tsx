@@ -42,6 +42,7 @@ export interface ContentTabPanelsProps {
   scheduledItems: ContentDraft[];
   visibleScheduledItems: ContentDraft[];
   postedItems: ContentDraft[];
+  visiblePostedItems: ContentDraft[];
   draftAttributions: DraftAttribution[];
   opportunities: ContentOpportunity[];
   visibleOpportunities: ContentOpportunity[];

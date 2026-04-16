@@ -5,9 +5,9 @@ import { EmptyState, ContentTabPanelsProps } from './helpers';
 import { PostedCard } from './cards/PostedCard';
 
 export function PostedPanel(props: ContentTabPanelsProps) {
-  const { postedItems, draftAttributions } = props;
+  const { visiblePostedItems, draftAttributions } = props;
 
-  if (postedItems.length === 0) {
+  if (visiblePostedItems.length === 0) {
     return (
       <EmptyState
         icon={<CheckCircle2 size={26} className="text-[var(--accent-foreground)]" />}
@@ -19,7 +19,7 @@ export function PostedPanel(props: ContentTabPanelsProps) {
   const attributionByDraftId = new Map(draftAttributions.map((a) => [a.draft_id, a]));
   return (
     <div className="flex flex-col gap-2">
-      {postedItems.map((d) => (
+      {visiblePostedItems.map((d) => (
         <PostedCard key={d.id} draft={d} attribution={attributionByDraftId.get(d.id)} />
       ))}
     </div>

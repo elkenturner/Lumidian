@@ -46,7 +46,6 @@ import {
   getDraftStatusFresh,
   getBrandProfile,
   getContentSettings,
-  updateContentSettings,
   getDraftAttributions,
   getQuoraQuestions,
   triggerScan,
@@ -1585,7 +1584,7 @@ export default function ContentHubPage() {
   const [pinnedDraftId, setPinnedDraftId] = useState<number | null>(null);
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [brandPrompts, setBrandPrompts] = useState<Prompt[]>([]);
-  const [contentSettings, setContentSettings] = useState<BrandContentSettings[]>([]);
+  const [contentSettings, setContentSettings] = useState<BrandContentSettings[]>([]); // backend draft-generation prefs (loaded but not used for sidebar toggles)
 
   // Report-running guard (set by dashboard via localStorage)
   const [reportRunning, setReportRunning] = useState(false);
@@ -1622,17 +1621,16 @@ export default function ContentHubPage() {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [upgradeModalReason, setUpgradeModalReason] = useState('');
 
-  const [savedPlatform, setSavedPlatform] = useState<string | null>(null);
-  useEffect(() => {
-    if (!savedPlatform) return;
-    const t = setTimeout(() => setSavedPlatform(null), 2000);
-    return () => clearTimeout(t);
-  }, [savedPlatform]);
+  // Per-tab platform toggles (local view filters, independent per tab)
+  const [tabDisabledPlatforms, setTabDisabledPlatforms] = useState<Record<QueueTab, string[]>>({
+    drafts: [],
+    scheduled: [],
+    opportunities: [],
+    posted: [],
+  });
 
-  // Platform filtering
-  const _disabledPlatforms = new Set(
-    contentSettings.filter((s) => !s.enabled).map((s) => s.platform)
-  );
+  // Disabled platforms for the active tab
+  const _disabledPlatforms = new Set(tabDisabledPlatforms[activeTab]);
 
   // Active platform filters (independent per tab)
   const [draftPlatformFilter, setDraftPlatformFilter] = useState<string>('all');
@@ -1643,11 +1641,11 @@ export default function ContentHubPage() {
     setOppPlatformFilter('all');
   }, [activeTab]);
 
-  // Tab counts (using filtered draft/scheduled counts)
+  // Tab counts (total per tab, unaffected by toggles)
   const tabCounts = {
-    drafts: draftItems.filter((d) => !_disabledPlatforms.has(d.platform)).length,
-    scheduled: scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform)).length,
-    opportunities: opportunities.filter((o) => !_disabledPlatforms.has(o.platform)).length,
+    drafts: draftItems.length,
+    scheduled: scheduledItems.length,
+    opportunities: opportunities.length,
     posted: postedItems.length,
   };
 
@@ -2081,15 +2079,17 @@ export default function ContentHubPage() {
     }
   }, [selectedBrandId, scanning, brandPrompts.length]);
 
-  async function handleTogglePlatform(platform: string, enabled: boolean) {
-    if (!selectedBrandId) return;
-    const updated = await updateContentSettings(selectedBrandId, platform, { enabled }).catch((err) => { logError(err, 'Content: toggle platform setting'); return null; });
-    if (updated) {
-      setContentSettings((prev) =>
-        prev.map((s) => (s.platform === platform ? { ...s, ...updated } : s))
-      );
-      setSavedPlatform(platform);
-    }
+  function handleTogglePlatform(platform: string) {
+    setTabDisabledPlatforms((prev) => {
+      const current = prev[activeTab];
+      const isDisabled = current.includes(platform);
+      return {
+        ...prev,
+        [activeTab]: isDisabled
+          ? current.filter((p) => p !== platform)
+          : [...current, platform],
+      };
+    });
   }
 
   // Filter drafts to only show enabled platforms + active platform filter
@@ -2097,6 +2097,7 @@ export default function ContentHubPage() {
     (d) => !_disabledPlatforms.has(d.platform) && (draftPlatformFilter === 'all' || d.platform === draftPlatformFilter)
   );
   const visibleScheduledItems = scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform));
+  const visiblePostedItems = postedItems.filter((d) => !_disabledPlatforms.has(d.platform));
   const visibleOpportunities = opportunities.filter(
     (o) => !_disabledPlatforms.has(o.platform) && (oppPlatformFilter === 'all' || o.platform === oppPlatformFilter)
   );
@@ -2521,6 +2522,7 @@ export default function ContentHubPage() {
               scheduledItems={scheduledItems}
               visibleScheduledItems={visibleScheduledItems}
               postedItems={postedItems}
+              visiblePostedItems={visiblePostedItems}
               draftAttributions={draftAttributions}
               opportunities={opportunities}
               visibleOpportunities={visibleOpportunities}
@@ -2725,8 +2727,7 @@ export default function ContentHubPage() {
                   return true;
                 }).map(({ key, color, proOnly }) => {
                   const isLocked = proOnly && user?.subscription_tier !== 'pro' && !user?.is_admin;
-                  const setting = contentSettings.find((s) => s.platform === key);
-                  const enabled = setting?.enabled ?? true;
+                  const enabled = !_disabledPlatforms.has(key);
                   return (
                     <button
                       key={key}
@@ -2736,13 +2737,13 @@ export default function ContentHubPage() {
                           setUpgradeModalOpen(true);
                           return;
                         }
-                        handleTogglePlatform(key, !enabled);
+                        handleTogglePlatform(key);
                       }}
                       className={`w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg transition-colors duration-200 group ${
                         isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[rgba(255,255,255,0.03)]'
                       }`}
-                      title={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires Pro plan` : enabled ? `Disable ${PLATFORM_DISPLAY[key] ?? key}` : `Enable ${PLATFORM_DISPLAY[key] ?? key}`}
-                      aria-label={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires Pro plan` : enabled ? `Disable ${PLATFORM_DISPLAY[key] ?? key}` : `Enable ${PLATFORM_DISPLAY[key] ?? key}`}
+                      title={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires Pro plan` : enabled ? `Hide ${PLATFORM_DISPLAY[key] ?? key}` : `Show ${PLATFORM_DISPLAY[key] ?? key}`}
+                      aria-label={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires Pro plan` : enabled ? `Hide ${PLATFORM_DISPLAY[key] ?? key}` : `Show ${PLATFORM_DISPLAY[key] ?? key}`}
                     >
                       <div className="flex items-center gap-2.5">
                         <div
@@ -2759,9 +2760,6 @@ export default function ContentHubPage() {
                         </span>
                         {isLocked && (
                           <span className="text-[9px] bg-[rgba(95,126,166,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
-                        )}
-                        {!isLocked && savedPlatform === key && (
-                          <Check size={12} className="text-[var(--success)]" />
                         )}
                       </div>
                       {/* Custom toggle switch */}

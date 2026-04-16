@@ -30,21 +30,21 @@ import clsx from 'clsx';
 const TIER_OPTIONS = [
   {
     value: 'basic',
-    label: 'Basic',
-    runs: '5 queries per prompt',
-    description: 'Ideal for small brands starting out',
+    label: 'Starter',
+    runs: '15 prompts per brand',
+    description: '$100/mo — 1 standard brand',
   },
   {
-    value: 'standard',
-    label: 'Standard',
-    runs: '10 queries per prompt',
-    description: 'Best for growing brands',
+    value: 'starter',
+    label: 'Growth',
+    runs: '25 prompts per brand',
+    description: '$300/mo — 1 standard brand',
   },
   {
-    value: 'premium',
-    label: 'Premium',
-    runs: '20 queries per prompt',
-    description: 'Maximum coverage & frequency',
+    value: 'pro',
+    label: 'Pro',
+    runs: '100 prompts per brand',
+    description: '$500/mo — 2 pro brands',
   },
 ];
 
@@ -215,7 +215,7 @@ export default function TrackerPage() {
                     <div>
                       <p className="text-sm font-semibold text-[var(--text-primary)]">{brand.name}</p>
                       <span className="inline-flex items-center mt-0.5 px-2 py-0.5 rounded text-xs font-medium bg-[rgba(95,126,166,0.08)] text-[var(--text-muted)] border border-[var(--border-default)] capitalize">
-                        {brand.tier}
+                        {brand.brand_type === 'pro' ? 'Pro' : brand.brand_type === 'pitch' ? 'Pitch' : 'Standard'}
                       </span>
                     </div>
                   </div>

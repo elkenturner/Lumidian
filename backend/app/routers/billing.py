@@ -87,7 +87,7 @@ TEAM_MEMBER_LIMITS: dict = {
 }
 # Weekly manual opp-scan limits per brand (on-demand only, no auto-scans).
 WEEKLY_SCAN_LIMITS: dict = {
-    None: 2, "": 2,
+    None: 0, "": 0,
     "basic": 5,
     "starter": 10,
     "pro": 25,
@@ -431,7 +431,8 @@ async def change_plan(
         user_id=user.id,
     )
 
-    return {"message": f"Plan switched to {request.tier}. Billing adjusts at your next renewal."}
+    display_name = TIER_DISPLAY_NAMES.get(request.tier, request.tier)
+    return {"message": f"Plan switched to {display_name}. Billing adjusts at your next renewal."}
 
 
 # ── Cancel subscription ────────────────────────────────────────────────────────

@@ -227,11 +227,12 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
         )
         count_of_type = existing_of_type.scalar_one()
         if count_of_type >= brand_type_limit:
-            tier_name = user.subscription_tier or "free"
+            from app.routers.billing import TIER_DISPLAY_NAMES
+            tier_display = TIER_DISPLAY_NAMES.get(user.subscription_tier, "Free")
             kind = "pitch" if payload.brand_type == "pitch" else "standard"
             raise HTTPException(
                 status_code=status.HTTP_402_PAYMENT_REQUIRED,
-                detail=f"Brand limit reached: your {tier_name} plan allows {brand_type_limit} {kind} brand(s). Upgrade to add more.",
+                detail=f"Brand limit reached: your {tier_display} plan allows {brand_type_limit} {kind} brand(s). Upgrade to add more.",
             )
 
     slug = _slugify(payload.name)
@@ -566,10 +567,11 @@ async def add_competitor(brand_id: int, payload: CompetitorCreate, db: DbDep, us
         )
         current_count = count_result.scalar_one()
         if current_count >= limit:
-            tier = user.subscription_tier or "free"
+            from app.routers.billing import TIER_DISPLAY_NAMES
+            tier_display = TIER_DISPLAY_NAMES.get(user.subscription_tier, "Free")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Competitor limit reached: your {tier} plan allows {limit} competitor(s) per brand.",
+                detail=f"Competitor limit reached: your {tier_display} plan allows {limit} competitor(s) per brand.",
             )
 
     competitor = Competitor(brand_id=brand_id, name=payload.name)

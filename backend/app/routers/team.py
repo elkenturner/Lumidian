@@ -63,10 +63,11 @@ async def invite_team_member(request: InviteTeamMemberRequest, db: DbDep, user: 
         )
         current_count = count_result.scalar_one()
         if current_count >= limit:
-            tier = user.subscription_tier or "free"
+            from app.routers.billing import TIER_DISPLAY_NAMES
+            tier_display = TIER_DISPLAY_NAMES.get(user.subscription_tier, "Free")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Team member limit reached: your {tier} plan allows {limit} seat(s). Upgrade to Pro for more.",
+                detail=f"Team member limit reached: your {tier_display} plan allows {limit} seat(s). Upgrade to Pro for more.",
             )
 
     email = request.email.strip().lower()

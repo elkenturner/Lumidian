@@ -1384,6 +1384,7 @@ export interface BackgroundStatus {
   drafts_generating: boolean;
   scanning: boolean;
   model_scores: Array<{ model: string; score: number }>;
+  prompt_count: number;
 }
 
 export async function getBackgroundStatus(): Promise<BackgroundStatus> {

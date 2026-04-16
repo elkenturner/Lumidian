@@ -262,7 +262,7 @@ export default function NewBrandPage() {
 
             <div className="space-y-3 mb-6">
 
-              {/* Starter brand */}
+              {/* Standard brand */}
               {(() => {
                 const needsUpgrade = !isOnPaidPlan;
                 const noSlots = !needsUpgrade && standardRemaining === 0;
@@ -282,7 +282,7 @@ export default function NewBrandPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">
-                          <p className="text-sm font-semibold text-[var(--text-primary)]">Starter brand</p>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">Standard brand</p>
                           {!isAdmin && billing && !needsUpgrade && (
                             <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
                               standardRemaining === 0

@@ -180,7 +180,7 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     if brand.brand_type == "pitch":
         raise HTTPException(
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
-            detail="Opportunity drafting is available on Starter and Pro plans. Upgrade to draft replies from live opportunities.",
+            detail="Opportunity drafting is available on paid plans. Upgrade to draft replies from live opportunities.",
         )
 
     try:

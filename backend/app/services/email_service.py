@@ -208,7 +208,7 @@ Here's how to get started:
   3. Run your first report and see your current visibility score.
 
 Your free account includes a pitch deck (10 prompts) to get started.
-Upgrade to Starter or Pro to unlock full tracking.
+Upgrade to a paid plan to unlock full tracking.
 
 Log in any time at:
   {login_url}
@@ -305,7 +305,7 @@ Your pitch deck brand "{brand_name}" on Lumidian expires in about 24 hours.
 After expiry, the brand and all its tracking data will be automatically
 deleted. Any drafts or reports you want to keep should be saved now.
 
-To keep this brand permanently, upgrade to a Starter or Pro plan:
+To keep this brand permanently, upgrade to a paid plan:
   {upgrade_url}
 
 View your dashboard:

@@ -28,7 +28,7 @@ from app.dependencies import (
     require_brand_active,
 )
 from app.models import Brand, TrackingRun
-from app.routers.billing import DAILY_RUN_LIMITS
+from app.routers.billing import DAILY_RUN_LIMITS, TIER_DISPLAY_NAMES
 from app.schemas import ManualRunResponse, TrackingRunStatus, TrackingRunSummary
 
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
         )
         runs_today = runs_today_result.scalar_one()
         if runs_today >= daily_limit:
-            plan_label = "Free plan" if not tier else "Starter plan"
+            plan_label = "Free plan" if not tier else f"{TIER_DISPLAY_NAMES.get(tier, tier.title())} plan"
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"{plan_label} includes {daily_limit} manual run{'s' if daily_limit > 1 else ''} per day. Your limit resets at midnight UTC. Upgrade to Pro for unlimited runs.",

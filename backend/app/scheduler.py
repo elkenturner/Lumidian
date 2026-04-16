@@ -174,7 +174,8 @@ async def _sqlite_backup_sweep() -> None:
         logger.warning("Backup skipped — database file not found: %s", db_path)
         return
 
-    backup_dir = Path(__file__).resolve().parent.parent / "backups"
+    # Store backups alongside the DB (on the persistent volume in production)
+    backup_dir = db_path.parent / "backups"
     backup_dir.mkdir(parents=True, exist_ok=True)
 
     timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")

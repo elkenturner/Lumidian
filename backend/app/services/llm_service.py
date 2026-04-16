@@ -28,10 +28,32 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY", "")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# Perplexity rate-limit guard: allow at most 2 concurrent calls to avoid 429s.
-# Perplexity's per-minute quota is small; flooding it causes later prompts in a
-# run to fail while early ones succeed, producing inconsistent report data.
-_PERPLEXITY_SEM = asyncio.Semaphore(2)
+# ── Per-model rate limiting ──────────────────────────────────────────────────
+# Semaphores limit concurrency; _RatePacer adds a minimum gap between requests
+# so we never burst past a provider's per-minute quota even under high concurrency.
+
+class _RatePacer:
+    """Enforce a minimum interval between requests to a single provider."""
+    __slots__ = ("_lock", "_min_gap", "_last")
+
+    def __init__(self, requests_per_minute: float):
+        self._lock = asyncio.Lock()
+        self._min_gap = 60.0 / requests_per_minute
+        self._last = 0.0
+
+    async def wait(self):
+        async with self._lock:
+            now = time.monotonic()
+            wait = self._min_gap - (now - self._last)
+            if wait > 0:
+                await asyncio.sleep(wait)
+            self._last = time.monotonic()
+
+
+# Perplexity: 1 concurrent + paced to 20 RPM (1 every 3s).
+# Perplexity has the tightest quota; this prevents mid-run 429 cascades.
+_PERPLEXITY_SEM = asyncio.Semaphore(1)
+_PERPLEXITY_PACER = _RatePacer(20)
 
 # Claude rate-limit guard: Anthropic enforces 50 req/min on claude-haiku.
 # With ~2-3s per call, 3 concurrent slots ≈ 60-90 req/min at peak.
@@ -197,19 +219,28 @@ async def _query_claude(prompt: str, brand_name: str, model_version: str = "clau
 
 # ── Perplexity ────────────────────────────────────────────────────────────────
 
+_perplexity_client = None  # Module-level singleton — avoids per-request connection churn
+
+def _get_perplexity_client():
+    global _perplexity_client
+    if _perplexity_client is None:
+        from openai import AsyncOpenAI
+        _perplexity_client = AsyncOpenAI(
+            api_key=PERPLEXITY_API_KEY,
+            base_url="https://api.perplexity.ai",
+            timeout=45.0,
+        )
+    return _perplexity_client
+
+
 async def _query_perplexity(prompt: str, brand_name: str, model_version: str = "sonar") -> dict:
     if not PERPLEXITY_API_KEY:
         return _api_key_placeholder("perplexity")
     start = time.monotonic()
     try:
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(
-            api_key=PERPLEXITY_API_KEY,
-            base_url="https://api.perplexity.ai",
-        )
-        # Throttle to at most _PERPLEXITY_SEM concurrent calls so we don't
-        # blast Perplexity's per-minute quota and cause 429s on later prompts.
+        client = _get_perplexity_client()
+        # Rate-pace then acquire semaphore — prevents bursting past RPM quota.
+        await _PERPLEXITY_PACER.wait()
         async with _PERPLEXITY_SEM:
             response = await client.chat.completions.create(
                 model=model_version,
@@ -361,19 +392,31 @@ def _classify_error(error: str) -> str:
     return "other"
 
 
-async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 3, model_version: str = "", cancel_event: asyncio.Event | None = None) -> dict:
+# Per-model retry budgets.  Rate-limited models (Perplexity) get more attempts
+# because a single 429 shouldn't burn the whole query — the pacer will keep us
+# under quota on the retry.
+_MAX_ATTEMPTS: dict[str, int] = {
+    "perplexity": 5,
+    "gemini": 4,
+}
+_DEFAULT_MAX_ATTEMPTS = 3
+
+
+async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 0, model_version: str = "", cancel_event: asyncio.Event | None = None) -> dict:
     """
     Call handler(prompt, brand_name, model_version) and retry with backoff.
 
     Retry strategy by error type:
-      - rate_limit (429, quota): 65s flat backoff (wait for quota reset)
-      - overload (503, timeout): 3 attempts, 5s → 10s backoff + jitter
-        For Gemini pro: falls back to flash on retry instead of retrying pro
+      - rate_limit (429, quota): 30-90s jittered backoff (avoids thundering herd)
+      - overload (503, timeout): 5s → 10s backoff + jitter; falls back to lighter model
       - other: 3s flat backoff
       - api_key_not_configured / auth: no retry (permanent)
 
     If cancel_event is provided and set, retries stop immediately.
     """
+    if max_attempts <= 0:
+        max_attempts = _MAX_ATTEMPTS.get(model_key, _DEFAULT_MAX_ATTEMPTS)
+
     display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
     errors: list[str] = []
 
@@ -428,10 +471,9 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
         # Don't sleep after the last attempt
         if attempt < max_attempts:
             if error_type == "rate_limit":
-                retry_delay = 65
+                # Jittered 30-90s — spreads retries so they don't all hit at once
+                retry_delay = 30 + random.uniform(0, 60)
             elif error_type == "overload":
-                # 5s → 10s backoff + jitter. If the API is 503-ing,
-                # waiting longer won't help — it's a capacity issue.
                 retry_delay = 5 * (2 ** (attempt - 1))
                 retry_delay = retry_delay * (1 + random.uniform(0, 0.25))
             else:

@@ -216,7 +216,7 @@ const COMPARISON_FEATURES = [
   { label: 'LinkedIn & X drafts', free: false, basic: false, starter: false, pro: true },
   { label: 'Gap analysis', free: true, basic: true, starter: true, pro: true },
   { label: 'Brand profile & voice', free: true, basic: true, starter: true, pro: true },
-  { label: 'Opportunity scanner', free: '2/week', basic: '5/week', starter: '10/week', pro: '25/week' },
+  { label: 'Opportunity scanner', free: false, basic: '5/week', starter: '10/week', pro: '25/week' },
   { label: 'Trend charts', free: true, basic: true, starter: true, pro: true },
   { label: 'Email alerts', free: true, basic: true, starter: true, pro: true },
   { label: 'Competitors per brand', free: '3', basic: '3', starter: '5', pro: '15' },

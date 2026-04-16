@@ -41,7 +41,7 @@ async def test_free_user_cannot_trigger_manual_scan(client: httpx.AsyncClient):
 
     resp = await client.post(f"/api/opportunities/{brand_id}/scan")
     assert resp.status_code == 402, resp.text
-    assert "weekly" in resp.json()["detail"].lower() or "starter" in resp.json()["detail"].lower()
+    assert "not available" in resp.json()["detail"].lower()
 
 
 async def test_starter_user_can_trigger_scan_under_limit(client: httpx.AsyncClient):

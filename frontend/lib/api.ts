@@ -1063,42 +1063,42 @@ export interface AdminStats {
 }
 
 export async function adminGetUsers(): Promise<AdminUser[]> {
-  const res = await api.get<AdminUser[]>('/analytics/admin/users');
+  const res = await api.get<AdminUser[]>('/admin/users');
   return res.data;
 }
 
 export async function adminGetRuns(): Promise<AdminRun[]> {
-  const res = await api.get<AdminRun[]>('/analytics/admin/runs');
+  const res = await api.get<AdminRun[]>('/admin/runs');
   return res.data;
 }
 
 export async function adminGetStats(): Promise<AdminStats> {
-  const res = await api.get<AdminStats>('/analytics/admin/stats');
+  const res = await api.get<AdminStats>('/admin/stats');
   return res.data;
 }
 
 export async function adminTriggerRun(brandId: number): Promise<{ run_id: number; status: string }> {
-  const res = await api.post<{ run_id: number; status: string }>(`/analytics/admin/trigger-run/${brandId}`);
+  const res = await api.post<{ run_id: number; status: string }>(`/admin/trigger-run/${brandId}`);
   return res.data;
 }
 
 export async function adminGetLogs(lines = 100): Promise<{ lines: string[]; exists: boolean }> {
-  const res = await api.get<{ lines: string[]; exists: boolean }>(`/analytics/admin/logs?lines=${lines}`);
+  const res = await api.get<{ lines: string[]; exists: boolean }>(`/admin/logs?lines=${lines}`);
   return res.data;
 }
 
 export async function adminPauseUser(userId: number): Promise<{ user_id: number; is_paused: boolean; action: string }> {
-  const res = await api.post<{ user_id: number; is_paused: boolean; action: string }>(`/analytics/admin/users/${userId}/pause`);
+  const res = await api.post<{ user_id: number; is_paused: boolean; action: string }>(`/admin/users/${userId}/pause`);
   return res.data;
 }
 
 export async function adminRemoveUser(userId: number): Promise<{ user_id: number; deleted: boolean }> {
-  const res = await api.delete<{ user_id: number; deleted: boolean }>(`/analytics/admin/users/${userId}`);
+  const res = await api.delete<{ user_id: number; deleted: boolean }>(`/admin/users/${userId}`);
   return res.data;
 }
 
 export async function adminGenerateDraft(brandId: number): Promise<{ brand_id: number; status: string }> {
-  const res = await api.post<{ brand_id: number; status: string }>(`/analytics/admin/generate-draft/${brandId}`);
+  const res = await api.post<{ brand_id: number; status: string }>(`/admin/generate-draft/${brandId}`);
   return res.data;
 }
 

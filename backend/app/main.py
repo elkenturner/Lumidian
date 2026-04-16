@@ -57,6 +57,7 @@ from app.routers import (
     settings,
     tracking,
 )
+from app.routers import admin as admin_router
 from app.routers import analytics as analytics_router
 from app.routers import auth as auth_router
 from app.routers import billing as billing_router
@@ -218,6 +219,7 @@ app.include_router(settings.router, prefix="/api")
 app.include_router(auth_router.router, prefix="/api")
 app.include_router(billing_router.router, prefix="/api")
 app.include_router(analytics_router.router, prefix="/api")
+app.include_router(admin_router.router, prefix="/api")
 app.include_router(reports_router.router, prefix="/api")
 app.include_router(team_router.router, prefix="/api")
 app.include_router(errors_router.router, prefix="/api")

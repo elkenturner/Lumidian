@@ -655,22 +655,11 @@ async def stripe_webhook(request: Request, db: DbDep):
             user.updated_at = utcnow()
             await db.flush()
 
-            # Downgrade pro brands back to standard so they don't retain
-            # elevated prompt limits (100 → 25) after subscription cancellation.
-            if old_tier == "pro":
-                from sqlalchemy import update as sa_update
-
-                from app.models import Brand
-                downgrade_result = await db.execute(
-                    sa_update(Brand)
-                    .where(Brand.user_id == user.id, Brand.brand_type == "pro")
-                    .values(brand_type="standard", prompt_limit=25, tier="standard")
-                )
-                if downgrade_result.rowcount > 0:
-                    logger.info(
-                        "Downgraded %d pro brand(s) to standard for user %d after cancellation",
-                        downgrade_result.rowcount, user.id,
-                    )
+            # Brands are NOT downgraded on cancellation. They stay as-is
+            # (standard/pro with their prompts intact) but become read-only
+            # because subscription_status="canceled" triggers the freeze in
+            # require_brand_active(). When the user resubscribes, the freeze
+            # lifts automatically and all their data is still there.
 
             logger.warning(
                 "Subscription canceled for user %s (was %s). customer=%s",

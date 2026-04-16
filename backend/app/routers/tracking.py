@@ -27,7 +27,7 @@ from app.dependencies import (
     require_active_subscription,
     require_brand_active,
 )
-from app.models import Brand, TrackingRun
+from app.models import Brand, Prompt, TrackingRun
 from app.routers.billing import DAILY_RUN_LIMITS, TIER_DISPLAY_NAMES
 from app.schemas import ManualRunResponse, TrackingRunStatus, TrackingRunSummary
 
@@ -955,13 +955,20 @@ async def get_background_status(db: DbDep, user: CurrentUser):
     active_run = running_result.scalar_one_or_none()
     report_running = active_run is not None
 
-    # Get model scores for the active run
+    # Get model scores and prompt count for the active run
     model_scores = []
-    if active_run and active_run.model_scores:
-        model_scores = [
-            {"model": ms.model, "score": round((ms.total_mentions / ms.total_queries) * 100) if ms.total_queries > 0 else 0}
-            for ms in active_run.model_scores
-        ]
+    prompt_count = 0
+    if active_run:
+        if active_run.model_scores:
+            model_scores = [
+                {"model": ms.model, "score": round((ms.total_mentions / ms.total_queries) * 100) if ms.total_queries > 0 else 0}
+                for ms in active_run.model_scores
+            ]
+        from sqlalchemy import func
+        pc_result = await db.execute(
+            select(func.count(Prompt.id)).where(Prompt.brand_id == active_run.brand_id)
+        )
+        prompt_count = pc_result.scalar() or 0
 
     # Check in-memory sets for drafts and scanning
     drafts_generating = bool(user_brand_ids & _state.generating_brands)
@@ -972,4 +979,5 @@ async def get_background_status(db: DbDep, user: CurrentUser):
         "drafts_generating": drafts_generating,
         "scanning": scanning,
         "model_scores": model_scores,
+        "prompt_count": prompt_count,
     }

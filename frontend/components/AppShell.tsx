@@ -24,7 +24,7 @@ const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> 
 const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/methodology'];
 
 /* ── Premium animated report-running banner ─────────────────────────────────── */
-function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ model: string; score: number }>; isMobile: boolean }) {
+function ReportRunningBanner({ modelScores, isMobile, promptCount }: { modelScores: Array<{ model: string; score: number }>; isMobile: boolean; promptCount: number }) {
   const [activeIdx, setActiveIdx] = useState(0);
   useEffect(() => {
     const t = setInterval(() => setActiveIdx((i) => (i + 1) % MODEL_ORDER.length), 2200);
@@ -88,6 +88,11 @@ function ReportRunningBanner({ modelScores, isMobile }: { modelScores: Array<{ m
           <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>
             — querying AI models with your prompts
           </span>
+          {promptCount > 0 && (
+            <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 6 }}>
+              (~{Math.ceil((promptCount * 5 * 3) / 60 + 0.5)} min est. for {promptCount} prompts)
+            </span>
+          )}
         </div>
 
         {/* Model score pills */}
@@ -724,6 +729,7 @@ function AppShellInner({
   draftsGenerating,
   scanning,
   modelScores,
+  promptCount,
   user,
   children,
 }: {
@@ -734,6 +740,7 @@ function AppShellInner({
   draftsGenerating: boolean;
   scanning: boolean;
   modelScores: Array<{ model: string; score: number }>;
+  promptCount: number;
   user: { name?: string | null; email?: string; is_admin?: boolean; subscription_tier?: string | null } | null;
   children: React.ReactNode;
 }) {
@@ -818,7 +825,7 @@ function AppShellInner({
       >
         <ImpersonationBanner />
         {/* Global status banners — written by dashboard/content pages via localStorage */}
-        {reportRunning && <ReportRunningBanner modelScores={modelScores} isMobile={isMobile} />}
+        {reportRunning && <ReportRunningBanner modelScores={modelScores} isMobile={isMobile} promptCount={promptCount} />}
         {draftsGenerating && <DraftsGeneratingBanner isMobile={isMobile} isPro={user?.subscription_tier === 'pro' || !!user?.is_admin} />}
         {scanning && <ScanningBanner isMobile={isMobile} isPro={user?.subscription_tier === 'pro' || !!user?.is_admin} />}
         {children}
@@ -933,6 +940,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [draftsGenerating, setDraftsGenerating] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [modelScores, setModelScores] = useState<Array<{ model: string; score: number }>>([]);
+  const [promptCount, setPromptCount] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const { user } = useAuth();
 
@@ -980,6 +988,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           setDraftsGenerating(status.drafts_generating);
           setScanning(status.scanning);
           setModelScores(status.model_scores || []);
+          setPromptCount(status.prompt_count || 0);
           active = status.report_running || status.drafts_generating || status.scanning;
           try {
             if (status.report_running) localStorage.setItem('clarity_report_running', '1');
@@ -994,6 +1003,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           setDraftsGenerating(false);
           setScanning(false);
           setModelScores([]);
+          setPromptCount(0);
         }
       }
       if (!cancelled) {
@@ -1041,6 +1051,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           draftsGenerating={draftsGenerating}
           scanning={scanning}
           modelScores={modelScores}
+          promptCount={promptCount}
           user={user}
         >
           {children}

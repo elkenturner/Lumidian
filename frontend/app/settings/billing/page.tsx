@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { CreditCard, Check, Loader2, Zap, AlertTriangle, CheckCircle2, X } from 'lucide-react';
-import { getBillingStatus, createCheckoutSession, createPortalSession, cancelSubscription, BillingStatus } from '@/lib/api';
+import { getBillingStatus, createCheckoutSession, createPortalSession, cancelSubscription, changePlan, BillingStatus } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { logError } from '@/lib/utils/errors';
 
@@ -75,7 +75,16 @@ export default function BillingPage() {
     init();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [confirmTier, setConfirmTier] = useState<string | null>(null);
+
   async function handleUpgrade(tier: string) {
+    // Existing subscribers: switch plan in-place via Stripe subscription modify
+    const hasActiveSub = currentTier && status?.subscription_status && !['canceled', 'incomplete_expired'].includes(status.subscription_status);
+    if (hasActiveSub) {
+      setConfirmTier(tier);
+      return;
+    }
+    // New subscribers: send to Stripe checkout
     setUpgrading(tier);
     try {
       const { checkout_url } = await createCheckoutSession(tier);
@@ -83,6 +92,23 @@ export default function BillingPage() {
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
       alert(e?.response?.data?.detail || 'Unable to start checkout. Please try again or contact support.');
+    } finally {
+      setUpgrading(null);
+    }
+  }
+
+  async function handleConfirmSwitch() {
+    if (!confirmTier) return;
+    setUpgrading(confirmTier);
+    try {
+      await changePlan(confirmTier);
+      setConfirmTier(null);
+      const updated = await getBillingStatus();
+      setStatus(updated);
+      await refresh();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      alert(e?.response?.data?.detail || 'Unable to switch plan. Please try again or contact support.');
     } finally {
       setUpgrading(null);
     }
@@ -155,6 +181,51 @@ export default function BillingPage() {
           </div>
         </div>
       )}
+
+      {/* Plan switch confirmation modal */}
+      {confirmTier && (() => {
+        const tierRank = { basic: 0, starter: 1, pro: 2 } as const;
+        const currentRank = currentTier ? tierRank[currentTier as keyof typeof tierRank] ?? -1 : -1;
+        const targetRank = tierRank[confirmTier as keyof typeof tierRank] ?? 0;
+        const isDowngrade = targetRank < currentRank;
+        const targetName = TIER_DISPLAY_NAMES[confirmTier] || confirmTier;
+        const targetPrice = TIER_PRICES[confirmTier] || '$0';
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setConfirmTier(null)} />
+            <div className="card relative max-w-sm w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+              <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-2">
+                {isDowngrade ? 'Downgrade' : 'Upgrade'} to {targetName}?
+              </h3>
+              <p className="text-xs text-[var(--text-muted)] mb-4">
+                {isDowngrade
+                  ? `Your plan will switch to ${targetName} (${targetPrice}/mo) at your next billing cycle. You'll keep your current features until then.`
+                  : `Your plan will switch to ${targetName} (${targetPrice}/mo). The new rate applies at your next billing cycle.`}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmTier(null)}
+                  className="flex-1 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[var(--border-default)] rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmSwitch}
+                  disabled={upgrading !== null}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2 text-xs font-medium rounded-lg transition-colors disabled:opacity-50 ${
+                    isDowngrade
+                      ? 'text-[var(--warning)] bg-[var(--warning)]/10 hover:bg-[var(--warning)]/20 border border-[var(--warning)]/25'
+                      : 'text-white bg-[var(--accent)] hover:bg-[var(--accent-hover)]'
+                  }`}
+                >
+                  {upgrading && <Loader2 size={11} className="animate-spin" />}
+                  Confirm {isDowngrade ? 'downgrade' : 'upgrade'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Success banner */}
       {successParam === 'true' && (
@@ -325,7 +396,7 @@ export default function BillingPage() {
                         } disabled:opacity-50`}
                       >
                         {upgrading === tier ? <Loader2 size={13} className="animate-spin" /> : null}
-                        {upgrading === tier ? 'Redirecting\u2026' : isUpgrade ? `Upgrade to ${displayName}` : isDowngrade ? `Switch to ${displayName}` : 'Subscribe'}
+                        {upgrading === tier ? (currentTier ? 'Switching\u2026' : 'Redirecting\u2026') : isUpgrade ? `Upgrade to ${displayName}` : isDowngrade ? `Downgrade to ${displayName}` : 'Subscribe'}
                       </button>
                     )}
                   </div>

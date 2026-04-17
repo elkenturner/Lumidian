@@ -4,14 +4,17 @@ import { useState } from 'react';
 import {
   ArrowRight,
   BarChart2,
+  ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import { ContentDraft, DraftAttribution } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
-import { relativeTime } from '../helpers';
+import { relativeTime, PLATFORM_DISPLAY } from '../helpers';
 
 export function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?: DraftAttribution }) {
   const [expanded, setExpanded] = useState(false);
   const title = draft.title ?? draft.content_text.slice(0, 80) + (draft.content_text.length > 80 ? '…' : '');
+  const isReply = draft.opportunity_id != null || draft.source === 'opportunity';
 
   type ConfidenceTier = 'awaiting' | 'early' | 'developing' | 'established';
   function getConfidenceTier(runs: number): ConfidenceTier {
@@ -95,25 +98,56 @@ export function PostedCard({ draft, attribution }: { draft: ContentDraft; attrib
     );
   }
 
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        className={`card w-full text-left px-4 py-3 flex items-center gap-3 transition-colors hover:border-[rgba(255,255,255,0.14)] cursor-pointer ${isReply ? 'border-l-[3px] border-l-[#6366f1]' : ''}`}
+      >
+        {isReply ? (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[rgba(99,102,241,0.12)] text-[#818cf8] shrink-0">
+            Reply
+          </span>
+        ) : (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[rgba(74,222,128,0.10)] text-[#4ade80] shrink-0">
+            Original
+          </span>
+        )}
+        <p className="text-sm text-[var(--text-secondary)] truncate flex-1 min-w-0">{title}</p>
+        <span className="text-[11px] text-[var(--text-faint)] shrink-0">{PLATFORM_DISPLAY[draft.platform] ?? draft.platform}</span>
+        <span className="text-xs text-[var(--text-faint)] shrink-0">{relativeTime(draft.updated_at)}</span>
+        <ChevronRight size={14} className="text-[var(--text-faint)] shrink-0" />
+      </button>
+    );
+  }
+
   return (
-    <div className="card p-4 flex flex-col gap-2 transition-colors">
+    <div className={`card p-4 flex flex-col gap-2 transition-colors ${isReply ? 'border-l-[3px] border-l-[#6366f1]' : ''}`}>
       <div className="flex items-center gap-2">
         <PlatformBadge platform={draft.platform} />
+        {isReply ? (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[rgba(99,102,241,0.12)] text-[#818cf8]">
+            Thread Reply
+          </span>
+        ) : (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[rgba(74,222,128,0.10)] text-[#4ade80]">
+            Original Content
+          </span>
+        )}
         <p className="flex-1 text-sm text-[var(--text-secondary)] truncate">{title}</p>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors shrink-0"
-        >
-          {expanded ? 'Hide' : 'View'}
-        </button>
         <span className="text-xs text-[var(--text-faint)] shrink-0">{relativeTime(draft.updated_at)}</span>
+        <button
+          onClick={() => setExpanded(false)}
+          className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors"
+          aria-label="Collapse"
+        >
+          <ChevronDown size={14} />
+        </button>
       </div>
 
-      {expanded && (
-        <div className="bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-3">
-          <pre className="text-xs text-[var(--text-muted)] whitespace-pre-wrap leading-relaxed font-mono">{draft.content_text}</pre>
-        </div>
-      )}
+      <div className="bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg p-3">
+        <pre className="text-xs text-[var(--text-muted)] whitespace-pre-wrap leading-relaxed font-mono">{draft.content_text}</pre>
+      </div>
 
       {attributionNode && (
         <div className="border-t border-[var(--border-subtle)] pt-2">

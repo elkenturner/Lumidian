@@ -1145,7 +1145,7 @@ function RequestDraftModal({
   );
 }
 
-// ── Opportunity card (Live Opportunities tab) ─────────────────────────────────
+// ── Opportunity card (Visibility Opportunities tab) ──────────────────────────
 
 function OpportunityCard({
   opp,
@@ -2171,16 +2171,16 @@ export default function ContentHubPage() {
           <p>Content Hub generates AI drafts for your brand and surfaces live threads across Reddit, Quora, LinkedIn, and X where you can contribute.</p>
           <ul className="space-y-2 mt-2">
             <li><span className="text-[var(--text-primary)] font-medium">Regenerate Drafts</span> — replaces all existing drafts with a fresh batch across your tracked prompts and platforms.</li>
-            <li><span className="text-[var(--text-primary)] font-medium">Live Opportunities</span> tab shows threads across Reddit, Quora, LinkedIn, and X matching your tracked prompts. Use &quot;Scan for Opportunities&quot; to refresh.</li>
-            <li><span className="text-[var(--text-primary)] font-medium">Drafts tab</span> — review, edit, and approve AI drafts before they go live.</li>
-            <li><span className="text-[var(--text-primary)] font-medium">Saved Drafts tab</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
+            <li><span className="text-[var(--text-primary)] font-medium">Visibility Opportunities</span> tab shows threads across Reddit, Quora, LinkedIn, and X matching your tracked prompts. Use &quot;Scan for Opportunities&quot; to refresh.</li>
+            <li><span className="text-[var(--text-primary)] font-medium">Queue</span> — review, edit, and approve AI drafts before they go live.</li>
+            <li><span className="text-[var(--text-primary)] font-medium">Scheduled</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Posted tab</span> — content that has been marked as posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Brand Settings</span> — control which platforms generate drafts and how frequently.</li>
           </ul>
         </HelpModal>
       )}
       {oppHelpOpen && (
-        <HelpModal title="Live Opportunities" onClose={() => setOppHelpOpen(false)}>
+        <HelpModal title="Visibility Opportunities" onClose={() => setOppHelpOpen(false)}>
           <p>Threads and discussions across Reddit, Quora, LinkedIn, and X where your brand can meaningfully contribute.</p>
           <p>Scanners search for content matching your tracked prompts. Only results with a relevance score of 40+ are shown.</p>
           <ul className="space-y-2 mt-2">
@@ -2659,7 +2659,7 @@ export default function ContentHubPage() {
                             ) : (
                               <>
                                 <RefreshCw size={14} />
-                                Regenerate Live Opportunities
+                                Regenerate Visibility Opportunities
                               </>
                             )}
                           </button>

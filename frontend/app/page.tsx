@@ -159,7 +159,7 @@ const FEATURES = [
   },
   {
     icon: MessageSquare,
-    title: 'Live Opportunities',
+    title: 'Visibility Opportunities',
     desc: 'Surface live threads and discussions across Reddit, Quora, LinkedIn, and X where your brand can contribute — scored by relevance.',
   },
   {

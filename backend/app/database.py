@@ -331,6 +331,8 @@ async def run_migrations():
             processed_at DATETIME NOT NULL
         )""",
         "CREATE INDEX IF NOT EXISTS idx_processed_webhook_events_stripe_id ON processed_webhook_events(stripe_event_id)",
+        # 2026-04-16: Admin tier override — prevents Stripe webhooks from reverting admin-set tiers
+        "ALTER TABLE users ADD COLUMN admin_tier_override INTEGER NOT NULL DEFAULT 0",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

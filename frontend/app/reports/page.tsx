@@ -420,10 +420,10 @@ export default function ReportsPage() {
 
           {/* Live / Index score summary */}
           {!loading && responses.length > 0 && (() => {
-            const liveR = responses.filter(r => r.model === 'perplexity' || r.model === 'gemini');
-            const indexR = responses.filter(r => r.model === 'chatgpt' || r.model === 'claude');
-            const liveS = liveR.length > 0 ? Math.round(liveR.filter(r => r.mentioned).length / liveR.length * 100) : null;
-            const indexS = indexR.length > 0 ? Math.round(indexR.filter(r => r.mentioned).length / indexR.length * 100) : null;
+            const liveR = responses.filter(r => (r.model === 'perplexity' || r.model === 'gemini') && !r.error);
+            const indexR = responses.filter(r => (r.model === 'chatgpt' || r.model === 'claude') && !r.error);
+            const liveS = liveR.length > 0 ? Math.round(liveR.filter(r => r.mentioned).length / liveR.length * 1000) / 10 : null;
+            const indexS = indexR.length > 0 ? Math.round(indexR.filter(r => r.mentioned).length / indexR.length * 1000) / 10 : null;
             if (liveS === null && indexS === null) return null;
             return (
               <div className="mb-4 bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl px-5 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">

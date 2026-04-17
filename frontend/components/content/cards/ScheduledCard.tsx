@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import {
   FileText,
   ChevronDown,
+  ChevronRight,
   ExternalLink,
   CheckCircle2,
   Edit2,
@@ -95,10 +96,11 @@ export function ScheduledCard({
   onMarkPosted: (id: number) => void;
   onMoveToDrafts: (id: number) => void;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const title = draft.title ?? draft.content_text.slice(0, 80) + (draft.content_text.length > 80 ? '…' : '');
+  const isReply = draft.opportunity_id != null || draft.source === 'opportunity';
 
   async function handleCopy() {
     try {
@@ -112,16 +114,55 @@ export function ScheduledCard({
 
   const guidance = POSTING_GUIDANCE[draft.platform];
 
+  // Compact collapsed view
+  if (!expanded) {
+    return (
+      <button
+        onClick={() => setExpanded(true)}
+        className={`card w-full text-left px-4 py-3 flex items-center gap-3 transition-colors hover:border-[rgba(255,255,255,0.14)] cursor-pointer ${isReply ? 'border-l-[3px] border-l-[#6366f1]' : ''}`}
+      >
+        {isReply ? (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[rgba(99,102,241,0.12)] text-[#818cf8] shrink-0">
+            Reply
+          </span>
+        ) : (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[rgba(74,222,128,0.10)] text-[#4ade80] shrink-0">
+            Original
+          </span>
+        )}
+        <p className="text-sm text-[var(--text-secondary)] truncate flex-1 min-w-0">{title}</p>
+        <span className="text-[11px] text-[var(--text-faint)] shrink-0">{PLATFORM_DISPLAY[draft.platform] ?? draft.platform}</span>
+        <ChevronRight size={14} className="text-[var(--text-faint)] shrink-0" />
+      </button>
+    );
+  }
+
   return (
-    <div className="card p-4 flex flex-col gap-3 transition-colors">
+    <div className={`card p-4 flex flex-col gap-3 transition-colors ${isReply ? 'border-l-[3px] border-l-[#6366f1]' : ''}`}>
       <div className="flex items-center gap-2 flex-wrap">
         <PlatformBadge platform={draft.platform} />
+        {isReply ? (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[rgba(99,102,241,0.12)] text-[#818cf8]">
+            Thread Reply
+          </span>
+        ) : (
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[rgba(74,222,128,0.10)] text-[#4ade80]">
+            Original Content
+          </span>
+        )}
         {draft.approved_at && (
           <span className="text-xs text-[var(--text-muted)] flex items-center gap-1">
             <CheckCircle2 size={11} className="text-[var(--success)]" />
             Approved {relativeTime(draft.approved_at)}
           </span>
         )}
+        <button
+          onClick={() => setExpanded(false)}
+          className="ml-auto text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors"
+          aria-label="Collapse"
+        >
+          <ChevronDown size={14} />
+        </button>
       </div>
 
       {draft.content_brief && (
@@ -140,20 +181,18 @@ export function ScheduledCard({
         )}
       </div>
 
-      {expanded && (
-        <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-lg p-3 relative">
-          <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed font-mono pr-14">
-            {draft.content_text}
-          </pre>
-          <button
-            onClick={handleCopy}
-            className="absolute top-2 right-2 flex items-center gap-1 text-[10px] text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors"
-          >
-            {copied ? <Check size={11} className="text-[var(--success)]" /> : <Copy size={11} />}
-            {copied ? 'Copied' : 'Copy'}
-          </button>
-        </div>
-      )}
+      <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-lg p-3 relative">
+        <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed font-mono pr-14">
+          {draft.content_text}
+        </pre>
+        <button
+          onClick={handleCopy}
+          className="absolute top-2 right-2 flex items-center gap-1 text-[10px] text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors"
+        >
+          {copied ? <Check size={11} className="text-[var(--success)]" /> : <Copy size={11} />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
 
       {guidance && (
         <div className="border border-[var(--border-default)] rounded-lg overflow-hidden">
@@ -186,11 +225,11 @@ export function ScheduledCard({
 
       <div className="flex items-center gap-2 pt-1 flex-wrap">
         <button
-          onClick={() => setExpanded(!expanded)}
+          onClick={() => setExpanded(false)}
           className="flex items-center gap-1.5 text-xs bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 transition-colors"
         >
           <FileText size={11} />
-          {expanded ? 'Hide Draft' : 'View Draft'}
+          Hide Draft
         </button>
         <button
           onClick={() => onMarkPosted(draft.id)}
@@ -204,7 +243,7 @@ export function ScheduledCard({
           className="flex items-center gap-1.5 text-xs text-[var(--text-faint)] hover:text-[var(--text-muted)] rounded-lg px-3 py-1.5 transition-colors ml-auto"
         >
           <Edit2 size={11} />
-          Move back to Drafts
+          Move back to Queue
         </button>
       </div>
     </div>

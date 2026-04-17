@@ -1908,6 +1908,12 @@ export default function ContentHubPage() {
     setToast({ message: 'Opportunity dismissed', type: 'info' });
   }
 
+  function handleNavigateToQueueDraft(draftId: number) {
+    setActivePrimaryTab('content_drafts');
+    setActiveSubTab('queue');
+    setPinnedDraftId(draftId);
+  }
+
   // ── Right panel actions ────────────────────────────────────────────────────
 
   async function handleGenerateNow() {
@@ -2597,6 +2603,7 @@ export default function ContentHubPage() {
               handleMoveBackToDrafts={handleMoveBackToDrafts}
               handleDraftOpportunity={handleDraftOpportunity}
               handleDismissOpportunity={handleDismissOpportunity}
+              onNavigateToQueueDraft={handleNavigateToQueueDraft}
               setOppHelpOpen={setOppHelpOpen}
               user={user}
               onRequestDraft={() => setRequestDraftOpen(true)}

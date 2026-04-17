@@ -78,6 +78,7 @@ export interface ContentTabPanelsProps {
   onRequestDraft?: () => void;
   // Bulk actions
   handleApproveAll?: () => Promise<void>;
+  onNavigateToQueueDraft?: (draftId: number) => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

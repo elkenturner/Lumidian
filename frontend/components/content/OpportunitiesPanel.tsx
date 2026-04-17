@@ -13,14 +13,14 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
   const {
     opportunities, visibleOpportunities, oppPlatformFilter, setOppPlatformFilter,
     handleDraftOpportunity, handleDismissOpportunity, draftStatus, setOppHelpOpen,
-    _disabledPlatforms,
+    _disabledPlatforms, draftItems, onNavigateToQueueDraft,
   } = props;
 
   const header = (
     <>
       <div className="flex items-center justify-between mb-4">
         <p className="text-xs text-[var(--text-muted)]">
-          Threads and questions matched to your tracked prompts
+          Live threads where your brand can gain visibility
         </p>
         <button
           onClick={() => setOppHelpOpen(true)}
@@ -83,6 +83,8 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
               onDraft={handleDraftOpportunity}
               onDismiss={handleDismissOpportunity}
               queueFull={!!draftStatus?.draft_queue_full}
+              draftedReply={draftItems.find((d) => d.opportunity_id === o.id) ?? null}
+              onNavigateToDraft={onNavigateToQueueDraft}
             />
           </motion.div>
         ))}

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, X } from 'lucide-react';
-import { adminExitImpersonation } from '@/lib/api';
+import { adminExitImpersonation, swapSessionToken } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function ImpersonationBanner() {
@@ -20,7 +20,9 @@ export default function ImpersonationBanner() {
     if (!token) return;
     setExiting(true);
     try {
-      await adminExitImpersonation(token);
+      const result = await adminExitImpersonation(token);
+      // Set admin cookie via Next.js Route Handler (reliable, bypasses rewrite proxy)
+      await swapSessionToken(result.admin_token);
       sessionStorage.removeItem('admin_restore_token');
       await refresh();
       router.push('/admin');

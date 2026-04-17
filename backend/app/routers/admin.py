@@ -16,7 +16,6 @@ POST   /api/admin/reset-password              — reset any user's password
 from __future__ import annotations
 
 import logging
-import os
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -155,9 +154,93 @@ async def admin_remove_user(user_id: int, db: DbDep, user: CurrentUser):
         raise HTTPException(status_code=400, detail="Cannot delete an admin account")
 
     logger.warning("Admin %s deleting user %s (%d) and all their data", user.email, target.email, user_id)
+
+    # Cascade-delete all user data in correct order (leaf tables first).
+    # Brand.user_id uses ondelete=SET NULL, so we must delete brands explicitly.
+    from sqlalchemy import delete as sa_delete, select as sa_select
+
+    from app.models import (
+        AnalyticsEvent, BrandContentSettings, BrandProfile, CompetitorMention,
+        ContentAttribution, ContentDraft, ContentEvent, ContentGap, ContentOpportunity,
+        ContentPost, DraftAttribution, Notification, PasswordResetToken,
+        PromptRunScore, QueryResult, RunModelScore, TeamMember,
+    )
+
+    # Get all brand IDs for this user
+    brand_ids_result = await db.execute(
+        sa_select(Brand.id).where(Brand.user_id == user_id)
+    )
+    brand_ids = [r[0] for r in brand_ids_result.all()]
+
+    if brand_ids:
+        # Get child IDs we need for deeper deletes
+        run_ids_result = await db.execute(
+            sa_select(TrackingRun.id).where(TrackingRun.brand_id.in_(brand_ids))
+        )
+        run_ids = [r[0] for r in run_ids_result.all()]
+
+        prompt_ids_result = await db.execute(
+            sa_select(Prompt.id).where(Prompt.brand_id.in_(brand_ids))
+        )
+        prompt_ids = [r[0] for r in prompt_ids_result.all()]
+
+        competitor_ids_result = await db.execute(
+            sa_select(Competitor.id).where(Competitor.brand_id.in_(brand_ids))
+        )
+        competitor_ids = [r[0] for r in competitor_ids_result.all()]
+
+        draft_ids_result = await db.execute(
+            sa_select(ContentDraft.id).where(ContentDraft.brand_id.in_(brand_ids))
+        )
+        draft_ids = [r[0] for r in draft_ids_result.all()]
+
+        post_ids = []
+        if draft_ids:
+            post_ids_result = await db.execute(
+                sa_select(ContentPost.id).where(ContentPost.draft_id.in_(draft_ids))
+            )
+            post_ids = [r[0] for r in post_ids_result.all()]
+
+        # Delete leaf tables first, working up to parents
+        if post_ids:
+            await db.execute(sa_delete(ContentAttribution).where(ContentAttribution.content_post_id.in_(post_ids)))
+        if draft_ids:
+            await db.execute(sa_delete(ContentPost).where(ContentPost.draft_id.in_(draft_ids)))
+            await db.execute(sa_delete(DraftAttribution).where(DraftAttribution.draft_id.in_(draft_ids)))
+        if competitor_ids:
+            await db.execute(sa_delete(CompetitorMention).where(CompetitorMention.competitor_id.in_(competitor_ids)))
+        if run_ids:
+            await db.execute(sa_delete(QueryResult).where(QueryResult.tracking_run_id.in_(run_ids)))
+            await db.execute(sa_delete(RunModelScore).where(RunModelScore.tracking_run_id.in_(run_ids)))
+        if prompt_ids:
+            await db.execute(sa_delete(PromptRunScore).where(PromptRunScore.prompt_id.in_(prompt_ids)))
+
+        # Mid-level tables
+        await db.execute(sa_delete(ContentDraft).where(ContentDraft.brand_id.in_(brand_ids)))
+        await db.execute(sa_delete(ContentGap).where(ContentGap.brand_id.in_(brand_ids)))
+        await db.execute(sa_delete(ContentOpportunity).where(ContentOpportunity.brand_id.in_(brand_ids)))
+        await db.execute(sa_delete(ContentEvent).where(ContentEvent.brand_id.in_(brand_ids)))
+        await db.execute(sa_delete(BrandContentSettings).where(BrandContentSettings.brand_id.in_(brand_ids)))
+        await db.execute(sa_delete(BrandProfile).where(BrandProfile.brand_id.in_(brand_ids)))
+        await db.execute(sa_delete(Competitor).where(Competitor.brand_id.in_(brand_ids)))
+        await db.execute(sa_delete(TrackingRun).where(TrackingRun.brand_id.in_(brand_ids)))
+        await db.execute(sa_delete(Prompt).where(Prompt.brand_id.in_(brand_ids)))
+        await db.execute(sa_delete(Brand).where(Brand.id.in_(brand_ids)))
+
+    # Delete direct user relations
+    await db.execute(sa_delete(PasswordResetToken).where(PasswordResetToken.user_id == user_id))
+    await db.execute(sa_delete(Notification).where(Notification.user_id == user_id))
+    await db.execute(sa_delete(TeamMember).where(TeamMember.account_owner_id == user_id))
+    await db.execute(sa_delete(TeamMember).where(TeamMember.user_id == user_id))
+    await db.execute(sa_delete(AnalyticsEvent).where(AnalyticsEvent.user_id == user_id))
+
+    # Finally delete the user
     await db.delete(target)
     await db.commit()
-    return {"user_id": user_id, "deleted": True}
+
+    logger.info("Admin %s successfully deleted user %s (%d) — %d brands removed",
+                user.email, target.email, user_id, len(brand_ids))
+    return {"user_id": user_id, "deleted": True, "brands_removed": len(brand_ids)}
 
 
 # ── Admin: all tracking runs ──────────────────────────────────────────────────
@@ -342,27 +425,6 @@ async def admin_reset_password(
     return {"message": f"Password reset successfully for {email}"}
 
 
-# ── Shared cookie helpers ──────────────────────────────────────────────────────
-
-COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
-
-
-def _cookie_secure() -> bool:
-    return os.getenv("ENVIRONMENT", "development").lower() == "production"
-
-
-def _set_auth_cookies(response: Response, token: str) -> None:
-    secure = _cookie_secure()
-    response.set_cookie(
-        "clarity_token", token, httponly=True, secure=secure,
-        samesite="lax", max_age=COOKIE_MAX_AGE, path="/",
-    )
-    response.set_cookie(
-        "clarity_session", "1", httponly=False, secure=secure,
-        samesite="lax", max_age=COOKIE_MAX_AGE, path="/",
-    )
-
-
 # ── Admin: impersonate a user ─────────────────────────────────────────────────
 
 @router.post("/impersonate/{user_id}")
@@ -373,7 +435,7 @@ async def admin_impersonate(
     response: Response,
     clarity_token: str | None = Cookie(default=None),
 ):
-    """Mint a JWT for target user and swap cookies. Returns admin token for restoration."""
+    """Mint a JWT for target user and swap cookies. Returns both tokens for frontend handling."""
     _require_admin(user)
 
     target = await db.get(User, user_id)
@@ -389,14 +451,19 @@ async def admin_impersonate(
         "impersonated_by": user.id,
     }
     target_token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    _set_auth_cookies(response, target_token)
+
+    # Set cookies directly (works when Set-Cookie headers are forwarded by proxy)
+    from app.routers.auth import set_auth_cookies
+    set_auth_cookies(response, target_token)
 
     logger.warning(
         "Admin %s started impersonating user %s (%d)",
         user.email, target.email, target.id,
     )
+    # Return target_token so frontend can set cookie via Route Handler as fallback
     return {
         "admin_token": clarity_token,
+        "target_token": target_token,
         "target_user_id": target.id,
         "target_user_email": target.email,
     }
@@ -425,9 +492,10 @@ async def admin_exit_impersonation(request: ExitImpersonationRequest, response: 
         if not admin_user or not admin_user.is_admin:
             raise HTTPException(status_code=403, detail="Token does not belong to an admin")
 
-    _set_auth_cookies(response, request.admin_token)
+    from app.routers.auth import set_auth_cookies
+    set_auth_cookies(response, request.admin_token)
     logger.info("Admin %s exited impersonation", admin_user.email)
-    return {"restored": True, "admin_user_id": int(admin_user_id)}
+    return {"restored": True, "admin_user_id": int(admin_user_id), "admin_token": request.admin_token}
 
 
 # ── Admin: user detail ────────────────────────────────────────────────────────
@@ -510,6 +578,7 @@ async def admin_edit_user(user_id: int, body: AdminEditUser, db: DbDep, user: Cu
         raise HTTPException(status_code=400, detail="Cannot edit another admin account")
 
     changes = body.model_dump(exclude_unset=True)
+    tier_changed = False
     for field, new_val in changes.items():
         old_val = getattr(target, field, None)
         if field == "trial_end":
@@ -523,11 +592,19 @@ async def admin_edit_user(user_id: int, body: AdminEditUser, db: DbDep, user: Cu
             )
             setattr(target, "trial_end", parsed)
         else:
+            if field == "subscription_tier" and new_val != old_val:
+                tier_changed = True
             logger.info(
                 "Admin %s updated user %d %s: %r → %r",
                 user.email, user_id, field, old_val, new_val,
             )
             setattr(target, field, new_val)
+
+    # When admin manually changes tier, set override flag so Stripe webhooks
+    # don't revert the change. Cleared when user changes subscription via Stripe.
+    if tier_changed:
+        target.admin_tier_override = True
+        logger.info("Admin %s set admin_tier_override for user %d", user.email, user_id)
 
     target.updated_at = utcnow()
     await db.commit()

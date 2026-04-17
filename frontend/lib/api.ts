@@ -1207,14 +1207,27 @@ export async function adminDeleteCompetitor(competitorId: number): Promise<{ com
   return res.data;
 }
 
-export async function adminImpersonate(userId: number): Promise<{ admin_token: string; target_user_id: number; target_user_email: string }> {
-  const res = await api.post<{ admin_token: string; target_user_id: number; target_user_email: string }>(`/admin/impersonate/${userId}`);
+export async function adminImpersonate(userId: number): Promise<{ admin_token: string; target_token: string; target_user_id: number; target_user_email: string }> {
+  const res = await api.post<{ admin_token: string; target_token: string; target_user_id: number; target_user_email: string }>(`/admin/impersonate/${userId}`);
   return res.data;
 }
 
-export async function adminExitImpersonation(adminToken: string): Promise<{ restored: boolean; admin_user_id: number }> {
-  const res = await api.post<{ restored: boolean; admin_user_id: number }>('/admin/exit-impersonation', { admin_token: adminToken });
+export async function adminExitImpersonation(adminToken: string): Promise<{ restored: boolean; admin_user_id: number; admin_token: string }> {
+  const res = await api.post<{ restored: boolean; admin_user_id: number; admin_token: string }>('/admin/exit-impersonation', { admin_token: adminToken });
   return res.data;
+}
+
+/**
+ * Set a JWT as the session cookie via the Next.js Route Handler.
+ * Bypasses the rewrite proxy to guarantee the httpOnly cookie is set.
+ */
+export async function swapSessionToken(token: string): Promise<void> {
+  await fetch('/api/auth/swap-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+    credentials: 'same-origin',
+  });
 }
 
 export async function exportReportPDF(brandId: number, days = 0): Promise<void> {

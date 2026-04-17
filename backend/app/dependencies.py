@@ -111,24 +111,27 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     logger.debug(f"get_current_user: id={user.id} is_admin={user.is_admin}")
+    # Admin impersonation sessions bypass paused/unverified/password checks
+    is_impersonated = bool(payload.get("impersonated_by"))
     # Invalidate sessions issued before the last password change
-    token_iat = payload.get("iat")
-    pw_changed = getattr(user, "password_changed_at", None)
-    if token_iat and pw_changed:
-        from datetime import datetime, timezone
-        iat_dt = datetime.fromtimestamp(token_iat, tz=timezone.utc).replace(tzinfo=None)
-        if iat_dt < pw_changed:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Session expired due to password change. Please log in again.",
-            )
-    if getattr(user, "is_paused", False) and not user.is_admin:
+    if not is_impersonated:
+        token_iat = payload.get("iat")
+        pw_changed = getattr(user, "password_changed_at", None)
+        if token_iat and pw_changed:
+            from datetime import datetime, timezone
+            iat_dt = datetime.fromtimestamp(token_iat, tz=timezone.utc).replace(tzinfo=None)
+            if iat_dt < pw_changed:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Session expired due to password change. Please log in again.",
+                )
+    if getattr(user, "is_paused", False) and not user.is_admin and not is_impersonated:
         logger.warning(f"get_current_user: BLOCKED - account paused for user {user.id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your account has been paused. Contact support to restore access.",
         )
-    if not getattr(user, "email_verified", True) and not user.is_admin:
+    if not getattr(user, "email_verified", True) and not user.is_admin and not is_impersonated:
         logger.warning(f"get_current_user: BLOCKED - email not verified for user {user.id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -155,7 +158,8 @@ async def get_current_user_allow_unverified(
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-    if getattr(user, "is_paused", False) and not user.is_admin:
+    is_impersonated = bool(payload.get("impersonated_by"))
+    if getattr(user, "is_paused", False) and not user.is_admin and not is_impersonated:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your account has been paused. Contact support to restore access.",

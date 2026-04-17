@@ -577,8 +577,11 @@ async def stripe_webhook(request: Request, db: DbDep):
                 user.stripe_subscription_id = sub_id
                 changed = True
             if tier and user.subscription_tier != tier:
-                user.subscription_tier = tier
-                changed = True
+                if getattr(user, "admin_tier_override", False):
+                    logger.info("Skipping tier update for user %s — admin override active", user.email)
+                else:
+                    user.subscription_tier = tier
+                    changed = True
             if user.subscription_status != "active":
                 user.subscription_status = "active"
                 changed = True
@@ -619,7 +622,10 @@ async def stripe_webhook(request: Request, db: DbDep):
             user.subscription_status = sub_status
             user.stripe_subscription_id = sub_id
             if tier:
-                user.subscription_tier = tier
+                if getattr(user, "admin_tier_override", False):
+                    logger.info("Skipping tier update for user %s — admin override active", user.email)
+                else:
+                    user.subscription_tier = tier
             # Store trial end date if present (Stripe sends unix timestamp)
             trial_end_ts = data_obj.get("trial_end")
             if trial_end_ts:
@@ -653,6 +659,7 @@ async def stripe_webhook(request: Request, db: DbDep):
             user.subscription_status = "canceled"
             user.subscription_tier = None
             user.stripe_subscription_id = None
+            user.admin_tier_override = False  # Clear override on cancellation
             user.updated_at = utcnow()
             await db.flush()
 

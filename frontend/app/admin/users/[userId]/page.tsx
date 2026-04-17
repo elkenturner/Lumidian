@@ -13,7 +13,7 @@ import {
   adminGetUser, adminEditUser, adminGetUserRuns, adminGetUserBrands,
   adminImpersonate, adminTriggerRun, adminGenerateDraft,
   adminEditBrand, adminAddPrompt, adminEditPrompt, adminDeletePrompt,
-  adminAddCompetitor, adminDeleteCompetitor,
+  adminAddCompetitor, adminDeleteCompetitor, swapSessionToken,
   AdminUserDetail, AdminEditUserPayload, AdminBrandDetail, AdminUserRun,
 } from '@/lib/api';
 
@@ -508,6 +508,8 @@ export default function AdminUserDetailPage() {
     try {
       const result = await adminImpersonate(userId);
       sessionStorage.setItem('admin_restore_token', result.admin_token);
+      // Set cookie via Next.js Route Handler (reliable, bypasses rewrite proxy)
+      await swapSessionToken(result.target_token);
       await refresh();
       router.push('/dashboard');
     } catch (err) {

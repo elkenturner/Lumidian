@@ -85,6 +85,8 @@ import { renderPreviewHtml } from '@/components/content/helpers';
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted';
+type PrimaryTab = 'opportunities' | 'content_drafts' | 'posted';
+type ContentDraftsSubTab = 'queue' | 'scheduled';
 
 // ── Draft card (Drafts tab) ───────────────────────────────────────────────────
 
@@ -1555,7 +1557,13 @@ function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?:
 export default function ContentHubPage() {
   const { user } = useAuth();
   const { brands, activeBrandId: selectedBrandId, setActiveBrandId: setSelectedBrandId, loading: brandsLoading } = useBrand();
-  const [activeTab, setActiveTab] = useState<QueueTab>('drafts');
+  const [activePrimaryTab, setActivePrimaryTab] = useState<PrimaryTab>('content_drafts');
+  const [activeSubTab, setActiveSubTab] = useState<ContentDraftsSubTab>('queue');
+  const activeTab: QueueTab = activePrimaryTab === 'content_drafts'
+    ? (activeSubTab === 'scheduled' ? 'scheduled' : 'drafts')
+    : activePrimaryTab === 'opportunities'
+    ? 'opportunities'
+    : 'posted';
   const [toast, setToast] = useState<ToastData | null>(null);
   useEffect(() => {
     if (!toast) return;
@@ -1568,8 +1576,16 @@ export default function ContentHubPage() {
 
   useEffect(() => {
     const tab = new URLSearchParams(window.location.search).get('tab');
-    if (tab === 'opportunities' || tab === 'scheduled' || tab === 'posted') {
-      setActiveTab(tab as QueueTab);
+    if (tab === 'opportunities') {
+      setActivePrimaryTab('opportunities');
+    } else if (tab === 'drafts') {
+      setActivePrimaryTab('content_drafts');
+      setActiveSubTab('queue');
+    } else if (tab === 'scheduled') {
+      setActivePrimaryTab('content_drafts');
+      setActiveSubTab('scheduled');
+    } else if (tab === 'posted') {
+      setActivePrimaryTab('posted');
     }
   }, []);
   const [loading, setLoading] = useState(true);
@@ -1646,6 +1662,12 @@ export default function ContentHubPage() {
     drafts: draftItems.length,
     scheduled: scheduledItems.length,
     opportunities: opportunities.length,
+    posted: postedItems.length,
+  };
+
+  const primaryTabCounts = {
+    opportunities: opportunities.length,
+    content_drafts: draftItems.length + scheduledItems.length,
     posted: postedItems.length,
   };
 
@@ -1861,7 +1883,7 @@ export default function ContentHubPage() {
       setPinnedDraftId(draft.id);
       // Refresh status so the count is accurate
       if (selectedBrandId) getDraftStatus(selectedBrandId).then(setDraftStatus).catch((err) => logError(err, 'Content: refresh draft status after drafting opportunity'));
-      setActiveTab('drafts');
+      setActivePrimaryTab('content_drafts'); setActiveSubTab('queue');
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { detail?: string | Array<{ msg?: string }> } } };
       const rawDetail = err?.response?.data?.detail;
@@ -1897,7 +1919,7 @@ export default function ContentHubPage() {
 
     // Clear drafts UI immediately to show we're refreshing
     setDraftItems([]);
-    setActiveTab('drafts');
+    setActivePrimaryTab('content_drafts'); setActiveSubTab('queue');
 
     try {
       // Backend starts generation in the background and returns 202 immediately.
@@ -2102,10 +2124,9 @@ export default function ContentHubPage() {
     (o) => !_disabledPlatforms.has(o.platform) && (oppPlatformFilter === 'all' || o.platform === oppPlatformFilter)
   );
 
-  const TABS: { key: QueueTab; label: string }[] = [
-    { key: 'opportunities' as QueueTab, label: 'Live Opportunities' },
-    { key: 'drafts', label: 'Drafts' },
-    { key: 'scheduled', label: 'Saved Drafts' },
+  const PRIMARY_TABS: { key: PrimaryTab; label: string }[] = [
+    { key: 'opportunities', label: 'Visibility Opportunities' },
+    { key: 'content_drafts', label: 'Content Drafts' },
     { key: 'posted', label: 'Posted' },
   ];
 
@@ -2133,7 +2154,7 @@ export default function ContentHubPage() {
           onClose={() => setRequestDraftOpen(false)}
           onCreated={(draft) => {
             setDraftItems((prev) => [draft, ...prev]);
-            setActiveTab('drafts');
+            setActivePrimaryTab('content_drafts'); setActiveSubTab('queue');
           }}
         />
       )}
@@ -2485,31 +2506,61 @@ export default function ContentHubPage() {
         <div className="flex flex-col md:flex-row gap-6">
           {/* ── Left panel (70%) — Content Queue ────────────────────────────── */}
           <div className="flex-1 min-w-0">
-            {/* Tab bar */}
-            <div className="flex gap-1 mb-5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-              {TABS.map((tab) => (
+            {/* Primary tab bar */}
+            <div className="flex gap-1 mb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+              {PRIMARY_TABS.map((tab) => (
                 <button
                   key={tab.key}
-                  onClick={() => setActiveTab(tab.key)}
+                  onClick={() => {
+                    setActivePrimaryTab(tab.key);
+                    if (tab.key === 'content_drafts') setActiveSubTab('queue');
+                  }}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-[color,background-color,border-color] ${
-                    activeTab === tab.key
+                    activePrimaryTab === tab.key
                       ? 'bg-[rgba(95,126,166,0.18)] text-[var(--accent-foreground)] border border-[rgba(95,126,166,0.30)] shadow-[0_0_14px_rgba(95,126,166,0.14)]'
                       : 'text-[var(--text-faint)] bg-transparent border border-transparent hover:text-[var(--text-muted)]'
                   }`}
                 >
                   {tab.label}
-                  {tabCounts[tab.key] > 0 && (
+                  {primaryTabCounts[tab.key] > 0 && (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                      activeTab === tab.key
+                      activePrimaryTab === tab.key
                         ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]'
                         : 'bg-[rgba(255,255,255,0.08)] text-[var(--text-faint)]'
                     }`}>
-                      {tabCounts[tab.key]}
+                      {primaryTabCounts[tab.key]}
                     </span>
                   )}
                 </button>
               ))}
             </div>
+
+            {/* Sub-tabs for Content Drafts */}
+            {activePrimaryTab === 'content_drafts' && (
+              <div className="flex gap-1 mb-5 pl-0.5">
+                {([
+                  { key: 'queue' as ContentDraftsSubTab, label: 'Queue', count: tabCounts.drafts },
+                  { key: 'scheduled' as ContentDraftsSubTab, label: 'Scheduled', count: tabCounts.scheduled },
+                ]).map((sub) => (
+                  <button
+                    key={sub.key}
+                    onClick={() => setActiveSubTab(sub.key)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${
+                      activeSubTab === sub.key
+                        ? 'bg-[var(--bg-card)] text-[var(--text-primary)]'
+                        : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'
+                    }`}
+                  >
+                    {sub.label}
+                    {sub.count > 0 && (
+                      <span className="text-[10px] ml-1 text-[var(--accent)]">{sub.count}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activePrimaryTab !== 'content_drafts' && <div className="mb-2" />}
 
             {/* Tab content */}
             <ContentTabPanels
@@ -2586,7 +2637,7 @@ export default function ContentHubPage() {
                       draftStatus.draft_count === 0;
                     return (
                       <>
-                        {activeTab === 'opportunities' ? (
+                        {activePrimaryTab === 'opportunities' ? (
                         <>
                           <button
                             onClick={handleScanNow}
@@ -2663,7 +2714,7 @@ export default function ContentHubPage() {
                   <>
                     {([
                       { label: 'Drafts', count: draftStatus.draft_count, cap: draftStatus.draft_cap },
-                      { label: 'Saved Drafts', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
+                      { label: 'Scheduled', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
                     ] as Array<{ label: string; count: number; cap: number }>).map(({ label, count, cap }) => {
                       const pct = cap > 0 ? count / cap : 0;
                       const barColor = 'var(--accent)';
@@ -2723,7 +2774,7 @@ export default function ContentHubPage() {
                   { key: 'linkedin', color: '#0a66c2', proOnly: true },
                   { key: 'x', color: '#94a3b8', proOnly: true },
                 ] as const).filter(({ key }) => {
-                  if (activeTab === 'opportunities') return key !== 'medium' && key !== 'wikipedia';
+                  if (activePrimaryTab === 'opportunities') return key !== 'medium' && key !== 'wikipedia';
                   return true;
                 }).map(({ key, color, proOnly }) => {
                   const isLocked = proOnly && user?.subscription_tier !== 'pro' && !user?.is_admin;

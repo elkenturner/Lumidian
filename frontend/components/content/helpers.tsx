@@ -21,6 +21,8 @@ export const PLATFORM_DISPLAY: Record<string, string> = {
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted';
+export type PrimaryTab = 'opportunities' | 'content_drafts' | 'posted';
+export type ContentDraftsSubTab = 'queue' | 'scheduled';
 
 export interface QualityCheck {
   label: string;

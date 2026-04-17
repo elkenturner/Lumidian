@@ -25,7 +25,7 @@ export function OpportunitiesPanel(props: ContentTabPanelsProps) {
         <button
           onClick={() => setOppHelpOpen(true)}
           className="text-[var(--text-faint)] hover:text-[var(--accent)] transition-colors"
-          title="How do Live Opportunities work?"
+          title="How do Visibility Opportunities work?"
         >
           <HelpCircle size={14} />
         </button>

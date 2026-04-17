@@ -13,7 +13,7 @@ export default function DashboardModelBreakdown({ models, deltas }: DashboardMod
   return (
     <div className="space-y-3 w-full">
       {models.map((m) => {
-        const pct = Math.round(m.mention_rate * 100);
+        const pct = Math.round(m.mention_rate * 1000) / 10;
         const barColor = MODEL_BAR_COLORS[m.model] ?? 'var(--accent)';
         const barWidth = `${pct}%`;
         const delta = deltas?.[m.model];

@@ -442,14 +442,14 @@ export default function DashboardPage() {
     if (!mods.length) return null;
     const mentions = mods.reduce((s, m) => s + m.total_mentions, 0);
     const total = mods.reduce((s, m) => s + m.total_queries, 0);
-    return total > 0 ? Math.round(mentions / total * 100) : null;
+    return total > 0 ? Math.round(mentions / total * 1000) / 10 : null;
   })();
   const indexScore = (() => {
     const mods = latestModelBreakdown.filter(m => m.model === 'chatgpt' || m.model === 'claude');
     if (!mods.length) return null;
     const mentions = mods.reduce((s, m) => s + m.total_mentions, 0);
     const total = mods.reduce((s, m) => s + m.total_queries, 0);
-    return total > 0 ? Math.round(mentions / total * 100) : null;
+    return total > 0 ? Math.round(mentions / total * 1000) / 10 : null;
   })();
   const daysSinceFirst = trends.length > 0 && trends[0].completed_at
     ? Math.max(0, Math.floor((Date.now() - parseUTCISO(trends[0].completed_at).getTime()) / 86_400_000))

@@ -244,14 +244,47 @@ export function DraftCard({
     : 'border-[var(--border-default)]';
 
   return (
-    <div className={`card card-hover p-5 flex flex-col gap-3 transition-colors ${qualityClass}`}>
+    <div className={`card card-hover p-5 flex flex-col gap-3 transition-colors ${qualityClass} ${draft.opportunity_id != null || draft.source === 'opportunity' ? 'border-l-[3px] border-l-[#6366f1]' : ''}`}>
       {/* Top row */}
       <div className="flex items-center justify-between gap-2">
-        <PlatformBadge platform={draft.platform} />
+        <div className="flex items-center gap-2">
+          <PlatformBadge platform={draft.platform} />
+          {draft.opportunity_id != null || draft.source === 'opportunity' ? (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[rgba(99,102,241,0.12)] text-[#818cf8]">
+              Thread Reply
+            </span>
+          ) : (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[rgba(74,222,128,0.10)] text-[#4ade80]">
+              Original Content
+            </span>
+          )}
+        </div>
         <span className="text-[10px] text-[var(--text-faint)] shrink-0">
           {relativeTime(draft.created_at)}
         </span>
       </div>
+
+      {/* Thread reply context — shown for all opportunity drafts regardless of platform */}
+      {(draft.opportunity_id != null || draft.source === 'opportunity') && (
+        <div className="flex flex-col gap-1">
+          {draft.content_brief && (
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed truncate">
+              Re: {draft.content_brief.replace(/^Reply .* in r\/\w+ — /, '').replace(/^Targeting: /, '')}
+            </p>
+          )}
+          {draft.platform_guidelines_applied?.startsWith('http') && (
+            <a
+              href={draft.platform_guidelines_applied}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[11px] text-[#818cf8] hover:text-[#a5b4fc] transition-colors"
+            >
+              <ExternalLink size={10} />
+              View original thread
+            </a>
+          )}
+        </div>
+      )}
 
       {/* Target prompt / posting instruction */}
       {draft.opportunity_id != null && draft.platform === 'reddit' &&

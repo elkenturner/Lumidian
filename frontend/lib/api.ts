@@ -210,6 +210,7 @@ export interface ContentDraft {
   dismissed_at: string | null;
   posted_at: string | null;
   visibility_at_post: number | null;
+  source: string | null;
   edited_count: number;
   time_to_approve_seconds: number | null;
   created_at: string;

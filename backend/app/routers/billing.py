@@ -46,7 +46,7 @@ TIER_DISPLAY_NAMES: dict[str | None, str] = {
 # Canonical tier ordering for UI rendering (lowest → highest).
 TIER_ORDER: list[str | None] = [None, "basic", "starter", "pro"]
 
-TIER_LIMITS = {"basic": 15, "starter": 25, "pro": 100}
+TIER_LIMITS = {"basic": 10, "starter": 25, "pro": 30}
 TIER_PRICES = {
     "basic": os.getenv("STRIPE_BASIC_PRICE_ID", ""),
     "starter": os.getenv("STRIPE_STARTER_PRICE_ID", ""),
@@ -97,7 +97,7 @@ WEEKLY_SCAN_LIMITS: dict = {
 PROMPT_LIMITS: dict[str, int] = {
     "pitch": 10,
     "standard": 25,
-    "pro": 100,
+    "pro": 30,
 }
 
 # Brand type limits per subscription tier: {tier: {brand_type: max_count}}
@@ -492,7 +492,7 @@ async def _upgrade_brands_for_tier(db: AsyncSession, user_id: int, tier: str) ->
         result = await db.execute(
             sa_update(Brand)
             .where(Brand.user_id == user_id, Brand.brand_type.in_(["standard", "pitch"]))
-            .values(brand_type="pro", prompt_limit=100)
+            .values(brand_type="pro", prompt_limit=30)
         )
         if result.rowcount > 0:
             logger.info("Auto-upgraded %d brand(s) to pro for user %d", result.rowcount, user_id)
@@ -500,7 +500,7 @@ async def _upgrade_brands_for_tier(db: AsyncSession, user_id: int, tier: str) ->
         result = await db.execute(
             sa_update(Brand)
             .where(Brand.user_id == user_id, Brand.brand_type == "pitch")
-            .values(brand_type="standard", prompt_limit=15)
+            .values(brand_type="standard", prompt_limit=10)
         )
         if result.rowcount > 0:
             logger.info("Auto-upgraded %d pitch brand(s) to standard (basic) for user %d", result.rowcount, user_id)

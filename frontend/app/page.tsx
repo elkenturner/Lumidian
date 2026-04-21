@@ -206,9 +206,9 @@ const HOW_STEPS = [
 
 const COMPARISON_FEATURES = [
   { label: 'Brands', free: '1 (30-day)', basic: '1', starter: '1', pro: '2' },
-  { label: 'Prompts per brand', free: '10', basic: '15', starter: '25', pro: '100' },
+  { label: 'Prompts per brand', free: '10', basic: '10', starter: '25', pro: '30' },
   { label: 'Manual runs per day', free: '1', basic: '2', starter: '3', pro: 'Unlimited' },
-  { label: 'AI models monitored', free: '4', basic: '4', starter: '4', pro: '4 (enhanced)' },
+  { label: 'AI models monitored', free: '3', basic: '4 (enhanced search)', starter: '4 (enhanced search)', pro: '4 (enhanced search)' },
   { label: 'Daily tracking', free: true, basic: true, starter: true, pro: true },
   { label: 'Visibility score & report', free: true, basic: true, starter: true, pro: true },
   { label: 'Content Hub & drafting', free: true, basic: true, starter: true, pro: true },

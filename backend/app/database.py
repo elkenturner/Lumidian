@@ -431,9 +431,11 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
         )
         prompt_count = prompt_count_result.scalar_one() or 1
 
+        from app.services.llm_service import models_for_brand_type
         tier_runs = {"basic": 3, "standard": 3, "premium": 3}
         runs_per_prompt = tier_runs.get(brand.tier, 3) if brand else 3
-        total_queries = prompt_count * 4 * runs_per_prompt  # 4 models
+        model_count = len(models_for_brand_type(brand.brand_type)) if brand else 4
+        total_queries = prompt_count * model_count * runs_per_prompt
         # ~8 effective concurrent queries, ~3s each
         est_minutes = (total_queries / 8 * 3) / 60
         max_age_minutes = max(15, int(est_minutes * 2))

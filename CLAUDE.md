@@ -212,9 +212,9 @@ JWT issued with 7-day expiry, stored in httpOnly `clarity_token` cookie. Compani
 ### Tier-Based Query Counts
 | Tier | Runs per prompt per model |
 |------|--------------------------|
-| basic | 5 |
-| standard | 5 |
-| premium | 5 |
+| basic | 3 |
+| standard | 3 |
+| premium | 3 |
 
 ### Visibility Score & Mention Detection
 Score = `(queries with mention) / (total queries) × 100`. Mention detection: case-insensitive substring check (`brand_name.lower() in response.lower()`) **plus** fuzzy normalized check (lowercase + strip non-alphanumeric). `mentioned = exact OR fuzzy`. Queries with errors are excluded from the denominator.
@@ -286,7 +286,7 @@ Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Over
 | 04:00 | Monthly (1st) | Website context refresh via Jina |
 | 06:00 | Daily | Pitch expiry warnings & cleanup |
 | 08:00 | Daily | Morning visibility tracking sweep |
-| 21:00 | Daily | Visibility drop alerts (email if ≥10pp drop) |
+| 21:00 | Daily | Visibility drop alerts (email if ≥15pp drop) |
 
 Scheduler can be paused via `SystemSetting` key `"scheduler_paused"`.
 

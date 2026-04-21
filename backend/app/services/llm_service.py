@@ -15,6 +15,7 @@ import asyncio
 import logging
 import os
 import random
+import re
 import time
 
 from dotenv import load_dotenv
@@ -139,6 +140,32 @@ def _build_result(
         "latency_ms": latency_ms,
         "error": error,
     }
+
+
+# ── Citation stripping (used by search-model responses) ──────────────────────
+# Patterns for stripping citation noise from search-model responses.
+# Applied BEFORE mention-detection so brand names hidden in URL hostnames
+# (e.g. "stripe.com" in a footer) do not produce false-positive matches.
+_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+_BRACKET_REF_RE = re.compile(r"\[\d+\]")
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")  # [text](url) -> text
+
+
+def _strip_url_citations(text: str) -> str:
+    """
+    Remove URLs, bracketed numeric refs, and markdown link targets so brand
+    mention detection only sees the visible answer text.
+    Markdown link text is preserved (so "[Stripe](https://stripe.com)" -> "Stripe").
+    """
+    if not text:
+        return text
+    # 1) Markdown links — keep the visible label, drop the URL
+    text = _MD_LINK_RE.sub(r"\1", text)
+    # 2) Bare URLs — drop entirely
+    text = _URL_RE.sub("", text)
+    # 3) Bracketed numeric citation markers like [1] [2] — drop
+    text = _BRACKET_REF_RE.sub("", text)
+    return text
 
 
 # ── ChatGPT ───────────────────────────────────────────────────────────────────

@@ -63,6 +63,72 @@ async def test_register_allows_reuse_of_unverified_email(client: httpx.AsyncClie
     assert resp.json()["email"] == "reuse@example.com"
 
 
+async def test_register_reuse_cascades_abandoned_brands(client: httpx.AsyncClient):
+    """Re-registering an unverified email must wipe the abandoned user's brands.
+
+    `brands.user_id` uses ON DELETE SET NULL, so if the re-register flow naively
+    deleted the stale User it would orphan any brand/prompt/run rows created
+    during onboarding — and the scheduler would keep sweeping them forever.
+    This regression guards the cascade in auth.register.
+    """
+    from sqlalchemy import select
+
+    from app.models import Brand, Prompt, User
+
+    await register_user(client, email="abandon@example.com", password="Password123")
+
+    # Grab the unverified user and stand up the kind of junk they would have
+    # produced during the abandoned onboarding flow. We snapshot the password
+    # hash because SQLite can reuse the old row's primary key after the cascade,
+    # so the id alone is not a reliable identity check.
+    async with AsyncSessionLocal() as db:
+        stale_user = (
+            await db.execute(select(User).where(User.email == "abandon@example.com"))
+        ).scalar_one()
+        stale_user_id = stale_user.id
+        stale_password_hash = stale_user.password_hash
+        brand = Brand(
+            name="Abandoned Brand",
+            slug="abandoned-brand",
+            user_id=stale_user_id,
+            brand_type="pitch",
+        )
+        db.add(brand)
+        await db.flush()
+        stale_brand_id = brand.id
+        db.add(Prompt(brand_id=stale_brand_id, text="orphan prompt"))
+        await db.commit()
+
+    # Re-register with the same email — this must cascade-delete the user.
+    resp = await client.post(
+        "/api/auth/register",
+        json={"email": "abandon@example.com", "password": "NewPassword1"},
+    )
+    assert resp.status_code == 201
+
+    async with AsyncSessionLocal() as db:
+        # Exactly one user exists under this email, and it's the fresh one
+        # (different password hash than the abandoned account).
+        users = (
+            await db.execute(select(User).where(User.email == "abandon@example.com"))
+        ).scalars().all()
+        assert len(users) == 1
+        assert users[0].password_hash != stale_password_hash
+
+        # Abandoned brand and its prompt were cascaded, not orphaned.
+        assert (
+            await db.execute(select(Brand).where(Brand.id == stale_brand_id))
+        ).scalar_one_or_none() is None
+        orphans = (
+            await db.execute(select(Brand).where(Brand.user_id.is_(None)))
+        ).scalars().all()
+        assert orphans == []
+        prompts_left = (
+            await db.execute(select(Prompt).where(Prompt.brand_id == stale_brand_id))
+        ).scalars().all()
+        assert prompts_left == []
+
+
 async def test_register_weak_password_rejected(client: httpx.AsyncClient):
     resp = await client.post(
         "/api/auth/register",

@@ -155,92 +155,14 @@ async def admin_remove_user(user_id: int, db: DbDep, user: CurrentUser):
 
     logger.warning("Admin %s deleting user %s (%d) and all their data", user.email, target.email, user_id)
 
-    # Cascade-delete all user data in correct order (leaf tables first).
-    # Brand.user_id uses ondelete=SET NULL, so we must delete brands explicitly.
-    from sqlalchemy import delete as sa_delete, select as sa_select
+    from app.services.user_service import cascade_delete_user
 
-    from app.models import (
-        AnalyticsEvent, BrandContentSettings, BrandProfile, CompetitorMention,
-        ContentAttribution, ContentDraft, ContentEvent, ContentGap, ContentOpportunity,
-        ContentPost, DraftAttribution, Notification, PasswordResetToken,
-        PromptRunScore, QueryResult, RunModelScore, TeamMember,
-    )
-
-    # Get all brand IDs for this user
-    brand_ids_result = await db.execute(
-        sa_select(Brand.id).where(Brand.user_id == user_id)
-    )
-    brand_ids = [r[0] for r in brand_ids_result.all()]
-
-    if brand_ids:
-        # Get child IDs we need for deeper deletes
-        run_ids_result = await db.execute(
-            sa_select(TrackingRun.id).where(TrackingRun.brand_id.in_(brand_ids))
-        )
-        run_ids = [r[0] for r in run_ids_result.all()]
-
-        prompt_ids_result = await db.execute(
-            sa_select(Prompt.id).where(Prompt.brand_id.in_(brand_ids))
-        )
-        prompt_ids = [r[0] for r in prompt_ids_result.all()]
-
-        competitor_ids_result = await db.execute(
-            sa_select(Competitor.id).where(Competitor.brand_id.in_(brand_ids))
-        )
-        competitor_ids = [r[0] for r in competitor_ids_result.all()]
-
-        draft_ids_result = await db.execute(
-            sa_select(ContentDraft.id).where(ContentDraft.brand_id.in_(brand_ids))
-        )
-        draft_ids = [r[0] for r in draft_ids_result.all()]
-
-        post_ids = []
-        if draft_ids:
-            post_ids_result = await db.execute(
-                sa_select(ContentPost.id).where(ContentPost.draft_id.in_(draft_ids))
-            )
-            post_ids = [r[0] for r in post_ids_result.all()]
-
-        # Delete leaf tables first, working up to parents
-        if post_ids:
-            await db.execute(sa_delete(ContentAttribution).where(ContentAttribution.content_post_id.in_(post_ids)))
-        if draft_ids:
-            await db.execute(sa_delete(ContentPost).where(ContentPost.draft_id.in_(draft_ids)))
-            await db.execute(sa_delete(DraftAttribution).where(DraftAttribution.draft_id.in_(draft_ids)))
-        if competitor_ids:
-            await db.execute(sa_delete(CompetitorMention).where(CompetitorMention.competitor_id.in_(competitor_ids)))
-        if run_ids:
-            await db.execute(sa_delete(QueryResult).where(QueryResult.tracking_run_id.in_(run_ids)))
-            await db.execute(sa_delete(RunModelScore).where(RunModelScore.tracking_run_id.in_(run_ids)))
-        if prompt_ids:
-            await db.execute(sa_delete(PromptRunScore).where(PromptRunScore.prompt_id.in_(prompt_ids)))
-
-        # Mid-level tables
-        await db.execute(sa_delete(ContentDraft).where(ContentDraft.brand_id.in_(brand_ids)))
-        await db.execute(sa_delete(ContentGap).where(ContentGap.brand_id.in_(brand_ids)))
-        await db.execute(sa_delete(ContentOpportunity).where(ContentOpportunity.brand_id.in_(brand_ids)))
-        await db.execute(sa_delete(ContentEvent).where(ContentEvent.brand_id.in_(brand_ids)))
-        await db.execute(sa_delete(BrandContentSettings).where(BrandContentSettings.brand_id.in_(brand_ids)))
-        await db.execute(sa_delete(BrandProfile).where(BrandProfile.brand_id.in_(brand_ids)))
-        await db.execute(sa_delete(Competitor).where(Competitor.brand_id.in_(brand_ids)))
-        await db.execute(sa_delete(TrackingRun).where(TrackingRun.brand_id.in_(brand_ids)))
-        await db.execute(sa_delete(Prompt).where(Prompt.brand_id.in_(brand_ids)))
-        await db.execute(sa_delete(Brand).where(Brand.id.in_(brand_ids)))
-
-    # Delete direct user relations
-    await db.execute(sa_delete(PasswordResetToken).where(PasswordResetToken.user_id == user_id))
-    await db.execute(sa_delete(Notification).where(Notification.user_id == user_id))
-    await db.execute(sa_delete(TeamMember).where(TeamMember.account_owner_id == user_id))
-    await db.execute(sa_delete(TeamMember).where(TeamMember.user_id == user_id))
-    await db.execute(sa_delete(AnalyticsEvent).where(AnalyticsEvent.user_id == user_id))
-
-    # Finally delete the user
-    await db.delete(target)
+    brands_removed = await cascade_delete_user(db, user_id)
     await db.commit()
 
     logger.info("Admin %s successfully deleted user %s (%d) — %d brands removed",
-                user.email, target.email, user_id, len(brand_ids))
-    return {"user_id": user_id, "deleted": True, "brands_removed": len(brand_ids)}
+                user.email, target.email, user_id, brands_removed)
+    return {"user_id": user_id, "deleted": True, "brands_removed": brands_removed}
 
 
 # ── Admin: all tracking runs ──────────────────────────────────────────────────

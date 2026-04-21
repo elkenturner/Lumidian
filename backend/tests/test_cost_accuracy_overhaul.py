@@ -97,3 +97,36 @@ def test_chatgpt_pro_variant_uses_search_model():
 def test_get_model_version_for_chatgpt_pro_returns_search_variant():
     assert llm_service._get_model_version("chatgpt", pro=True) == "gpt-4o-mini-search-preview"
     assert llm_service._get_model_version("chatgpt", pro=False) == "gpt-4.1-mini"
+
+
+def test_strip_url_citations_removes_full_urls():
+    raw = "The best widget is from Acme Inc. See https://acme.com/about for more."
+    cleaned = llm_service._strip_url_citations(raw)
+    assert "https://acme.com/about" not in cleaned
+    assert "Acme Inc" in cleaned
+
+
+def test_strip_url_citations_removes_markdown_links():
+    raw = "Check out ([Stripe](https://stripe.com/docs)) for payments."
+    cleaned = llm_service._strip_url_citations(raw)
+    assert "stripe.com" not in cleaned.lower()
+    assert "Stripe" in cleaned  # the visible link text survives
+
+
+def test_strip_url_citations_removes_bracket_refs():
+    raw = "Use Webflow [1] or Framer [2] for design[3]."
+    cleaned = llm_service._strip_url_citations(raw)
+    assert "[1]" not in cleaned
+    assert "[2]" not in cleaned
+    assert "[3]" not in cleaned
+    assert "Webflow" in cleaned and "Framer" in cleaned
+
+
+def test_strip_url_citations_prevents_false_positive_brand_match():
+    """Citation-only mentions of a brand domain MUST NOT count as a brand mention."""
+    raw = (
+        "I recommend Notion and Coda for note-taking. "
+        "Sources: https://stripe.com/blog/payments-overview"
+    )
+    cleaned = llm_service._strip_url_citations(raw)
+    assert "stripe" not in cleaned.lower()

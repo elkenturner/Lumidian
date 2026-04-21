@@ -322,6 +322,46 @@ def test_other_tier_limits_unchanged():
 
 
 @pytest.mark.asyncio
+async def test_data_fix_lowers_pro_prompt_limit_for_brands_under_thirty():
+    """Pro brands with prompt_limit=100 and ≤30 prompts get lowered to 30."""
+    from app.database import AsyncSessionLocal, run_migrations
+    from app.models import Brand, Prompt, User
+
+    async with AsyncSessionLocal() as db:
+        u = User(email="pro_migration@test.com", subscription_tier="pro",
+                email_verified=1)
+        db.add(u)
+        await db.commit()
+        await db.refresh(u)
+        small = Brand(name="Small", slug="small-pm", user_id=u.id,
+                      brand_type="pro", prompt_limit=100)
+        big = Brand(name="Big", slug="big-pm", user_id=u.id,
+                    brand_type="pro", prompt_limit=100)
+        db.add_all([small, big])
+        await db.commit()
+        await db.refresh(small)
+        await db.refresh(big)
+        for i in range(5):
+            db.add(Prompt(brand_id=small.id, text=f"p{i}"))
+        for i in range(35):
+            db.add(Prompt(brand_id=big.id, text=f"p{i}"))
+        await db.commit()
+        small_id, big_id = small.id, big.id
+
+    await run_migrations()
+
+    async with AsyncSessionLocal() as db:
+        small_after = await db.get(Brand, small_id)
+        big_after = await db.get(Brand, big_id)
+        assert small_after.prompt_limit == 30, (
+            "Under-30-prompt Pro brand must be lowered to the new cap"
+        )
+        assert big_after.prompt_limit == 100, (
+            "Over-30-prompt Pro brand must be grandfathered"
+        )
+
+
+@pytest.mark.asyncio
 async def test_run_tracking_skips_chatgpt_for_pitch_brand(monkeypatch):
     """End-to-end: pitch brand should query 3 models, not 4."""
     from app.database import AsyncSessionLocal

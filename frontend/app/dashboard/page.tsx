@@ -922,7 +922,11 @@ export default function DashboardPage() {
                       {[1,2,3,4].map(i => <div key={i} className="h-6 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
                     </div>
                   ) : (
-                    <DashboardModelBreakdown models={latestModelStats} deltas={modelDeltas} />
+                    <DashboardModelBreakdown
+                      models={latestModelStats}
+                      deltas={modelDeltas}
+                      isPitchBrand={selectedBrand?.brand_type === 'pitch'}
+                    />
                   )}
                 </div>
               </div>

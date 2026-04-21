@@ -162,6 +162,23 @@ async def _log_score_change_events(
                 )
 
 
+def _compute_overall_score(model_stats: dict[str, dict]) -> float:
+    """Avg-of-per-model overall score; skips models with zero queries.
+
+    Spec: 2026-04-20-cost-accuracy-decisions.md, decision #5.
+    """
+    per_model_scores: list[float] = []
+    for stats in model_stats.values():
+        tq = stats.get("total_queries", 0)
+        if tq <= 0:
+            continue
+        tm = stats.get("total_mentions", 0)
+        per_model_scores.append(tm / tq * 100.0)
+    if not per_model_scores:
+        return 0.0
+    return sum(per_model_scores) / len(per_model_scores)
+
+
 async def run_tracking(
     brand_id: int,
     run_type: str = "manual",

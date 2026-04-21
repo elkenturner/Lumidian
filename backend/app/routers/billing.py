@@ -492,7 +492,7 @@ async def _upgrade_brands_for_tier(db: AsyncSession, user_id: int, tier: str) ->
         result = await db.execute(
             sa_update(Brand)
             .where(Brand.user_id == user_id, Brand.brand_type.in_(["standard", "pitch"]))
-            .values(brand_type="pro", prompt_limit=100)
+            .values(brand_type="pro", prompt_limit=30)
         )
         if result.rowcount > 0:
             logger.info("Auto-upgraded %d brand(s) to pro for user %d", result.rowcount, user_id)

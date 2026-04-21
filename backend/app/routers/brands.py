@@ -295,7 +295,7 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
     prompt_limit = PROMPT_LIMITS.get(payload.brand_type, 25)
 
     # Enforce tier based on brand_type — ignore user-supplied value to prevent
-    # free users from choosing "premium" tier (20 runs per prompt instead of 5).
+    # free users from choosing "premium" tier.
     BRAND_TYPE_TO_TIER = {"pitch": "basic", "standard": "standard", "pro": "premium"}
     enforced_tier = BRAND_TYPE_TO_TIER.get(payload.brand_type, "basic")
 

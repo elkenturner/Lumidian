@@ -349,10 +349,22 @@ async def run_migrations():
         # Ensure brands match their owner's subscription tier.
         # Catches pitch brands that weren't upgraded due to webhook race,
         # AND brands where brand_type was changed but prompt_limit wasn't.
+        # Sync Pro user brands to brand_type='pro'.  For prompt_limit:
+        #  - Brand at old default of 100 with ≤30 prompts: lower to 30 (new cap).
+        #  - Brand at 100 with >30 prompts: grandfather (leave at 100).
+        await conn.execute(text(
+            "UPDATE brands SET brand_type = 'pro' "
+            "WHERE brand_type != 'pro' AND user_id IN "
+            "(SELECT id FROM users WHERE subscription_tier = 'pro')"
+        ))
         await conn.execute(text("""
-            UPDATE brands SET brand_type = 'pro', prompt_limit = 100
-            WHERE (brand_type != 'pro' OR prompt_limit != 100)
+            UPDATE brands SET prompt_limit = 30
+            WHERE prompt_limit = 100
               AND user_id IN (SELECT id FROM users WHERE subscription_tier = 'pro')
+              AND id NOT IN (
+                SELECT brand_id FROM prompts
+                GROUP BY brand_id HAVING COUNT(*) > 30
+              )
         """))
         await conn.execute(text("""
             UPDATE brands SET brand_type = 'standard', prompt_limit = 25

@@ -250,6 +250,14 @@ export default function MethodologyPage() {
                 <span className="text-[var(--text-faint)]">&times;</span>{' '}
                 <span style={{ color: 'var(--accent-light)' }}>100</span>
               </div>
+              <p className="mt-3 text-[12px] text-[var(--text-muted)] leading-relaxed">
+                <span className="font-medium text-[var(--text-secondary)]">Per-model score</span>{' '}
+                is calculated this way for each AI model individually. Your{' '}
+                <span className="font-medium text-[var(--text-secondary)]">overall visibility score</span>{' '}
+                is the average of every active model&apos;s score, so a model
+                with no queries (e.g. ChatGPT on the free trial) doesn&apos;t
+                drag the average down.
+              </p>
             </div>
           </li>
 
@@ -284,9 +292,10 @@ export default function MethodologyPage() {
             borderColor: 'var(--border-subtle)',
           }}
         >
-          <span className="text-[var(--text-secondary)] font-medium">Higher tiers, more queries.</span>{' '}
-          Paid plans run each prompt more times per model, giving you higher
-          statistical confidence in your scores.
+          <span className="text-[var(--text-secondary)] font-medium">3 runs per prompt per model.</span>{' '}
+          Each prompt is sent to every supported model 3 times to smooth out
+          response variation. Paid tiers add ChatGPT&apos;s native web search
+          and Perplexity Sonar Pro for sharper, more current detection.
         </div>
       </section>
 

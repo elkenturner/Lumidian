@@ -292,9 +292,18 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
     if existing:
         if existing.email_verified:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already registered")
-        # Unverified account with this email — replace it so the user can re-register
-        await db.delete(existing)
+        # Unverified account with this email — replace it so the user can re-register.
+        # Must cascade: the abandoned user may have created a pitch brand during
+        # onboarding, and brands.user_id uses SET NULL on delete, which would orphan
+        # the brand and leave the scheduler sweeping it forever.
+        from app.services.user_service import cascade_delete_user
+        brands_removed = await cascade_delete_user(db, existing.id)
         await db.flush()
+        if brands_removed:
+            logger.info(
+                "register: replaced unverified user %s — cascaded %d brand(s)",
+                email, brands_removed,
+            )
 
     verification_code = f"{secrets.randbelow(100_000_000):08d}"
     code_hash = hash_password(verification_code)

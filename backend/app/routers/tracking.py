@@ -330,6 +330,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     from app.database import AsyncSessionLocal
     from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
     from app.services.llm_service import TIER_RUNS, models_for_brand_type, query_model
+    from app.services.tracking_service import _compute_overall_score
 
     def utcnow():
         return datetime.now(UTC).replace(tzinfo=None)
@@ -455,11 +456,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
                 overall_queries += tq
                 overall_mentions += tm
 
-            overall_score = (
-                (overall_mentions / overall_queries * 100.0)
-                if overall_queries > 0
-                else 0.0
-            )
+            overall_score = _compute_overall_score(model_stats)
 
             run = await db.get(TrackingRun, run_id)
             if run:
@@ -719,6 +716,7 @@ async def _background_prompt_run(
     from app.models import QueryResult, RunModelScore
     from app.models import TrackingRun as TR
     from app.services.llm_service import TIER_RUNS, models_for_brand_type, query_model
+    from app.services.tracking_service import _compute_overall_score
 
     active_models = models_for_brand_type(brand_type)
 
@@ -804,7 +802,7 @@ async def _background_prompt_run(
                 overall_queries += tq
                 overall_mentions += tm
 
-            overall_score = (overall_mentions / overall_queries * 100.0) if overall_queries > 0 else 0.0
+            overall_score = _compute_overall_score(model_stats)
 
             run = await db.get(TR, run_id)
             if run:

@@ -81,3 +81,19 @@ def test_fallback_models_does_not_reference_gemini_pro():
     assert "gemini-2.5-pro" not in src, (
         "_FALLBACK_MODELS still references killed gemini-2.5-pro"
     )
+
+
+# ── Phase 3: ChatGPT search for paid; skip for pitch ──────────────────────────
+
+def test_chatgpt_pro_variant_uses_search_model():
+    versions = llm_service._MODEL_VERSIONS["chatgpt"]
+    assert versions["default"] == "gpt-4.1-mini"
+    assert versions["pro"] == "gpt-4o-mini-search-preview", (
+        "Pro tier ChatGPT must use the OpenAI native web-search model "
+        "(spec decision #3)"
+    )
+
+
+def test_get_model_version_for_chatgpt_pro_returns_search_variant():
+    assert llm_service._get_model_version("chatgpt", pro=True) == "gpt-4o-mini-search-preview"
+    assert llm_service._get_model_version("chatgpt", pro=False) == "gpt-4.1-mini"

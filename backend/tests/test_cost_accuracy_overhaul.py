@@ -99,6 +99,28 @@ def test_get_model_version_for_chatgpt_pro_returns_search_variant():
     assert llm_service._get_model_version("chatgpt", pro=False) == "gpt-4.1-mini"
 
 
+def test_is_pro_includes_basic_starter_and_pro():
+    """
+    All paid tiers (Starter/basic, Growth/starter, Pro/pro) must trigger the
+    pro=True flag so they get ChatGPT search + sonar-pro. Decision 2026-04-20:
+    Starter pays $100, deserves a quality bump over Free, and the cost delta
+    fits within margin.
+    """
+    sources = "\n".join([
+        inspect.getsource(ts.run_tracking),
+    ])
+    from app.routers import tracking as trk_router
+    sources += "\n" + inspect.getsource(trk_router)
+
+    matches = re.findall(r'subscription_tier\s+in\s+\(([^)]+)\)', sources)
+    assert matches, "Could not find subscription_tier membership check"
+    for m in matches:
+        tiers = {t.strip().strip("'\"") for t in m.split(",")}
+        assert tiers == {"basic", "starter", "pro"}, (
+            f"is_pro tier set must be {{basic, starter, pro}}; got {tiers}"
+        )
+
+
 def test_strip_url_citations_removes_full_urls():
     raw = "The best widget is from Acme Inc. See https://acme.com/about for more."
     cleaned = llm_service._strip_url_citations(raw)
@@ -315,7 +337,8 @@ def test_pro_prompt_limit_is_thirty():
 
 
 def test_other_tier_limits_unchanged():
-    assert billing_module.TIER_LIMITS["basic"] == 15
+    # Starter (basic) lowered 15 -> 10 on 2026-04-20 to fund ChatGPT search rollout to all paid tiers.
+    assert billing_module.TIER_LIMITS["basic"] == 10
     assert billing_module.TIER_LIMITS["starter"] == 25
     assert billing_module.PROMPT_LIMITS["pitch"] == 10
     assert billing_module.PROMPT_LIMITS["standard"] == 25

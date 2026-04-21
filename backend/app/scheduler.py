@@ -50,6 +50,9 @@ def _is_brand_paused(brand, paused_user_ids: set[int]) -> bool:
 
     Skips if:
       - Pitch brand has expired
+      - Brand is orphaned (user_id IS NULL) — defense-in-depth against any
+        user-deletion path that forgets to cascade; otherwise the scheduler
+        would burn LLM quota on brands no one can ever see
       - Brand owner has is_paused=True (admin-paused account)
     """
     from datetime import datetime
@@ -60,8 +63,12 @@ def _is_brand_paused(brand, paused_user_ids: set[int]) -> bool:
     if brand.brand_type == "pitch" and brand.pitch_expires_at and brand.pitch_expires_at <= now:
         return True
 
+    # Skip orphaned brands (no owner)
+    if brand.user_id is None:
+        return True
+
     # Skip brands whose owner is paused
-    if brand.user_id and brand.user_id in paused_user_ids:
+    if brand.user_id in paused_user_ids:
         return True
 
     return False
@@ -317,8 +324,6 @@ async def _visibility_alert_sweep() -> None:
         for brand in brands:
             if _is_brand_paused(brand, paused_user_ids):
                 continue  # No need to log - this is a silent skip for alert processing
-            if brand.user_id is None:
-                continue
 
             # Get two most recent completed runs
             runs_result = await db.execute(

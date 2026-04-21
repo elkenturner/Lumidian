@@ -227,3 +227,69 @@ def test_tracking_service_detect_mention_strips_citations():
     from app.services.tracking_service import _detect_mention as _ts_detect_mention
     response = "Try Notion. Sources: https://stripe.com/blog"
     assert _ts_detect_mention("Stripe", response, error=None, model="chatgpt") is False
+
+
+# ── Phase 3.4: pitch brands skip ChatGPT ──────────────────────────────────────
+
+def test_supported_models_includes_chatgpt():
+    assert "chatgpt" in llm_service.SUPPORTED_MODELS
+
+
+def test_models_for_brand_type_excludes_chatgpt_for_pitch():
+    models = llm_service.models_for_brand_type("pitch")
+    assert "chatgpt" not in models
+    assert set(models) == {"claude", "perplexity", "gemini"}
+
+
+def test_models_for_brand_type_includes_chatgpt_for_standard():
+    models = llm_service.models_for_brand_type("standard")
+    assert set(models) == {"chatgpt", "claude", "perplexity", "gemini"}
+
+
+def test_models_for_brand_type_includes_chatgpt_for_pro():
+    models = llm_service.models_for_brand_type("pro")
+    assert set(models) == {"chatgpt", "claude", "perplexity", "gemini"}
+
+
+def test_models_for_brand_type_unknown_defaults_to_full_list():
+    models = llm_service.models_for_brand_type("something-weird")
+    assert set(models) == {"chatgpt", "claude", "perplexity", "gemini"}
+
+
+@pytest.mark.asyncio
+async def test_run_tracking_skips_chatgpt_for_pitch_brand(monkeypatch):
+    """End-to-end: pitch brand should query 3 models, not 4."""
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt, User
+
+    async with AsyncSessionLocal() as db:
+        u = User(email="pitch_e2e@test.com", name="t", subscription_tier=None,
+                email_verified=1)
+        db.add(u)
+        await db.commit()
+        await db.refresh(u)
+        b = Brand(name="PitchBrand", slug="pitchbrand-e2e", user_id=u.id,
+                  tier="basic", brand_type="pitch")
+        db.add(b)
+        await db.commit()
+        await db.refresh(b)
+        p = Prompt(brand_id=b.id, text="any prompt", prompt_type="pitch")
+        db.add(p)
+        await db.commit()
+        brand_id = b.id
+
+    call_log: list[str] = []
+
+    async def fake_query_model(model, prompt, brand_name, pro=False, cancel_event=None):
+        call_log.append(model)
+        return {"response_text": f"text-from-{model}", "mentioned": False,
+                "latency_ms": 1, "error": None}
+
+    monkeypatch.setattr("app.services.tracking_service.query_model", fake_query_model)
+
+    from app.services.tracking_service import run_tracking
+    await run_tracking(brand_id, run_type="manual")
+
+    assert "chatgpt" not in call_log, "Pitch brands must skip ChatGPT"
+    # 3 models * 3 runs * 1 prompt = 9 calls
+    assert len(call_log) == 9, f"Expected 9 calls (3 models × 3 runs), got {len(call_log)}"

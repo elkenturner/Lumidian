@@ -301,6 +301,26 @@ def test_compute_overall_score_does_not_double_count_old_formula():
     assert ts._compute_overall_score(stats) == pytest.approx(75.0)
 
 
+# ── Phase 5: Pro prompt cap 100 -> 30 ─────────────────────────────────────────
+
+from app.routers import billing as billing_module
+
+
+def test_pro_tier_limit_is_thirty():
+    assert billing_module.TIER_LIMITS["pro"] == 30
+
+
+def test_pro_prompt_limit_is_thirty():
+    assert billing_module.PROMPT_LIMITS["pro"] == 30
+
+
+def test_other_tier_limits_unchanged():
+    assert billing_module.TIER_LIMITS["basic"] == 15
+    assert billing_module.TIER_LIMITS["starter"] == 25
+    assert billing_module.PROMPT_LIMITS["pitch"] == 10
+    assert billing_module.PROMPT_LIMITS["standard"] == 25
+
+
 @pytest.mark.asyncio
 async def test_run_tracking_skips_chatgpt_for_pitch_brand(monkeypatch):
     """End-to-end: pitch brand should query 3 models, not 4."""

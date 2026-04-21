@@ -15,6 +15,7 @@ import asyncio
 import logging
 import os
 import random
+import re
 import time
 
 from dotenv import load_dotenv
@@ -89,9 +90,9 @@ def _api_key_placeholder(model: str) -> dict:
     }
 
 TIER_RUNS = {
-    "basic": 5,
-    "standard": 5,
-    "premium": 5,
+    "basic": 3,
+    "standard": 3,
+    "premium": 3,
 }
 
 # Model categories for the dual-score visibility architecture.
@@ -106,10 +107,10 @@ INDEX_MODELS: frozenset = frozenset({"chatgpt", "claude"})
 # so better models = better brand detection.  INDEX_MODELS (chatgpt, claude)
 # use static training data; upgrading them doesn't improve visibility.
 _MODEL_VERSIONS: dict[str, dict[str, str]] = {
-    "chatgpt":    {"default": "gpt-4.1-mini",              "pro": "gpt-4.1-mini"},
+    "chatgpt":    {"default": "gpt-4.1-mini",              "pro": "gpt-4o-mini-search-preview"},
     "claude":     {"default": "claude-haiku-4-5-20251001",  "pro": "claude-haiku-4-5-20251001"},
     "perplexity": {"default": "sonar",                      "pro": "sonar-pro"},
-    "gemini":     {"default": "gemini-2.5-flash",           "pro": "gemini-2.5-pro"},
+    "gemini":     {"default": "gemini-2.5-flash",           "pro": "gemini-2.5-flash"},
 }
 
 
@@ -141,21 +142,53 @@ def _build_result(
     }
 
 
+# ── Citation stripping (used by search-model responses) ──────────────────────
+# Patterns for stripping citation noise from search-model responses.
+# Applied BEFORE mention-detection so brand names hidden in URL hostnames
+# (e.g. "stripe.com" in a footer) do not produce false-positive matches.
+_URL_RE = re.compile(r"https?://\S+", re.IGNORECASE)
+_BRACKET_REF_RE = re.compile(r"\[\d+\]")
+_MD_LINK_RE = re.compile(r"\[([^\]]+)\]\([^)]+\)")  # [text](url) -> text
+
+
+def _strip_url_citations(text: str) -> str:
+    """
+    Remove URLs, bracketed numeric refs, and markdown link targets so brand
+    mention detection only sees the visible answer text.
+    Markdown link text is preserved (so "[Stripe](https://stripe.com)" -> "Stripe").
+    """
+    if not text:
+        return text
+    # 1) Markdown links — keep the visible label, drop the URL
+    text = _MD_LINK_RE.sub(r"\1", text)
+    # 2) Bare URLs — drop entirely
+    text = _URL_RE.sub("", text)
+    # 3) Bracketed numeric citation markers like [1] [2] — drop
+    text = _BRACKET_REF_RE.sub("", text)
+    return text
+
+
 # ── ChatGPT ───────────────────────────────────────────────────────────────────
 
 async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt-4.1-mini") -> dict:
     if not OPENAI_API_KEY:
         return _api_key_placeholder("chatgpt")
+    is_search = "search" in model_version
     start = time.monotonic()
     try:
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-        response = await client.chat.completions.create(
-            model=model_version,
-            messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=1024,
-        )
+        # Search-preview models reject `temperature` and require `web_search_options`.
+        # Search responses are longer because of citation footers, so bump the cap.
+        kwargs: dict = {
+            "model": model_version,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_completion_tokens": 2048 if is_search else 1024,
+        }
+        if is_search:
+            kwargs["web_search_options"] = {}
+        response = await client.chat.completions.create(**kwargs)
         latency_ms = int((time.monotonic() - start) * 1000)
         text = response.choices[0].message.content
         if not text:
@@ -166,6 +199,19 @@ async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt
                 None, brand_name, latency_ms,
                 error="Empty response from ChatGPT API",
             )
+        # For search responses, strip URL/citation noise BEFORE the mention check
+        # so a brand hidden inside a citation URL doesn't trigger a false positive.
+        # Store the ORIGINAL text in response_text so the user-facing transcript
+        # still shows citations.
+        if is_search:
+            cleaned = _strip_url_citations(text)
+            mentioned = _mentioned(brand_name, cleaned)
+            return {
+                "response_text": text,
+                "mentioned": mentioned,
+                "latency_ms": latency_ms,
+                "error": None,
+            }
         return _build_result(text, brand_name, latency_ms)
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
@@ -289,15 +335,14 @@ def _get_gemini_client():
     return _gemini_client
 
 
-_GEMINI_TIMEOUT = 90.0   # seconds; default for Flash models
-_GEMINI_PRO_TIMEOUT = 120.0  # seconds; Pro models are significantly slower
+_GEMINI_TIMEOUT = 90.0   # seconds; Flash is the only variant we use
 
 
 async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemini-2.5-flash") -> dict:
     if not GEMINI_API_KEY:
         return _api_key_placeholder("gemini")
     start = time.monotonic()
-    timeout = _GEMINI_PRO_TIMEOUT if "pro" in model_version else _GEMINI_TIMEOUT
+    timeout = _GEMINI_TIMEOUT
     try:
         from google.genai import types
 
@@ -376,6 +421,18 @@ _DISPATCHERS = {
 
 SUPPORTED_MODELS = list(_DISPATCHERS.keys())
 
+# Brand-type → enabled model list.
+# Pitch (free trial) brands get 3 models — ChatGPT search is gated as a
+# paid-tier upgrade incentive (see spec decision #4).
+_PITCH_EXCLUDED_MODELS: frozenset = frozenset({"chatgpt"})
+
+
+def models_for_brand_type(brand_type: str) -> list[str]:
+    """Return the model list this brand_type is allowed to query."""
+    if brand_type == "pitch":
+        return [m for m in SUPPORTED_MODELS if m not in _PITCH_EXCLUDED_MODELS]
+    return list(SUPPORTED_MODELS)
+
 
 def _classify_error(error: str) -> str:
     """Classify an error string for retry strategy."""
@@ -424,7 +481,6 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
     # Track whether we've fallen back to a lighter model for overload errors
     active_model_version = model_version
     _FALLBACK_MODELS = {
-        "gemini-2.5-pro": "gemini-2.5-flash",
         "sonar-pro": "sonar",
     }
 

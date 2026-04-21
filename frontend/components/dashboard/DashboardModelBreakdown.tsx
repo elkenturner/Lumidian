@@ -6,10 +6,12 @@ import { MODEL_BAR_COLORS } from './helpers';
 interface DashboardModelBreakdownProps {
   models: ModelStat[];
   deltas?: Record<string, number>;
+  isPitchBrand?: boolean;
 }
 
-export default function DashboardModelBreakdown({ models, deltas }: DashboardModelBreakdownProps) {
-  if (!models.length) return <p className="text-xs text-[var(--text-faint)]">No model data yet</p>;
+export default function DashboardModelBreakdown({ models, deltas, isPitchBrand }: DashboardModelBreakdownProps) {
+  const showLockedChatGPT = isPitchBrand && !models.some((m) => m.model === 'chatgpt');
+  if (!models.length && !showLockedChatGPT) return <p className="text-xs text-[var(--text-faint)]">No model data yet</p>;
   return (
     <div className="space-y-3 w-full">
       {models.map((m) => {
@@ -36,6 +38,22 @@ export default function DashboardModelBreakdown({ models, deltas }: DashboardMod
           </div>
         );
       })}
+      {showLockedChatGPT && (
+        <div className="opacity-60">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-[var(--text-secondary)]">ChatGPT</span>
+            <a
+              href="/settings/billing"
+              className="text-[11px] font-medium text-[var(--accent-light)] hover:underline"
+            >
+              Unlock with paid plan →
+            </a>
+          </div>
+          <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+            <div className="h-full w-full rounded-full bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.08)_0_4px,transparent_4px_8px)]" />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

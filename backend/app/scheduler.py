@@ -6,7 +6,7 @@ Jobs:
   • 04:00 UTC, day 1 — Monthly website context refresh via Jina Reader
   • 06:00 UTC        — Pitch brand expiry: warn users 24 h before expiry, delete expired brands
   • 08:00 UTC        — Morning tracking sweep (once daily)
-  • 21:00 UTC        — Visibility drop alerts (email if score drops ≥ 10 pts vs previous run)
+  • 21:00 UTC        — Visibility drop alerts (email if score drops ≥ 15 pts vs previous run)
 
 Pitch brand lifecycle:
   - Created with pitch_expires_at = now + 30 days
@@ -296,7 +296,7 @@ async def _visibility_alert_sweep() -> None:
     overall_score values. If the drop exceeds ALERT_DROP_PCT, email the brand
     owner. A brand is only alerted once per 7-day window to avoid spam.
     """
-    ALERT_DROP_PCT = 10.0       # trigger when score drops ≥ 10 points
+    ALERT_DROP_PCT = 15.0       # trigger when score drops ≥ 15 points (raised 2026-04-20 to compensate for finer 3-run granularity)
     ALERT_COOLDOWN_DAYS = 7     # don't re-alert within 7 days
 
     if await _is_scheduler_paused():

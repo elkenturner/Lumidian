@@ -31,7 +31,7 @@ const TIER_OPTIONS = [
   {
     value: 'basic',
     label: 'Starter',
-    runs: '15 prompts per brand',
+    runs: '10 prompts per brand',
     description: '$100/mo — 1 standard brand',
   },
   {
@@ -43,7 +43,7 @@ const TIER_OPTIONS = [
   {
     value: 'pro',
     label: 'Pro',
-    runs: '100 prompts per brand',
+    runs: '30 prompts per brand',
     description: '$500/mo — 2 pro brands',
   },
 ];

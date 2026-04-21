@@ -173,16 +173,22 @@ def _strip_url_citations(text: str) -> str:
 async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt-4.1-mini") -> dict:
     if not OPENAI_API_KEY:
         return _api_key_placeholder("chatgpt")
+    is_search = "search" in model_version
     start = time.monotonic()
     try:
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-        response = await client.chat.completions.create(
-            model=model_version,
-            messages=[{"role": "user", "content": prompt}],
-            max_completion_tokens=1024,
-        )
+        # Search-preview models reject `temperature` and require `web_search_options`.
+        # Search responses are longer because of citation footers, so bump the cap.
+        kwargs: dict = {
+            "model": model_version,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_completion_tokens": 2048 if is_search else 1024,
+        }
+        if is_search:
+            kwargs["web_search_options"] = {}
+        response = await client.chat.completions.create(**kwargs)
         latency_ms = int((time.monotonic() - start) * 1000)
         text = response.choices[0].message.content
         if not text:
@@ -193,6 +199,19 @@ async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt
                 None, brand_name, latency_ms,
                 error="Empty response from ChatGPT API",
             )
+        # For search responses, strip URL/citation noise BEFORE the mention check
+        # so a brand hidden inside a citation URL doesn't trigger a false positive.
+        # Store the ORIGINAL text in response_text so the user-facing transcript
+        # still shows citations.
+        if is_search:
+            cleaned = _strip_url_citations(text)
+            mentioned = _mentioned(brand_name, cleaned)
+            return {
+                "response_text": text,
+                "mentioned": mentioned,
+                "latency_ms": latency_ms,
+                "error": None,
+            }
         return _build_result(text, brand_name, latency_ms)
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)

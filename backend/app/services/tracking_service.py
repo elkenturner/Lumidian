@@ -49,11 +49,16 @@ def _detect_mention(
     if not response_text or error == "api_key_not_configured":
         return False
 
+    # Strip URL citations + bracketed refs before matching so brand names
+    # appearing only inside footnote URLs don't trigger false positives.
+    from app.services.llm_service import _strip_url_citations
+    cleaned = _strip_url_citations(response_text)
+
     brand_norm = _normalize(brand_name)
-    response_norm = _normalize(response_text)
+    response_norm = _normalize(cleaned)
 
     # Exact case-insensitive match
-    exact = brand_name.lower() in response_text.lower()
+    exact = brand_name.lower() in cleaned.lower()
     # Normalized match (handles "Spotit Early" → "spotitearly" == "spotitearly")
     fuzzy = brand_norm in response_norm
 
@@ -68,7 +73,7 @@ def _detect_mention(
         exact,
         fuzzy,
         mentioned,
-        response_text[:200],
+        cleaned[:200],
     )
     return mentioned
 

@@ -568,7 +568,7 @@ async def run_tracking(
                 prev_run = prev_res.scalar_one_or_none()
                 if prev_run and prev_run.overall_score is not None:
                     drop = prev_run.overall_score - overall_score
-                    if drop >= 10.0:
+                    if drop >= 15.0:
                         notif_db.add(Notification(
                             user_id=uid,
                             type="visibility_drop",

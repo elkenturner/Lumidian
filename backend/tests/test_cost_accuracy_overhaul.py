@@ -52,3 +52,19 @@ def test_database_local_tier_runs_dict_uses_three():
     assert matches, "Could not locate tier_runs literal in fail_stale_runs_for_brand"
     nums = re.findall(r":\s*(\d+)", matches[0])
     assert nums and all(n == "3" for n in nums), f"tier_runs has non-3 values: {nums}"
+
+
+# ── Phase 2: gemini-2.5-pro killed ────────────────────────────────────────────
+
+def test_gemini_uses_flash_for_default_and_pro():
+    versions = llm_service._MODEL_VERSIONS["gemini"]
+    assert versions["default"] == "gemini-2.5-flash"
+    assert versions["pro"] == "gemini-2.5-flash", (
+        "Pro tier must NOT use gemini-2.5-pro — experiment showed zero accuracy "
+        "uplift and 2.8x latency. Spec decision #1."
+    )
+
+
+def test_get_model_version_for_gemini_pro_returns_flash():
+    assert llm_service._get_model_version("gemini", pro=True) == "gemini-2.5-flash"
+    assert llm_service._get_model_version("gemini", pro=False) == "gemini-2.5-flash"

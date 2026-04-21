@@ -26,7 +26,7 @@ from app.database import AsyncSessionLocal
 from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
 from app.models import utcnow as _utcnow
 from app.services.drafting_service import auto_draft_top_gaps
-from app.services.llm_service import SUPPORTED_MODELS, TIER_RUNS, query_model
+from app.services.llm_service import SUPPORTED_MODELS, TIER_RUNS, models_for_brand_type, query_model
 from app.services.quora_scanner_service import scan_brand_opportunities as quora_scan
 from app.services.reddit_scanner_service import scan_brand_opportunities as reddit_scan
 
@@ -191,6 +191,8 @@ async def run_tracking(
 
         brand_name = str(brand.name)
         brand_tier = str(brand.tier)
+        brand_type = str(brand.brand_type or "standard")
+        active_models = models_for_brand_type(brand_type)
 
         # Load user subscription tier for model version selection
         from app.models import User
@@ -268,7 +270,7 @@ async def run_tracking(
     tasks = [
         _bounded_query(pid, ptext, model, run_number)
         for pid, ptext in prompt_data
-        for model in SUPPORTED_MODELS
+        for model in active_models
         for run_number in range(1, runs_per_prompt + 1)
     ]
 
@@ -303,7 +305,7 @@ async def run_tracking(
             # Aggregate per-model stats
             model_stats: dict[str, dict] = {
                 m: {"total_queries": 0, "total_mentions": 0}
-                for m in SUPPORTED_MODELS
+                for m in active_models
             }
             for qr in query_results:
                 if qr.error:

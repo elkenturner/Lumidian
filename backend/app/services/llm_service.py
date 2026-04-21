@@ -421,6 +421,18 @@ _DISPATCHERS = {
 
 SUPPORTED_MODELS = list(_DISPATCHERS.keys())
 
+# Brand-type → enabled model list.
+# Pitch (free trial) brands get 3 models — ChatGPT search is gated as a
+# paid-tier upgrade incentive (see spec decision #4).
+_PITCH_EXCLUDED_MODELS: frozenset = frozenset({"chatgpt"})
+
+
+def models_for_brand_type(brand_type: str) -> list[str]:
+    """Return the model list this brand_type is allowed to query."""
+    if brand_type == "pitch":
+        return [m for m in SUPPORTED_MODELS if m not in _PITCH_EXCLUDED_MODELS]
+    return list(SUPPORTED_MODELS)
+
 
 def _classify_error(error: str) -> str:
     """Classify an error string for retry strategy."""

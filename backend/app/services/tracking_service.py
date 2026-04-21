@@ -350,11 +350,7 @@ async def run_tracking(
                 overall_queries += tq
                 overall_mentions += tm
 
-            overall_score = (
-                (overall_mentions / overall_queries * 100.0)
-                if overall_queries > 0
-                else 0.0
-            )
+            overall_score = _compute_overall_score(model_stats)
 
             # Update the TrackingRun
             run = await db.get(TrackingRun, run_id)

@@ -256,6 +256,51 @@ def test_models_for_brand_type_unknown_defaults_to_full_list():
     assert set(models) == {"chatgpt", "claude", "perplexity", "gemini"}
 
 
+# ── Phase 4: avg-of-per-model overall score ───────────────────────────────────
+
+
+def test_compute_overall_score_avg_of_per_model():
+    stats = {
+        "chatgpt":    {"total_queries": 9, "total_mentions": 3},
+        "claude":     {"total_queries": 9, "total_mentions": 0},
+        "perplexity": {"total_queries": 9, "total_mentions": 6},
+        "gemini":     {"total_queries": 9, "total_mentions": 9},
+    }
+    # Avg = (33.33 + 0 + 66.67 + 100) / 4 = 50.0
+    assert ts._compute_overall_score(stats) == pytest.approx(50.0, abs=0.05)
+
+
+def test_compute_overall_score_skips_zero_query_models():
+    stats = {
+        "chatgpt":    {"total_queries": 0, "total_mentions": 0},
+        "claude":     {"total_queries": 6, "total_mentions": 3},
+        "perplexity": {"total_queries": 6, "total_mentions": 3},
+        "gemini":     {"total_queries": 6, "total_mentions": 3},
+    }
+    assert ts._compute_overall_score(stats) == pytest.approx(50.0)
+
+
+def test_compute_overall_score_returns_zero_for_all_zero():
+    stats = {
+        "chatgpt": {"total_queries": 0, "total_mentions": 0},
+        "claude":  {"total_queries": 0, "total_mentions": 0},
+    }
+    assert ts._compute_overall_score(stats) == 0.0
+
+
+def test_compute_overall_score_does_not_double_count_old_formula():
+    """Regression: old denominator-weighted formula would give 23.08% here."""
+    stats = {
+        "chatgpt":    {"total_queries": 30, "total_mentions": 0},
+        "claude":     {"total_queries": 3,  "total_mentions": 3},
+        "perplexity": {"total_queries": 3,  "total_mentions": 3},
+        "gemini":     {"total_queries": 3,  "total_mentions": 3},
+    }
+    # Old formula: 9 / 39 = 23.08%
+    # Avg formula: (0 + 100 + 100 + 100) / 4 = 75.0%
+    assert ts._compute_overall_score(stats) == pytest.approx(75.0)
+
+
 @pytest.mark.asyncio
 async def test_run_tracking_skips_chatgpt_for_pitch_brand(monkeypatch):
     """End-to-end: pitch brand should query 3 models, not 4."""

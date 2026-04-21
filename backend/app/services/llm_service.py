@@ -109,7 +109,7 @@ _MODEL_VERSIONS: dict[str, dict[str, str]] = {
     "chatgpt":    {"default": "gpt-4.1-mini",              "pro": "gpt-4.1-mini"},
     "claude":     {"default": "claude-haiku-4-5-20251001",  "pro": "claude-haiku-4-5-20251001"},
     "perplexity": {"default": "sonar",                      "pro": "sonar-pro"},
-    "gemini":     {"default": "gemini-2.5-flash",           "pro": "gemini-2.5-pro"},
+    "gemini":     {"default": "gemini-2.5-flash",           "pro": "gemini-2.5-flash"},
 }
 
 

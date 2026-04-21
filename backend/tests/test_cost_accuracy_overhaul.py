@@ -130,3 +130,100 @@ def test_strip_url_citations_prevents_false_positive_brand_match():
     )
     cleaned = llm_service._strip_url_citations(raw)
     assert "stripe" not in cleaned.lower()
+
+
+# ── Phase 3.3: _query_chatgpt search variant ──────────────────────────────────
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+
+def _mock_openai_response(content: str):
+    msg = MagicMock()
+    msg.message = MagicMock()
+    msg.message.content = content
+    resp = MagicMock()
+    resp.choices = [msg]
+    return resp
+
+
+@pytest.mark.asyncio
+async def test_query_chatgpt_search_variant_uses_web_search_options():
+    """Pro/search model call must include web_search_options={}."""
+    fake_response = _mock_openai_response("Acme is great. https://acme.com")
+
+    with patch.object(llm_service, "OPENAI_API_KEY", "sk-test"):
+        with patch("openai.AsyncOpenAI") as mock_cls:
+            client = mock_cls.return_value
+            client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+            result = await llm_service._query_chatgpt(
+                "is acme good?", "Acme", model_version="gpt-4o-mini-search-preview"
+            )
+
+    create_kwargs = client.chat.completions.create.await_args.kwargs
+    assert create_kwargs["model"] == "gpt-4o-mini-search-preview"
+    assert "web_search_options" in create_kwargs
+    assert create_kwargs["web_search_options"] == {}
+    # Non-search params that the preview model rejects must be absent
+    assert "temperature" not in create_kwargs
+    assert result["mentioned"] is True
+
+
+@pytest.mark.asyncio
+async def test_query_chatgpt_default_variant_does_not_send_web_search_options():
+    """Default (non-search) model must NOT pass web_search_options."""
+    fake_response = _mock_openai_response("Plain text response about Acme.")
+    with patch.object(llm_service, "OPENAI_API_KEY", "sk-test"):
+        with patch("openai.AsyncOpenAI") as mock_cls:
+            client = mock_cls.return_value
+            client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+            await llm_service._query_chatgpt(
+                "test", "Acme", model_version="gpt-4.1-mini"
+            )
+
+    create_kwargs = client.chat.completions.create.await_args.kwargs
+    assert "web_search_options" not in create_kwargs
+
+
+@pytest.mark.asyncio
+async def test_query_chatgpt_strips_citations_before_mention_check():
+    """A brand whose name appears ONLY inside a citation URL must NOT count."""
+    fake_response = _mock_openai_response(
+        "I recommend Notion and Coda. Sources: https://stripe.com/blog"
+    )
+    with patch.object(llm_service, "OPENAI_API_KEY", "sk-test"):
+        with patch("openai.AsyncOpenAI") as mock_cls:
+            client = mock_cls.return_value
+            client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+            result = await llm_service._query_chatgpt(
+                "best note-taking?", "Stripe", model_version="gpt-4o-mini-search-preview"
+            )
+
+    assert result["mentioned"] is False, (
+        "Stripe appeared only in a citation URL — must be stripped before mention check"
+    )
+
+
+@pytest.mark.asyncio
+async def test_query_chatgpt_search_variant_uses_higher_token_cap():
+    """Search responses include long citation footers — token cap must be bumped."""
+    fake_response = _mock_openai_response("ok")
+    with patch.object(llm_service, "OPENAI_API_KEY", "sk-test"):
+        with patch("openai.AsyncOpenAI") as mock_cls:
+            client = mock_cls.return_value
+            client.chat.completions.create = AsyncMock(return_value=fake_response)
+
+            await llm_service._query_chatgpt(
+                "test", "Acme", model_version="gpt-4o-mini-search-preview"
+            )
+
+    create_kwargs = client.chat.completions.create.await_args.kwargs
+    assert create_kwargs["max_completion_tokens"] >= 2048
+
+
+def test_tracking_service_detect_mention_strips_citations():
+    from app.services.tracking_service import _detect_mention as _ts_detect_mention
+    response = "Try Notion. Sources: https://stripe.com/blog"
+    assert _ts_detect_mention("Stripe", response, error=None, model="chatgpt") is False

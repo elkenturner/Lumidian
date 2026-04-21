@@ -289,15 +289,14 @@ def _get_gemini_client():
     return _gemini_client
 
 
-_GEMINI_TIMEOUT = 90.0   # seconds; default for Flash models
-_GEMINI_PRO_TIMEOUT = 120.0  # seconds; Pro models are significantly slower
+_GEMINI_TIMEOUT = 90.0   # seconds; Flash is the only variant we use
 
 
 async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemini-2.5-flash") -> dict:
     if not GEMINI_API_KEY:
         return _api_key_placeholder("gemini")
     start = time.monotonic()
-    timeout = _GEMINI_PRO_TIMEOUT if "pro" in model_version else _GEMINI_TIMEOUT
+    timeout = _GEMINI_TIMEOUT
     try:
         from google.genai import types
 
@@ -424,7 +423,6 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
     # Track whether we've fallen back to a lighter model for overload errors
     active_model_version = model_version
     _FALLBACK_MODELS = {
-        "gemini-2.5-pro": "gemini-2.5-flash",
         "sonar-pro": "sonar",
     }
 

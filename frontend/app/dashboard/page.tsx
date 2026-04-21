@@ -439,17 +439,17 @@ export default function DashboardPage() {
     .sort((a, b) => b.mention_rate - a.mention_rate);
   const liveScore = (() => {
     const mods = latestModelBreakdown.filter(m => m.model === 'perplexity' || m.model === 'gemini');
-    if (!mods.length) return null;
-    const mentions = mods.reduce((s, m) => s + m.total_mentions, 0);
-    const total = mods.reduce((s, m) => s + m.total_queries, 0);
-    return total > 0 ? Math.round(mentions / total * 1000) / 10 : null;
+    const active = mods.filter(m => m.total_queries > 0);
+    if (!active.length) return null;
+    const avg = active.reduce((s, m) => s + (m.total_mentions / m.total_queries), 0) / active.length;
+    return Math.round(avg * 1000) / 10;
   })();
   const indexScore = (() => {
     const mods = latestModelBreakdown.filter(m => m.model === 'chatgpt' || m.model === 'claude');
-    if (!mods.length) return null;
-    const mentions = mods.reduce((s, m) => s + m.total_mentions, 0);
-    const total = mods.reduce((s, m) => s + m.total_queries, 0);
-    return total > 0 ? Math.round(mentions / total * 1000) / 10 : null;
+    const active = mods.filter(m => m.total_queries > 0);
+    if (!active.length) return null;
+    const avg = active.reduce((s, m) => s + (m.total_mentions / m.total_queries), 0) / active.length;
+    return Math.round(avg * 1000) / 10;
   })();
   const daysSinceFirst = trends.length > 0 && trends[0].completed_at
     ? Math.max(0, Math.floor((Date.now() - parseUTCISO(trends[0].completed_at).getTime()) / 86_400_000))

@@ -38,3 +38,17 @@ def test_tracking_service_in_app_drop_threshold_is_fifteen():
     assert all(float(m) == 15.0 for m in matches), (
         f"Drop threshold(s) not 15.0: {matches}"
     )
+
+
+# ── Phase 1.3: stale-run estimator local tier_runs dict 5 -> 3 ────────────────
+
+from app import database as db_module
+
+
+def test_database_local_tier_runs_dict_uses_three():
+    """The estimator inside fail_stale_runs_for_brand must mirror TIER_RUNS."""
+    src = inspect.getsource(db_module.fail_stale_runs_for_brand)
+    matches = re.findall(r"tier_runs\s*=\s*\{([^}]+)\}", src)
+    assert matches, "Could not locate tier_runs literal in fail_stale_runs_for_brand"
+    nums = re.findall(r":\s*(\d+)", matches[0])
+    assert nums and all(n == "3" for n in nums), f"tier_runs has non-3 values: {nums}"

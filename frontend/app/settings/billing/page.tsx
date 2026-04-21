@@ -12,12 +12,12 @@ import { TIER_DISPLAY_NAMES, TIER_PRICES } from '@/lib/tiers';
 const TIER_FEATURES: Record<string, string[]> = {
   basic: [
     '1 standard brand',
-    '15 tracked prompts per brand',
+    '10 tracked prompts per brand',
     '2 manual runs per day',
     'Content drafts (10 queued)',
     '5 manual opportunity scans per week',
     '3 competitors tracked per brand',
-    '4 AI models tracked',
+    '4 AI models tracked (with ChatGPT web search)',
     'Email support',
   ],
   starter: [
@@ -33,7 +33,7 @@ const TIER_FEATURES: Record<string, string[]> = {
   ],
   pro: [
     '2 pro brands',
-    '100 tracked prompts per brand',
+    '30 tracked prompts per brand',
     'Unlimited manual runs',
     'Unlimited content drafts',
     'LinkedIn & X content drafts',
@@ -307,7 +307,7 @@ export default function BillingPage() {
                   </p>
                 </div>
                 <p className="text-xs text-[var(--text-faint)]">
-                  {currentTier === 'basic' ? '15 prompts per brand' : currentTier === 'starter' ? '25 prompts per brand' : currentTier === 'pro' ? '100 prompts per brand' : '10 prompts on free plan — upgrade for more'}
+                  {currentTier === 'basic' ? '10 prompts per brand' : currentTier === 'starter' ? '25 prompts per brand' : currentTier === 'pro' ? '30 prompts per brand' : '10 prompts on free plan — upgrade for more'}
                 </p>
               </div>
             )}

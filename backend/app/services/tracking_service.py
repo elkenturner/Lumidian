@@ -26,7 +26,7 @@ from app.database import AsyncSessionLocal
 from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
 from app.models import utcnow as _utcnow
 from app.services.drafting_service import auto_draft_top_gaps
-from app.services.llm_service import SUPPORTED_MODELS, TIER_RUNS, query_model
+from app.services.llm_service import SUPPORTED_MODELS, TIER_RUNS, models_for_brand_type, query_model
 from app.services.quora_scanner_service import scan_brand_opportunities as quora_scan
 from app.services.reddit_scanner_service import scan_brand_opportunities as reddit_scan
 
@@ -49,11 +49,16 @@ def _detect_mention(
     if not response_text or error == "api_key_not_configured":
         return False
 
+    # Strip URL citations + bracketed refs before matching so brand names
+    # appearing only inside footnote URLs don't trigger false positives.
+    from app.services.llm_service import _strip_url_citations
+    cleaned = _strip_url_citations(response_text)
+
     brand_norm = _normalize(brand_name)
-    response_norm = _normalize(response_text)
+    response_norm = _normalize(cleaned)
 
     # Exact case-insensitive match
-    exact = brand_name.lower() in response_text.lower()
+    exact = brand_name.lower() in cleaned.lower()
     # Normalized match (handles "Spotit Early" → "spotitearly" == "spotitearly")
     fuzzy = brand_norm in response_norm
 
@@ -68,7 +73,7 @@ def _detect_mention(
         exact,
         fuzzy,
         mentioned,
-        response_text[:200],
+        cleaned[:200],
     )
     return mentioned
 
@@ -157,6 +162,23 @@ async def _log_score_change_events(
                 )
 
 
+def _compute_overall_score(model_stats: dict[str, dict]) -> float:
+    """Avg-of-per-model overall score; skips models with zero queries.
+
+    Spec: 2026-04-20-cost-accuracy-decisions.md, decision #5.
+    """
+    per_model_scores: list[float] = []
+    for stats in model_stats.values():
+        tq = stats.get("total_queries", 0)
+        if tq <= 0:
+            continue
+        tm = stats.get("total_mentions", 0)
+        per_model_scores.append(tm / tq * 100.0)
+    if not per_model_scores:
+        return 0.0
+    return sum(per_model_scores) / len(per_model_scores)
+
+
 async def run_tracking(
     brand_id: int,
     run_type: str = "manual",
@@ -186,12 +208,14 @@ async def run_tracking(
 
         brand_name = str(brand.name)
         brand_tier = str(brand.tier)
+        brand_type = str(brand.brand_type or "standard")
+        active_models = models_for_brand_type(brand_type)
 
         # Load user subscription tier for model version selection
         from app.models import User
         user_result = await db.execute(select(User).where(User.id == brand.user_id))
         user = user_result.scalar_one_or_none()
-        is_pro = user is not None and user.subscription_tier in ("starter", "pro")
+        is_pro = user is not None and user.subscription_tier in ("basic", "starter", "pro")
 
         prompts_result = await db.execute(
             select(Prompt).where(Prompt.brand_id == brand_id)
@@ -263,7 +287,7 @@ async def run_tracking(
     tasks = [
         _bounded_query(pid, ptext, model, run_number)
         for pid, ptext in prompt_data
-        for model in SUPPORTED_MODELS
+        for model in active_models
         for run_number in range(1, runs_per_prompt + 1)
     ]
 
@@ -298,7 +322,7 @@ async def run_tracking(
             # Aggregate per-model stats
             model_stats: dict[str, dict] = {
                 m: {"total_queries": 0, "total_mentions": 0}
-                for m in SUPPORTED_MODELS
+                for m in active_models
             }
             for qr in query_results:
                 if qr.error:
@@ -326,11 +350,7 @@ async def run_tracking(
                 overall_queries += tq
                 overall_mentions += tm
 
-            overall_score = (
-                (overall_mentions / overall_queries * 100.0)
-                if overall_queries > 0
-                else 0.0
-            )
+            overall_score = _compute_overall_score(model_stats)
 
             # Update the TrackingRun
             run = await db.get(TrackingRun, run_id)
@@ -568,7 +588,7 @@ async def run_tracking(
                 prev_run = prev_res.scalar_one_or_none()
                 if prev_run and prev_run.overall_score is not None:
                     drop = prev_run.overall_score - overall_score
-                    if drop >= 10.0:
+                    if drop >= 15.0:
                         notif_db.add(Notification(
                             user_id=uid,
                             type="visibility_drop",

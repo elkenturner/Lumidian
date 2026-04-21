@@ -329,7 +329,8 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
     from app.database import AsyncSessionLocal
     from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
-    from app.services.llm_service import SUPPORTED_MODELS, TIER_RUNS, query_model
+    from app.services.llm_service import TIER_RUNS, models_for_brand_type, query_model
+    from app.services.tracking_service import _compute_overall_score
 
     def utcnow():
         return datetime.now(UTC).replace(tzinfo=None)
@@ -338,6 +339,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     # so we never access SQLAlchemy-managed attributes on detached objects.
     brand_name: str = ""
     brand_tier: str = "basic"
+    brand_type: str = "standard"
     prompt_data: list[tuple[int, str]] = []  # (prompt_id, prompt_text)
     is_pro: bool = False
 
@@ -356,16 +358,19 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
         brand_name = str(brand.name)
         brand_tier = str(brand.tier)
+        brand_type = str(brand.brand_type or "standard")
 
         from app.models import User
         user_result = await db.execute(select(User).where(User.id == brand.user_id))
         user_obj = user_result.scalar_one_or_none()
-        is_pro = user_obj is not None and user_obj.subscription_tier in ("starter", "pro")
+        is_pro = user_obj is not None and user_obj.subscription_tier in ("basic", "starter", "pro")
 
         prompts_result = await db.execute(
             select(Prompt).where(Prompt.brand_id == brand_id)
         )
         prompt_data = [(p.id, p.text) for p in prompts_result.scalars().all()]
+
+    active_models = models_for_brand_type(brand_type)
 
     logger.info(
         "Manual run %d — brand=%r tier=%s prompts=%d",
@@ -403,7 +408,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     tasks = [
         _bounded_query(pid, ptext, model, rn)
         for pid, ptext in prompt_data
-        for model in SUPPORTED_MODELS
+        for model in active_models
         for rn in range(1, runs_per_prompt + 1)
     ]
 
@@ -426,7 +431,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
             await db.flush()
 
             model_stats = {
-                m: {"total_queries": 0, "total_mentions": 0} for m in SUPPORTED_MODELS
+                m: {"total_queries": 0, "total_mentions": 0} for m in active_models
             }
             for qr in query_results:
                 if qr.error:
@@ -451,11 +456,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
                 overall_queries += tq
                 overall_mentions += tm
 
-            overall_score = (
-                (overall_mentions / overall_queries * 100.0)
-                if overall_queries > 0
-                else 0.0
-            )
+            overall_score = _compute_overall_score(model_stats)
 
             run = await db.get(TrackingRun, run_id)
             if run:
@@ -682,9 +683,10 @@ async def trigger_prompt_run(
     # avoids a TOCTOU race where another coroutine grabs the lock between
     # our locked() check and the pop().
 
-    is_pro = user.subscription_tier in ("starter", "pro")
+    is_pro = user.subscription_tier in ("basic", "starter", "pro")
+    brand_type = str(brand.brand_type or "standard")
     asyncio.create_task(
-        _background_prompt_run(run_id, brand_id, prompt_id, str(prompt.text), str(brand.name), str(brand.tier), is_pro=is_pro),
+        _background_prompt_run(run_id, brand_id, prompt_id, str(prompt.text), str(brand.name), str(brand.tier), is_pro=is_pro, brand_type=brand_type),
         name=f"prompt-tracking-{brand_id}-{prompt_id}-{run_id}",
     )
 
@@ -704,6 +706,7 @@ async def _background_prompt_run(
     brand_name: str,
     brand_tier: str,
     is_pro: bool = False,
+    brand_type: str = "standard",
 ) -> None:
     """Execute a single-prompt tracking run independently of full runs."""
     import asyncio as _asyncio
@@ -712,7 +715,10 @@ async def _background_prompt_run(
     from app.database import AsyncSessionLocal
     from app.models import QueryResult, RunModelScore
     from app.models import TrackingRun as TR
-    from app.services.llm_service import SUPPORTED_MODELS, TIER_RUNS, query_model
+    from app.services.llm_service import TIER_RUNS, models_for_brand_type, query_model
+    from app.services.tracking_service import _compute_overall_score
+
+    active_models = models_for_brand_type(brand_type)
 
     def utcnow():
         return datetime.now(UTC).replace(tzinfo=None)
@@ -744,7 +750,7 @@ async def _background_prompt_run(
 
     tasks = [
         _bounded_query(model, rn)
-        for model in SUPPORTED_MODELS
+        for model in active_models
         for rn in range(1, runs_per_prompt + 1)
     ]
 
@@ -772,7 +778,7 @@ async def _background_prompt_run(
                 db.add(qr)
             await db.flush()
 
-            model_stats = {m: {"total_queries": 0, "total_mentions": 0} for m in SUPPORTED_MODELS}
+            model_stats = {m: {"total_queries": 0, "total_mentions": 0} for m in active_models}
             for qr in query_results:
                 if qr.error:
                     continue
@@ -796,7 +802,7 @@ async def _background_prompt_run(
                 overall_queries += tq
                 overall_mentions += tm
 
-            overall_score = (overall_mentions / overall_queries * 100.0) if overall_queries > 0 else 0.0
+            overall_score = _compute_overall_score(model_stats)
 
             run = await db.get(TR, run_id)
             if run:

@@ -349,10 +349,22 @@ async def run_migrations():
         # Ensure brands match their owner's subscription tier.
         # Catches pitch brands that weren't upgraded due to webhook race,
         # AND brands where brand_type was changed but prompt_limit wasn't.
+        # Sync Pro user brands to brand_type='pro'.  For prompt_limit:
+        #  - Brand at old default of 100 with ≤30 prompts: lower to 30 (new cap).
+        #  - Brand at 100 with >30 prompts: grandfather (leave at 100).
+        await conn.execute(text(
+            "UPDATE brands SET brand_type = 'pro' "
+            "WHERE brand_type != 'pro' AND user_id IN "
+            "(SELECT id FROM users WHERE subscription_tier = 'pro')"
+        ))
         await conn.execute(text("""
-            UPDATE brands SET brand_type = 'pro', prompt_limit = 100
-            WHERE (brand_type != 'pro' OR prompt_limit != 100)
+            UPDATE brands SET prompt_limit = 30
+            WHERE prompt_limit = 100
               AND user_id IN (SELECT id FROM users WHERE subscription_tier = 'pro')
+              AND id NOT IN (
+                SELECT brand_id FROM prompts
+                GROUP BY brand_id HAVING COUNT(*) > 30
+              )
         """))
         await conn.execute(text("""
             UPDATE brands SET brand_type = 'standard', prompt_limit = 25
@@ -419,9 +431,11 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
         )
         prompt_count = prompt_count_result.scalar_one() or 1
 
-        tier_runs = {"basic": 5, "standard": 5, "premium": 5}
-        runs_per_prompt = tier_runs.get(brand.tier, 5) if brand else 5
-        total_queries = prompt_count * 4 * runs_per_prompt  # 4 models
+        from app.services.llm_service import models_for_brand_type
+        tier_runs = {"basic": 3, "standard": 3, "premium": 3}
+        runs_per_prompt = tier_runs.get(brand.tier, 3) if brand else 3
+        model_count = len(models_for_brand_type(brand.brand_type)) if brand else 4
+        total_queries = prompt_count * model_count * runs_per_prompt
         # ~8 effective concurrent queries, ~3s each
         est_minutes = (total_queries / 8 * 3) / 60
         max_age_minutes = max(15, int(est_minutes * 2))

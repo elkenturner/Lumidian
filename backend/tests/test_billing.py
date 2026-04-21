@@ -162,13 +162,13 @@ async def test_create_checkout_session_carries_tier_metadata(client: httpx.Async
 
 
 async def test_billing_status_basic_tier(client: httpx.AsyncClient):
-    """Basic-tier user ($100 Starter) gets correct prompt_limit of 15."""
+    """Basic-tier user ($100 Starter) gets correct prompt_limit of 10."""
     await register_and_login(client, email="billing_basic@example.com", subscription_tier="basic")
     resp = await client.get("/api/billing/status")
     assert resp.status_code == 200
     data = resp.json()
     assert data["subscription_tier"] == "basic"
-    assert data["prompt_limit"] == 15
+    assert data["prompt_limit"] == 10
 
 
 async def test_billing_status_basic_tier_brand_limits(client: httpx.AsyncClient):
@@ -182,7 +182,7 @@ async def test_billing_status_basic_tier_brand_limits(client: httpx.AsyncClient)
 
 
 async def test_webhook_checkout_completed_basic_tier(client: httpx.AsyncClient):
-    """checkout.session.completed with tier=basic upgrades pitch brand to standard with prompt_limit=15."""
+    """checkout.session.completed with tier=basic upgrades pitch brand to standard with prompt_limit=10."""
     import json
 
     import stripe as _stripe
@@ -248,7 +248,7 @@ async def test_webhook_checkout_completed_basic_tier(client: httpx.AsyncClient):
         result = await db.execute(select(Brand).where(Brand.id == brand_id))
         brand = result.scalar_one()
         assert brand.brand_type == "standard"
-        assert brand.prompt_limit == 15
+        assert brand.prompt_limit == 10
 
 
 async def test_create_checkout_basic_tier(client: httpx.AsyncClient):
@@ -334,10 +334,10 @@ async def test_webhook_checkout_completed_sets_active_tier(client: httpx.AsyncCl
 
 
 async def test_billing_usage_basic_tier(client: httpx.AsyncClient):
-    """Basic-tier user gets correct run limit (2) and prompt limit (15)."""
+    """Basic-tier user gets correct run limit (2) and prompt limit (10)."""
     await register_and_login(client, email="billing_basic_usage@example.com", subscription_tier="basic")
     resp = await client.get("/api/billing/usage")
     assert resp.status_code == 200
     data = resp.json()
     assert data["manual_run_limit"] == 2
-    assert data["prompt_limit"] == 15
+    assert data["prompt_limit"] == 10

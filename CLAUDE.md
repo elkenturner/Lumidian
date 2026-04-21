@@ -72,7 +72,7 @@ Copy `backend/.env.example` → `backend/.env`. **`JWT_SECRET` (≥32 chars) is 
 ### Stack
 - **Backend:** Python 3.11+, FastAPI 0.115, SQLAlchemy 2.0 (async), SQLite + aiosqlite, APScheduler, bcrypt, PyJWT, Stripe, ReportLab, pyotp
 - **Frontend:** Next.js 15, React 18, TypeScript (strict), Tailwind CSS, Radix UI, Recharts, Axios, date-fns, lucide-react
-- **LLM providers:** OpenAI (gpt-4.1-mini), Anthropic (claude-haiku-4-5-20251001), Google GenAI (gemini-2.5-flash default, gemini-2.5-pro for paid subscribers), Perplexity (sonar default, sonar-pro for paid subscribers)
+- **LLM providers:** OpenAI (gpt-4.1-mini default, gpt-4o-mini-search-preview for paid subscribers), Anthropic (claude-haiku-4-5-20251001), Google GenAI (gemini-2.5-flash for all tiers), Perplexity (sonar default, sonar-pro for paid subscribers)
 
 ### Backend Layout
 ```
@@ -212,9 +212,9 @@ JWT issued with 7-day expiry, stored in httpOnly `clarity_token` cookie. Compani
 ### Tier-Based Query Counts
 | Tier | Runs per prompt per model |
 |------|--------------------------|
-| basic | 5 |
-| standard | 5 |
-| premium | 5 |
+| basic | 3 |
+| standard | 3 |
+| premium | 3 |
 
 ### Visibility Score & Mention Detection
 Score = `(queries with mention) / (total queries) × 100`. Mention detection: case-insensitive substring check (`brand_name.lower() in response.lower()`) **plus** fuzzy normalized check (lowercase + strip non-alphanumeric). `mentioned = exact OR fuzzy`. Queries with errors are excluded from the denominator.
@@ -260,7 +260,7 @@ Caps defined in `routers/content.py` (`TIER_SCHEDULED_CAPS`) and `services/draft
 Drafts are generated on brand creation (onboarding) and manually via "Regenerate Drafts". No recurring auto-draft job. Opportunity scanning is fully manual/on-demand (triggered by user or during onboarding) and is separate from drafting. Draft platforms: reddit, quora, medium, wikipedia, linkedin, x.
 
 ### LLM Concurrency & Resilience
-Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Overall tracking concurrency: `MAX_CONCURRENT=10` in `tracking_service.py`. Model fallbacks on overload (503): `gemini-2.5-pro` → `gemini-2.5-flash`, `sonar-pro` → `sonar`. Rate limit errors get 65s retry delay. Auth errors (invalid API key) are not retried. Timeouts: Claude draft generation 30s, sentiment classification 15s, Reddit scanner relevance 10s.
+Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Overall tracking concurrency: `MAX_CONCURRENT=10` in `tracking_service.py`. Model fallbacks on overload (503): `sonar-pro` → `sonar`. Rate limit errors get 65s retry delay. Auth errors (invalid API key) are not retried. Timeouts: Claude draft generation 30s, sentiment classification 15s, Reddit scanner relevance 10s.
 
 ### Run Cancellation
 `POST /api/tracking/run/{run_id}/cancel` force-cancels stuck runs. Cancellation propagates to in-flight LLM queries via `asyncio.Event`, interrupting retry backoff sleeps immediately. Cancel events cleaned up in `tracking.py:cleanup_cancel_event()`. Stale runs auto-failed after 15 minutes (dynamic threshold based on brand size).
@@ -286,7 +286,7 @@ Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Over
 | 04:00 | Monthly (1st) | Website context refresh via Jina |
 | 06:00 | Daily | Pitch expiry warnings & cleanup |
 | 08:00 | Daily | Morning visibility tracking sweep |
-| 21:00 | Daily | Visibility drop alerts (email if ≥10pp drop) |
+| 21:00 | Daily | Visibility drop alerts (email if ≥15pp drop) |
 
 Scheduler can be paused via `SystemSetting` key `"scheduler_paused"`.
 

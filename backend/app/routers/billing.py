@@ -46,7 +46,7 @@ TIER_DISPLAY_NAMES: dict[str | None, str] = {
 # Canonical tier ordering for UI rendering (lowest → highest).
 TIER_ORDER: list[str | None] = [None, "basic", "starter", "pro"]
 
-TIER_LIMITS = {"basic": 15, "starter": 25, "pro": 100}
+TIER_LIMITS = {"basic": 15, "starter": 25, "pro": 30}
 TIER_PRICES = {
     "basic": os.getenv("STRIPE_BASIC_PRICE_ID", ""),
     "starter": os.getenv("STRIPE_STARTER_PRICE_ID", ""),
@@ -97,7 +97,7 @@ WEEKLY_SCAN_LIMITS: dict = {
 PROMPT_LIMITS: dict[str, int] = {
     "pitch": 10,
     "standard": 25,
-    "pro": 100,
+    "pro": 30,
 }
 
 # Brand type limits per subscription tier: {tier: {brand_type: max_count}}

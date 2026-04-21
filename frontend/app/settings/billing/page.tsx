@@ -33,7 +33,7 @@ const TIER_FEATURES: Record<string, string[]> = {
   ],
   pro: [
     '2 pro brands',
-    '100 tracked prompts per brand',
+    '30 tracked prompts per brand',
     'Unlimited manual runs',
     'Unlimited content drafts',
     'LinkedIn & X content drafts',
@@ -307,7 +307,7 @@ export default function BillingPage() {
                   </p>
                 </div>
                 <p className="text-xs text-[var(--text-faint)]">
-                  {currentTier === 'basic' ? '15 prompts per brand' : currentTier === 'starter' ? '25 prompts per brand' : currentTier === 'pro' ? '100 prompts per brand' : '10 prompts on free plan — upgrade for more'}
+                  {currentTier === 'basic' ? '15 prompts per brand' : currentTier === 'starter' ? '25 prompts per brand' : currentTier === 'pro' ? '30 prompts per brand' : '10 prompts on free plan — upgrade for more'}
                 </p>
               </div>
             )}

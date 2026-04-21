@@ -89,9 +89,9 @@ def _api_key_placeholder(model: str) -> dict:
     }
 
 TIER_RUNS = {
-    "basic": 5,
-    "standard": 5,
-    "premium": 5,
+    "basic": 3,
+    "standard": 3,
+    "premium": 3,
 }
 
 # Model categories for the dual-score visibility architecture.

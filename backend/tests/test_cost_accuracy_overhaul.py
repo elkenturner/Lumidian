@@ -68,3 +68,16 @@ def test_gemini_uses_flash_for_default_and_pro():
 def test_get_model_version_for_gemini_pro_returns_flash():
     assert llm_service._get_model_version("gemini", pro=True) == "gemini-2.5-flash"
     assert llm_service._get_model_version("gemini", pro=False) == "gemini-2.5-flash"
+
+
+def test_gemini_pro_timeout_constant_removed():
+    assert not hasattr(llm_service, "_GEMINI_PRO_TIMEOUT"), (
+        "Dead constant — Pro variant of Gemini was killed in Phase 2.1"
+    )
+
+
+def test_fallback_models_does_not_reference_gemini_pro():
+    src = inspect.getsource(llm_service._with_retry)
+    assert "gemini-2.5-pro" not in src, (
+        "_FALLBACK_MODELS still references killed gemini-2.5-pro"
+    )

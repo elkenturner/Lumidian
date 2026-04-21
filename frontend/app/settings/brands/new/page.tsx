@@ -343,7 +343,7 @@ export default function NewBrandPage() {
                           ) : null}
                         </div>
                         <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                          Up to <span className="text-[var(--text-secondary)] font-medium">100 prompts</span>. Deeper tracking with higher prompt coverage.
+                          Up to <span className="text-[var(--text-secondary)] font-medium">30 prompts</span>. Deeper tracking with higher prompt coverage.
                         </p>
                         {needsUpgrade && <p className="text-[11px] text-[var(--accent-foreground)] mt-1.5">Requires a Pro plan — <span className="underline">upgrade</span></p>}
                         {noSlots && <p className="text-[11px] text-[var(--danger)] mt-1.5">No slots remaining — <span className="underline">upgrade to add more</span></p>}

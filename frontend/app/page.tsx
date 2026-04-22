@@ -553,8 +553,6 @@ function HowItWorksSection() {
 
 function DashboardMockup() {
   const { ref: scoreRef, value: scoreVal } = useCountUp(67, 1600);
-  const { ref: liveRef, value: liveVal } = useCountUp(72, 1400);
-  const { ref: indexRef, value: indexVal } = useCountUp(61, 1400);
   const [barWidths, setBarWidths] = useState([0, 0, 0, 0]);
   const [compWidths, setCompWidths] = useState([0, 0]);
   const barTriggered = useRef(false);
@@ -643,46 +641,50 @@ function DashboardMockup() {
             </svg>
           </div>
 
-          {/* Live vs Index */}
+          {/* Live search coverage */}
           <div className="col-span-2 bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-2xl p-4">
-            <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider mb-3">Live vs Index</p>
-            <div className="space-y-3">
-              <div ref={liveRef}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#22c55e]" />
-                    <span className="text-xs text-[#94a3b8]">Live Search</span>
-                  </div>
-                  <span className="text-xs font-bold text-[#22c55e]">{liveVal}%</span>
-                </div>
-                <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#22c55e] rounded-full transition-[width] duration-700"
-                    style={{ width: `${liveVal}%` }}
-                  />
-                </div>
-              </div>
-              <div ref={indexRef}>
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#8ba8cc]" />
-                    <span className="text-xs text-[#94a3b8]">AI Index</span>
-                  </div>
-                  <span className="text-xs font-bold text-[#8ba8cc]">{indexVal}%</span>
-                </div>
-                <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-[#8ba8cc] rounded-full transition-[width] duration-700"
-                    style={{ width: `${indexVal}%` }}
-                  />
-                </div>
-              </div>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-[#64748b] uppercase tracking-wider">Live Web Search</p>
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-semibold text-[#22c55e] bg-[rgba(34,197,94,0.1)] border border-[rgba(34,197,94,0.2)] rounded-full px-2 py-0.5">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#22c55e] opacity-60" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#22c55e]" />
+                </span>
+                All 4 active
+              </span>
             </div>
 
-            {/* How We Track blurb */}
-            <div className="mt-4 pt-3 border-t border-[rgba(51,65,85,0.4)]">
+            {/* Model pills */}
+            <div className="grid grid-cols-4 gap-2 mb-4">
+              {[
+                { name: 'ChatGPT', color: '#10a37f', delay: 0 },
+                { name: 'Claude', color: '#f97316', delay: 60 },
+                { name: 'Perplexity', color: '#8b5cf6', delay: 120 },
+                { name: 'Gemini', color: '#3b82f6', delay: 180 },
+              ].map(({ name, color, delay }) => (
+                <div
+                  key={name}
+                  className="flex flex-col items-center gap-1.5 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.07)] rounded-xl py-2.5 px-1"
+                  style={{
+                    opacity: barInView ? 1 : 0,
+                    transform: barInView ? 'scale(1)' : 'scale(0.92)',
+                    transition: `opacity 0.3s cubic-bezier(0.23,1,0.32,1) ${delay}ms, transform 0.3s cubic-bezier(0.23,1,0.32,1) ${delay}ms`,
+                  }}
+                >
+                  <span
+                    className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: color }}
+                  />
+                  <span className="text-[10px] font-medium text-[#94a3b8] text-center leading-tight">{name}</span>
+                  <Check size={10} className="text-[#22c55e]" strokeWidth={3} />
+                </div>
+              ))}
+            </div>
+
+            {/* Blurb */}
+            <div className="pt-3 border-t border-[rgba(51,65,85,0.4)]">
               <p className="text-[11px] leading-relaxed text-[#64748b]">
-                Lumidian queries each AI model directly — including web-grounded search from Perplexity and Gemini — to measure how often your brand appears in real AI responses. No scraping, no guessing. Consistent, reproducible visibility scores you can track over time.
+                Lumidian queries each AI assistant — ChatGPT, Claude, Perplexity, and Gemini — with live web search enabled, so your scores reflect how your brand actually appears in real answers today.
               </p>
               <Link
                 href="/methodology"

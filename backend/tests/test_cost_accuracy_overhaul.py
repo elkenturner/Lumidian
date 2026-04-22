@@ -102,20 +102,19 @@ def test_is_pro_includes_basic_starter_and_pro():
     pro=True flag so they get ChatGPT search + sonar-pro. Decision 2026-04-20:
     Starter pays $100, deserves a quality bump over Free, and the cost delta
     fits within margin.
-    """
-    sources = "\n".join([
-        inspect.getsource(ts.run_tracking),
-    ])
-    from app.routers import tracking as trk_router
-    sources += "\n" + inspect.getsource(trk_router)
 
-    matches = re.findall(r'subscription_tier\s+in\s+\(([^)]+)\)', sources)
-    assert matches, "Could not find subscription_tier membership check"
-    for m in matches:
-        tiers = {t.strip().strip("'\"") for t in m.split(",")}
-        assert tiers == {"basic", "starter", "pro"}, (
-            f"is_pro tier set must be {{basic, starter, pro}}; got {tiers}"
-        )
+    After the is_paid_tier refactor the literal tuple no longer appears in callers;
+    the canonical source of truth is llm_service._PAID_TIERS. Verify that frozenset
+    contains exactly {"basic", "starter", "pro"} and that is_paid_tier delegates to it.
+    """
+    assert llm_service._PAID_TIERS == frozenset({"basic", "starter", "pro"}), (
+        f"_PAID_TIERS must be {{basic, starter, pro}}; got {llm_service._PAID_TIERS}"
+    )
+    assert llm_service.is_paid_tier("basic") is True
+    assert llm_service.is_paid_tier("starter") is True
+    assert llm_service.is_paid_tier("pro") is True
+    assert llm_service.is_paid_tier(None) is False
+    assert llm_service.is_paid_tier("free") is False
 
 
 def test_strip_url_citations_removes_full_urls():
@@ -409,7 +408,7 @@ async def test_data_fix_lowers_pro_prompt_limit_for_brands_under_thirty():
 
 @pytest.mark.asyncio
 async def test_run_tracking_skips_chatgpt_for_pitch_brand(monkeypatch):
-    """End-to-end: pitch brand should query 3 models, not 4."""
+    """End-to-end: pitch brand should query 2 models (perplexity+gemini), not 4."""
     from app.database import AsyncSessionLocal
     from app.models import Brand, Prompt, User
 
@@ -442,5 +441,6 @@ async def test_run_tracking_skips_chatgpt_for_pitch_brand(monkeypatch):
     await run_tracking(brand_id, run_type="manual")
 
     assert "chatgpt" not in call_log, "Pitch brands must skip ChatGPT"
-    # 3 models * 3 runs * 1 prompt = 9 calls
-    assert len(call_log) == 9, f"Expected 9 calls (3 models × 3 runs), got {len(call_log)}"
+    assert "claude" not in call_log, "Pitch brands must skip Claude"
+    # 2 models (perplexity + gemini) × 3 runs × 1 prompt = 6 calls
+    assert len(call_log) == 6, f"Expected 6 calls (2 models × 3 runs), got {len(call_log)}"

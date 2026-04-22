@@ -26,30 +26,30 @@ if not JWT_SECRET:
 JWT_ALGORITHM = "HS256"
 logger = logging.getLogger(__name__)
 
-# ── Pro-only platform gate ────────────────────────────────────────────────────
+# ── Paid-only platform gate ───────────────────────────────────────────────────
 
-PRO_ONLY_PLATFORMS: frozenset[str] = frozenset({
+PAID_ONLY_PLATFORMS: frozenset[str] = frozenset({
     "linkedin", "linkedin_article", "linkedin_post", "linkedin_reply",
     "x", "x_thread", "x_post", "x_reply",
 })
 
 
-def is_pro_only_platform(platform: str) -> bool:
-    """Return True if the platform requires a Pro subscription."""
-    return platform in PRO_ONLY_PLATFORMS
+def is_paid_only_platform(platform: str) -> bool:
+    """Return True if the platform requires any paid subscription."""
+    return platform in PAID_ONLY_PLATFORMS
 
 
-def require_pro_for_platform(platform: str, user) -> None:
-    """Raise HTTP 403 if the platform is Pro-only and the user isn't Pro or admin."""
-    if not is_pro_only_platform(platform):
+def require_paid_for_platform(platform: str, user) -> None:
+    """Raise HTTP 403 if the platform is paid-only and the user isn't paid or admin."""
+    if not is_paid_only_platform(platform):
         return
     if getattr(user, "is_admin", False):
         return
-    if getattr(user, "subscription_tier", None) == "pro":
+    if getattr(user, "subscription_tier", None):
         return
     raise HTTPException(
         status_code=status.HTTP_403_FORBIDDEN,
-        detail="LinkedIn and X features require a Pro subscription.",
+        detail="LinkedIn and X features require a paid plan.",
     )
 
 

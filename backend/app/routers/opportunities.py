@@ -23,7 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, is_pro_only_platform, require_brand_active
+from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user, is_paid_only_platform, require_brand_active
 from app.models import Brand, ContentOpportunity, Prompt
 from app.schemas import ContentDraftSchema, ContentOpportunitySchema
 
@@ -103,11 +103,11 @@ async def list_opportunities(
     # Sort by blended relevance + recency score (Python-side, small dataset)
     all_opps.sort(key=lambda opp: _blended_score(opp, now), reverse=True)
 
-    # Filter out Pro-only platforms for non-Pro users
+    # Filter out paid-only platforms for free users
     user_tier = getattr(user, "subscription_tier", None)
     is_admin = getattr(user, "is_admin", False)
-    if not is_admin and user_tier != "pro":
-        all_opps = [o for o in all_opps if not is_pro_only_platform(o.platform)]
+    if not is_admin and not user_tier:
+        all_opps = [o for o in all_opps if not is_paid_only_platform(o.platform)]
 
     # Balanced interleaving: distribute evenly across platforms
     from collections import defaultdict
@@ -169,8 +169,8 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     from app.services.drafting_service import generate_opportunity_draft
 
     opp = await _get_opportunity_or_404(db, opportunity_id)
-    from app.dependencies import require_pro_for_platform
-    require_pro_for_platform(opp.platform, user)
+    from app.dependencies import require_paid_for_platform
+    require_paid_for_platform(opp.platform, user)
     brand = await get_brand_for_user(opp.brand_id, db, user)
 
     # Check if brand is paused

@@ -61,6 +61,9 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_paused: Mapped[bool] = mapped_column(Boolean, default=False)  # admin-controlled account pause
     admin_tier_override: Mapped[bool] = mapped_column(Boolean, default=False)  # prevents Stripe webhook from reverting admin tier edits
+    pending_tier: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    pending_tier_effective_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    stripe_schedule_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

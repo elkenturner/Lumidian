@@ -21,8 +21,6 @@ interface VisibilityChartProps {
   sparkData: Array<TrendPoint & { formattedDate: string; score: number }>;
   nextReportHours: number | null;
   loadingAnalytics: boolean;
-  liveScore: number | null;
-  indexScore: number | null;
   scoreConfidence?: 'low' | 'medium' | 'high';
   activeModels?: number;
 }
@@ -40,14 +38,10 @@ export default function VisibilityChart({
   sparkData,
   nextReportHours,
   loadingAnalytics,
-  liveScore,
-  indexScore,
   scoreConfidence,
   activeModels,
 }: VisibilityChartProps) {
   const animatedScore = useCountUp(score ?? 0);
-  const animatedLive = useCountUp(liveScore ?? 0);
-  const animatedIndex = useCountUp(indexScore ?? 0);
 
   return (
     <div className="card border-t-2 border-t-[var(--accent)] p-6 shadow-[0_8px_32px_rgba(0,0,0,0.25),0_0_40px_var(--accent-muted),inset_0_1px_0_rgba(255,255,255,0.07)]">
@@ -56,7 +50,7 @@ export default function VisibilityChart({
           <p className="text-[13px] font-medium text-[var(--text-secondary)] flex items-center">
             Visibility Score
             <HelpTooltip
-                text="Percentage of AI responses that mention your brand across all tracked prompts and models. Combines Live Search (real-time web) and AI Index (training data) scores."
+                text="Percentage of AI responses that mention your brand across all tracked prompts and models. The overall score is the average of each active model's score, so tiers with different models still compare cleanly."
                 href="/methodology#scoring"
               />
           </p>
@@ -110,43 +104,6 @@ export default function VisibilityChart({
         <p className="text-[11px] text-[var(--text-faint)] mt-2">
           Next report in {nextReportHours}h
         </p>
-      )}
-
-      {/* Live / Index sub-score breakdown */}
-      {!loadingAnalytics && score !== null && (liveScore !== null || indexScore !== null) && (
-        <div className="mt-3 space-y-2 border-t border-[rgba(255,255,255,0.06)] pt-3">
-          {([
-            { label: 'Live Search', s: liveScore,  animated: animatedLive,  models: 'Perplexity \u00b7 Gemini',  color: 'var(--success)' },
-            { label: 'AI Index',    s: indexScore, animated: animatedIndex, models: 'GPT-4o-mini \u00b7 Claude', color: 'var(--accent-light)' },
-          ] as Array<{ label: string; s: number | null; animated: string; models: string; color: string }>).map(({ label, s, animated, models, color }) => (
-            <div key={label}>
-              <div className="flex items-center gap-3 mb-0.5">
-                <div className="flex items-center gap-1.5 w-20 md:w-24 flex-shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: color }} />
-                  <span className="text-[11px] font-medium text-[var(--text-muted)] truncate">{label}</span>
-                </div>
-                <div className="flex-1 h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${s ?? 0}%`, background: color }} />
-                </div>
-                <span className="text-xs font-bold tabular-nums w-9 text-right flex-shrink-0" style={{ color }}>
-                  {s !== null ? `${animated}%` : '\u2014'}
-                </span>
-              </div>
-              <p className="text-[9px] text-[var(--text-faint)] pl-[88px] md:pl-[108px] truncate">{models}</p>
-            </div>
-          ))}
-          {liveScore !== null && indexScore !== null && (
-            <p className="text-[10px] text-[var(--text-muted)] italic pt-0.5">
-              {liveScore >= 50 && indexScore >= 50
-                ? 'Strong across live search and AI knowledge.'
-                : liveScore >= 50 && indexScore < 50
-                  ? 'Trending online \u2014 not yet embedded in AI training data.'
-                  : liveScore < 50 && indexScore >= 50
-                    ? 'AI-recognized brand \u2014 boost recent content for live visibility.'
-                    : 'Low visibility across channels \u2014 more content and coverage needed.'}
-            </p>
-          )}
-        </div>
       )}
     </div>
   );

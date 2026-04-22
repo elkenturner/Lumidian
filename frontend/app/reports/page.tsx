@@ -418,58 +418,6 @@ export default function ReportsPage() {
             </div>
           )}
 
-          {/* Live / Index score summary */}
-          {!loading && responses.length > 0 && (() => {
-            const liveR = responses.filter(r => (r.model === 'perplexity' || r.model === 'gemini') && !r.error);
-            const indexR = responses.filter(r => (r.model === 'chatgpt' || r.model === 'claude') && !r.error);
-            const liveS = liveR.length > 0 ? Math.round(liveR.filter(r => r.mentioned).length / liveR.length * 1000) / 10 : null;
-            const indexS = indexR.length > 0 ? Math.round(indexR.filter(r => r.mentioned).length / indexR.length * 1000) / 10 : null;
-            if (liveS === null && indexS === null) return null;
-            return (
-              <div className="mb-4 bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl px-5 py-4 shadow-[0_4px_24px_rgba(0,0,0,0.20)]">
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">Score Breakdown</p>
-                  <Link href="/methodology#scoring" className="text-[10px] text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors">
-                    How is this calculated?
-                  </Link>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {([
-                    { label: 'Live Search', s: liveS,  models: 'Perplexity · Gemini',  color: 'var(--success)' },
-                    { label: 'AI Index',    s: indexS, models: 'GPT-4o-mini · Claude', color: 'var(--accent-light)' },
-                  ] as Array<{ label: string; s: number | null; models: string; color: string }>).map(({ label, s, models, color }) => (
-                    <div key={label}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />
-                          <span className="text-xs font-medium text-[var(--text-secondary)]">{label}</span>
-                        </div>
-                        <span className="text-sm font-bold tabular-nums font-mono" style={{ color }}>
-                          {s !== null ? `${s}%` : '—'}
-                        </span>
-                      </div>
-                      <div className="h-1.5 bg-[rgba(255,255,255,0.08)] rounded-full overflow-hidden">
-                        <div className="h-full rounded-full transition-[width]" style={{ width: `${s ?? 0}%`, background: color }} />
-                      </div>
-                      <p className="text-[10px] text-[var(--text-faint)] mt-1">{models}</p>
-                    </div>
-                  ))}
-                </div>
-                {liveS !== null && indexS !== null && (
-                  <p className="text-[11px] text-[var(--text-muted)] italic mt-3 border-t border-[rgba(255,255,255,0.05)] pt-2.5">
-                    {liveS >= 50 && indexS >= 50
-                      ? 'Strong across both live search and AI knowledge.'
-                      : liveS >= 50 && indexS < 50
-                        ? 'Trending online — not yet embedded in AI training data.'
-                        : liveS < 50 && indexS >= 50
-                          ? 'AI-recognized brand — boost recent content for live visibility.'
-                          : 'Low visibility across channels — more content and coverage needed.'}
-                  </p>
-                )}
-              </div>
-            );
-          })()}
-
           {/* Prompt visibility list */}
           <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
             <div className="px-5 py-3.5 border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)] flex items-center justify-between">
@@ -554,39 +502,24 @@ export default function ReportsPage() {
                           </div>
                         </div>
 
-                        {/* Model breakdown badges — grouped by Live Search / AI Index */}
-                        <div className="flex flex-col gap-1.5">
-                          {([
-                            { category: 'Live', models: ['perplexity', 'gemini'], color: 'var(--success)' },
-                            { category: 'Index', models: ['chatgpt', 'claude'],   color: 'var(--accent-light)' },
-                          ] as Array<{ category: string; models: string[]; color: string }>).map(({ category, models: catModels, color }) => (
-                            <div key={category} className="flex items-center gap-2">
-                              <span
-                                className="text-[9px] font-bold uppercase tracking-wider flex-shrink-0 w-9"
-                                style={{ color }}
+                        {/* Model breakdown badges */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {MODEL_ORDER.map((modelKey) => {
+                            const ms = g.modelStats.get(modelKey);
+                            const cfg = getModelCfg(modelKey);
+                            const pct = ms && ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : null;
+                            const mentionColor = pct === null ? 'var(--text-faint)' : pct >= 60 ? 'var(--success)' : pct >= 30 ? 'var(--warning)' : 'var(--danger)';
+                            return (
+                              <div
+                                key={modelKey}
+                                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)]"
                               >
-                                {category}
-                              </span>
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                {catModels.map(modelKey => {
-                                  const ms = g.modelStats.get(modelKey);
-                                  const cfg = getModelCfg(modelKey);
-                                  const pct = ms && ms.total > 0 ? Math.round((ms.mentioned / ms.total) * 100) : null;
-                                  const mentionColor = pct === null ? 'var(--text-faint)' : pct >= 60 ? 'var(--success)' : pct >= 30 ? 'var(--warning)' : 'var(--danger)';
-                                  return (
-                                    <div
-                                      key={modelKey}
-                                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)]"
-                                    >
-                                      <span className="text-xs font-semibold" style={{ color: pct === null ? 'var(--text-faint)' : cfg.text }}>{cfg.label}</span>
-                                      <span className="text-[rgba(255,255,255,0.10)]">·</span>
-                                      <span className="text-xs font-bold tabular-nums font-mono" style={{ color: mentionColor }}>{pct !== null ? `${pct}%` : '—'}</span>
-                                    </div>
-                                  );
-                                })}
+                                <span className="text-xs font-semibold" style={{ color: pct === null ? 'var(--text-faint)' : cfg.text }}>{cfg.label}</span>
+                                <span className="text-[rgba(255,255,255,0.10)]">·</span>
+                                <span className="text-xs font-bold tabular-nums font-mono" style={{ color: mentionColor }}>{pct !== null ? `${pct}%` : '—'}</span>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
 
                         {/* View details link */}

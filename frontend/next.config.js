@@ -13,9 +13,13 @@ const nextConfig = {
   },
 
   async headers() {
-    const csp = [
+    const isProd = process.env.NODE_ENV === 'production';
+    const scriptSrc = isProd
+      ? "script-src 'self' 'unsafe-inline' blob:"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:";
+    const cspDirectives = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' blob:",
+      scriptSrc,
       "worker-src 'self' blob:",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "img-src 'self' data: https:",
@@ -24,8 +28,9 @@ const nextConfig = {
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      "upgrade-insecure-requests",
-    ].join('; ');
+    ];
+    if (isProd) cspDirectives.push("upgrade-insecure-requests");
+    const csp = cspDirectives.join('; ');
 
     return [
       {
@@ -51,7 +56,4 @@ module.exports = withSentryConfig(nextConfig, {
 
   // Hides source maps from generated client bundles
   hideSourceMaps: true,
-
-  // Automatically tree-shake Sentry logger statements to reduce bundle size
-  disableLogger: true,
 });

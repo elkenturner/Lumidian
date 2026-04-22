@@ -89,10 +89,12 @@ def _api_key_placeholder(model: str) -> dict:
         "error": "api_key_not_configured",
     }
 
+RUNS_PER_PROMPT = 3
+
 TIER_RUNS = {
-    "basic": 3,
-    "standard": 3,
-    "premium": 3,
+    "basic": RUNS_PER_PROMPT,
+    "standard": RUNS_PER_PROMPT,
+    "premium": RUNS_PER_PROMPT,
 }
 
 # Model categories for the dual-score visibility architecture.

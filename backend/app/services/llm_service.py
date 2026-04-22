@@ -57,10 +57,12 @@ class _RatePacer:
 _PERPLEXITY_SEM = asyncio.Semaphore(2)
 _PERPLEXITY_PACER = _RatePacer(20)
 
-# Claude rate-limit guard: Anthropic enforces 50 req/min on claude-haiku.
-# With ~2-3s per call, 3 concurrent slots ≈ 60-90 req/min at peak.
-# Combined with the 65s retry backoff for 429s, this keeps us under the limit.
-_CLAUDE_SEM = asyncio.Semaphore(3)
+# Claude rate-limit guard: Anthropic org cap is 50k INPUT TOKENS/min for
+# claude-haiku-4-5. With web_search (max_uses=3), each call consumes ~15-30k
+# input tokens (search results count as input), so 2 RPM serialized keeps us
+# under the cap. Concurrency=1 because pacer already bounds throughput.
+_CLAUDE_SEM = asyncio.Semaphore(1)
+_CLAUDE_PACER = _RatePacer(2)
 
 # Gemini rate-limit guard: Google returns 503 UNAVAILABLE when flooded.
 # 2 concurrent slots (like Perplexity) reduce burst pressure on the API.
@@ -262,6 +264,7 @@ async def _query_claude(prompt: str, brand_name: str, model_version: str = "clau
         import anthropic
 
         client = anthropic.AsyncAnthropic(api_key=ANTHROPIC_API_KEY)
+        await _CLAUDE_PACER.wait()
         async with _CLAUDE_SEM:
             response = await client.messages.create(
                 model=model_version,

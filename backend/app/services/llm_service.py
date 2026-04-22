@@ -97,17 +97,9 @@ TIER_RUNS = {
     "premium": RUNS_PER_PROMPT,
 }
 
-# Model categories for the dual-score visibility architecture.
-# LIVE_MODELS  — query the web in real-time; reflect content changes within days.
-# INDEX_MODELS — static training data; change slowly, reflect long-term presence.
-LIVE_MODELS: frozenset = frozenset({"perplexity", "gemini"})
-INDEX_MODELS: frozenset = frozenset({"chatgpt", "claude"})
-
-# Model versions per subscription tier.
-# Default = Starter/free users; Pro = paid Pro subscribers.
-# Only LIVE_MODELS (perplexity, gemini) get upgraded — they query the web,
-# so better models = better brand detection.  INDEX_MODELS (chatgpt, claude)
-# use static training data; upgrading them doesn't improve visibility.
+# Model versions per subscription tier. Paid tiers get upgraded ChatGPT (web
+# search) and Perplexity (sonar-pro). Claude and Gemini use the same version
+# across tiers; Claude is only queried on Pro (see models_for_tier).
 _MODEL_VERSIONS: dict[str, dict[str, str]] = {
     "chatgpt":    {"default": "gpt-4.1-mini",              "pro": "gpt-4o-mini-search-preview"},
     "claude":     {"default": "claude-haiku-4-5-20251001",  "pro": "claude-haiku-4-5-20251001"},
@@ -424,17 +416,31 @@ _DISPATCHERS = {
 
 SUPPORTED_MODELS = list(_DISPATCHERS.keys())
 
-# Brand-type → enabled model list.
-# Pitch (free trial) brands get 3 models — ChatGPT search is gated as a
-# paid-tier upgrade incentive (see spec decision #4).
-_PITCH_EXCLUDED_MODELS: frozenset = frozenset({"chatgpt"})
+# Tier-based model gating.
+# Free / pitch: Perplexity + Gemini only (web-native, no paid API cost).
+# Paid non-pro (Starter, Growth): + ChatGPT search.
+# Pro: + Claude Haiku with live web_search_20250305 tool.
+_FREE_MODELS: tuple[str, ...] = ("perplexity", "gemini")
+_PAID_NON_PRO_MODELS: tuple[str, ...] = ("chatgpt", "perplexity", "gemini")
+_PRO_MODELS: tuple[str, ...] = ("chatgpt", "claude", "perplexity", "gemini")
 
 
-def models_for_brand_type(brand_type: str) -> list[str]:
-    """Return the model list this brand_type is allowed to query."""
-    if brand_type == "pitch":
-        return [m for m in SUPPORTED_MODELS if m not in _PITCH_EXCLUDED_MODELS]
-    return list(SUPPORTED_MODELS)
+def models_for_tier(brand_type: str, tier: str | None) -> list[str]:
+    """Return the model list this (brand_type, subscription tier) combo is allowed to query.
+
+    - brand_type="pitch" always means free-tier semantics, regardless of the user's subscription
+      (pitch brands are temporary free-trial objects; they auto-upgrade on subscribe).
+    - tier is the internal subscription_tier string: None, "basic" (Starter), "starter" (Growth),
+      or "pro".
+    """
+    if brand_type == "pitch" or tier is None:
+        return list(_FREE_MODELS)
+    if tier in ("basic", "starter"):
+        return list(_PAID_NON_PRO_MODELS)
+    if tier == "pro":
+        return list(_PRO_MODELS)
+    # Unknown tier — be conservative, treat as free.
+    return list(_FREE_MODELS)
 
 
 def _classify_error(error: str) -> str:

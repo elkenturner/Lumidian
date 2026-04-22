@@ -248,31 +248,57 @@ def test_tracking_service_detect_mention_strips_citations():
     assert _ts_detect_mention("Stripe", response, error=None, model="chatgpt") is False
 
 
-# ── Phase 3.4: pitch brands skip ChatGPT ──────────────────────────────────────
+# ── Phase 3.4: tier-aware model gating ───────────────────────────────────────
 
 def test_supported_models_includes_chatgpt():
     assert "chatgpt" in llm_service.SUPPORTED_MODELS
 
 
-def test_models_for_brand_type_excludes_chatgpt_for_pitch():
-    models = llm_service.models_for_brand_type("pitch")
+def test_models_for_tier_free_pitch_brand_excludes_chatgpt_and_claude():
+    models = llm_service.models_for_tier("pitch", None)
     assert "chatgpt" not in models
-    assert set(models) == {"claude", "perplexity", "gemini"}
+    assert "claude" not in models
+    assert "perplexity" in models
+    assert "gemini" in models
 
 
-def test_models_for_brand_type_includes_chatgpt_for_standard():
-    models = llm_service.models_for_brand_type("standard")
+def test_models_for_tier_free_standard_brand_excludes_chatgpt_and_claude():
+    # Defensive: even a non-pitch brand under a free account should not hit paid models.
+    models = llm_service.models_for_tier("standard", None)
+    assert "chatgpt" not in models
+    assert "claude" not in models
+
+
+def test_models_for_tier_starter_gets_chatgpt_no_claude():
+    models = llm_service.models_for_tier("standard", "basic")
+    assert "chatgpt" in models
+    assert "claude" not in models
+    assert "perplexity" in models
+    assert "gemini" in models
+
+
+def test_models_for_tier_growth_gets_chatgpt_no_claude():
+    models = llm_service.models_for_tier("standard", "starter")
+    assert "chatgpt" in models
+    assert "claude" not in models
+
+
+def test_models_for_tier_pro_gets_all_four_including_claude():
+    models = llm_service.models_for_tier("standard", "pro")
     assert set(models) == {"chatgpt", "claude", "perplexity", "gemini"}
 
 
-def test_models_for_brand_type_includes_chatgpt_for_pro():
-    models = llm_service.models_for_brand_type("pro")
-    assert set(models) == {"chatgpt", "claude", "perplexity", "gemini"}
+def test_models_for_tier_pitch_on_pro_account_stays_free():
+    # brand_type="pitch" ALWAYS means free tier semantics, regardless of user sub.
+    models = llm_service.models_for_tier("pitch", "pro")
+    assert "chatgpt" not in models
+    assert "claude" not in models
 
 
-def test_models_for_brand_type_unknown_defaults_to_full_list():
-    models = llm_service.models_for_brand_type("something-weird")
-    assert set(models) == {"chatgpt", "claude", "perplexity", "gemini"}
+def test_models_for_tier_unknown_tier_defaults_to_free():
+    models = llm_service.models_for_tier("standard", "something-weird")
+    assert "chatgpt" not in models
+    assert "claude" not in models
 
 
 # ── Phase 4: avg-of-per-model overall score ───────────────────────────────────

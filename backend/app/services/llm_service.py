@@ -425,6 +425,16 @@ _PAID_NON_PRO_MODELS: tuple[str, ...] = ("chatgpt", "perplexity", "gemini")
 _PRO_MODELS: tuple[str, ...] = ("chatgpt", "claude", "perplexity", "gemini")
 
 
+# Which subscription tiers get upgraded model versions (ChatGPT search, sonar-pro).
+# Kept here so callers don't re-hardcode the literal tuple.
+_PAID_TIERS: frozenset = frozenset({"basic", "starter", "pro"})
+
+
+def is_paid_tier(tier: str | None) -> bool:
+    """True if this subscription tier receives upgraded model versions."""
+    return tier in _PAID_TIERS
+
+
 def models_for_tier(brand_type: str, tier: str | None) -> list[str]:
     """Return the model list this (brand_type, subscription tier) combo is allowed to query.
 

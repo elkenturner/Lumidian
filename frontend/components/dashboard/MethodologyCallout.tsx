@@ -76,12 +76,9 @@ export default function MethodologyCallout({ visible }: MethodologyCalloutProps)
                   Understanding Your Visibility Score
                 </p>
                 <p className="text-xs text-[var(--text-muted)] leading-relaxed mt-1.5">
-                  Your score combines two types of AI visibility:{' '}
-                  <span className="text-[var(--text-secondary)] font-medium">Live Search</span>{' '}
-                  measures how often your brand appears in real-time AI search results (Perplexity, Gemini).{' '}
-                  <span className="text-[var(--text-secondary)] font-medium">AI Index</span>{' '}
-                  measures whether your brand is embedded in AI training data (ChatGPT, Claude).
-                  Both matter — check the breakdown below your score.
+                  Your visibility score is calculated by sending your prompts to{' '}
+                  <span className="text-[var(--text-secondary)] font-medium">4 AI assistants</span>{' '}
+                  — ChatGPT, Claude, Perplexity, and Gemini — each with live web search enabled, and measuring how often your brand is mentioned in the responses.
                 </p>
                 <Link
                   href="/methodology"

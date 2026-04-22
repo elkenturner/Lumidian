@@ -72,7 +72,7 @@ Copy `backend/.env.example` → `backend/.env`. **`JWT_SECRET` (≥32 chars) is 
 ### Stack
 - **Backend:** Python 3.11+, FastAPI 0.115, SQLAlchemy 2.0 (async), SQLite + aiosqlite, APScheduler, bcrypt, PyJWT, Stripe, ReportLab, pyotp
 - **Frontend:** Next.js 15, React 18, TypeScript (strict), Tailwind CSS, Radix UI, Recharts, Axios, date-fns, lucide-react
-- **LLM providers:** OpenAI (gpt-4.1-mini default, gpt-4o-mini-search-preview for paid subscribers), Anthropic (claude-haiku-4-5-20251001), Google GenAI (gemini-2.5-flash for all tiers), Perplexity (sonar default, sonar-pro for paid subscribers)
+- **LLM providers:** OpenAI (gpt-4.1-mini default, gpt-4o-mini-search-preview for paid subscribers), Anthropic (claude-haiku-4-5-20251001 with web_search_20250305 — Pro tier only), Google GenAI (gemini-2.5-flash for all tiers), Perplexity (sonar default, sonar-pro for paid subscribers)
 
 ### Backend Layout
 ```
@@ -204,17 +204,29 @@ JWT issued with 7-day expiry, stored in httpOnly `clarity_token` cookie. Compani
 - Authenticated users on `/login` or `/register` → redirect `/dashboard`
 - Unauthenticated users on any other path → redirect `/login?from={path}`
 
-### LLM Model Categories
-- **LIVE_MODELS** (Perplexity, Gemini) — query the live web; changes reflected within days
-- **INDEX_MODELS** (ChatGPT, Claude) — static training data; changes slowly
-- Perplexity: limited to 2 concurrent requests via `asyncio.Semaphore(2)` to avoid 429s
+### LLM Model Selection
+All four models query the live web:
+- **ChatGPT** (`gpt-4o-mini-search-preview`, paid tiers only) — OpenAI native web search
+- **Claude** (`claude-haiku-4-5-20251001` + `web_search_20250305` tool, Pro tier only) — Anthropic server-side web search
+- **Perplexity** (`sonar` free, `sonar-pro` paid) — search-native model
+- **Gemini** (`gemini-2.5-flash` with `google_search` grounding tool) — Google search grounding
+
+Per-tier model lists are computed by `models_for_tier(brand_type, tier)` in `llm_service.py`.
+
+Concurrency guards: Perplexity `Semaphore(2)`, Claude `Semaphore(3)`, Gemini `Semaphore(2)`.
 
 ### Tier-Based Query Counts
-| Tier | Runs per prompt per model |
-|------|--------------------------|
-| basic | 3 |
-| standard | 3 |
-| premium | 3 |
+All tiers use 3 runs per prompt per model (see `RUNS_PER_PROMPT` in `llm_service.py`).
+
+### Tier-Based Model Lists
+| Internal tier | UI name  | Models queried                                                |
+|---------------|----------|---------------------------------------------------------------|
+| `None`        | Free     | Perplexity, Gemini                                            |
+| `basic`       | Starter  | ChatGPT search, Perplexity, Gemini                            |
+| `starter`     | Growth   | ChatGPT search, Perplexity (sonar-pro), Gemini                |
+| `pro`         | Pro      | ChatGPT search, Claude + web_search, Perplexity (sonar-pro), Gemini |
+
+Pitch brands (`brand_type='pitch'`) always receive the Free list regardless of subscription.
 
 ### Visibility Score & Mention Detection
 Score = `(queries with mention) / (total queries) × 100`. Mention detection: case-insensitive substring check (`brand_name.lower() in response.lower()`) **plus** fuzzy normalized check (lowercase + strip non-alphanumeric). `mentioned = exact OR fuzzy`. Queries with errors are excluded from the denominator.

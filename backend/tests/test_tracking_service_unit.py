@@ -169,3 +169,81 @@ class TestModelVersionSelection:
         from app.services.llm_service import _get_model_version
         assert _get_model_version("unknown", pro=False) == "unknown"
         assert _get_model_version("unknown", pro=True) == "unknown"
+
+
+# ── Claude web search tests ────────────────────────────────────────────────────
+
+import pytest
+from unittest.mock import MagicMock, patch
+
+
+class _MockClaudeTextBlock:
+    def __init__(self, text):
+        self.type = "text"
+        self.text = text
+
+
+class _MockClaudeMessage:
+    def __init__(self, text):
+        self.content = [_MockClaudeTextBlock(text)]
+
+
+@pytest.mark.asyncio
+async def test_query_claude_uses_web_search_tool_and_strips_urls_before_mention_check():
+    """Claude tracker queries must include web_search_20250305 and must not be tricked
+    by brand-name-in-URL false positives (e.g. 'brand.com' in a citation footer)."""
+    from app.services import llm_service
+
+    captured_kwargs: dict = {}
+
+    async def fake_create(**kwargs):
+        captured_kwargs.update(kwargs)
+        # Response contains brand only inside a URL citation — mention should be False after stripping.
+        return _MockClaudeMessage(
+            "Top options include Nike and Adidas. See more at https://stripe.com for payment details. [1]"
+        )
+
+    fake_client = MagicMock()
+    fake_client.messages.create = fake_create
+
+    with patch.object(llm_service, "ANTHROPIC_API_KEY", "test-key"), \
+         patch("anthropic.AsyncAnthropic", return_value=fake_client):
+        result = await llm_service._query_claude(
+            prompt="best running shoes?",
+            brand_name="Stripe",
+            model_version="claude-haiku-4-5-20251001",
+        )
+
+    # 1) The tool must be on the request
+    tools = captured_kwargs.get("tools") or []
+    assert any(t.get("type") == "web_search_20250305" for t in tools), \
+        f"Claude request missing web_search_20250305 tool: tools={tools}"
+
+    # 2) The original response text is preserved for the transcript
+    assert "stripe.com" in result["response_text"]
+
+    # 3) Mention detection must ignore the URL — "Stripe" is only in the citation
+    assert result["mentioned"] is False, \
+        "Brand in URL citation should NOT count as a mention after stripping"
+
+
+@pytest.mark.asyncio
+async def test_query_claude_detects_mention_in_visible_text():
+    from app.services import llm_service
+
+    async def fake_create(**kwargs):
+        return _MockClaudeMessage("I recommend Stripe for online payments.")
+
+    fake_client = MagicMock()
+    fake_client.messages.create = fake_create
+
+    with patch.object(llm_service, "ANTHROPIC_API_KEY", "test-key"), \
+         patch("anthropic.AsyncAnthropic", return_value=fake_client):
+        result = await llm_service._query_claude(
+            prompt="payment processors?",
+            brand_name="Stripe",
+            model_version="claude-haiku-4-5-20251001",
+        )
+
+    assert result["mentioned"] is True
+    assert "Stripe" in result["response_text"]

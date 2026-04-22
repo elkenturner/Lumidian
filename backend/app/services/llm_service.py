@@ -222,7 +222,39 @@ async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt
 
 # ── Claude ────────────────────────────────────────────────────────────────────
 
+# Claude web search tool spec (Anthropic server-side tool).
+# Docs: https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search-tool
+# max_uses=3 caps search calls per request to bound cost (search = $10/1k queries).
+_CLAUDE_SEARCH_TOOL: dict = {
+    "type": "web_search_20250305",
+    "name": "web_search",
+    "max_uses": 3,
+}
+
+
+def _extract_claude_text(response) -> str:
+    """Concatenate all text blocks from a Claude response, skipping tool-use blocks.
+
+    Tool-use responses include interleaved `server_tool_use` and `web_search_tool_result`
+    blocks; we want only the model's prose. Blocks without a `text` attribute are ignored.
+    """
+    parts: list[str] = []
+    for block in response.content or []:
+        block_type = getattr(block, "type", None)
+        if block_type == "text":
+            text = getattr(block, "text", None)
+            if text:
+                parts.append(text)
+    return "".join(parts)
+
+
 async def _query_claude(prompt: str, brand_name: str, model_version: str = "claude-haiku-4-5-20251001") -> dict:
+    """Query Claude with the web_search tool enabled.
+
+    Only called for Pro-tier tracking (see models_for_tier), so search is always on.
+    URL citations are stripped before mention detection to avoid false positives
+    from brand names appearing in citation URLs.
+    """
     if not ANTHROPIC_API_KEY:
         return _api_key_placeholder("claude")
     start = time.monotonic()
@@ -233,20 +265,31 @@ async def _query_claude(prompt: str, brand_name: str, model_version: str = "clau
         async with _CLAUDE_SEM:
             response = await client.messages.create(
                 model=model_version,
-                max_tokens=1024,
+                max_tokens=2048,  # search responses are longer than plain answers
+                tools=[_CLAUDE_SEARCH_TOOL],
                 messages=[{"role": "user", "content": prompt}],
             )
         latency_ms = int((time.monotonic() - start) * 1000)
-        text = response.content[0].text if response.content else None
+        text = _extract_claude_text(response)
         if not text:
             logger.warning(
-                "[claude] API returned empty/null content for prompt %r", prompt[:100]
+                "[claude] API returned no text blocks for prompt %r", prompt[:100]
             )
             return _build_result(
                 None, brand_name, latency_ms,
                 error="Empty response from Claude API",
             )
-        return _build_result(text, brand_name, latency_ms)
+        # Strip URL/citation noise BEFORE mention check so brand names hidden
+        # in citation URLs do not produce false positives. Keep original text
+        # in response_text so the user-facing transcript retains citations.
+        cleaned = _strip_url_citations(text)
+        mentioned = _mentioned(brand_name, cleaned)
+        return {
+            "response_text": text,
+            "mentioned": mentioned,
+            "latency_ms": latency_ms,
+            "error": None,
+        }
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.error("[claude] API error for prompt %r: %s", prompt[:100], exc)

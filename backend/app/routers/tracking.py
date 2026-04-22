@@ -329,7 +329,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
     from app.database import AsyncSessionLocal
     from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
-    from app.services.llm_service import RUNS_PER_PROMPT, models_for_brand_type, query_model
+    from app.services.llm_service import RUNS_PER_PROMPT, models_for_tier, is_paid_tier, query_model
     from app.services.tracking_service import _compute_overall_score
 
     def utcnow():
@@ -340,7 +340,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     brand_name: str = ""
     brand_type: str = "standard"
     prompt_data: list[tuple[int, str]] = []  # (prompt_id, prompt_text)
-    is_pro: bool = False
+    is_paid: bool = False
 
     async with AsyncSessionLocal() as db:
         brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
@@ -361,14 +361,15 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
         from app.models import User
         user_result = await db.execute(select(User).where(User.id == brand.user_id))
         user_obj = user_result.scalar_one_or_none()
-        is_pro = user_obj is not None and user_obj.subscription_tier in ("basic", "starter", "pro")
+        tier = user_obj.subscription_tier if user_obj else None
+        is_paid = is_paid_tier(tier)
 
         prompts_result = await db.execute(
             select(Prompt).where(Prompt.brand_id == brand_id)
         )
         prompt_data = [(p.id, p.text) for p in prompts_result.scalars().all()]
 
-    active_models = models_for_brand_type(brand_type)
+    active_models = models_for_tier(brand_type, tier)
 
     logger.info(
         "Manual run %d — brand=%r prompts=%d",
@@ -391,7 +392,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
     async def _bounded_query(prompt_id: int, prompt_text: str, model: str, run_number: int):
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_pro, cancel_event=cancel_evt)
+            result = await query_model(model, prompt_text, brand_name, pro=is_paid, cancel_event=cancel_evt)
         return QueryResult(
             tracking_run_id=run_id,
             prompt_id=prompt_id,
@@ -681,10 +682,10 @@ async def trigger_prompt_run(
     # avoids a TOCTOU race where another coroutine grabs the lock between
     # our locked() check and the pop().
 
-    is_pro = user.subscription_tier in ("basic", "starter", "pro")
+    tier = user.subscription_tier
     brand_type = str(brand.brand_type or "standard")
     asyncio.create_task(
-        _background_prompt_run(run_id, brand_id, prompt_id, str(prompt.text), str(brand.name), is_pro=is_pro, brand_type=brand_type),
+        _background_prompt_run(run_id, brand_id, prompt_id, str(prompt.text), str(brand.name), tier=tier, brand_type=brand_type),
         name=f"prompt-tracking-{brand_id}-{prompt_id}-{run_id}",
     )
 
@@ -702,7 +703,7 @@ async def _background_prompt_run(
     prompt_id: int,
     prompt_text: str,
     brand_name: str,
-    is_pro: bool = False,
+    tier: str | None = None,
     brand_type: str = "standard",
 ) -> None:
     """Execute a single-prompt tracking run independently of full runs."""
@@ -712,10 +713,11 @@ async def _background_prompt_run(
     from app.database import AsyncSessionLocal
     from app.models import QueryResult, RunModelScore
     from app.models import TrackingRun as TR
-    from app.services.llm_service import RUNS_PER_PROMPT, models_for_brand_type, query_model
+    from app.services.llm_service import RUNS_PER_PROMPT, is_paid_tier, models_for_tier, query_model
     from app.services.tracking_service import _compute_overall_score
 
-    active_models = models_for_brand_type(brand_type)
+    active_models = models_for_tier(brand_type, tier)
+    is_paid = is_paid_tier(tier)
 
     def utcnow():
         return datetime.now(UTC).replace(tzinfo=None)
@@ -733,7 +735,7 @@ async def _background_prompt_run(
 
     async def _bounded_query(model: str, run_number: int):
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_pro)
+            result = await query_model(model, prompt_text, brand_name, pro=is_paid)
         return QueryResult(
             tracking_run_id=run_id,
             prompt_id=prompt_id,

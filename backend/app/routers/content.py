@@ -231,8 +231,8 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
     check_rate_limit(user.id, limit=10)  # burst guard (per minute)
     brand = await get_brand_for_user(brand_id, db, user)
     require_brand_active(brand, user)
-    from app.dependencies import require_pro_for_platform
-    require_pro_for_platform(request.platform, user)
+    from app.dependencies import require_paid_for_platform
+    require_paid_for_platform(request.platform, user)
     if not user.is_admin:
         await _check_weekly_manual_draft_limit(db, brand, user.subscription_tier)
 
@@ -797,8 +797,8 @@ async def update_brand_settings(
     """Update content settings for a specific platform for a brand."""
     await get_brand_for_user(brand_id, db, user)
 
-    from app.dependencies import require_pro_for_platform
-    require_pro_for_platform(platform, user)
+    from app.dependencies import require_paid_for_platform
+    require_paid_for_platform(platform, user)
 
     if platform not in SUPPORTED_PLATFORMS:
         raise HTTPException(

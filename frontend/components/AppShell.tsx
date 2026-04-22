@@ -160,12 +160,12 @@ const DRAFT_PLATFORM_ITEMS = [
   { key: 'quora', label: 'Quora', color: '#b92b27' },
   { key: 'medium', label: 'Medium', color: '#00ab6c' },
   { key: 'wikipedia', label: 'Wikipedia', color: '#94a3b8' },
-  { key: 'linkedin', label: 'LinkedIn', color: '#0a66c2', proOnly: true },
-  { key: 'x', label: 'X', color: '#e7e9ea', proOnly: true },
+  { key: 'linkedin', label: 'LinkedIn', color: '#0a66c2', paidOnly: true },
+  { key: 'x', label: 'X', color: '#e7e9ea', paidOnly: true },
 ] as const;
 
-function DraftsGeneratingBanner({ isMobile, isPro }: { isMobile: boolean; isPro: boolean }) {
-  const platforms = DRAFT_PLATFORM_ITEMS.filter(p => !('proOnly' in p) || isPro);
+function DraftsGeneratingBanner({ isMobile, isPaid }: { isMobile: boolean; isPaid: boolean }) {
+  const platforms = DRAFT_PLATFORM_ITEMS.filter(p => !('paidOnly' in p) || isPaid);
   const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
@@ -275,12 +275,12 @@ function DraftsGeneratingBanner({ isMobile, isPro }: { isMobile: boolean; isPro:
 const SCAN_PLATFORM_ITEMS = [
   { key: 'reddit', label: 'Reddit', color: '#ff4500' },
   { key: 'quora', label: 'Quora', color: '#b92b27' },
-  { key: 'linkedin', label: 'LinkedIn', color: '#0a66c2', proOnly: true },
-  { key: 'x', label: 'X', color: '#e7e9ea', proOnly: true },
+  { key: 'linkedin', label: 'LinkedIn', color: '#0a66c2', paidOnly: true },
+  { key: 'x', label: 'X', color: '#e7e9ea', paidOnly: true },
 ] as const;
 
-function ScanningBanner({ isMobile, isPro }: { isMobile: boolean; isPro: boolean }) {
-  const platforms = SCAN_PLATFORM_ITEMS.filter(p => !('proOnly' in p) || isPro);
+function ScanningBanner({ isMobile, isPaid }: { isMobile: boolean; isPaid: boolean }) {
+  const platforms = SCAN_PLATFORM_ITEMS.filter(p => !('paidOnly' in p) || isPaid);
   const [activeIdx, setActiveIdx] = useState(0);
 
   useEffect(() => {
@@ -826,8 +826,8 @@ function AppShellInner({
         <ImpersonationBanner />
         {/* Global status banners — written by dashboard/content pages via localStorage */}
         {reportRunning && <ReportRunningBanner modelScores={modelScores} isMobile={isMobile} promptCount={promptCount} />}
-        {draftsGenerating && <DraftsGeneratingBanner isMobile={isMobile} isPro={user?.subscription_tier === 'pro' || !!user?.is_admin} />}
-        {scanning && <ScanningBanner isMobile={isMobile} isPro={user?.subscription_tier === 'pro' || !!user?.is_admin} />}
+        {draftsGenerating && <DraftsGeneratingBanner isMobile={isMobile} isPaid={!!user?.subscription_tier || !!user?.is_admin} />}
+        {scanning && <ScanningBanner isMobile={isMobile} isPaid={!!user?.subscription_tier || !!user?.is_admin} />}
         {children}
       </main>
 

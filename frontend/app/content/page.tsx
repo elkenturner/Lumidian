@@ -967,8 +967,8 @@ function RequestDraftModal({
             <label className="text-xs text-[var(--text-muted)] font-medium uppercase tracking-wide mb-1.5 block">Platform</label>
             <div className="grid grid-cols-3 gap-2">
               {DRAFT_PLATFORMS.map((p) => {
-                const isPro = p === 'linkedin' || p === 'x';
-                const isLocked = isPro && user?.subscription_tier !== 'pro' && !user?.is_admin;
+                const isPaidOnly = p === 'linkedin' || p === 'x';
+                const isLocked = isPaidOnly && !user?.subscription_tier && !user?.is_admin;
                 const label = PLATFORM_DISPLAY[p] ?? p;
 
                 if (isLocked) {
@@ -980,7 +980,7 @@ function RequestDraftModal({
                     >
                       <PlatformIcon platform={p} size={12} color="var(--text-faint)" />
                       {label}
-                      <span className="text-[9px] bg-[rgba(95,126,166,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
+                      <span className="text-[9px] bg-[rgba(95,126,166,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">UPGRADE</span>
                     </button>
                   );
                 }
@@ -2774,24 +2774,24 @@ export default function ContentHubPage() {
               <p className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wide mb-3">Platforms</p>
               <div className="space-y-1">
                 {([
-                  { key: 'reddit', color: '#ff4500', proOnly: false },
-                  { key: 'quora', color: '#b92b27', proOnly: false },
-                  { key: 'medium', color: '#94a3b8', proOnly: false },
-                  { key: 'wikipedia', color: '#64748b', proOnly: false },
-                  { key: 'linkedin', color: '#0a66c2', proOnly: true },
-                  { key: 'x', color: '#94a3b8', proOnly: true },
+                  { key: 'reddit', color: '#ff4500', paidOnly: false },
+                  { key: 'quora', color: '#b92b27', paidOnly: false },
+                  { key: 'medium', color: '#94a3b8', paidOnly: false },
+                  { key: 'wikipedia', color: '#64748b', paidOnly: false },
+                  { key: 'linkedin', color: '#0a66c2', paidOnly: true },
+                  { key: 'x', color: '#94a3b8', paidOnly: true },
                 ] as const).filter(({ key }) => {
                   if (activePrimaryTab === 'opportunities') return key !== 'medium' && key !== 'wikipedia';
                   return true;
-                }).map(({ key, color, proOnly }) => {
-                  const isLocked = proOnly && user?.subscription_tier !== 'pro' && !user?.is_admin;
+                }).map(({ key, color, paidOnly }) => {
+                  const isLocked = paidOnly && !user?.subscription_tier && !user?.is_admin;
                   const enabled = !_disabledPlatforms.has(key);
                   return (
                     <button
                       key={key}
                       onClick={() => {
                         if (isLocked) {
-                          setUpgradeModalReason(`${PLATFORM_DISPLAY[key] ?? key} scanning and drafting requires a Pro subscription.`);
+                          setUpgradeModalReason(`${PLATFORM_DISPLAY[key] ?? key} scanning and drafting requires a paid plan.`);
                           setUpgradeModalOpen(true);
                           return;
                         }
@@ -2800,8 +2800,8 @@ export default function ContentHubPage() {
                       className={`w-full flex items-center justify-between py-2.5 px-3 -mx-3 rounded-lg transition-colors duration-200 group ${
                         isLocked ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[rgba(255,255,255,0.03)]'
                       }`}
-                      title={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires Pro plan` : enabled ? `Hide ${PLATFORM_DISPLAY[key] ?? key}` : `Show ${PLATFORM_DISPLAY[key] ?? key}`}
-                      aria-label={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires Pro plan` : enabled ? `Hide ${PLATFORM_DISPLAY[key] ?? key}` : `Show ${PLATFORM_DISPLAY[key] ?? key}`}
+                      title={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires a paid plan` : enabled ? `Hide ${PLATFORM_DISPLAY[key] ?? key}` : `Show ${PLATFORM_DISPLAY[key] ?? key}`}
+                      aria-label={isLocked ? `${PLATFORM_DISPLAY[key] ?? key} requires a paid plan` : enabled ? `Hide ${PLATFORM_DISPLAY[key] ?? key}` : `Show ${PLATFORM_DISPLAY[key] ?? key}`}
                     >
                       <div className="flex items-center gap-2.5">
                         <div
@@ -2817,7 +2817,7 @@ export default function ContentHubPage() {
                           {PLATFORM_DISPLAY[key] ?? key}
                         </span>
                         {isLocked && (
-                          <span className="text-[9px] bg-[rgba(95,126,166,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">PRO</span>
+                          <span className="text-[9px] bg-[rgba(95,126,166,0.2)] text-[var(--accent)] px-1.5 py-0.5 rounded-full font-semibold">UPGRADE</span>
                         )}
                       </div>
                       {/* Custom toggle switch */}

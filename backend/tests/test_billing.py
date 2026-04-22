@@ -341,3 +341,51 @@ async def test_billing_usage_basic_tier(client: httpx.AsyncClient):
     data = resp.json()
     assert data["manual_run_limit"] == 2
     assert data["prompt_limit"] == 10
+
+
+async def test_sync_brands_for_tier_downgrades_pro_brands_to_starter():
+    """When a user downgrades to starter (Growth), any brand_type='pro' brand
+    must be moved back to 'standard' with prompt_limit=25."""
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, User, utcnow
+    from app.routers.billing import _sync_brands_for_tier
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="sync_dg_starter@example.com", password_hash="x", email_verified=1)
+        db.add(user)
+        await db.flush()
+        brand = Brand(
+            user_id=user.id, name="Pro Brand", slug="pro-brand-sync-starter",
+            tier="basic", brand_type="pro", prompt_limit=30,
+        )
+        db.add(brand)
+        await db.commit()
+        brand_id = brand.id
+        await _sync_brands_for_tier(db, user.id, "starter")
+        await db.commit()
+        await db.refresh(brand)
+        assert brand.brand_type == "standard"
+        assert brand.prompt_limit == 25
+
+
+async def test_sync_brands_for_tier_downgrades_pro_brands_to_basic():
+    """Starter (basic) downgrade: pro brand → standard with prompt_limit=10."""
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, User
+    from app.routers.billing import _sync_brands_for_tier
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="sync_dg_basic@example.com", password_hash="x", email_verified=1)
+        db.add(user)
+        await db.flush()
+        brand = Brand(
+            user_id=user.id, name="Pro Brand B", slug="pro-brand-sync-basic",
+            tier="basic", brand_type="pro", prompt_limit=30,
+        )
+        db.add(brand)
+        await db.commit()
+        await _sync_brands_for_tier(db, user.id, "basic")
+        await db.commit()
+        await db.refresh(brand)
+        assert brand.brand_type == "standard"
+        assert brand.prompt_limit == 10

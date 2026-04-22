@@ -477,12 +477,13 @@ async def cancel_subscription(
     return {"message": "Subscription will be canceled at the end of the current billing period"}
 
 
-# ── Brand upgrade helper (idempotent) ────────────────────────────────────────
+# ── Brand sync helper (idempotent) ────────────────────────────────────────────
 
-async def _upgrade_brands_for_tier(db: AsyncSession, user_id: int, tier: str) -> None:
-    """Upgrade a user's brands to match their subscription tier.
+async def _sync_brands_for_tier(db: AsyncSession, user_id: int, tier: str) -> None:
+    """Sync a user's brand rows to match their subscription tier.
 
-    Idempotent — safe to call from multiple webhook events.
+    Handles both directions: upgrades pitch/standard brands on tier increase,
+    and demotes pro brands back to standard on tier decrease. Idempotent.
     """
     from sqlalchemy import update as sa_update
 
@@ -495,23 +496,37 @@ async def _upgrade_brands_for_tier(db: AsyncSession, user_id: int, tier: str) ->
             .values(brand_type="pro", prompt_limit=30)
         )
         if result.rowcount > 0:
-            logger.info("Auto-upgraded %d brand(s) to pro for user %d", result.rowcount, user_id)
-    elif tier == "basic":
-        result = await db.execute(
-            sa_update(Brand)
-            .where(Brand.user_id == user_id, Brand.brand_type == "pitch")
-            .values(brand_type="standard", prompt_limit=10)
-        )
-        if result.rowcount > 0:
-            logger.info("Auto-upgraded %d pitch brand(s) to standard (basic) for user %d", result.rowcount, user_id)
+            logger.info("Synced %d brand(s) up to pro for user %d", result.rowcount, user_id)
     elif tier == "starter":
-        result = await db.execute(
+        # Pitch → standard (Growth)
+        await db.execute(
             sa_update(Brand)
             .where(Brand.user_id == user_id, Brand.brand_type == "pitch")
             .values(brand_type="standard", prompt_limit=25)
         )
-        if result.rowcount > 0:
-            logger.info("Auto-upgraded %d pitch brand(s) to standard for user %d", result.rowcount, user_id)
+        # Pro → standard (downgrade)
+        dg = await db.execute(
+            sa_update(Brand)
+            .where(Brand.user_id == user_id, Brand.brand_type == "pro")
+            .values(brand_type="standard", prompt_limit=25)
+        )
+        if dg.rowcount > 0:
+            logger.info("Synced %d pro brand(s) down to standard for user %d (tier=starter)", dg.rowcount, user_id)
+    elif tier == "basic":
+        # Pitch → standard (Starter)
+        await db.execute(
+            sa_update(Brand)
+            .where(Brand.user_id == user_id, Brand.brand_type == "pitch")
+            .values(brand_type="standard", prompt_limit=10)
+        )
+        # Pro → standard (downgrade)
+        dg = await db.execute(
+            sa_update(Brand)
+            .where(Brand.user_id == user_id, Brand.brand_type == "pro")
+            .values(brand_type="standard", prompt_limit=10)
+        )
+        if dg.rowcount > 0:
+            logger.info("Synced %d pro brand(s) down to standard for user %d (tier=basic)", dg.rowcount, user_id)
 
 
 # ── Webhook ───────────────────────────────────────────────────────────────────
@@ -596,7 +611,7 @@ async def stripe_webhook(request: Request, db: DbDep):
             # before customer.subscription.created — if we only upgrade in
             # the subscription handler, it sees old_tier == tier and skips.
             if tier:
-                await _upgrade_brands_for_tier(db, user.id, tier)
+                await _sync_brands_for_tier(db, user.id, tier)
             logger.info(
                 "checkout.session.completed for user %s (customer=%s, subscription=%s)",
                 user.email, customer_id, sub_id,
@@ -646,7 +661,7 @@ async def stripe_webhook(request: Request, db: DbDep):
             # Upgrade brands to match tier (idempotent — safe even if
             # checkout.session.completed already handled this).
             if tier:
-                await _upgrade_brands_for_tier(db, user.id, tier)
+                await _sync_brands_for_tier(db, user.id, tier)
 
     elif event_type == "customer.subscription.deleted":
         customer_id = data_obj.get("customer")

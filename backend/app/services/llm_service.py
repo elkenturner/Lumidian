@@ -455,7 +455,10 @@ def _classify_error(error: str) -> str:
 # under quota on the retry.
 _MAX_ATTEMPTS: dict[str, int] = {
     "perplexity": 5,
-    "gemini": 4,
+    # Gemini: Google 503s are rarely transient within a single run, so extra
+    # attempts mostly waste backoff time (5s + 10s + 20s) without recovering.
+    # Accept skipped queries; live results average out across runs.
+    "gemini": 2,
 }
 _DEFAULT_MAX_ATTEMPTS = 3
 

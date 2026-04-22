@@ -176,6 +176,7 @@ async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt
     if not OPENAI_API_KEY:
         return _api_key_placeholder("chatgpt")
     is_search = "search" in model_version
+    logger.info("[chatgpt] querying model_version=%s is_search=%s", model_version, is_search)
     start = time.monotonic()
     try:
         from openai import AsyncOpenAI

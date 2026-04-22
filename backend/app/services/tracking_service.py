@@ -26,7 +26,7 @@ from app.database import AsyncSessionLocal
 from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
 from app.models import utcnow as _utcnow
 from app.services.drafting_service import auto_draft_top_gaps
-from app.services.llm_service import RUNS_PER_PROMPT, SUPPORTED_MODELS, models_for_brand_type, query_model
+from app.services.llm_service import RUNS_PER_PROMPT, SUPPORTED_MODELS, models_for_tier, query_model
 from app.services.quora_scanner_service import scan_brand_opportunities as quora_scan
 from app.services.reddit_scanner_service import scan_brand_opportunities as reddit_scan
 

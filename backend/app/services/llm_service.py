@@ -97,17 +97,9 @@ TIER_RUNS = {
     "premium": RUNS_PER_PROMPT,
 }
 
-# Model categories for the dual-score visibility architecture.
-# LIVE_MODELS  — query the web in real-time; reflect content changes within days.
-# INDEX_MODELS — static training data; change slowly, reflect long-term presence.
-LIVE_MODELS: frozenset = frozenset({"perplexity", "gemini"})
-INDEX_MODELS: frozenset = frozenset({"chatgpt", "claude"})
-
-# Model versions per subscription tier.
-# Default = Starter/free users; Pro = paid Pro subscribers.
-# Only LIVE_MODELS (perplexity, gemini) get upgraded — they query the web,
-# so better models = better brand detection.  INDEX_MODELS (chatgpt, claude)
-# use static training data; upgrading them doesn't improve visibility.
+# Model versions per subscription tier. Paid tiers get upgraded ChatGPT (web
+# search) and Perplexity (sonar-pro). Claude and Gemini use the same version
+# across tiers; Claude is only queried on Pro (see models_for_tier).
 _MODEL_VERSIONS: dict[str, dict[str, str]] = {
     "chatgpt":    {"default": "gpt-4.1-mini",              "pro": "gpt-4o-mini-search-preview"},
     "claude":     {"default": "claude-haiku-4-5-20251001",  "pro": "claude-haiku-4-5-20251001"},
@@ -176,6 +168,7 @@ async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt
     if not OPENAI_API_KEY:
         return _api_key_placeholder("chatgpt")
     is_search = "search" in model_version
+    logger.info("[chatgpt] querying model_version=%s is_search=%s", model_version, is_search)
     start = time.monotonic()
     try:
         from openai import AsyncOpenAI
@@ -229,7 +222,39 @@ async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt
 
 # ── Claude ────────────────────────────────────────────────────────────────────
 
+# Claude web search tool spec (Anthropic server-side tool).
+# Docs: https://docs.anthropic.com/en/docs/build-with-claude/tool-use/web-search-tool
+# max_uses=3 caps search calls per request to bound cost (search = $10/1k queries).
+_CLAUDE_SEARCH_TOOL: dict = {
+    "type": "web_search_20250305",
+    "name": "web_search",
+    "max_uses": 3,
+}
+
+
+def _extract_claude_text(response) -> str:
+    """Concatenate all text blocks from a Claude response, skipping tool-use blocks.
+
+    Tool-use responses include interleaved `server_tool_use` and `web_search_tool_result`
+    blocks; we want only the model's prose. Blocks without a `text` attribute are ignored.
+    """
+    parts: list[str] = []
+    for block in response.content or []:
+        block_type = getattr(block, "type", None)
+        if block_type == "text":
+            text = getattr(block, "text", None)
+            if text:
+                parts.append(text)
+    return "".join(parts)
+
+
 async def _query_claude(prompt: str, brand_name: str, model_version: str = "claude-haiku-4-5-20251001") -> dict:
+    """Query Claude with the web_search tool enabled.
+
+    Only called for Pro-tier tracking (see models_for_tier), so search is always on.
+    URL citations are stripped before mention detection to avoid false positives
+    from brand names appearing in citation URLs.
+    """
     if not ANTHROPIC_API_KEY:
         return _api_key_placeholder("claude")
     start = time.monotonic()
@@ -240,20 +265,31 @@ async def _query_claude(prompt: str, brand_name: str, model_version: str = "clau
         async with _CLAUDE_SEM:
             response = await client.messages.create(
                 model=model_version,
-                max_tokens=1024,
+                max_tokens=2048,  # search responses are longer than plain answers
+                tools=[_CLAUDE_SEARCH_TOOL],
                 messages=[{"role": "user", "content": prompt}],
             )
         latency_ms = int((time.monotonic() - start) * 1000)
-        text = response.content[0].text if response.content else None
+        text = _extract_claude_text(response)
         if not text:
             logger.warning(
-                "[claude] API returned empty/null content for prompt %r", prompt[:100]
+                "[claude] API returned no text blocks for prompt %r", prompt[:100]
             )
             return _build_result(
                 None, brand_name, latency_ms,
                 error="Empty response from Claude API",
             )
-        return _build_result(text, brand_name, latency_ms)
+        # Strip URL/citation noise BEFORE mention check so brand names hidden
+        # in citation URLs do not produce false positives. Keep original text
+        # in response_text so the user-facing transcript retains citations.
+        cleaned = _strip_url_citations(text)
+        mentioned = _mentioned(brand_name, cleaned)
+        return {
+            "response_text": text,
+            "mentioned": mentioned,
+            "latency_ms": latency_ms,
+            "error": None,
+        }
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.error("[claude] API error for prompt %r: %s", prompt[:100], exc)
@@ -423,17 +459,41 @@ _DISPATCHERS = {
 
 SUPPORTED_MODELS = list(_DISPATCHERS.keys())
 
-# Brand-type → enabled model list.
-# Pitch (free trial) brands get 3 models — ChatGPT search is gated as a
-# paid-tier upgrade incentive (see spec decision #4).
-_PITCH_EXCLUDED_MODELS: frozenset = frozenset({"chatgpt"})
+# Tier-based model gating.
+# Free / pitch: Perplexity + Gemini only (web-native, no paid API cost).
+# Paid non-pro (Starter, Growth): + ChatGPT search.
+# Pro: + Claude Haiku with live web_search_20250305 tool.
+_FREE_MODELS: tuple[str, ...] = ("perplexity", "gemini")
+_PAID_NON_PRO_MODELS: tuple[str, ...] = ("chatgpt", "perplexity", "gemini")
+_PRO_MODELS: tuple[str, ...] = ("chatgpt", "claude", "perplexity", "gemini")
 
 
-def models_for_brand_type(brand_type: str) -> list[str]:
-    """Return the model list this brand_type is allowed to query."""
-    if brand_type == "pitch":
-        return [m for m in SUPPORTED_MODELS if m not in _PITCH_EXCLUDED_MODELS]
-    return list(SUPPORTED_MODELS)
+# Which subscription tiers get upgraded model versions (ChatGPT search, sonar-pro).
+# Kept here so callers don't re-hardcode the literal tuple.
+_PAID_TIERS: frozenset = frozenset({"basic", "starter", "pro"})
+
+
+def is_paid_tier(tier: str | None) -> bool:
+    """True if this subscription tier receives upgraded model versions."""
+    return tier in _PAID_TIERS
+
+
+def models_for_tier(brand_type: str, tier: str | None) -> list[str]:
+    """Return the model list this (brand_type, subscription tier) combo is allowed to query.
+
+    - brand_type="pitch" always means free-tier semantics, regardless of the user's subscription
+      (pitch brands are temporary free-trial objects; they auto-upgrade on subscribe).
+    - tier is the internal subscription_tier string: None, "basic" (Starter), "starter" (Growth),
+      or "pro".
+    """
+    if brand_type == "pitch" or tier is None:
+        return list(_FREE_MODELS)
+    if tier in ("basic", "starter"):
+        return list(_PAID_NON_PRO_MODELS)
+    if tier == "pro":
+        return list(_PRO_MODELS)
+    # Unknown tier — be conservative, treat as free.
+    return list(_FREE_MODELS)
 
 
 def _classify_error(error: str) -> str:

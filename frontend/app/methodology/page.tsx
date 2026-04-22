@@ -28,6 +28,77 @@ function SectionDivider() {
   );
 }
 
+/* ── Tier badge shown on each model card ───────────────────────────────────── */
+type TierBadge = 'Free +' | 'Paid' | 'Pro only';
+
+function ModelTierBadge({ label }: { label: TierBadge }) {
+  // Three flavors, each with a distinct accent so users can scan the grid fast.
+  const styles: Record<TierBadge, { color: string; border: string; bg: string }> = {
+    'Free +': {
+      color: 'var(--success-text)',
+      border: 'color-mix(in srgb, var(--success) 25%, transparent)',
+      bg: 'var(--success-muted)',
+    },
+    'Paid': {
+      color: 'var(--text-secondary)',
+      border: 'var(--border-subtle)',
+      bg: 'transparent',
+    },
+    'Pro only': {
+      color: 'var(--accent-light)',
+      border: 'var(--accent-border)',
+      bg: 'var(--accent-muted)',
+    },
+  };
+  const s = styles[label];
+  return (
+    <span
+      className="text-[10px] font-semibold tracking-[0.08em] uppercase px-2 py-[3px] rounded-md border whitespace-nowrap"
+      style={{ color: s.color, borderColor: s.border, background: s.bg }}
+    >
+      {label}
+    </span>
+  );
+}
+
+/* ── Model card for the 4-up grid ──────────────────────────────────────────── */
+function ModelCard({
+  name,
+  provider,
+  tier,
+  body,
+}: {
+  name: string;
+  provider: string;
+  tier: TierBadge;
+  body: string;
+}) {
+  return (
+    <div
+      className="rounded-xl p-5 border flex flex-col h-full"
+      style={{
+        background: 'var(--bg-raised)',
+        borderColor: 'var(--border-subtle)',
+      }}
+    >
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <div className="min-w-0">
+          <h3 className="text-[15px] font-semibold text-[var(--text-primary)] leading-tight">
+            {name}
+          </h3>
+          <p className="text-[11px] text-[var(--text-faint)] mt-1 tracking-[0.02em]">
+            {provider}
+          </p>
+        </div>
+        <ModelTierBadge label={tier} />
+      </div>
+      <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
+        {body}
+      </p>
+    </div>
+  );
+}
+
 export default function MethodologyPage() {
   return (
     <div className="px-4 sm:px-8 lg:px-12 py-6 sm:py-12 max-w-4xl mx-auto">
@@ -63,82 +134,48 @@ export default function MethodologyPage() {
       <SectionDivider />
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* TWO TYPES OF VISIBILITY                                               */}
+      {/* HOW WE MEASURE VISIBILITY — 4 model cards                             */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="model-types" className="scroll-mt-20">
-        <SectionLabel>Model Types</SectionLabel>
+      <section id="models" className="scroll-mt-20">
+        <SectionLabel>Models</SectionLabel>
 
         <h2 className="text-xl sm:text-2xl font-bold text-[var(--text-primary)] tracking-tight mb-2">
-          Two types of AI visibility
+          How we measure visibility
         </h2>
         <p className="text-[15px] text-[var(--text-muted)] leading-relaxed mb-8">
-          Not all AI models work the same way. Understanding the difference
-          changes how you interpret your scores and where you focus.
+          Every model we query answers against the live web. Each one reaches for
+          sources differently, so we treat them as four independent readings of
+          what the web says about you today.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Live Search card */}
-          <div
-            className="rounded-xl p-5 sm:p-6 border"
-            style={{
-              background: 'var(--success-muted)',
-              borderColor: 'color-mix(in srgb, var(--success) 15%, transparent)',
-            }}
-          >
-            <div className="flex items-center gap-2.5 mb-3">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ background: 'var(--success)' }}
-              />
-              <span className="text-sm font-semibold text-[var(--success-text)]">
-                Live Search
-              </span>
-            </div>
-
-            <p className="text-[13px] font-medium text-[var(--text-secondary)] mb-2">
-              Perplexity &middot; Gemini
-            </p>
-
-            <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
-              These models search the web in real-time when answering. Gemini uses
-              Google Search grounding; Perplexity has built-in web search. Your
-              content landscape today shapes their answers today. Changes show up
-              within days.
-            </p>
-          </div>
-
-          {/* AI Index card */}
-          <div
-            className="rounded-xl p-5 sm:p-6 border"
-            style={{
-              background: 'var(--accent-muted)',
-              borderColor: 'var(--accent-border)',
-            }}
-          >
-            <div className="flex items-center gap-2.5 mb-3">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ background: 'var(--accent-light)' }}
-              />
-              <span className="text-sm font-semibold" style={{ color: 'var(--accent-light)' }}>
-                AI Index
-              </span>
-            </div>
-
-            <p className="text-[13px] font-medium text-[var(--text-secondary)] mb-2">
-              ChatGPT &middot; Claude
-            </p>
-
-            <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
-              These models draw from training data — a snapshot of the web at
-              the time they were trained. They reflect foundational AI knowledge
-              and are slower to change, but mentions here are more durable. This
-              is the long-game metric.
-            </p>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <ModelCard
+            name="ChatGPT"
+            provider="OpenAI"
+            tier="Paid"
+            body="OpenAI's native web search retrieves live results before answering, matching what users see in ChatGPT today."
+          />
+          <ModelCard
+            name="Claude"
+            provider="Anthropic"
+            tier="Pro only"
+            body="Claude Haiku 4.5 with Anthropic's web-search tool. Issues up to three targeted searches per query before responding."
+          />
+          <ModelCard
+            name="Perplexity"
+            provider="Perplexity"
+            tier="Free +"
+            body="Search-grounded by design. Every answer is built from sources pulled at request time, with inline citations."
+          />
+          <ModelCard
+            name="Gemini"
+            provider="Google"
+            tier="Free +"
+            body="Google Search grounding is on for every query, so answers reflect current web context rather than static knowledge."
+          />
         </div>
 
-        {/* Callout */}
+        {/* Scoring callout — replaces the old Live/Index combination note. */}
         <div
           className="mt-6 rounded-lg px-4 py-3.5 border text-[13px] text-[var(--text-secondary)] leading-relaxed"
           style={{
@@ -146,9 +183,10 @@ export default function MethodologyPage() {
             borderColor: 'var(--border-subtle)',
           }}
         >
-          Your overall visibility score combines both types. The per-model
-          breakdown shows you where to focus — and whether to prioritize
-          short-term content (Live Search) or long-term authority (AI Index).
+          Your overall visibility score is the average of the per-model scores
+          for whichever models your plan queries. That way a Free brand and a
+          Pro brand are always compared like-for-like against the models they
+          actually run — no model sitting at zero drags the average down.
         </div>
       </section>
 
@@ -254,9 +292,8 @@ export default function MethodologyPage() {
                 <span className="font-medium text-[var(--text-secondary)]">Per-model score</span>{' '}
                 is calculated this way for each AI model individually. Your{' '}
                 <span className="font-medium text-[var(--text-secondary)]">overall visibility score</span>{' '}
-                is the average of every active model&apos;s score, so a model
-                with no queries (e.g. ChatGPT on the free trial) doesn&apos;t
-                drag the average down.
+                is the average of every model your plan queries, so tiers with
+                fewer models aren&apos;t penalized against tiers with more.
               </p>
             </div>
           </li>
@@ -284,18 +321,54 @@ export default function MethodologyPage() {
           </li>
         </ol>
 
-        {/* Tier note */}
+        {/* Runs + tier-coverage table */}
         <div
-          className="mt-6 rounded-lg px-4 py-3.5 border text-[13px] text-[var(--text-muted)] leading-relaxed"
+          className="mt-6 rounded-lg px-4 py-4 border"
           style={{
             background: 'var(--bg-raised)',
             borderColor: 'var(--border-subtle)',
           }}
         >
-          <span className="text-[var(--text-secondary)] font-medium">3 runs per prompt per model.</span>{' '}
-          Each prompt is sent to every supported model 3 times to smooth out
-          response variation. Paid tiers add ChatGPT&apos;s native web search
-          and Perplexity Sonar Pro for sharper, more current detection.
+          <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
+            <span className="text-[var(--text-secondary)] font-medium">3 runs per prompt per model.</span>{' '}
+            Each prompt is sent to every supported model three times to smooth
+            out response variation. Which models run depends on your plan:
+          </p>
+
+          <table className="w-full text-[13px] mt-4">
+            <thead>
+              <tr className="border-b border-[var(--border-subtle)]">
+                <th className="text-left font-medium text-[var(--text-secondary)] py-2.5 pr-4 w-[110px]">Tier</th>
+                <th className="text-left font-medium text-[var(--text-secondary)] py-2.5">Models queried</th>
+              </tr>
+            </thead>
+            <tbody className="text-[var(--text-primary)]">
+              <tr className="border-b border-[var(--border-subtle)]">
+                <td className="py-2.5 pr-4 font-medium">Free</td>
+                <td className="py-2.5 text-[var(--text-muted)] font-mono text-[12.5px]">
+                  Perplexity, Gemini
+                </td>
+              </tr>
+              <tr className="border-b border-[var(--border-subtle)]">
+                <td className="py-2.5 pr-4 font-medium">Starter</td>
+                <td className="py-2.5 text-[var(--text-muted)] font-mono text-[12.5px]">
+                  ChatGPT, Perplexity, Gemini
+                </td>
+              </tr>
+              <tr className="border-b border-[var(--border-subtle)]">
+                <td className="py-2.5 pr-4 font-medium">Growth</td>
+                <td className="py-2.5 text-[var(--text-muted)] font-mono text-[12.5px]">
+                  ChatGPT, Perplexity Pro, Gemini
+                </td>
+              </tr>
+              <tr>
+                <td className="py-2.5 pr-4 font-medium" style={{ color: 'var(--accent-light)' }}>Pro</td>
+                <td className="py-2.5 text-[var(--text-muted)] font-mono text-[12.5px]">
+                  ChatGPT, Claude, Perplexity Pro, Gemini
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -343,12 +416,13 @@ export default function MethodologyPage() {
             }}
           >
             <p className="text-sm font-semibold text-[var(--text-primary)] mb-1.5">
-              Real web context where it matters
+              Every answer comes from today&apos;s web
             </p>
             <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
-              Gemini includes Google Search grounding and Perplexity inherently
-              searches the web — so your Live Search scores reflect the real,
-              current content landscape without needing to scrape a browser.
+              Every model we query runs against the live web — ChatGPT&apos;s native
+              search, Claude&apos;s web-search tool, Perplexity&apos;s search grounding,
+              and Gemini&apos;s Google Search integration. Scores reflect the web as
+              it exists today, not a frozen snapshot from a model&apos;s training run.
             </p>
           </div>
 
@@ -384,82 +458,101 @@ export default function MethodologyPage() {
           What moves your score
         </h2>
         <p className="text-[15px] text-[var(--text-muted)] leading-relaxed mb-8">
-          Different model types respond to different strategies. Knowing the
-          difference lets you focus where it counts.
+          Every model we query is doing the same thing under the hood — searching
+          the web for sources that answer the prompt, then composing an answer
+          from what it finds. Four things consistently show up in the sources
+          that get cited.
         </p>
 
-        <div className="space-y-6">
-          {/* Live Search factors */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ background: 'var(--success)' }}
-              />
-              <h3 className="text-sm font-semibold text-[var(--success-text)]">
-                Live Search factors
-              </h3>
+        <ul className="space-y-5">
+          <li className="flex gap-4">
+            <span
+              className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold"
+              style={{
+                background: 'var(--accent-muted)',
+                color: 'var(--accent-light)',
+              }}
+            >
+              1
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                Fresh web content that answers the prompt
+              </p>
+              <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
+                Reddit threads, Quora answers, and recent articles that mention
+                your brand in the context of what the prompt is actually asking.
+                Relevance to the question beats generic brand mentions every time.
+              </p>
             </div>
-            <ul className="space-y-2 ml-4">
-              <li className="flex items-start gap-2.5 text-[13px] text-[var(--text-muted)] leading-relaxed">
-                <span className="text-[var(--success)] mt-1.5 flex-shrink-0">&bull;</span>
-                Recent content on authoritative sites — blog posts, press coverage, industry publications
-              </li>
-              <li className="flex items-start gap-2.5 text-[13px] text-[var(--text-muted)] leading-relaxed">
-                <span className="text-[var(--success)] mt-1.5 flex-shrink-0">&bull;</span>
-                SEO fundamentals — being cited and linked on domains that Perplexity and Gemini surface
-              </li>
-              <li className="flex items-start gap-2.5 text-[13px] text-[var(--text-muted)] leading-relaxed">
-                <span className="text-[var(--success)] mt-1.5 flex-shrink-0">&bull;</span>
-                Community presence on Reddit, Quora, and forums where these models pull context
-              </li>
-            </ul>
-          </div>
+          </li>
 
-          {/* AI Index factors */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <div
-                className="w-2 h-2 rounded-full"
-                style={{ background: 'var(--accent-light)' }}
-              />
-              <h3 className="text-sm font-semibold" style={{ color: 'var(--accent-light)' }}>
-                AI Index factors
-              </h3>
+          <li className="flex gap-4">
+            <span
+              className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold"
+              style={{
+                background: 'var(--accent-muted)',
+                color: 'var(--accent-light)',
+              }}
+            >
+              2
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                Authority on sources AI search weights heavily
+              </p>
+              <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
+                Wikipedia, major publications, and industry-specific subreddits
+                that reliably surface in grounded searches. A mention on a domain
+                the models already trust moves the needle.
+              </p>
             </div>
-            <ul className="space-y-2 ml-4">
-              <li className="flex items-start gap-2.5 text-[13px] text-[var(--text-muted)] leading-relaxed">
-                <span style={{ color: 'var(--accent-light)' }} className="mt-1.5 flex-shrink-0">&bull;</span>
-                Wikipedia presence — a strong signal for training data inclusion
-              </li>
-              <li className="flex items-start gap-2.5 text-[13px] text-[var(--text-muted)] leading-relaxed">
-                <span style={{ color: 'var(--accent-light)' }} className="mt-1.5 flex-shrink-0">&bull;</span>
-                Consistent mentions across authoritative sources over time
-              </li>
-              <li className="flex items-start gap-2.5 text-[13px] text-[var(--text-muted)] leading-relaxed">
-                <span style={{ color: 'var(--accent-light)' }} className="mt-1.5 flex-shrink-0">&bull;</span>
-                Broad inclusion in datasets that models are trained on — documentation, academic references, news archives
-              </li>
-            </ul>
-          </div>
-        </div>
+          </li>
 
-        {/* Connection callout */}
-        <div
-          className="mt-8 rounded-lg px-4 py-3.5 border text-[13px] leading-relaxed"
-          style={{
-            background: 'var(--bg-raised)',
-            borderColor: 'var(--border-subtle)',
-          }}
-        >
-          <span className="text-[var(--text-secondary)] font-medium">The flywheel effect.</span>{' '}
-          <span className="text-[var(--text-muted)]">
-            Live Search improvements often precede AI Index improvements.
-            Today&apos;s content becomes tomorrow&apos;s training data — so consistent
-            visibility on Perplexity and Gemini now builds durable visibility on
-            ChatGPT and Claude over time.
-          </span>
-        </div>
+          <li className="flex gap-4">
+            <span
+              className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold"
+              style={{
+                background: 'var(--accent-muted)',
+                color: 'var(--accent-light)',
+              }}
+            >
+              3
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                Repeat mentions across independent sources
+              </p>
+              <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
+                One mention on one site is easy to pass over. Three independent
+                sources corroborating the same claim is much harder to ignore —
+                that&apos;s when models start treating it as the default answer.
+              </p>
+            </div>
+          </li>
+
+          <li className="flex gap-4">
+            <span
+              className="flex-shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[11px] font-bold"
+              style={{
+                background: 'var(--accent-muted)',
+                color: 'var(--accent-light)',
+              }}
+            >
+              4
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+                Prompt-term adjacency
+              </p>
+              <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
+                Your brand name appearing near the prompt&apos;s core keywords on the
+                source page. Proximity is how search-grounded models decide which
+                mentions are relevant to the question being asked.
+              </p>
+            </div>
+          </li>
+        </ul>
       </section>
 
       {/* Back to top */}

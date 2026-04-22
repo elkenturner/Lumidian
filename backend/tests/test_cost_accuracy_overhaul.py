@@ -15,8 +15,8 @@ from app.services import tracking_service as ts
 
 # ── Phase 1: runs per prompt = 3 ──────────────────────────────────────────────
 
-def test_tier_runs_is_three_for_every_tier():
-    assert llm_service.TIER_RUNS == {"basic": 3, "standard": 3, "premium": 3}
+def test_runs_per_prompt_is_three():
+    assert llm_service.RUNS_PER_PROMPT == 3
 
 
 # ── Phase 1.2: drop-alert threshold 10 -> 15 ──────────────────────────────────
@@ -40,18 +40,15 @@ def test_tracking_service_in_app_drop_threshold_is_fifteen():
     )
 
 
-# ── Phase 1.3: stale-run estimator local tier_runs dict 5 -> 3 ────────────────
+# ── Phase 1.3: stale-run estimator references RUNS_PER_PROMPT ─────────────────
 
 from app import database as db_module
 
 
-def test_database_local_tier_runs_dict_uses_three():
-    """The estimator inside fail_stale_runs_for_brand must mirror TIER_RUNS."""
+def test_database_stale_estimator_uses_runs_per_prompt_constant():
+    """The estimator inside fail_stale_runs_for_brand must use RUNS_PER_PROMPT."""
     src = inspect.getsource(db_module.fail_stale_runs_for_brand)
-    matches = re.findall(r"tier_runs\s*=\s*\{([^}]+)\}", src)
-    assert matches, "Could not locate tier_runs literal in fail_stale_runs_for_brand"
-    nums = re.findall(r":\s*(\d+)", matches[0])
-    assert nums and all(n == "3" for n in nums), f"tier_runs has non-3 values: {nums}"
+    assert "RUNS_PER_PROMPT" in src, "fail_stale_runs_for_brand should reference RUNS_PER_PROMPT"
 
 
 # ── Phase 2: gemini-2.5-pro killed ────────────────────────────────────────────

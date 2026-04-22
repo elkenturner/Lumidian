@@ -396,7 +396,10 @@ async def cleanup_stale_runs(max_age_minutes: int = 15):
                     TrackingRun.created_at < cutoff,
                 )
             )
-            .values(status="failed")
+            .values(
+                status="failed",
+                error_message=f"Auto-failed by startup cleanup: run exceeded {max_age_minutes} minute threshold without completing",
+            )
             .returning(TrackingRun.id)
         )
         stale_ids = result.scalars().all()
@@ -423,7 +426,7 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
     from app.models import Brand, Prompt, TrackingRun
 
     if max_age_minutes is None:
-        # Calculate expected run duration from prompt count + tier
+        # Calculate expected run duration from prompt count + active model count
         brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
         brand = brand_result.scalar_one_or_none()
         prompt_count_result = await db.execute(
@@ -431,11 +434,9 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
         )
         prompt_count = prompt_count_result.scalar_one() or 1
 
-        from app.services.llm_service import models_for_brand_type
-        tier_runs = {"basic": 3, "standard": 3, "premium": 3}
-        runs_per_prompt = tier_runs.get(brand.tier, 3) if brand else 3
+        from app.services.llm_service import RUNS_PER_PROMPT, models_for_brand_type
         model_count = len(models_for_brand_type(brand.brand_type)) if brand else 4
-        total_queries = prompt_count * model_count * runs_per_prompt
+        total_queries = prompt_count * model_count * RUNS_PER_PROMPT
         # ~8 effective concurrent queries, ~3s each
         est_minutes = (total_queries / 8 * 3) / 60
         max_age_minutes = max(15, int(est_minutes * 2))
@@ -448,7 +449,10 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
             TrackingRun.status.in_(["pending", "running"]),
             TrackingRun.created_at < cutoff,
         )
-        .values(status="failed")
+        .values(
+            status="failed",
+            error_message=f"Auto-failed by stale cleanup: run exceeded {max_age_minutes} minute threshold without completing",
+        )
     )
     if result.rowcount > 0:
         logger.warning("Auto-failed %d stale run(s) for brand %d (threshold: %d min)", result.rowcount, brand_id, max_age_minutes)

@@ -26,7 +26,7 @@ from app.database import AsyncSessionLocal
 from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
 from app.models import utcnow as _utcnow
 from app.services.drafting_service import auto_draft_top_gaps
-from app.services.llm_service import SUPPORTED_MODELS, TIER_RUNS, models_for_brand_type, query_model
+from app.services.llm_service import RUNS_PER_PROMPT, SUPPORTED_MODELS, models_for_brand_type, query_model
 from app.services.quora_scanner_service import scan_brand_opportunities as quora_scan
 from app.services.reddit_scanner_service import scan_brand_opportunities as reddit_scan
 
@@ -194,7 +194,6 @@ async def run_tracking(
     # Extract values as plain Python types while the session is open, so we
     # never access SQLAlchemy-managed attributes on detached objects later.
     brand_name: str = ""
-    brand_tier: str = "basic"
     is_pro: bool = False
     prompt_data: list[tuple[int, str]] = []  # (prompt_id, prompt_text)
     run_id: int = 0
@@ -207,7 +206,6 @@ async def run_tracking(
             raise ValueError(f"Brand {brand_id} not found")
 
         brand_name = str(brand.name)
-        brand_tier = str(brand.tier)
         brand_type = str(brand.brand_type or "standard")
         active_models = models_for_brand_type(brand_type)
 
@@ -224,11 +222,11 @@ async def run_tracking(
         if not prompt_data:
             raise ValueError(f"Brand {brand_id} has no prompts configured")
 
-        runs_per_prompt = TIER_RUNS.get(brand_tier, TIER_RUNS["basic"])
+        runs_per_prompt = RUNS_PER_PROMPT
 
         logger.info(
-            "Scheduled run starting — brand=%r tier=%s prompts=%d runs_per_prompt=%d",
-            brand_name, brand_tier, len(prompt_data), runs_per_prompt,
+            "Scheduled run starting — brand=%r prompts=%d runs_per_prompt=%d",
+            brand_name, len(prompt_data), runs_per_prompt,
         )
 
         # ── 2. Create TrackingRun record ─────────────────────────────────────

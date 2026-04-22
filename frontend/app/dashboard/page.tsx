@@ -424,9 +424,9 @@ export default function DashboardPage() {
   const totalPrompts = (brandDetail?.prompts ?? []).length;
   const totalRuns = trends.length;
 
-  // Derive Live/Index and Performance by Model from the latest run's model
-  // breakdown (same data source as the headline score) so all numbers stay
-  // consistent. Historical context lives in the trend chart.
+  // Derive Performance by Model from the latest run's model breakdown (same
+  // data source as the headline score) so all numbers stay consistent.
+  // Historical context lives in the trend chart.
   const latestModelBreakdown = overview?.model_breakdown ?? [];
   const latestModelStats: ModelStat[] = latestModelBreakdown
     .map(m => ({
@@ -437,20 +437,6 @@ export default function DashboardPage() {
       mention_rate: m.total_queries > 0 ? m.total_mentions / m.total_queries : 0,
     }))
     .sort((a, b) => b.mention_rate - a.mention_rate);
-  const liveScore = (() => {
-    const mods = latestModelBreakdown.filter(m => m.model === 'perplexity' || m.model === 'gemini');
-    const active = mods.filter(m => m.total_queries > 0);
-    if (!active.length) return null;
-    const avg = active.reduce((s, m) => s + (m.total_mentions / m.total_queries), 0) / active.length;
-    return Math.round(avg * 1000) / 10;
-  })();
-  const indexScore = (() => {
-    const mods = latestModelBreakdown.filter(m => m.model === 'chatgpt' || m.model === 'claude');
-    const active = mods.filter(m => m.total_queries > 0);
-    if (!active.length) return null;
-    const avg = active.reduce((s, m) => s + (m.total_mentions / m.total_queries), 0) / active.length;
-    return Math.round(avg * 1000) / 10;
-  })();
   const daysSinceFirst = trends.length > 0 && trends[0].completed_at
     ? Math.max(0, Math.floor((Date.now() - parseUTCISO(trends[0].completed_at).getTime()) / 86_400_000))
     : null;
@@ -729,8 +715,6 @@ export default function DashboardPage() {
                   sparkData={sparkData}
                   nextReportHours={nextReportHours}
                   loadingAnalytics={loadingAnalytics}
-                  liveScore={liveScore}
-                  indexScore={indexScore}
                   scoreConfidence={analytics?.score_confidence}
                   activeModels={analytics?.active_models}
                 />
@@ -913,8 +897,8 @@ export default function DashboardPage() {
                     <BarChart2 size={15} className="text-[var(--accent)]" />
                     <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Performance by Model</h3>
                     <HelpTooltip
-                      text="How often each AI model mentions your brand. Live models (Perplexity, Gemini) query the web in real-time; Index models (ChatGPT, Claude) draw from training data."
-                      href="/methodology#model-types"
+                      text="How often each AI model mentions your brand when answering your tracked prompts. Every model queries the live web before answering."
+                      href="/methodology#models"
                     />
                   </div>
                   {loadingAnalytics ? (

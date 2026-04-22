@@ -329,7 +329,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
     from app.database import AsyncSessionLocal
     from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
-    from app.services.llm_service import TIER_RUNS, models_for_brand_type, query_model
+    from app.services.llm_service import RUNS_PER_PROMPT, models_for_brand_type, query_model
     from app.services.tracking_service import _compute_overall_score
 
     def utcnow():
@@ -338,7 +338,6 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     # Extract all values we need as plain Python types before the session closes,
     # so we never access SQLAlchemy-managed attributes on detached objects.
     brand_name: str = ""
-    brand_tier: str = "basic"
     brand_type: str = "standard"
     prompt_data: list[tuple[int, str]] = []  # (prompt_id, prompt_text)
     is_pro: bool = False
@@ -357,7 +356,6 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
             return
 
         brand_name = str(brand.name)
-        brand_tier = str(brand.tier)
         brand_type = str(brand.brand_type or "standard")
 
         from app.models import User
@@ -373,8 +371,8 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     active_models = models_for_brand_type(brand_type)
 
     logger.info(
-        "Manual run %d — brand=%r tier=%s prompts=%d",
-        run_id, brand_name, brand_tier, len(prompt_data),
+        "Manual run %d — brand=%r prompts=%d",
+        run_id, brand_name, len(prompt_data),
     )
 
     if not prompt_data:
@@ -387,7 +385,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
                 await err_db.commit()
         return
 
-    runs_per_prompt = TIER_RUNS.get(brand_tier, TIER_RUNS["basic"])
+    runs_per_prompt = RUNS_PER_PROMPT
     semaphore = asyncio.Semaphore(10)
     cancel_evt = get_cancel_event(run_id)
 
@@ -686,7 +684,7 @@ async def trigger_prompt_run(
     is_pro = user.subscription_tier in ("basic", "starter", "pro")
     brand_type = str(brand.brand_type or "standard")
     asyncio.create_task(
-        _background_prompt_run(run_id, brand_id, prompt_id, str(prompt.text), str(brand.name), str(brand.tier), is_pro=is_pro, brand_type=brand_type),
+        _background_prompt_run(run_id, brand_id, prompt_id, str(prompt.text), str(brand.name), is_pro=is_pro, brand_type=brand_type),
         name=f"prompt-tracking-{brand_id}-{prompt_id}-{run_id}",
     )
 
@@ -704,7 +702,6 @@ async def _background_prompt_run(
     prompt_id: int,
     prompt_text: str,
     brand_name: str,
-    brand_tier: str,
     is_pro: bool = False,
     brand_type: str = "standard",
 ) -> None:
@@ -715,7 +712,7 @@ async def _background_prompt_run(
     from app.database import AsyncSessionLocal
     from app.models import QueryResult, RunModelScore
     from app.models import TrackingRun as TR
-    from app.services.llm_service import TIER_RUNS, models_for_brand_type, query_model
+    from app.services.llm_service import RUNS_PER_PROMPT, models_for_brand_type, query_model
     from app.services.tracking_service import _compute_overall_score
 
     active_models = models_for_brand_type(brand_type)
@@ -731,7 +728,7 @@ async def _background_prompt_run(
             run.started_at = utcnow()
             await db.commit()
 
-    runs_per_prompt = TIER_RUNS.get(brand_tier, TIER_RUNS["basic"])
+    runs_per_prompt = RUNS_PER_PROMPT
     semaphore = _asyncio.Semaphore(10)
 
     async def _bounded_query(model: str, run_number: int):
@@ -755,8 +752,8 @@ async def _background_prompt_run(
     ]
 
     logger.info(
-        "Prompt run %d — brand=%r prompt_id=%d tier=%s tasks=%d",
-        run_id, brand_name, prompt_id, brand_tier, len(tasks),
+        "Prompt run %d — brand=%r prompt_id=%d tasks=%d",
+        run_id, brand_name, prompt_id, len(tasks),
     )
 
     try:

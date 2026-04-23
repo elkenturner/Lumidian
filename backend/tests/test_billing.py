@@ -758,3 +758,37 @@ async def test_webhook_subscription_schedule_released_clears_pending(client: htt
         assert u.pending_tier is None
         assert u.stripe_schedule_id is None
         assert u.pending_tier_effective_at is None
+
+
+async def test_billing_status_includes_pending_fields(client: httpx.AsyncClient):
+    """GET /billing/status returns pending_tier and pending_tier_effective_at."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="status_pending@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET pending_tier = :pt, pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {"pt": "starter", "pte": "2026-05-09 00:00:00", "email": "status_pending@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.get("/api/billing/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["pending_tier"] == "starter"
+    assert data["pending_tier_effective_at"] is not None
+    assert data["pending_tier_effective_at"].startswith("2026-05-09")
+
+
+async def test_billing_status_pending_null_when_unset(client: httpx.AsyncClient):
+    """Users without a scheduled downgrade see null pending fields."""
+    await register_and_login(client, email="status_nopending@example.com", subscription_tier="pro")
+    resp = await client.get("/api/billing/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["pending_tier"] is None
+    assert data["pending_tier_effective_at"] is None

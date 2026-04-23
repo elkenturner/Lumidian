@@ -154,6 +154,11 @@ async def billing_status(user: Annotated[User, Depends(get_current_user)]):
         "brand_limits": brand_limits,
         "is_admin": user.is_admin,
         "has_payment_method": bool(user.stripe_customer_id),
+        "pending_tier": user.pending_tier,
+        "pending_tier_effective_at": (
+            user.pending_tier_effective_at.isoformat()
+            if user.pending_tier_effective_at else None
+        ),
     }
 
 

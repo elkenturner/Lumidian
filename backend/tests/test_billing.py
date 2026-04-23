@@ -585,3 +585,44 @@ async def test_change_plan_select_current_tier_releases_pending(client: httpx.As
         assert u.pending_tier is None
         assert u.stripe_schedule_id is None
         assert u.pending_tier_effective_at is None
+
+
+async def test_change_plan_rejects_same_as_pending(client: httpx.AsyncClient):
+    """Setting target to the already-pending tier returns 400."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="dup_pending@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET stripe_subscription_id = :sid, stripe_schedule_id = :schid,
+                                 pending_tier = :pt, pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {"sid": "sub_x", "schid": "sch_x", "pt": "starter",
+             "pte": "2026-05-09 00:00:00", "email": "dup_pending@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.post("/api/billing/change-plan", json={"tier": "starter"})
+    assert resp.status_code == 400
+    assert "already scheduled" in resp.json()["detail"].lower()
+
+
+async def test_change_plan_rejects_same_as_current_no_pending(client: httpx.AsyncClient):
+    """Selecting current tier with no pending schedule returns 400."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="dup_current@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("UPDATE users SET stripe_subscription_id = :sid WHERE email = :email"),
+            {"sid": "sub_y", "email": "dup_current@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.post("/api/billing/change-plan", json={"tier": "pro"})
+    assert resp.status_code == 400
+    assert "already on this plan" in resp.json()["detail"].lower()

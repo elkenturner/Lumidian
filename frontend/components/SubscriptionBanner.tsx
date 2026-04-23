@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, Clock, X, ExternalLink, Loader2 } from 'lucide-react';
 import { createPortalSession } from '@/lib/api';
+import { AppToast, ToastData } from '@/components/AppToast';
 
 interface Props {
   status: string;  // 'past_due' | 'canceled' | 'unpaid' | 'trialing'
@@ -14,6 +15,13 @@ interface Props {
 export default function SubscriptionBanner({ status, daysRemaining, trialEnd }: Props) {
   const [loading, setLoading] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [toast, setToast] = useState<ToastData | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   if (dismissed) return null;
 
@@ -29,7 +37,7 @@ export default function SubscriptionBanner({ status, daysRemaining, trialEnd }: 
       const { portal_url } = await createPortalSession();
       window.location.href = portal_url;
     } catch {
-      alert('Could not open billing portal. Please try again.');
+      setToast({ message: 'Could not open billing portal. Please try again.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -106,6 +114,7 @@ export default function SubscriptionBanner({ status, daysRemaining, trialEnd }: 
       >
         <X size={14} />
       </button>
+      {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

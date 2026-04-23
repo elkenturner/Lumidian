@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import ProgressBanner from '@/components/ProgressBanner';
 import ModelIcon from '@/components/ModelIcon';
+import { AppToast, ToastData } from '@/components/AppToast';
 import {
   getBrand,
   getTrends,
@@ -121,6 +122,12 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(false);
   const [expandedPromptId, setExpandedPromptId] = useState<number | null>(null);
   const [exportingPDF, setExportingPDF] = useState(false);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
   const [latestRun, setLatestRun] = useState<TrackingRun | null>(null);
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysis | null>(null);
   const [competitorModelFilter, setCompetitorModelFilter] = useState<string>('all');
@@ -208,7 +215,7 @@ export default function ReportsPage() {
     try {
       await exportReportPDF(selectedBrandId, 0);
     } catch {
-      alert('Failed to generate PDF. Please try again.');
+      setToast({ message: 'Failed to generate PDF. Please try again.', type: 'error' });
     } finally {
       setExportingPDF(false);
     }
@@ -726,6 +733,7 @@ export default function ReportsPage() {
           </Tabs>
         </>
       )}
+      {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </motion.div>
   );
 }

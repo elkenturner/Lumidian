@@ -971,6 +971,8 @@ export interface BillingStatus {
   brand_limits: { standard: number; pitch: number };
   is_admin: boolean;
   has_payment_method: boolean;
+  pending_tier: 'basic' | 'starter' | 'pro' | null;
+  pending_tier_effective_at: string | null;
 }
 
 export interface BillingUsage {

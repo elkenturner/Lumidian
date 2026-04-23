@@ -368,7 +368,7 @@ async def _create_late_attach_attribution(db: AsyncSession, draft: ContentDraft)
         runs_since_posting=0,
     )
     db.add(attribution)
-    await db.commit()
+    await db.flush()
 
 
 # ── Draft update ──────────────────────────────────────────────────────────────

@@ -43,9 +43,6 @@ TIER_DISPLAY_NAMES: dict[str | None, str] = {
     "pro": "Pro",            # $500/mo
 }
 
-# Canonical tier ordering for UI rendering (lowest → highest).
-TIER_ORDER: list[str | None] = [None, "basic", "starter", "pro"]
-
 TIER_LIMITS = {"basic": 10, "starter": 25, "pro": 30}
 TIER_PRICES = {
     "basic": os.getenv("STRIPE_BASIC_PRICE_ID", ""),

@@ -577,13 +577,28 @@ async def cancel_subscription(
     user: Annotated[User, Depends(get_current_user)],
     db: DbDep,
 ):
-    """Cancel the user's subscription at end of billing period."""
+    """Cancel the user's subscription at end of billing period.
+
+    If a downgrade is scheduled (SubscriptionSchedule), release it first so
+    Stripe doesn't try to transition a canceled subscription.
+    """
     if not user.stripe_subscription_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No active subscription found",
         )
     stripe = get_stripe()
+
+    # Release any pending downgrade schedule first.
+    if user.stripe_schedule_id:
+        try:
+            stripe.SubscriptionSchedule.release(user.stripe_schedule_id)
+        except Exception:
+            logger.exception("Failed to release schedule %s during cancel — proceeding anyway", user.stripe_schedule_id)
+        user.stripe_schedule_id = None
+        user.pending_tier = None
+        user.pending_tier_effective_at = None
+
     try:
         stripe.Subscription.modify(
             user.stripe_subscription_id,
@@ -595,7 +610,7 @@ async def cancel_subscription(
     except stripe.error.RateLimitError as exc:
         logger.warning("Stripe rate limit during subscription cancellation: %s", exc)
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests to payment service. Please wait a moment and try again.")
-    except Exception as exc:
+    except Exception:
         logger.exception("Subscription cancellation failed")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

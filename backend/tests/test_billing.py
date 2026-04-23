@@ -626,3 +626,41 @@ async def test_change_plan_rejects_same_as_current_no_pending(client: httpx.Asyn
     resp = await client.post("/api/billing/change-plan", json={"tier": "pro"})
     assert resp.status_code == 400
     assert "already on this plan" in resp.json()["detail"].lower()
+
+
+async def test_cancel_releases_pending_schedule_first(client: httpx.AsyncClient):
+    """Cancel while a downgrade is pending: release schedule, then cancel_at_period_end."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="cancel_with_sched@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET stripe_subscription_id = :sid, stripe_schedule_id = :schid,
+                                 pending_tier = :pt, pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {"sid": "sub_cancel_1", "schid": "sch_cancel_1", "pt": "starter",
+             "pte": "2026-05-09 00:00:00", "email": "cancel_with_sched@example.com"},
+        )
+        await db.commit()
+
+    with (
+        patch("stripe.SubscriptionSchedule.release") as mock_release,
+        patch("stripe.Subscription.modify") as mock_modify,
+    ):
+        resp = await client.post("/api/billing/cancel")
+
+    assert resp.status_code == 200, resp.text
+    mock_release.assert_called_once_with("sch_cancel_1")
+    mock_modify.assert_called_once_with("sub_cancel_1", cancel_at_period_end=True)
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "cancel_with_sched@example.com"))).scalar_one()
+        assert u.stripe_schedule_id is None
+        assert u.pending_tier is None
+        assert u.pending_tier_effective_at is None
+        assert u.subscription_status == "canceling"

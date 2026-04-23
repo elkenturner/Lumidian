@@ -1805,7 +1805,10 @@ export default function ContentHubPage() {
 
   async function handleApprove(id: number) {
     if (draftStatus?.scheduled_queue_full) {
-      alert(`Saved drafts queue is full (${draftStatus.scheduled_cap}/${draftStatus.scheduled_cap}). Mark some drafts as posted before approving more.`);
+      setToast({
+        message: `Scheduled queue is full (${draftStatus.scheduled_cap}/${draftStatus.scheduled_cap}). Mark some drafts as posted first.`,
+        type: 'error',
+      });
       return;
     }
     try {
@@ -1815,7 +1818,10 @@ export default function ContentHubPage() {
       const rawDetail = err?.response?.data?.detail;
       const detail = typeof rawDetail === 'string' ? rawDetail : '';
       if (detail.includes('queue is full') || err?.response?.status === 409) {
-        alert(detail || 'Saved drafts queue is full. Mark some drafts as posted first.');
+        setToast({
+          message: detail || 'Scheduled queue is full. Mark some drafts as posted first.',
+          type: 'error',
+        });
         return;
       }
       throw e;
@@ -1873,7 +1879,10 @@ export default function ContentHubPage() {
 
   async function handleDraftOpportunity(oppId: number) {
     if (draftStatus?.draft_queue_full) {
-      alert(`Draft queue is full (${draftStatus.draft_cap}/${draftStatus.draft_cap}). Approve or dismiss drafts to make room.`);
+      setToast({
+        message: `Draft queue is full (${draftStatus.draft_cap}/${draftStatus.draft_cap}). Approve or dismiss drafts to make room.`,
+        type: 'error',
+      });
       return;
     }
     try {
@@ -1897,7 +1906,7 @@ export default function ContentHubPage() {
         setUpgradeModalReason(detail);
         setUpgradeModalOpen(true);
       } else {
-        alert(detail);
+        setToast({ message: detail, type: 'error' });
       }
     }
   }

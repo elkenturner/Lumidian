@@ -6,6 +6,7 @@ import { CreditCard, Check, Loader2, Zap, AlertTriangle, CheckCircle2, X } from 
 import { getBillingStatus, createCheckoutSession, createPortalSession, cancelSubscription, changePlan, BillingStatus } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { logError } from '@/lib/utils/errors';
+import { AppToast, ToastData } from '@/components/AppToast';
 
 import { TIER_DISPLAY_NAMES, TIER_PRICES } from '@/lib/tiers';
 
@@ -57,6 +58,13 @@ export default function BillingPage() {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastData | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const successParam = searchParams.get('success');
 
@@ -93,7 +101,7 @@ export default function BillingPage() {
       window.location.href = checkout_url;
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
-      alert(e?.response?.data?.detail || 'Unable to start checkout. Please try again or contact support.');
+      setToast({ message: e?.response?.data?.detail || 'Unable to start checkout. Please try again or contact support.', type: 'error' });
     } finally {
       setUpgrading(null);
     }
@@ -110,7 +118,7 @@ export default function BillingPage() {
       await refresh();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
-      alert(e?.response?.data?.detail || 'Unable to switch plan. Please try again or contact support.');
+      setToast({ message: e?.response?.data?.detail || 'Unable to switch plan. Please try again or contact support.', type: 'error' });
     } finally {
       setUpgrading(null);
     }
@@ -123,7 +131,7 @@ export default function BillingPage() {
       window.location.href = portal_url;
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
-      alert(e?.response?.data?.detail || 'Unable to open the billing portal. Please try again.');
+      setToast({ message: e?.response?.data?.detail || 'Unable to open the billing portal. Please try again.', type: 'error' });
     } finally {
       setPortalLoading(false);
     }
@@ -139,7 +147,7 @@ export default function BillingPage() {
       setStatus(updated);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
-      alert(e?.response?.data?.detail || 'Unable to cancel subscription. Please try again or contact support.');
+      setToast({ message: e?.response?.data?.detail || 'Unable to cancel subscription. Please try again or contact support.', type: 'error' });
     } finally {
       setCancelLoading(false);
     }
@@ -419,6 +427,7 @@ export default function BillingPage() {
           )}
         </>
       )}
+      {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

@@ -1,15 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Shield, X } from 'lucide-react';
 import { adminExitImpersonation, swapSessionToken } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { AppToast, ToastData } from '@/components/AppToast';
 
 export default function ImpersonationBanner() {
   const router = useRouter();
   const { user, refresh } = useAuth();
   const [exiting, setExiting] = useState(false);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   if (typeof window === 'undefined') return null;
   const adminToken = sessionStorage.getItem('admin_restore_token');
@@ -27,7 +34,7 @@ export default function ImpersonationBanner() {
       await refresh();
       router.push('/admin');
     } catch {
-      alert('Failed to exit impersonation. Try logging out and back in.');
+      setToast({ message: 'Failed to exit impersonation. Try logging out and back in.', type: 'error' });
       setExiting(false);
     }
   }
@@ -73,6 +80,7 @@ export default function ImpersonationBanner() {
         <X size={12} />
         {exiting ? 'Restoring...' : 'Exit Impersonation'}
       </button>
+      {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

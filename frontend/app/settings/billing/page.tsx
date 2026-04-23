@@ -116,6 +116,21 @@ export default function BillingPage() {
     }
   }
 
+  async function handleCancelDowngrade() {
+    if (!currentTier) return;
+    setUpgrading(currentTier);
+    try {
+      await changePlan(currentTier);
+      const updated = await getBillingStatus();
+      setStatus(updated);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      alert(e?.response?.data?.detail || 'Could not cancel the downgrade.');
+    } finally {
+      setUpgrading(null);
+    }
+  }
+
   async function handlePortal() {
     setPortalLoading(true);
     try {
@@ -147,6 +162,7 @@ export default function BillingPage() {
 
   const currentTier = status?.subscription_tier || user?.subscription_tier;
   const isAdmin = status?.is_admin || user?.is_admin;
+  const pendingDate = status?.pending_tier_effective_at ? new Date(status.pending_tier_effective_at) : null;
 
   return (
     <div className="px-8 py-8 max-w-3xl">
@@ -228,6 +244,34 @@ export default function BillingPage() {
           </div>
         );
       })()}
+
+      {/* Pending downgrade banner */}
+      {status?.pending_tier && status.pending_tier_effective_at && (
+        <div className="mb-6 rounded-lg border border-[var(--warning)]/30 bg-[var(--warning)]/10 px-4 py-3 flex items-start gap-3">
+          <AlertTriangle size={16} className="text-[var(--warning)] mt-0.5 flex-shrink-0" />
+          <div className="flex-1 text-xs text-[var(--text-primary)]">
+            <p>
+              Your plan changes to <strong>{TIER_DISPLAY_NAMES[status.pending_tier] || status.pending_tier}</strong>
+              {' on '}
+              <strong>
+                {pendingDate!.toLocaleDateString(undefined, {
+                  year: 'numeric', month: 'long', day: 'numeric',
+                })}
+              </strong>.
+            </p>
+            <p className="text-[var(--text-muted)] mt-1">
+              You keep your current features until that date.
+            </p>
+          </div>
+          <button
+            onClick={handleCancelDowngrade}
+            disabled={upgrading !== null}
+            className="text-xs font-medium text-[var(--text-primary)] hover:underline disabled:opacity-50"
+          >
+            Cancel downgrade
+          </button>
+        </div>
+      )}
 
       {/* Success banner */}
       {successParam === 'true' && (
@@ -386,6 +430,14 @@ export default function BillingPage() {
                     {isCurrent ? (
                       <button disabled className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-faint)] rounded-lg py-2 text-sm font-medium">
                         Current plan
+                      </button>
+                    ) : status?.pending_tier === tier && status.pending_tier_effective_at ? (
+                      <button
+                        disabled
+                        aria-label={`Downgrade to ${displayName} scheduled for ${pendingDate!.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}`}
+                        className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-faint)] rounded-lg py-2 text-sm font-medium cursor-not-allowed"
+                      >
+                        Scheduled for {pendingDate!.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                       </button>
                     ) : (
                       <button

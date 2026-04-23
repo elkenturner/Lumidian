@@ -378,6 +378,7 @@ class UpdateDraftRequest(BaseModel):
     content_text: str | None = Field(None, max_length=50_000)
     status: str | None = None
     platform_guidelines_applied: str | None = Field(None, max_length=10_000)
+    prompt_id: int | None = Field(None, ge=1)
 
     @field_validator("status")
     @classmethod

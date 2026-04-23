@@ -16,6 +16,7 @@ import {
   adminAddCompetitor, adminDeleteCompetitor, swapSessionToken,
   AdminUserDetail, AdminEditUserPayload, AdminBrandDetail, AdminUserRun,
 } from '@/lib/api';
+import { AppToast, ToastData } from '@/components/AppToast';
 
 // ---------------------------------------------------------------------------
 // Reusable small components (matching admin/page.tsx patterns)
@@ -104,12 +105,13 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
 // ---------------------------------------------------------------------------
 
 function BrandCard({
-  brand, onUpdate, onTriggerRun, onGenerateDraft,
+  brand, onUpdate, onTriggerRun, onGenerateDraft, onError,
 }: {
   brand: AdminBrandDetail;
   onUpdate: (b: AdminBrandDetail) => void;
   onTriggerRun: (brandId: number) => void;
   onGenerateDraft: (brandId: number) => void;
+  onError: (message: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -145,21 +147,21 @@ function BrandCard({
         website_url: editUrl || undefined,
       });
       onUpdate({ ...brand, name: editName, slug: editSlug, tier: editTier, brand_type: editType, website_url: editUrl || null });
-    } catch (err) { logError(err, 'AdminUserDetail: save brand'); alert('Failed to save brand.'); }
+    } catch (err) { logError(err, 'AdminUserDetail: save brand'); onError('Failed to save brand.'); }
     finally { setSaving(false); }
   }
 
   async function handleRun() {
     setRunning(true);
     try { await adminTriggerRun(brand.id); onTriggerRun(brand.id); }
-    catch { alert('Failed to trigger run.'); }
+    catch { onError('Failed to trigger run.'); }
     finally { setRunning(false); }
   }
 
   async function handleDraft() {
     setDrafting(true);
     try { await adminGenerateDraft(brand.id); setDrafted(true); onGenerateDraft(brand.id); }
-    catch { alert('Failed to queue drafts.'); }
+    catch { onError('Failed to queue drafts.'); }
     finally { setDrafting(false); }
   }
 
@@ -170,7 +172,7 @@ function BrandCard({
       const updated = await adminEditPrompt(promptId, editPromptText);
       onUpdate({ ...brand, prompts: brand.prompts.map((p) => p.id === promptId ? { ...p, text: updated.text } : p) });
       setEditingPromptId(null);
-    } catch (err) { logError(err, 'AdminUserDetail: edit prompt'); alert('Failed to save prompt.'); }
+    } catch (err) { logError(err, 'AdminUserDetail: edit prompt'); onError('Failed to save prompt.'); }
     finally { setPromptBusy(false); }
   }
 
@@ -179,7 +181,7 @@ function BrandCard({
     try {
       await adminDeletePrompt(promptId);
       onUpdate({ ...brand, prompts: brand.prompts.filter((p) => p.id !== promptId) });
-    } catch (err) { logError(err, 'AdminUserDetail: delete prompt'); alert('Failed to delete prompt.'); }
+    } catch (err) { logError(err, 'AdminUserDetail: delete prompt'); onError('Failed to delete prompt.'); }
     finally { setPromptBusy(false); }
   }
 
@@ -191,7 +193,7 @@ function BrandCard({
       onUpdate({ ...brand, prompts: [...brand.prompts, added] });
       setNewPromptText('');
       setAddingPrompt(false);
-    } catch (err) { logError(err, 'AdminUserDetail: add prompt'); alert('Failed to add prompt.'); }
+    } catch (err) { logError(err, 'AdminUserDetail: add prompt'); onError('Failed to add prompt.'); }
     finally { setPromptBusy(false); }
   }
 
@@ -205,7 +207,7 @@ function BrandCard({
       setNewCompName('');
       setNewCompUrl('');
       setAddingCompetitor(false);
-    } catch (err) { logError(err, 'AdminUserDetail: add competitor'); alert('Failed to add competitor.'); }
+    } catch (err) { logError(err, 'AdminUserDetail: add competitor'); onError('Failed to add competitor.'); }
     finally { setCompBusy(false); }
   }
 
@@ -214,7 +216,7 @@ function BrandCard({
     try {
       await adminDeleteCompetitor(compId);
       onUpdate({ ...brand, competitors: brand.competitors.filter((c) => c.id !== compId) });
-    } catch (err) { logError(err, 'AdminUserDetail: delete competitor'); alert('Failed to delete competitor.'); }
+    } catch (err) { logError(err, 'AdminUserDetail: delete competitor'); onError('Failed to delete competitor.'); }
     finally { setCompBusy(false); }
   }
 
@@ -402,6 +404,12 @@ export default function AdminUserDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<Tab>('overview');
+  const [toast, setToast] = useState<ToastData | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   // Edit form state
   const [editTier, setEditTier] = useState<string>('');
@@ -472,7 +480,7 @@ export default function AdminUserDetailPage() {
 
   function handlePreSave() {
     const ch = computeChanges();
-    if (ch.length === 0) { alert('No changes to save.'); return; }
+    if (ch.length === 0) { setToast({ message: 'No changes to save.', type: 'info' }); return; }
     setEditChanges(ch);
     setShowConfirm(true);
   }
@@ -496,7 +504,7 @@ export default function AdminUserDetailPage() {
       setDetail(updated);
     } catch (err) {
       logError(err, 'AdminUserDetail: save user');
-      alert('Failed to save user.');
+      setToast({ message: 'Failed to save user.', type: 'error' });
     } finally {
       setEditSaving(false);
     }
@@ -514,7 +522,7 @@ export default function AdminUserDetailPage() {
       router.push('/dashboard');
     } catch (err) {
       logError(err, 'AdminUserDetail: impersonate');
-      alert('Failed to impersonate user.');
+      setToast({ message: 'Failed to impersonate user.', type: 'error' });
       setImpersonating(false);
     }
   }
@@ -784,6 +792,7 @@ export default function AdminUserDetailPage() {
                 onUpdate={handleBrandUpdate}
                 onTriggerRun={() => {}}
                 onGenerateDraft={() => {}}
+                onError={(message) => setToast({ message, type: 'error' })}
               />
             ))}
           </div>
@@ -835,6 +844,7 @@ export default function AdminUserDetailPage() {
         )}
 
       </div>
+      {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

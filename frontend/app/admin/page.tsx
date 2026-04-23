@@ -14,6 +14,7 @@ import {
   adminPauseUser, adminRemoveUser, adminGenerateDraft,
   AdminUser, AdminRun, AdminStats,
 } from '@/lib/api';
+import { AppToast, ToastData } from '@/components/AppToast';
 
 function StatCard({ label, value, icon: Icon }: { label: string; value: number | string; icon: React.ElementType }) {
   return (
@@ -73,6 +74,12 @@ export default function AdminPage() {
   const [removingUser, setRemovingUser] = useState<number | null>(null);
   const [confirmRemove, setConfirmRemove] = useState<AdminUser | null>(null);
   const [logsOpen, setLogsOpen] = useState(false);
+  const [toast, setToast] = useState<ToastData | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -110,7 +117,7 @@ export default function AdminPage() {
       await adminTriggerRun(brandId);
       setTimeout(() => load(), 1000);
     } catch {
-      alert('Failed to trigger run.');
+      setToast({ message: 'Failed to trigger run.', type: 'error' });
     } finally {
       setTriggeringBrand(null);
     }
@@ -122,7 +129,7 @@ export default function AdminPage() {
       await adminGenerateDraft(brandId);
       setDraftedBrands((prev) => new Set(prev).add(brandId));
     } catch {
-      alert('Failed to queue draft generation.');
+      setToast({ message: 'Failed to queue draft generation.', type: 'error' });
     } finally {
       setDraftingBrand(null);
     }
@@ -134,7 +141,7 @@ export default function AdminPage() {
       const result = await adminPauseUser(userId);
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, is_paused: result.is_paused } : u));
     } catch {
-      alert('Failed to update user status.');
+      setToast({ message: 'Failed to update user status.', type: 'error' });
     } finally {
       setPausingUser(null);
     }
@@ -147,7 +154,7 @@ export default function AdminPage() {
       await adminRemoveUser(userId);
       setUsers((prev) => prev.filter((u) => u.id !== userId));
     } catch {
-      alert('Failed to remove user.');
+      setToast({ message: 'Failed to remove user.', type: 'error' });
     } finally {
       setRemovingUser(null);
     }
@@ -463,6 +470,7 @@ export default function AdminPage() {
           </div>
         </div>
       )}
+      {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

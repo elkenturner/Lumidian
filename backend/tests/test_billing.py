@@ -541,3 +541,47 @@ async def test_change_plan_further_downgrade_amends_schedule(client: httpx.Async
         assert u.stripe_schedule_id == "sub_sched_fake_2"  # unchanged
         # Effective date unchanged
         assert str(u.pending_tier_effective_at).startswith("2026-05-09")
+
+
+async def test_change_plan_select_current_tier_releases_pending(client: httpx.AsyncClient):
+    """Pro user with pending starter → selects pro: releases schedule, clears pending."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="cancel_dg@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET
+                  stripe_subscription_id = :sid,
+                  stripe_schedule_id = :schid,
+                  pending_tier = :pt,
+                  pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {
+                "sid": "sub_fake_3", "schid": "sub_sched_fake_3",
+                "pt": "starter", "pte": "2026-05-09 00:00:00",
+                "email": "cancel_dg@example.com",
+            },
+        )
+        await db.commit()
+
+    with (
+        patch("stripe.SubscriptionSchedule.release") as mock_release,
+        patch("stripe.Subscription.modify") as mock_modify,
+    ):
+        resp = await client.post("/api/billing/change-plan", json={"tier": "pro"})
+
+    assert resp.status_code == 200, resp.text
+    mock_release.assert_called_once_with("sub_sched_fake_3")
+    mock_modify.assert_not_called()
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "cancel_dg@example.com"))).scalar_one()
+        assert u.subscription_tier == "pro"
+        assert u.pending_tier is None
+        assert u.stripe_schedule_id is None
+        assert u.pending_tier_effective_at is None

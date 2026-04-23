@@ -344,6 +344,33 @@ async def _create_draft_attribution(db: AsyncSession, draft: ContentDraft) -> No
     await db.commit()
 
 
+async def _create_late_attach_attribution(db: AsyncSession, draft: ContentDraft) -> None:
+    """Create a null-baseline DraftAttribution row for a draft that was posted
+    before having a prompt attached. Safe to call when a row already exists — no-ops."""
+    if draft.prompt_id is None:
+        return
+    from app.models import DraftAttribution
+
+    existing_result = await db.execute(
+        select(DraftAttribution).where(DraftAttribution.draft_id == draft.id)
+    )
+    if existing_result.scalar_one_or_none() is not None:
+        return
+
+    attribution = DraftAttribution(
+        draft_id=draft.id,
+        brand_id=draft.brand_id,
+        prompt_id=draft.prompt_id,
+        posted_at=draft.posted_at or utcnow(),
+        score_at_posting=None,
+        current_score=None,
+        delta=None,
+        runs_since_posting=0,
+    )
+    db.add(attribution)
+    await db.commit()
+
+
 # ── Draft update ──────────────────────────────────────────────────────────────
 
 @router.put("/draft/{draft_id}", response_model=ContentDraftSchema)
@@ -372,6 +399,11 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
                 detail="prompt_id must reference a prompt on the same brand as the draft",
             )
         draft.prompt_id = request.prompt_id
+        # Late attach: draft was already posted — create null-baseline attribution
+        if old_status == "posted":
+            # Flush the prompt_id assignment so the helper sees the updated draft
+            await db.flush()
+            await _create_late_attach_attribution(db, draft)
     if request.status is not None:
         allowed_statuses = {"draft", "approved", "posted", "failed"}
         if request.status not in allowed_statuses:

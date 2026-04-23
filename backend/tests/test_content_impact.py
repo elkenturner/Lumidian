@@ -238,3 +238,83 @@ async def test_update_draft_attach_and_post_atomic(client: httpx.AsyncClient):
         # Attribution row should exist; prompt_id attached before the posted-branch fired
         assert len(rows) == 1
         assert rows[0].prompt_id == prompt_id
+
+
+async def test_late_attach_creates_null_baseline_attribution(client: httpx.AsyncClient):
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt, DraftAttribution
+    from sqlalchemy import select
+    from datetime import datetime, timezone
+
+    email = "late1@example.com"
+    await _register_and_login(client, email=email)
+    user_id = await _current_user_id(email)
+
+    async with AsyncSessionLocal() as db:
+        brand = Brand(name="LA", slug="la-attach", user_id=user_id)
+        db.add(brand); await db.commit(); await db.refresh(brand)
+        prompt = Prompt(brand_id=brand.id, text="prompt text")
+        db.add(prompt); await db.commit(); await db.refresh(prompt)
+        # Draft is ALREADY posted with prompt_id=None (orphan)
+        draft = await _create_draft_direct(db, brand.id, prompt_id=None, status="posted")
+        draft.posted_at = datetime.now(timezone.utc)
+        await db.commit()
+        draft_id, prompt_id = draft.id, prompt.id
+
+    r = await client.put(
+        f"/api/content/draft/{draft_id}",
+        json={"prompt_id": prompt_id},
+    )
+    assert r.status_code == 200, r.text
+
+    async with AsyncSessionLocal() as db:
+        rows = (await db.execute(
+            select(DraftAttribution).where(DraftAttribution.draft_id == draft_id)
+        )).scalars().all()
+        assert len(rows) == 1
+        row = rows[0]
+        assert row.prompt_id == prompt_id
+        assert row.score_at_posting is None
+        assert row.delta is None
+        assert row.runs_since_posting == 0
+
+
+async def test_late_attach_does_not_create_duplicate_attribution(client: httpx.AsyncClient):
+    """If an attribution row already exists (unlikely but possible), don't create a second."""
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt, DraftAttribution
+    from datetime import datetime, timezone
+    from sqlalchemy import select
+
+    email = "late2@example.com"
+    await _register_and_login(client, email=email)
+    user_id = await _current_user_id(email)
+
+    async with AsyncSessionLocal() as db:
+        brand = Brand(name="LB", slug="lb-attach", user_id=user_id)
+        db.add(brand); await db.commit(); await db.refresh(brand)
+        prompt = Prompt(brand_id=brand.id, text="prompt text")
+        db.add(prompt); await db.commit(); await db.refresh(prompt)
+        draft = await _create_draft_direct(db, brand.id, prompt_id=None, status="posted")
+        draft.posted_at = datetime.now(timezone.utc)
+        await db.commit()
+        # Pre-seed an attribution row (simulate a prior attach that was then undone)
+        pre = DraftAttribution(
+            draft_id=draft.id, brand_id=brand.id, prompt_id=prompt.id,
+            posted_at=draft.posted_at,
+            score_at_posting=None, current_score=None, delta=None, runs_since_posting=0,
+        )
+        db.add(pre); await db.commit()
+        draft_id, prompt_id = draft.id, prompt.id
+
+    r = await client.put(
+        f"/api/content/draft/{draft_id}",
+        json={"prompt_id": prompt_id},
+    )
+    assert r.status_code == 200
+
+    async with AsyncSessionLocal() as db:
+        rows = (await db.execute(
+            select(DraftAttribution).where(DraftAttribution.draft_id == draft_id)
+        )).scalars().all()
+        assert len(rows) == 1  # no duplicate

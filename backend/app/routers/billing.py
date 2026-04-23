@@ -823,6 +823,24 @@ async def stripe_webhook(request: Request, db: DbDep):
             if tier:
                 await _sync_brands_for_tier(db, user.id, tier)
 
+    elif event_type in ("subscription_schedule.released", "subscription_schedule.canceled"):
+        schedule_id = data_obj.get("id")
+        if schedule_id:
+            result = await db.execute(
+                sa_select(UserModel).where(UserModel.stripe_schedule_id == schedule_id)
+            )
+            user = result.scalar_one_or_none()
+            if user:
+                logger.info(
+                    "Clearing pending state for user %s after schedule %s (%s)",
+                    user.email, schedule_id, event_type,
+                )
+                user.pending_tier = None
+                user.pending_tier_effective_at = None
+                user.stripe_schedule_id = None
+                user.updated_at = utcnow()
+                await db.flush()
+
     elif event_type == "customer.subscription.deleted":
         customer_id = data_obj.get("customer")
         result = await db.execute(

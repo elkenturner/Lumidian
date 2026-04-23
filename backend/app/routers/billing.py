@@ -373,71 +373,204 @@ async def change_plan(
     user: Annotated[User, Depends(get_current_user)],
     db: DbDep,
 ):
-    """Switch the user's subscription tier with no proration. Billing adjusts at next renewal."""
-    if request.tier not in TIER_PRICES:
+    """Switch the user's subscription tier.
+
+    Upgrades apply immediately with proration. Downgrades defer to the
+    current billing period end via a Stripe SubscriptionSchedule.
+    """
+    from datetime import datetime
+
+    target_tier = request.tier
+    if target_tier not in TIER_PRICES:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid tier")
     if not user.stripe_subscription_id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="No active subscription found. Use checkout to start a new subscription.",
         )
-    if user.subscription_tier == request.tier:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already on this plan")
-
-    price_id = TIER_PRICES[request.tier]
-    if not price_id:
+    current_tier = user.subscription_tier
+    if current_tier not in TIER_ORDER:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Stripe price ID for '{request.tier}' not configured",
+            detail="Cannot switch plans from a non-paid tier. Use checkout instead.",
         )
+
+    pending_tier = user.pending_tier
+    target_order = TIER_ORDER[target_tier]
+    current_order = TIER_ORDER[current_tier]
+    is_upgrade = target_order > current_order
+    is_downgrade = target_order < current_order
+    is_same = target_order == current_order
 
     stripe = get_stripe()
+    display = TIER_DISPLAY_NAMES.get(target_tier, target_tier)
 
-    try:
-        subscription = stripe.Subscription.retrieve(user.stripe_subscription_id)
-        items_data = subscription.get("items", {}).get("data", [])
-        if not items_data:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Could not retrieve subscription items from Stripe",
-            )
-        item_id = items_data[0]["id"]
-
-        stripe.Subscription.modify(
-            user.stripe_subscription_id,
-            items=[{"id": item_id, "price": price_id}],
-            proration_behavior="none",
-            metadata={"tier": request.tier, "user_id": str(user.id)},
-        )
-    except HTTPException:
-        raise
-    except stripe.error.APIConnectionError as exc:
-        logger.error("Stripe connection error during plan switch: %s", exc)
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Payment service temporarily unavailable. Please try again.")
-    except stripe.error.RateLimitError as exc:
-        logger.warning("Stripe rate limit during plan switch: %s", exc)
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests to payment service. Please wait a moment and try again.")
-    except Exception as exc:
-        logger.exception("Plan switch failed")
+    # Target already matches a pending downgrade — reject.
+    if pending_tier and target_tier == pending_tier:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Could not switch plan. Please try again or contact support.",
+            detail="Already scheduled to downgrade to this plan.",
         )
 
-    old_tier = user.subscription_tier
-    user.subscription_tier = request.tier
-    user.updated_at = utcnow()
-    await db.commit()
+    # Target equals current tier.
+    if is_same:
+        if pending_tier and user.stripe_schedule_id:
+            try:
+                stripe.SubscriptionSchedule.release(user.stripe_schedule_id)
+            except Exception:
+                logger.exception("Failed to release schedule %s", user.stripe_schedule_id)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Could not cancel the scheduled downgrade. Please try again.",
+                )
+            user.stripe_schedule_id = None
+            user.pending_tier = None
+            user.pending_tier_effective_at = None
+            user.updated_at = utcnow()
+            await db.commit()
+            return {"message": "Scheduled downgrade canceled."}
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Already on this plan")
 
-    from app.services.analytics_service import log_event
-    await log_event(
-        "plan_switched",
-        {"old_plan": old_tier, "new_plan": request.tier},
-        user_id=user.id,
-    )
+    # Upgrade path — release any pending schedule, then immediate modify.
+    if is_upgrade:
+        if user.stripe_schedule_id:
+            try:
+                stripe.SubscriptionSchedule.release(user.stripe_schedule_id)
+            except Exception:
+                logger.exception("Failed to release schedule %s during upgrade", user.stripe_schedule_id)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Could not process upgrade. Please try again.",
+                )
+            user.stripe_schedule_id = None
+            user.pending_tier = None
+            user.pending_tier_effective_at = None
 
-    display_name = TIER_DISPLAY_NAMES.get(request.tier, request.tier)
-    return {"message": f"Plan switched to {display_name}. Billing adjusts at your next renewal."}
+        price_id = TIER_PRICES[target_tier]
+        if not price_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Stripe price ID for '{target_tier}' not configured",
+            )
+        try:
+            subscription = stripe.Subscription.retrieve(user.stripe_subscription_id)
+            items_data = subscription.get("items", {}).get("data", [])
+            if not items_data:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Could not retrieve subscription items from Stripe",
+                )
+            item_id = items_data[0]["id"]
+            stripe.Subscription.modify(
+                user.stripe_subscription_id,
+                items=[{"id": item_id, "price": price_id}],
+                proration_behavior="create_prorations",
+                metadata={"tier": target_tier, "user_id": str(user.id)},
+            )
+        except HTTPException:
+            raise
+        except stripe.error.APIConnectionError as exc:
+            logger.error("Stripe connection error during plan upgrade: %s", exc)
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Payment service temporarily unavailable. Please try again.")
+        except stripe.error.RateLimitError as exc:
+            logger.warning("Stripe rate limit during plan upgrade: %s", exc)
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests to payment service. Please wait a moment and try again.")
+        except Exception:
+            logger.exception("Plan upgrade failed")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not upgrade plan. Please try again or contact support.",
+            )
+        old_tier = user.subscription_tier
+        user.subscription_tier = target_tier
+        user.updated_at = utcnow()
+        await db.commit()
+
+        from app.services.analytics_service import log_event
+        await log_event("plan_switched", {"old_plan": old_tier, "new_plan": target_tier}, user_id=user.id)
+        return {"message": f"Plan upgraded to {display}."}
+
+    # Downgrade path — create or amend a SubscriptionSchedule.
+    if is_downgrade:
+        new_price_id = TIER_PRICES[target_tier]
+        if not new_price_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Stripe price ID for '{target_tier}' not configured",
+            )
+        try:
+            if user.stripe_schedule_id:
+                # Amend existing schedule's phase 2.
+                schedule = stripe.SubscriptionSchedule.retrieve(user.stripe_schedule_id)
+                phase1 = schedule["phases"][0]
+                stripe.SubscriptionSchedule.modify(
+                    user.stripe_schedule_id,
+                    phases=[
+                        {
+                            "items": phase1["items"],
+                            "start_date": phase1["start_date"],
+                            "end_date": phase1["end_date"],
+                        },
+                        {
+                            "items": [{"price": new_price_id, "quantity": 1}],
+                            "iterations": 1,
+                            "metadata": {"tier": target_tier, "user_id": str(user.id)},
+                            "proration_behavior": "none",
+                        },
+                    ],
+                    end_behavior="release",
+                )
+                user.pending_tier = target_tier
+                user.updated_at = utcnow()
+                await db.commit()
+                return {"message": f"Scheduled downgrade updated to {display}."}
+            else:
+                # Create a new schedule from the subscription.
+                schedule = stripe.SubscriptionSchedule.create(
+                    from_subscription=user.stripe_subscription_id
+                )
+                phase1 = schedule["phases"][0]
+                stripe.SubscriptionSchedule.modify(
+                    schedule["id"],
+                    phases=[
+                        {
+                            "items": phase1["items"],
+                            "start_date": phase1["start_date"],
+                            "end_date": phase1["end_date"],
+                        },
+                        {
+                            "items": [{"price": new_price_id, "quantity": 1}],
+                            "iterations": 1,
+                            "metadata": {"tier": target_tier, "user_id": str(user.id)},
+                            "proration_behavior": "none",
+                        },
+                    ],
+                    end_behavior="release",
+                )
+                effective_at = datetime.fromtimestamp(phase1["end_date"], UTC).replace(tzinfo=None)
+                user.stripe_schedule_id = schedule["id"]
+                user.pending_tier = target_tier
+                user.pending_tier_effective_at = effective_at
+                user.updated_at = utcnow()
+                await db.commit()
+                return {"message": f"Plan downgrades to {display} on {effective_at.strftime('%b %d, %Y')}."}
+        except HTTPException:
+            raise
+        except stripe.error.APIConnectionError as exc:
+            logger.error("Stripe connection error during downgrade schedule: %s", exc)
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Payment service temporarily unavailable. Please try again.")
+        except stripe.error.RateLimitError as exc:
+            logger.warning("Stripe rate limit during downgrade schedule: %s", exc)
+            raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Too many requests to payment service. Please wait a moment and try again.")
+        except Exception:
+            logger.exception("Downgrade scheduling failed")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Could not schedule downgrade. Please try again or contact support.",
+            )
+
+    # Should be unreachable.
+    raise HTTPException(status_code=500, detail="Unexpected plan-change state")
 
 
 # ── Cancel subscription ────────────────────────────────────────────────────────

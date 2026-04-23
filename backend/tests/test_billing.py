@@ -389,3 +389,49 @@ async def test_sync_brands_for_tier_downgrades_pro_brands_to_basic():
         await db.refresh(brand)
         assert brand.brand_type == "standard"
         assert brand.prompt_limit == 10
+
+
+async def test_change_plan_downgrade_creates_schedule_and_keeps_current_tier(client: httpx.AsyncClient):
+    """Pro → Growth downgrade: creates SubscriptionSchedule, sets pending fields,
+    does NOT change subscription_tier locally."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="dg_create@example.com", subscription_tier="pro")
+    # Give the test user a fake stripe subscription id
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("UPDATE users SET stripe_subscription_id = :sid WHERE email = :email"),
+            {"sid": "sub_test_fake", "email": "dg_create@example.com"},
+        )
+        await db.commit()
+
+    # Mock Stripe: SubscriptionSchedule.create returns an object with phases
+    fake_schedule = {
+        "id": "sub_sched_fake",
+        "phases": [{
+            "items": [{"price": "price_test_pro", "quantity": 1}],
+            "start_date": 1713200000,
+            "end_date": 1715792000,
+        }],
+    }
+    with (
+        patch.dict("os.environ", {"STRIPE_STARTER_PRICE_ID": "price_test_starter", "STRIPE_PRO_PRICE_ID": "price_test_pro"}),
+        patch("stripe.SubscriptionSchedule.create", return_value=fake_schedule) as mock_create,
+        patch("stripe.SubscriptionSchedule.modify", return_value=fake_schedule) as mock_modify,
+    ):
+        resp = await client.post("/api/billing/change-plan", json={"tier": "starter"})
+
+    assert resp.status_code == 200, resp.text
+    mock_create.assert_called_once_with(from_subscription="sub_test_fake")
+    mock_modify.assert_called_once()
+
+    # Verify local state
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "dg_create@example.com"))).scalar_one()
+        assert u.subscription_tier == "pro"  # unchanged!
+        assert u.pending_tier == "starter"
+        assert u.stripe_schedule_id == "sub_sched_fake"
+        assert u.pending_tier_effective_at is not None

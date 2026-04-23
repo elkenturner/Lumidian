@@ -784,6 +784,7 @@ async def stripe_webhook(request: Request, db: DbDep):
         if user:
             from datetime import datetime
             old_tier = user.subscription_tier
+            prev_pending_tier = user.pending_tier
             user.subscription_status = sub_status
             user.stripe_subscription_id = sub_id
             if tier:
@@ -791,6 +792,15 @@ async def stripe_webhook(request: Request, db: DbDep):
                     logger.info("Skipping tier update for user %s — admin override active", user.email)
                 else:
                     user.subscription_tier = tier
+            # If this webhook reflects the completed phase transition, clear pending state.
+            if tier and prev_pending_tier and tier == prev_pending_tier:
+                logger.info(
+                    "Subscription schedule transition completed for user %s: tier=%s",
+                    user.email, tier,
+                )
+                user.pending_tier = None
+                user.pending_tier_effective_at = None
+                user.stripe_schedule_id = None
             # Store trial end date if present (Stripe sends unix timestamp)
             trial_end_ts = data_obj.get("trial_end")
             if trial_end_ts:

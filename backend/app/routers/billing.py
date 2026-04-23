@@ -52,6 +52,11 @@ TIER_PRICES = {
     "starter": os.getenv("STRIPE_STARTER_PRICE_ID", ""),
     "pro": os.getenv("STRIPE_PRO_PRICE_ID", ""),
 }
+# Integer ordering used to detect upgrade vs downgrade in change-plan.
+# Free (None) is not included — downgrading to Free goes through /cancel.
+TIER_ORDER = {"basic": 1, "starter": 2, "pro": 3}
+
+
 def _brand_limits_for_api(tier: str | None) -> dict[str, int]:
     """Derive {standard, pitch} brand limits from BRAND_TYPE_LIMITS.
 

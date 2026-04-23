@@ -9,6 +9,7 @@ GET  /api/content/draft/{draft_id}              — get draft detail with platfo
 PUT  /api/content/draft/{draft_id}              — update draft text / status
 POST /api/content/draft/{draft_id}/post         — mark as posted
 DELETE /api/content/draft/{draft_id}            — delete draft
+GET    /draft/{draft_id}/prompt-suggestions     - rank brand's prompts by similarity to this draft's text
 GET  /api/content/{brand_id}/settings           — get all platform settings for brand
 PUT  /api/content/{brand_id}/settings/{platform} — update platform settings
 GET  /api/content/{brand_id}/attribution        — get all attribution records for brand
@@ -41,6 +42,7 @@ from app.schemas import (
     CreateDraftRequest,
     GenerateNowRequest,
     PostDraftRequest,
+    PromptSuggestion,
     UpdateContentSettingsRequest,
     UpdateDraftRequest,
 )
@@ -55,6 +57,7 @@ from app.services.drafting_service import (
     auto_draft_top_gaps,
     generate_gap_draft,
     get_draft_cap,
+    rank_prompts_by_similarity,
 )
 
 SCHEDULED_CAP = 100  # max approved/scheduled drafts queued at once (pro tier default)
@@ -540,20 +543,22 @@ async def delete_draft(draft_id: int, db: DbDep, user: CurrentUser):
 
 # ── Prompt suggestions for orphan drafts ─────────────────────────────────────
 
-from app.schemas import PromptSuggestion  # noqa: E402 — grouped here intentionally
-from app.services.drafting_service import rank_prompts_by_similarity
+# Jaccard similarity thresholds for prompt-suggestion labels.
+# Tuned for short prompt text vs. draft paragraphs — revisit if length distributions change.
+_VERY_RELEVANT_THRESHOLD = 0.35
+_SOMEWHAT_THRESHOLD = 0.15
 
 
 def _label_for_similarity(score: float) -> str:
-    if score >= 0.35:
+    if score >= _VERY_RELEVANT_THRESHOLD:
         return "very_relevant"
-    if score >= 0.15:
+    if score >= _SOMEWHAT_THRESHOLD:
         return "somewhat"
     return "loose"
 
 
-@router.post("/draft/{draft_id}/prompt-suggestions", response_model=list[PromptSuggestion])
-async def suggest_prompts_for_draft(draft_id: int, db: DbDep, user: CurrentUser):
+@router.get("/draft/{draft_id}/prompt-suggestions", response_model=list[PromptSuggestion])
+async def get_prompt_suggestions_for_draft(draft_id: int, db: DbDep, user: CurrentUser):
     """Return up to 3 tracked prompts ranked by similarity to the draft's content."""
     draft = await _get_draft_for_user(db, draft_id, user)
     prompt_result = await db.execute(

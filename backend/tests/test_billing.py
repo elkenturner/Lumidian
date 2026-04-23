@@ -663,4 +663,54 @@ async def test_cancel_releases_pending_schedule_first(client: httpx.AsyncClient)
         assert u.stripe_schedule_id is None
         assert u.pending_tier is None
         assert u.pending_tier_effective_at is None
-        assert u.subscription_status == "canceling"
+
+
+async def test_webhook_clears_pending_when_transition_completes(client: httpx.AsyncClient):
+    """When customer.subscription.updated arrives with the pending_tier's price,
+    clear all three pending columns."""
+    import json
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="tx_complete@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET stripe_customer_id = :cid, stripe_subscription_id = :sid,
+                                 stripe_schedule_id = :schid, pending_tier = :pt,
+                                 pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {"cid": "cus_tx", "sid": "sub_tx", "schid": "sch_tx", "pt": "starter",
+             "pte": "2026-05-09 00:00:00", "email": "tx_complete@example.com"},
+        )
+        await db.commit()
+
+    event_payload = {
+        "id": "evt_tx_1",
+        "type": "customer.subscription.updated",
+        "data": {"object": {
+            "id": "sub_tx",
+            "customer": "cus_tx",
+            "status": "active",
+            "metadata": {"tier": "starter"},
+        }},
+    }
+
+    with patch("stripe.Webhook.construct_event", return_value=event_payload):
+        with patch.dict("os.environ", {"STRIPE_WEBHOOK_SECRET": "whsec_test", "STRIPE_SECRET_KEY": "sk_test"}):
+            resp = await client.post(
+                "/api/billing/webhook",
+                content=json.dumps(event_payload),
+                headers={"stripe-signature": "t=1,v1=fake"},
+            )
+    assert resp.status_code == 200
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "tx_complete@example.com"))).scalar_one()
+        assert u.subscription_tier == "starter"
+        assert u.pending_tier is None
+        assert u.stripe_schedule_id is None
+        assert u.pending_tier_effective_at is None

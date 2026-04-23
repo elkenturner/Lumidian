@@ -357,6 +357,13 @@ class ContentAttributionSchema(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class PromptSuggestion(BaseModel):
+    prompt_id: int
+    text: str
+    score: float
+    label: str  # "very_relevant" | "somewhat" | "loose"
+
+
 # ── Request schemas ───────────────────────────────────────────────────────────
 
 class CreateDraftRequest(BaseModel):

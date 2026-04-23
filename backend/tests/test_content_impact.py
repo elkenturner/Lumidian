@@ -318,3 +318,101 @@ async def test_late_attach_does_not_create_duplicate_attribution(client: httpx.A
             select(DraftAttribution).where(DraftAttribution.draft_id == draft_id)
         )).scalars().all()
         assert len(rows) == 1  # no duplicate
+
+
+# -- Integration tests against POST /api/content/draft/{id}/prompt-suggestions -
+
+@pytest.mark.asyncio
+async def test_prompt_suggestions_returns_ranked_top3(client: httpx.AsyncClient):
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt
+
+    email = "sugg1@example.com"
+    await _register_and_login(client, email=email)
+    user_id = await _current_user_id(email)
+
+    async with AsyncSessionLocal() as db:
+        brand = Brand(name="S", slug="s-sugg", user_id=user_id)
+        db.add(brand); await db.commit(); await db.refresh(brand)
+        prompts = [
+            Prompt(brand_id=brand.id, text="best ai tools for sales teams"),
+            Prompt(brand_id=brand.id, text="ai tools for marketing automation"),
+            Prompt(brand_id=brand.id, text="submarine navigation"),
+            Prompt(brand_id=brand.id, text="vegetarian weeknight recipes"),
+        ]
+        for p in prompts:
+            db.add(p)
+        await db.commit()
+        draft = await _create_draft_direct(db, brand.id, prompt_id=None)
+        draft.content_text = "ai tools sales outreach for startup teams"
+        await db.commit()
+        draft_id = draft.id
+
+    r = await client.post(
+        f"/api/content/draft/{draft_id}/prompt-suggestions",
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert isinstance(body, list)
+    assert len(body) <= 3
+    assert len(body) >= 1
+    # Top match should be the sales-tools prompt
+    assert "sales" in body[0]["text"].lower()
+    # Each entry has the expected shape
+    for item in body:
+        assert "prompt_id" in item
+        assert "text" in item
+        assert "score" in item
+        assert "label" in item
+        assert item["label"] in ("very_relevant", "somewhat", "loose")
+
+
+@pytest.mark.asyncio
+async def test_prompt_suggestions_empty_when_no_prompts(client: httpx.AsyncClient):
+    from app.database import AsyncSessionLocal
+    from app.models import Brand
+
+    email = "sugg2@example.com"
+    await _register_and_login(client, email=email)
+    user_id = await _current_user_id(email)
+
+    async with AsyncSessionLocal() as db:
+        brand = Brand(name="SE", slug="se-sugg", user_id=user_id)
+        db.add(brand); await db.commit(); await db.refresh(brand)
+        draft = await _create_draft_direct(db, brand.id, prompt_id=None)
+        draft_id = draft.id
+
+    r = await client.post(
+        f"/api/content/draft/{draft_id}/prompt-suggestions",
+    )
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+@pytest.mark.asyncio
+async def test_prompt_suggestions_labels_match_thresholds(client: httpx.AsyncClient):
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt
+
+    email = "sugg3@example.com"
+    await _register_and_login(client, email=email)
+    user_id = await _current_user_id(email)
+
+    async with AsyncSessionLocal() as db:
+        brand = Brand(name="SL", slug="sl-sugg", user_id=user_id)
+        db.add(brand); await db.commit(); await db.refresh(brand)
+        # Same text → score 1.0 → "very_relevant"
+        p1 = Prompt(brand_id=brand.id, text="ai tools sales")
+        db.add(p1); await db.commit()
+        draft = await _create_draft_direct(db, brand.id, prompt_id=None)
+        draft.content_text = "ai tools sales"
+        await db.commit()
+        draft_id = draft.id
+
+    r = await client.post(
+        f"/api/content/draft/{draft_id}/prompt-suggestions",
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body[0]["label"] == "very_relevant"
+    assert body[0]["score"] >= 0.35

@@ -320,7 +320,7 @@ async def test_late_attach_does_not_create_duplicate_attribution(client: httpx.A
         assert len(rows) == 1  # no duplicate
 
 
-# -- Integration tests against POST /api/content/draft/{id}/prompt-suggestions -
+# -- Integration tests against GET /api/content/draft/{id}/prompt-suggestions --
 
 @pytest.mark.asyncio
 async def test_prompt_suggestions_returns_ranked_top3(client: httpx.AsyncClient):
@@ -348,7 +348,7 @@ async def test_prompt_suggestions_returns_ranked_top3(client: httpx.AsyncClient)
         await db.commit()
         draft_id = draft.id
 
-    r = await client.post(
+    r = await client.get(
         f"/api/content/draft/{draft_id}/prompt-suggestions",
     )
     assert r.status_code == 200, r.text
@@ -382,7 +382,7 @@ async def test_prompt_suggestions_empty_when_no_prompts(client: httpx.AsyncClien
         draft = await _create_draft_direct(db, brand.id, prompt_id=None)
         draft_id = draft.id
 
-    r = await client.post(
+    r = await client.get(
         f"/api/content/draft/{draft_id}/prompt-suggestions",
     )
     assert r.status_code == 200
@@ -409,10 +409,39 @@ async def test_prompt_suggestions_labels_match_thresholds(client: httpx.AsyncCli
         await db.commit()
         draft_id = draft.id
 
-    r = await client.post(
+    r = await client.get(
         f"/api/content/draft/{draft_id}/prompt-suggestions",
     )
     assert r.status_code == 200
     body = r.json()
     assert body[0]["label"] == "very_relevant"
     assert body[0]["score"] >= 0.35
+
+
+def test_label_for_similarity_bands():
+    from app.routers.content import _label_for_similarity
+    # Above very_relevant threshold
+    assert _label_for_similarity(1.0) == "very_relevant"
+    assert _label_for_similarity(0.5) == "very_relevant"
+    # Exact very_relevant boundary (inclusive)
+    assert _label_for_similarity(0.35) == "very_relevant"
+    # Between somewhat and very_relevant
+    assert _label_for_similarity(0.34) == "somewhat"
+    assert _label_for_similarity(0.20) == "somewhat"
+    # Exact somewhat boundary (inclusive)
+    assert _label_for_similarity(0.15) == "somewhat"
+    # Below somewhat
+    assert _label_for_similarity(0.14) == "loose"
+    assert _label_for_similarity(0.0) == "loose"
+
+
+def test_label_for_similarity_uses_module_constants():
+    from app.routers.content import (
+        _label_for_similarity,
+        _VERY_RELEVANT_THRESHOLD,
+        _SOMEWHAT_THRESHOLD,
+    )
+    # Constants wire into the function, so changing them moves the labels
+    assert _label_for_similarity(_VERY_RELEVANT_THRESHOLD) == "very_relevant"
+    assert _label_for_similarity(_SOMEWHAT_THRESHOLD) == "somewhat"
+    assert _label_for_similarity(_SOMEWHAT_THRESHOLD - 0.01) == "loose"

@@ -483,3 +483,61 @@ async def test_change_plan_upgrade_while_pending_releases_schedule(client: httpx
         assert u.pending_tier is None
         assert u.stripe_schedule_id is None
         assert u.pending_tier_effective_at is None
+
+
+async def test_change_plan_further_downgrade_amends_schedule(client: httpx.AsyncClient):
+    """Pro user with pending starter → change target to basic: amend phase 2,
+    do NOT release/recreate the schedule. pending_tier_effective_at unchanged."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="further_dg@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET
+                  stripe_subscription_id = :sid,
+                  stripe_schedule_id = :schid,
+                  pending_tier = :pt,
+                  pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {
+                "sid": "sub_fake_2", "schid": "sub_sched_fake_2",
+                "pt": "starter", "pte": "2026-05-09 00:00:00",
+                "email": "further_dg@example.com",
+            },
+        )
+        await db.commit()
+
+    fake_schedule = {
+        "id": "sub_sched_fake_2",
+        "phases": [{
+            "items": [{"price": "price_test_pro", "quantity": 1}],
+            "start_date": 1713200000,
+            "end_date": 1715792000,
+        }],
+    }
+    with (
+        patch.dict("os.environ", {"STRIPE_BASIC_PRICE_ID": "price_test_basic"}),
+        patch("stripe.SubscriptionSchedule.retrieve", return_value=fake_schedule),
+        patch("stripe.SubscriptionSchedule.modify") as mock_modify,
+        patch("stripe.SubscriptionSchedule.release") as mock_release,
+        patch("stripe.SubscriptionSchedule.create") as mock_create,
+    ):
+        resp = await client.post("/api/billing/change-plan", json={"tier": "basic"})
+
+    assert resp.status_code == 200, resp.text
+    mock_modify.assert_called_once()
+    mock_release.assert_not_called()
+    mock_create.assert_not_called()
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "further_dg@example.com"))).scalar_one()
+        assert u.subscription_tier == "pro"  # unchanged
+        assert u.pending_tier == "basic"     # updated
+        assert u.stripe_schedule_id == "sub_sched_fake_2"  # unchanged
+        # Effective date unchanged
+        assert str(u.pending_tier_effective_at).startswith("2026-05-09")

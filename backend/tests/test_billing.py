@@ -435,3 +435,51 @@ async def test_change_plan_downgrade_creates_schedule_and_keeps_current_tier(cli
         assert u.pending_tier == "starter"
         assert u.stripe_schedule_id == "sub_sched_fake"
         assert u.pending_tier_effective_at is not None
+
+
+async def test_change_plan_upgrade_while_pending_releases_schedule(client: httpx.AsyncClient):
+    """If a downgrade is scheduled and the user upgrades, the schedule must
+    be released before the immediate modify fires."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="up_while_pending@example.com", subscription_tier="starter")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET
+                  stripe_subscription_id = :sid,
+                  stripe_schedule_id = :schid,
+                  pending_tier = :pt,
+                  pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {
+                "sid": "sub_fake_1", "schid": "sub_sched_fake_1",
+                "pt": "basic", "pte": "2026-05-09 00:00:00",
+                "email": "up_while_pending@example.com",
+            },
+        )
+        await db.commit()
+
+    fake_sub = {"items": {"data": [{"id": "si_fake_1"}]}}
+    with (
+        patch.dict("os.environ", {"STRIPE_PRO_PRICE_ID": "price_test_pro"}),
+        patch("stripe.SubscriptionSchedule.release") as mock_release,
+        patch("stripe.Subscription.retrieve", return_value=fake_sub),
+        patch("stripe.Subscription.modify") as mock_modify,
+    ):
+        resp = await client.post("/api/billing/change-plan", json={"tier": "pro"})
+
+    assert resp.status_code == 200, resp.text
+    mock_release.assert_called_once_with("sub_sched_fake_1")
+    mock_modify.assert_called_once()
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "up_while_pending@example.com"))).scalar_one()
+        assert u.subscription_tier == "pro"
+        assert u.pending_tier is None
+        assert u.stripe_schedule_id is None
+        assert u.pending_tier_effective_at is None

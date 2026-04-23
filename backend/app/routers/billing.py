@@ -25,6 +25,16 @@ from app.models import User, utcnow
 
 logger = logging.getLogger(__name__)
 
+# ── Stripe Customer Portal configuration ──────────────────────────────────────
+# The Customer Portal's "Customers can switch plans" setting MUST be disabled.
+# Plan switching is handled exclusively by POST /api/billing/change-plan, which
+# implements the period-end downgrade state machine (see
+# docs/superpowers/specs/2026-04-22-period-end-downgrades-design.md). Allowing
+# plan switches in the portal would bypass our SubscriptionSchedule logic and
+# create drift between Stripe and local pending_tier state.
+# "Cancel subscription" in the portal is fine — it uses cancel_at_period_end
+# which /api/billing/cancel also uses.
+
 router = APIRouter(prefix="/billing", tags=["billing"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]

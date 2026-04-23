@@ -68,3 +68,28 @@ def test_rank_empty_draft_text_all_zero():
     result = rank_prompts_by_similarity("", prompts)
     p, score = result[0]
     assert score == 0.0
+
+
+from app.schemas import UpdateDraftRequest
+
+
+def test_update_draft_request_accepts_prompt_id():
+    req = UpdateDraftRequest(prompt_id=42)
+    assert req.prompt_id == 42
+
+
+def test_update_draft_request_prompt_id_defaults_none():
+    req = UpdateDraftRequest(title="new title")
+    assert req.prompt_id is None
+
+
+def test_update_draft_request_prompt_id_rejects_negative():
+    with pytest.raises(Exception):
+        UpdateDraftRequest(prompt_id=-1)
+
+
+def test_update_draft_request_all_fields_together():
+    req = UpdateDraftRequest(prompt_id=7, status="posted", title="hi")
+    assert req.prompt_id == 7
+    assert req.status == "posted"
+    assert req.title == "hi"

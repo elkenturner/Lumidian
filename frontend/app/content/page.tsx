@@ -1581,7 +1581,7 @@ export default function ContentHubPage() {
     } else if (tab === 'drafts') {
       setActivePrimaryTab('content_drafts');
       setActiveSubTab('queue');
-    } else if (tab === 'scheduled') {
+    } else if (tab === 'scheduled' || tab === 'saved') {
       setActivePrimaryTab('content_drafts');
       setActiveSubTab('scheduled');
     } else if (tab === 'posted') {
@@ -2173,7 +2173,7 @@ export default function ContentHubPage() {
             <li><span className="text-[var(--text-primary)] font-medium">Regenerate Drafts</span> — replaces all existing drafts with a fresh batch across your tracked prompts and platforms.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Visibility Opportunities</span> tab shows threads across Reddit, Quora, LinkedIn, and X matching your tracked prompts. Use &quot;Scan for Opportunities&quot; to refresh.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Queue</span> — review, edit, and approve AI drafts before they go live.</li>
-            <li><span className="text-[var(--text-primary)] font-medium">Scheduled</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
+            <li><span className="text-[var(--text-primary)] font-medium">Saved</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Posted tab</span> — content that has been marked as posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Brand Settings</span> — control which platforms generate drafts and how frequently.</li>
           </ul>
@@ -2546,7 +2546,7 @@ export default function ContentHubPage() {
               <div className="flex gap-1 mb-5 pl-0.5">
                 {([
                   { key: 'queue' as ContentDraftsSubTab, label: 'Queue', count: tabCounts.drafts },
-                  { key: 'scheduled' as ContentDraftsSubTab, label: 'Scheduled', count: tabCounts.scheduled },
+                  { key: 'scheduled' as ContentDraftsSubTab, label: 'Saved', count: tabCounts.scheduled },
                 ]).map((sub) => (
                   <button
                     key={sub.key}
@@ -2721,7 +2721,7 @@ export default function ContentHubPage() {
                   <>
                     {([
                       { label: 'Drafts', count: draftStatus.draft_count, cap: draftStatus.draft_cap },
-                      { label: 'Scheduled', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
+                      { label: 'Saved', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
                     ] as Array<{ label: string; count: number; cap: number }>).map(({ label, count, cap }) => {
                       const pct = cap > 0 ? count / cap : 0;
                       const barColor = 'var(--accent)';

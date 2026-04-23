@@ -124,7 +124,7 @@ export function DraftsPanel(props: ContentTabPanelsProps) {
       <div className="flex items-start gap-2 bg-[var(--bg-base)] border border-[var(--border-subtle)] rounded-lg px-3 py-2.5">
         <RefreshCw size={12} className="text-[var(--text-faint)] flex-shrink-0 mt-0.5" />
         <p className="text-xs text-[var(--text-faint)]">
-          Unreviewed drafts are replaced when new drafts are generated. Move anything you want to keep to <span className="text-[var(--text-secondary)]">Scheduled</span> first.
+          Unreviewed drafts are replaced when new drafts are generated. Move anything you want to keep to <span className="text-[var(--text-secondary)]">Saved</span> first.
         </p>
       </div>
       <motion.div

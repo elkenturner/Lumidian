@@ -93,3 +93,148 @@ def test_update_draft_request_all_fields_together():
     assert req.prompt_id == 7
     assert req.status == "posted"
     assert req.title == "hi"
+
+
+# -- Integration tests against /api/content/draft/{id} ------------------------
+
+import httpx
+from tests.conftest import register_and_login as _register_and_login
+
+
+async def _create_draft_direct(db_session, brand_id: int, prompt_id: int | None = None, status: str = "draft"):
+    """Insert a ContentDraft row directly -- bypasses the draft-generation flow."""
+    from app.models import ContentDraft
+    d = ContentDraft(
+        brand_id=brand_id,
+        prompt_id=prompt_id,
+        platform="reddit",
+        status=status,
+        title="test",
+        content_text="test body",
+        content_brief="test brief",
+        visibility_score_at_draft=0.0,
+        estimated_impact=0.0,
+        source="manual",
+    )
+    db_session.add(d)
+    await db_session.commit()
+    await db_session.refresh(d)
+    return d
+
+
+async def _current_user_id(email: str) -> int:
+    """Look up the user id for a given email."""
+    from app.database import AsyncSessionLocal
+    from app.models import User
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as db:
+        res = await db.execute(select(User).where(User.email == email))
+        user = res.scalar_one()
+        return user.id
+
+
+async def test_update_draft_attaches_prompt_id(client: httpx.AsyncClient):
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt
+
+    email = "attach1@example.com"
+    await _register_and_login(client, email=email)
+    user_id = await _current_user_id(email)
+
+    async with AsyncSessionLocal() as db:
+        brand = Brand(name="B1", slug="b1-attach", user_id=user_id)
+        db.add(brand); await db.commit(); await db.refresh(brand)
+        prompt = Prompt(brand_id=brand.id, text="best ai tools for sales")
+        db.add(prompt); await db.commit(); await db.refresh(prompt)
+        draft = await _create_draft_direct(db, brand.id, prompt_id=None)
+        draft_id, prompt_id = draft.id, prompt.id
+
+    r = await client.put(
+        f"/api/content/draft/{draft_id}",
+        json={"prompt_id": prompt_id},
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["prompt_id"] == prompt_id
+
+
+async def test_update_draft_rejects_prompt_from_different_brand(client: httpx.AsyncClient):
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt
+
+    email = "attach2@example.com"
+    await _register_and_login(client, email=email)
+    user_id = await _current_user_id(email)
+
+    async with AsyncSessionLocal() as db:
+        brand_a = Brand(name="A", slug="a-attach", user_id=user_id)
+        brand_b = Brand(name="B", slug="b-attach", user_id=user_id)
+        db.add_all([brand_a, brand_b]); await db.commit()
+        await db.refresh(brand_a); await db.refresh(brand_b)
+        prompt_b = Prompt(brand_id=brand_b.id, text="other brand prompt")
+        db.add(prompt_b); await db.commit(); await db.refresh(prompt_b)
+        draft_a = await _create_draft_direct(db, brand_a.id)
+        draft_id, wrong_prompt_id = draft_a.id, prompt_b.id
+
+    r = await client.put(
+        f"/api/content/draft/{draft_id}",
+        json={"prompt_id": wrong_prompt_id},
+    )
+    assert r.status_code == 400
+
+
+async def test_update_draft_rejects_nonexistent_prompt(client: httpx.AsyncClient):
+    from app.database import AsyncSessionLocal
+    from app.models import Brand
+
+    email = "attach3@example.com"
+    await _register_and_login(client, email=email)
+    user_id = await _current_user_id(email)
+
+    async with AsyncSessionLocal() as db:
+        brand = Brand(name="C", slug="c-attach", user_id=user_id)
+        db.add(brand); await db.commit(); await db.refresh(brand)
+        draft = await _create_draft_direct(db, brand.id)
+        draft_id = draft.id
+
+    r = await client.put(
+        f"/api/content/draft/{draft_id}",
+        json={"prompt_id": 999999},
+    )
+    assert r.status_code == 400
+
+
+async def test_update_draft_attach_and_post_atomic(client: httpx.AsyncClient):
+    """Attach + post in a single request: prompt_id is set BEFORE the status transition
+    so visibility_at_post snapshot and _create_draft_attribution see a draft with a prompt."""
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt, DraftAttribution
+    from sqlalchemy import select
+
+    email = "attach4@example.com"
+    await _register_and_login(client, email=email)
+    user_id = await _current_user_id(email)
+
+    async with AsyncSessionLocal() as db:
+        brand = Brand(name="D", slug="d-attach", user_id=user_id)
+        db.add(brand); await db.commit(); await db.refresh(brand)
+        prompt = Prompt(brand_id=brand.id, text="test prompt")
+        db.add(prompt); await db.commit(); await db.refresh(prompt)
+        draft = await _create_draft_direct(db, brand.id, prompt_id=None, status="approved")
+        draft_id, prompt_id = draft.id, prompt.id
+
+    r = await client.put(
+        f"/api/content/draft/{draft_id}",
+        json={"prompt_id": prompt_id, "status": "posted"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["prompt_id"] == prompt_id
+    assert body["status"] == "posted"
+
+    async with AsyncSessionLocal() as db:
+        rows = (await db.execute(
+            select(DraftAttribution).where(DraftAttribution.draft_id == draft_id)
+        )).scalars().all()
+        # Attribution row should exist; prompt_id attached before the posted-branch fired
+        assert len(rows) == 1
+        assert rows[0].prompt_id == prompt_id

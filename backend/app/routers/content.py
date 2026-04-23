@@ -32,7 +32,7 @@ from app.dependencies import (
     require_active_subscription,
     require_brand_active,
 )
-from app.models import Brand, BrandContentSettings, ContentAttribution, ContentDraft, TrackingRun, utcnow
+from app.models import Brand, BrandContentSettings, ContentAttribution, ContentDraft, Prompt, TrackingRun, utcnow
 from app.schemas import (
     BrandContentSettingsSchema,
     ContentAttributionSchema,
@@ -361,6 +361,17 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
         draft.edited_count = (draft.edited_count or 0) + 1
     if request.platform_guidelines_applied is not None:
         draft.platform_guidelines_applied = request.platform_guidelines_applied
+    if request.prompt_id is not None:
+        prompt_result = await db.execute(
+            select(Prompt).where(Prompt.id == request.prompt_id)
+        )
+        target_prompt = prompt_result.scalar_one_or_none()
+        if target_prompt is None or target_prompt.brand_id != draft.brand_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="prompt_id must reference a prompt on the same brand as the draft",
+            )
+        draft.prompt_id = request.prompt_id
     if request.status is not None:
         allowed_statuses = {"draft", "approved", "posted", "failed"}
         if request.status not in allowed_statuses:
@@ -412,6 +423,16 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
     from app.services.analytics_service import log_event
     if content_changed:
         await log_event("draft_edited", {"draft_id": draft.id, "platform": draft.platform}, brand_id=draft.brand_id)
+    if request.prompt_id is not None:
+        await log_event(
+            "draft_prompt_attached",
+            {
+                "draft_id": draft.id,
+                "prompt_id": request.prompt_id,
+                "late_attach": old_status == "posted",
+            },
+            brand_id=draft.brand_id,
+        )
     if request.status == "approved" and old_status != "approved":
         await log_event(
             "draft_approved",

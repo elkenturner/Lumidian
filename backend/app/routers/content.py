@@ -538,6 +538,42 @@ async def delete_draft(draft_id: int, db: DbDep, user: CurrentUser):
     )
 
 
+# ── Prompt suggestions for orphan drafts ─────────────────────────────────────
+
+from app.schemas import PromptSuggestion  # noqa: E402 — grouped here intentionally
+from app.services.drafting_service import rank_prompts_by_similarity
+
+
+def _label_for_similarity(score: float) -> str:
+    if score >= 0.35:
+        return "very_relevant"
+    if score >= 0.15:
+        return "somewhat"
+    return "loose"
+
+
+@router.post("/draft/{draft_id}/prompt-suggestions", response_model=list[PromptSuggestion])
+async def suggest_prompts_for_draft(draft_id: int, db: DbDep, user: CurrentUser):
+    """Return up to 3 tracked prompts ranked by similarity to the draft's content."""
+    draft = await _get_draft_for_user(db, draft_id, user)
+    prompt_result = await db.execute(
+        select(Prompt).where(Prompt.brand_id == draft.brand_id).order_by(Prompt.id)
+    )
+    prompts = list(prompt_result.scalars().all())
+    if not prompts:
+        return []
+    ranked = rank_prompts_by_similarity(draft.content_text or "", prompts)[:3]
+    return [
+        PromptSuggestion(
+            prompt_id=p.id,
+            text=p.text,
+            score=round(score, 4),
+            label=_label_for_similarity(score),
+        )
+        for p, score in ranked
+    ]
+
+
 # ── Bulk approve ─────────────────────────────────────────────────────────────
 
 @router.post("/{brand_id}/drafts/approve-all")

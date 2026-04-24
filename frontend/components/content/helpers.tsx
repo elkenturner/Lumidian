@@ -79,6 +79,9 @@ export interface ContentTabPanelsProps {
   // Bulk actions
   handleApproveAll?: () => Promise<void>;
   onNavigateToQueueDraft?: (draftId: number) => void;
+  // Posted-tab wiring
+  onOpenAttach?: (draftId: number) => void;
+  onOpenExplainer?: () => void;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

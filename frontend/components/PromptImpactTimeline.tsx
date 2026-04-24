@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   ComposedChart,
   Area,
@@ -32,6 +32,7 @@ interface PromptImpactTimelineProps {
   contentEvents: ContentEventItem[];
   drafts?: PromptDraftSnapshot[];
   height?: number;
+  highlightDraftId?: number;
 }
 
 type Timeframe = '7d' | '30d' | '90d' | 'all';
@@ -41,10 +42,12 @@ export default function PromptImpactTimeline({
   contentEvents,
   drafts = [],
   height = 320,
+  highlightDraftId,
 }: PromptImpactTimelineProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>('90d');
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
   const [expandedDraft, setExpandedDraft] = useState<ExpandedDraftData | null>(null);
+  const [pulsingIndex, setPulsingIndex] = useState<number | null>(null);
 
   // Map draft_id to draft data for click expansion
   const draftsById = useMemo(() => {
@@ -76,6 +79,27 @@ export default function PromptImpactTimeline({
         ),
       }));
   }, [timeline, timeframe]);
+
+  // If the highlighted draft's event lies outside the current timeframe, switch to 'all'.
+  useEffect(() => {
+    if (highlightDraftId == null) return;
+    const event = contentEvents.find(
+      (e) =>
+        e.event_type === 'draft_posted' &&
+        (e.data as Record<string, unknown>)?.draft_id === highlightDraftId,
+    );
+    if (!event) return;
+    const eventTime = parseUTCISO(event.created_at).getTime();
+    const cutoffs: Record<Timeframe, number> = {
+      '7d': Date.now() - 7 * 86400000,
+      '30d': Date.now() - 30 * 86400000,
+      '90d': Date.now() - 90 * 86400000,
+      all: 0,
+    };
+    if (eventTime < cutoffs[timeframe]) {
+      setTimeframe('all');
+    }
+  }, [highlightDraftId, contentEvents, timeframe]);
 
   // Build marker index: map data index → array of drafts (supports multiple per day)
   const markersByIndex = useMemo(() => {
@@ -118,6 +142,23 @@ export default function PromptImpactTimeline({
       prev && prev.drafts[0]?.id === matchedDrafts[0]?.id ? null : { drafts: matchedDrafts },
     );
   }, [markersByIndex, draftsById]);
+
+  // Deep-link: auto-expand panel + one-shot pulse on the matching diamond
+  useEffect(() => {
+    if (highlightDraftId == null) return;
+    let targetIndex: number | null = null;
+    markersByIndex.forEach((markers, idx) => {
+      if (markers.some((m) => m.draftId === highlightDraftId)) {
+        targetIndex = idx;
+      }
+    });
+    if (targetIndex == null) return;
+
+    handleMarkerClick(targetIndex);
+    setPulsingIndex(targetIndex);
+    const timer = setTimeout(() => setPulsingIndex(null), 1400);
+    return () => clearTimeout(timer);
+  }, [highlightDraftId, markersByIndex, handleMarkerClick]);
 
   // Custom renderer that draws diamonds pinned to the top of the chart
   // Uses Recharts internal xAxisMap/yAxisMap props passed to Customized components
@@ -176,6 +217,22 @@ export default function PromptImpactTimeline({
                 strokeDasharray="4 3"
                 strokeOpacity={0.4}
               />
+              {/* One-shot pulse ring for deep-linked draft */}
+              {idx === pulsingIndex && (
+                <circle
+                  cx={cx}
+                  cy={diamondY}
+                  r={8}
+                  fill="none"
+                  stroke="var(--accent)"
+                  strokeWidth={2}
+                  opacity={0.9}
+                  style={{
+                    transformOrigin: `${cx}px ${diamondY}px`,
+                    animation: 'diamond-pulse 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards',
+                  }}
+                />
+              )}
               {/* Diamond */}
               <polygon
                 points={`${cx},${diamondY - size} ${cx + size},${diamondY} ${cx},${diamondY + size} ${cx - size},${diamondY}`}
@@ -217,7 +274,7 @@ export default function PromptImpactTimeline({
         })}
       </g>
     );
-  }, [filteredData, markersByIndex, hasMarkers, handleMarkerClick]);
+  }, [filteredData, markersByIndex, hasMarkers, handleMarkerClick, pulsingIndex]);
 
   const toggleModel = (model: string) => {
     setHiddenModels((prev) => {

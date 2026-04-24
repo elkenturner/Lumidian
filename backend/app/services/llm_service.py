@@ -64,9 +64,12 @@ _PERPLEXITY_PACER = _RatePacer(20)
 _CLAUDE_SEM = asyncio.Semaphore(1)
 _CLAUDE_PACER = _RatePacer(2)
 
-# Gemini rate-limit guard: Google returns 503 UNAVAILABLE when flooded.
-# 2 concurrent slots (like Perplexity) reduce burst pressure on the API.
+# Gemini rate-limit guard: Google returns 503 UNAVAILABLE under load. A pacer
+# at 30 RPM smooths the burst rate we submit so Google is less likely to tip
+# over during concurrent tracking runs; the semaphore still caps in-flight
+# requests so we can overlap response waits without exceeding RPM.
 _GEMINI_SEM = asyncio.Semaphore(2)
+_GEMINI_PACER = _RatePacer(30)
 
 
 # Human-readable display names for each model (used in placeholder messages)
@@ -400,6 +403,7 @@ async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemi
         response = None
         for config in (config_with_search, config_plain):
             try:
+                await _GEMINI_PACER.wait()
                 async with _GEMINI_SEM:
                     response = await asyncio.wait_for(
                         client.aio.models.generate_content(
@@ -520,12 +524,21 @@ def _classify_error(error: str) -> str:
 # under quota on the retry.
 _MAX_ATTEMPTS: dict[str, int] = {
     "perplexity": 5,
-    # Gemini: Google 503s are rarely transient within a single run, so extra
-    # attempts mostly waste backoff time (5s + 10s + 20s) without recovering.
-    # Accept skipped queries; live results average out across runs.
-    "gemini": 2,
+    # Gemini: Google's "high demand" 503s typically clear in 20-60s, so we need
+    # enough attempts to span that window. Paired with _OVERLOAD_BASE_DELAY below
+    # (20s base) this gives us ~20 + 40 + 80 + 90 ≈ 3.5min of retry coverage.
+    "gemini": 5,
 }
 _DEFAULT_MAX_ATTEMPTS = 3
+
+# Per-model base delay for `overload` error backoff (exponential, jittered).
+# Gemini needs a longer base because Google's high-demand spikes take tens of
+# seconds to clear; other providers usually recover within 5s.
+_OVERLOAD_BASE_DELAY: dict[str, float] = {
+    "gemini": 20.0,
+}
+_DEFAULT_OVERLOAD_BASE_DELAY = 5.0
+_OVERLOAD_MAX_DELAY = 90.0
 
 
 async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max_attempts: int = 0, model_version: str = "", cancel_event: asyncio.Event | None = None) -> dict:
@@ -534,7 +547,8 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
 
     Retry strategy by error type:
       - rate_limit (429, quota): 30-90s jittered backoff (avoids thundering herd)
-      - overload (503, timeout): 5s → 10s backoff + jitter; falls back to lighter model
+      - overload (503, timeout): exponential backoff from _OVERLOAD_BASE_DELAY
+        (5s default, 20s for gemini) up to _OVERLOAD_MAX_DELAY, with jitter
       - other: 3s flat backoff
       - api_key_not_configured / auth: no retry (permanent)
 
@@ -546,7 +560,12 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
     display = _MODEL_DISPLAY_NAMES.get(model_key, model_key)
     errors: list[str] = []
 
-    # Track whether we've fallen back to a lighter model for overload errors
+    # Track whether we've fallen back to a lighter model for overload errors.
+    # sonar-pro → sonar is safe: near-identical behavior and grounding. We
+    # intentionally do NOT fall back across Gemini generations — the user
+    # configured tracking against a specific model, and silently returning
+    # data from gemini-1.5-flash (different grounding, different quality)
+    # would poison their dataset without their knowledge.
     active_model_version = model_version
     _FALLBACK_MODELS = {
         "sonar-pro": "sonar",
@@ -599,7 +618,8 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
                 # Jittered 30-90s — spreads retries so they don't all hit at once
                 retry_delay = 30 + random.uniform(0, 60)
             elif error_type == "overload":
-                retry_delay = 5 * (2 ** (attempt - 1))
+                base = _OVERLOAD_BASE_DELAY.get(model_key, _DEFAULT_OVERLOAD_BASE_DELAY)
+                retry_delay = min(base * (2 ** (attempt - 1)), _OVERLOAD_MAX_DELAY)
                 retry_delay = retry_delay * (1 + random.uniform(0, 0.25))
             else:
                 retry_delay = 3

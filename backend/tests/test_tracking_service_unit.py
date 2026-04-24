@@ -247,3 +247,136 @@ async def test_query_claude_detects_mention_in_visible_text():
 
     assert result["mentioned"] is True
     assert "Stripe" in result["response_text"]
+
+
+# ── Gemini retry & fallback tests ─────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_gemini_retry_budget_is_five():
+    """Gemini's 503 'high demand' takes 20-60s to clear; budget must cover the window."""
+    from app.services.llm_service import _MAX_ATTEMPTS
+    assert _MAX_ATTEMPTS["gemini"] == 5
+
+
+@pytest.mark.asyncio
+async def test_gemini_overload_backoff_starts_at_20s():
+    """Gemini 503s need a longer initial backoff than other models; capped at 90s."""
+    from app.services import llm_service
+
+    recorded_delays: list[float] = []
+
+    async def fake_sleep(d):
+        recorded_delays.append(d)
+
+    async def always_overload(prompt, brand_name, model_version):
+        return {"response_text": None, "mentioned": False, "latency_ms": 10,
+                "error": "503 UNAVAILABLE — high demand"}
+
+    with patch("asyncio.sleep", side_effect=fake_sleep), \
+         patch("random.uniform", return_value=0.0):
+        result = await llm_service._with_retry(
+            always_overload, "test", "TestBrand", "gemini",
+            model_version="gemini-2.5-flash",
+        )
+
+    # 5 attempts → 4 sleeps between them
+    assert len(recorded_delays) == 4
+    # Delays must start at 20s and double up to cap at 90s (jitter=0 since we patched random)
+    # Expected: 20, 40, 80, 90 (capped)
+    assert recorded_delays[0] == 20.0
+    assert recorded_delays[1] == 40.0
+    assert recorded_delays[2] == 80.0
+    assert recorded_delays[3] == 90.0
+    assert result["error"].startswith("Empty response from Gemini API after 5 attempts")
+
+
+@pytest.mark.asyncio
+async def test_non_gemini_overload_backoff_unchanged():
+    """Perplexity and other models keep their 5s base backoff."""
+    from app.services import llm_service
+
+    recorded_delays: list[float] = []
+
+    async def fake_sleep(d):
+        recorded_delays.append(d)
+
+    async def always_overload(prompt, brand_name, model_version):
+        return {"response_text": None, "mentioned": False, "latency_ms": 10,
+                "error": "503 UNAVAILABLE"}
+
+    with patch("asyncio.sleep", side_effect=fake_sleep), \
+         patch("random.uniform", return_value=0.0):
+        await llm_service._with_retry(
+            always_overload, "test", "TestBrand", "perplexity",
+            model_version="sonar",
+        )
+
+    # Perplexity: 5 attempts → 4 sleeps with 5s base (5, 10, 20, 40)
+    assert recorded_delays == [5.0, 10.0, 20.0, 40.0]
+
+
+@pytest.mark.asyncio
+async def test_gemini_does_not_fall_back_across_generations():
+    """Retries must stay on the configured Gemini model version.
+
+    Silently returning data from gemini-1.5-flash when the user tracks against
+    gemini-2.5-flash would mix grounding behavior and response quality into
+    their dataset. All retries must use the original model version.
+    """
+    from app.services import llm_service
+
+    seen_versions: list[str] = []
+
+    async def record_version(prompt, brand_name, model_version):
+        seen_versions.append(model_version)
+        return {"response_text": None, "mentioned": False, "latency_ms": 10,
+                "error": "503 UNAVAILABLE"}
+
+    async def fake_sleep(d):
+        pass
+
+    with patch("asyncio.sleep", side_effect=fake_sleep), \
+         patch("random.uniform", return_value=0.0):
+        await llm_service._with_retry(
+            record_version, "test", "TestBrand", "gemini",
+            model_version="gemini-2.5-flash",
+        )
+
+    # Every attempt hits the same model version — no fallback chain.
+    assert all(v == "gemini-2.5-flash" for v in seen_versions), \
+        f"Expected only gemini-2.5-flash, saw {seen_versions}"
+    assert len(seen_versions) == 5, f"Expected 5 attempts, got {len(seen_versions)}"
+
+
+@pytest.mark.asyncio
+async def test_gemini_pacer_is_invoked():
+    """_query_gemini must call the module-level pacer before firing the request."""
+    from app.services import llm_service
+
+    pacer_waits = 0
+
+    class _FakePacer:
+        async def wait(self):
+            nonlocal pacer_waits
+            pacer_waits += 1
+
+    class _FakeResp:
+        text = "Hello TestBrand"
+        candidates = []
+
+    async def fake_generate_content(**kwargs):
+        return _FakeResp()
+
+    fake_client = MagicMock()
+    fake_client.aio.models.generate_content = fake_generate_content
+
+    with patch.object(llm_service, "GEMINI_API_KEY", "test-key"), \
+         patch.object(llm_service, "_GEMINI_PACER", _FakePacer()), \
+         patch.object(llm_service, "_get_gemini_client", return_value=fake_client):
+        result = await llm_service._query_gemini(
+            prompt="q", brand_name="TestBrand", model_version="gemini-2.5-flash",
+        )
+
+    assert pacer_waits >= 1, "Gemini pacer must be awaited before submitting the request"
+    assert result["error"] is None
+    assert result["mentioned"] is True

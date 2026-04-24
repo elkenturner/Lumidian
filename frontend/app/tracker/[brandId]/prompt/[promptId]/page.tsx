@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import {
   getPromptDetail,
@@ -18,9 +18,12 @@ import { useBrand } from '@/contexts/BrandContext';
 export default function PromptDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isMobile = useIsMobile();
   const brandId = Number(params.brandId);
   const promptId = Number(params.promptId);
+  const draftParam = searchParams?.get('draft');
+  const highlightDraftId = draftParam ? Number(draftParam) : undefined;
 
   const [data, setData] = useState<PromptDetailData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -139,6 +142,7 @@ export default function PromptDetailPage() {
           timeline={data.timeline}
           contentEvents={data.content_events}
           drafts={data.drafts}
+          highlightDraftId={Number.isFinite(highlightDraftId as number) ? highlightDraftId : undefined}
         />
       </div>
 

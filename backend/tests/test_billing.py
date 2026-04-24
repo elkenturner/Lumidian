@@ -341,3 +341,454 @@ async def test_billing_usage_basic_tier(client: httpx.AsyncClient):
     data = resp.json()
     assert data["manual_run_limit"] == 2
     assert data["prompt_limit"] == 10
+
+
+async def test_sync_brands_for_tier_downgrades_pro_brands_to_starter():
+    """When a user downgrades to starter (Growth), any brand_type='pro' brand
+    must be moved back to 'standard' with prompt_limit=25."""
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, User, utcnow
+    from app.routers.billing import _sync_brands_for_tier
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="sync_dg_starter@example.com", password_hash="x", email_verified=1)
+        db.add(user)
+        await db.flush()
+        brand = Brand(
+            user_id=user.id, name="Pro Brand", slug="pro-brand-sync-starter",
+            tier="basic", brand_type="pro", prompt_limit=30,
+        )
+        db.add(brand)
+        await db.commit()
+        brand_id = brand.id
+        await _sync_brands_for_tier(db, user.id, "starter")
+        await db.commit()
+        await db.refresh(brand)
+        assert brand.brand_type == "standard"
+        assert brand.prompt_limit == 25
+
+
+async def test_sync_brands_for_tier_downgrades_pro_brands_to_basic():
+    """Starter (basic) downgrade: pro brand → standard with prompt_limit=10."""
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, User
+    from app.routers.billing import _sync_brands_for_tier
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="sync_dg_basic@example.com", password_hash="x", email_verified=1)
+        db.add(user)
+        await db.flush()
+        brand = Brand(
+            user_id=user.id, name="Pro Brand B", slug="pro-brand-sync-basic",
+            tier="basic", brand_type="pro", prompt_limit=30,
+        )
+        db.add(brand)
+        await db.commit()
+        await _sync_brands_for_tier(db, user.id, "basic")
+        await db.commit()
+        await db.refresh(brand)
+        assert brand.brand_type == "standard"
+        assert brand.prompt_limit == 10
+
+
+async def test_change_plan_downgrade_creates_schedule_and_keeps_current_tier(client: httpx.AsyncClient):
+    """Pro → Growth downgrade: creates SubscriptionSchedule, sets pending fields,
+    does NOT change subscription_tier locally."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="dg_create@example.com", subscription_tier="pro")
+    # Give the test user a fake stripe subscription id
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("UPDATE users SET stripe_subscription_id = :sid WHERE email = :email"),
+            {"sid": "sub_test_fake", "email": "dg_create@example.com"},
+        )
+        await db.commit()
+
+    # Mock Stripe: SubscriptionSchedule.create returns an object with phases
+    fake_schedule = {
+        "id": "sub_sched_fake",
+        "phases": [{
+            "items": [{"price": "price_test_pro", "quantity": 1}],
+            "start_date": 1713200000,
+            "end_date": 1715792000,
+        }],
+    }
+    with (
+        patch.dict("os.environ", {"STRIPE_STARTER_PRICE_ID": "price_test_starter", "STRIPE_PRO_PRICE_ID": "price_test_pro"}),
+        patch("stripe.SubscriptionSchedule.create", return_value=fake_schedule) as mock_create,
+        patch("stripe.SubscriptionSchedule.modify", return_value=fake_schedule) as mock_modify,
+    ):
+        resp = await client.post("/api/billing/change-plan", json={"tier": "starter"})
+
+    assert resp.status_code == 200, resp.text
+    mock_create.assert_called_once_with(from_subscription="sub_test_fake")
+    mock_modify.assert_called_once()
+
+    # Verify local state
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "dg_create@example.com"))).scalar_one()
+        assert u.subscription_tier == "pro"  # unchanged!
+        assert u.pending_tier == "starter"
+        assert u.stripe_schedule_id == "sub_sched_fake"
+        assert u.pending_tier_effective_at is not None
+
+
+async def test_change_plan_upgrade_while_pending_releases_schedule(client: httpx.AsyncClient):
+    """If a downgrade is scheduled and the user upgrades, the schedule must
+    be released before the immediate modify fires."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="up_while_pending@example.com", subscription_tier="starter")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET
+                  stripe_subscription_id = :sid,
+                  stripe_schedule_id = :schid,
+                  pending_tier = :pt,
+                  pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {
+                "sid": "sub_fake_1", "schid": "sub_sched_fake_1",
+                "pt": "basic", "pte": "2026-05-09 00:00:00",
+                "email": "up_while_pending@example.com",
+            },
+        )
+        await db.commit()
+
+    fake_sub = {"items": {"data": [{"id": "si_fake_1"}]}}
+    with (
+        patch.dict("os.environ", {"STRIPE_PRO_PRICE_ID": "price_test_pro"}),
+        patch("stripe.SubscriptionSchedule.release") as mock_release,
+        patch("stripe.Subscription.retrieve", return_value=fake_sub),
+        patch("stripe.Subscription.modify") as mock_modify,
+    ):
+        resp = await client.post("/api/billing/change-plan", json={"tier": "pro"})
+
+    assert resp.status_code == 200, resp.text
+    mock_release.assert_called_once_with("sub_sched_fake_1")
+    mock_modify.assert_called_once()
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "up_while_pending@example.com"))).scalar_one()
+        assert u.subscription_tier == "pro"
+        assert u.pending_tier is None
+        assert u.stripe_schedule_id is None
+        assert u.pending_tier_effective_at is None
+
+
+async def test_change_plan_further_downgrade_amends_schedule(client: httpx.AsyncClient):
+    """Pro user with pending starter → change target to basic: amend phase 2,
+    do NOT release/recreate the schedule. pending_tier_effective_at unchanged."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="further_dg@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET
+                  stripe_subscription_id = :sid,
+                  stripe_schedule_id = :schid,
+                  pending_tier = :pt,
+                  pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {
+                "sid": "sub_fake_2", "schid": "sub_sched_fake_2",
+                "pt": "starter", "pte": "2026-05-09 00:00:00",
+                "email": "further_dg@example.com",
+            },
+        )
+        await db.commit()
+
+    fake_schedule = {
+        "id": "sub_sched_fake_2",
+        "phases": [{
+            "items": [{"price": "price_test_pro", "quantity": 1}],
+            "start_date": 1713200000,
+            "end_date": 1715792000,
+        }],
+    }
+    with (
+        patch.dict("os.environ", {"STRIPE_BASIC_PRICE_ID": "price_test_basic"}),
+        patch("stripe.SubscriptionSchedule.retrieve", return_value=fake_schedule),
+        patch("stripe.SubscriptionSchedule.modify") as mock_modify,
+        patch("stripe.SubscriptionSchedule.release") as mock_release,
+        patch("stripe.SubscriptionSchedule.create") as mock_create,
+    ):
+        resp = await client.post("/api/billing/change-plan", json={"tier": "basic"})
+
+    assert resp.status_code == 200, resp.text
+    mock_modify.assert_called_once()
+    mock_release.assert_not_called()
+    mock_create.assert_not_called()
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "further_dg@example.com"))).scalar_one()
+        assert u.subscription_tier == "pro"  # unchanged
+        assert u.pending_tier == "basic"     # updated
+        assert u.stripe_schedule_id == "sub_sched_fake_2"  # unchanged
+        # Effective date unchanged
+        assert str(u.pending_tier_effective_at).startswith("2026-05-09")
+
+
+async def test_change_plan_select_current_tier_releases_pending(client: httpx.AsyncClient):
+    """Pro user with pending starter → selects pro: releases schedule, clears pending."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="cancel_dg@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET
+                  stripe_subscription_id = :sid,
+                  stripe_schedule_id = :schid,
+                  pending_tier = :pt,
+                  pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {
+                "sid": "sub_fake_3", "schid": "sub_sched_fake_3",
+                "pt": "starter", "pte": "2026-05-09 00:00:00",
+                "email": "cancel_dg@example.com",
+            },
+        )
+        await db.commit()
+
+    with (
+        patch("stripe.SubscriptionSchedule.release") as mock_release,
+        patch("stripe.Subscription.modify") as mock_modify,
+    ):
+        resp = await client.post("/api/billing/change-plan", json={"tier": "pro"})
+
+    assert resp.status_code == 200, resp.text
+    mock_release.assert_called_once_with("sub_sched_fake_3")
+    mock_modify.assert_not_called()
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "cancel_dg@example.com"))).scalar_one()
+        assert u.subscription_tier == "pro"
+        assert u.pending_tier is None
+        assert u.stripe_schedule_id is None
+        assert u.pending_tier_effective_at is None
+
+
+async def test_change_plan_rejects_same_as_pending(client: httpx.AsyncClient):
+    """Setting target to the already-pending tier returns 400."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="dup_pending@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET stripe_subscription_id = :sid, stripe_schedule_id = :schid,
+                                 pending_tier = :pt, pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {"sid": "sub_x", "schid": "sch_x", "pt": "starter",
+             "pte": "2026-05-09 00:00:00", "email": "dup_pending@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.post("/api/billing/change-plan", json={"tier": "starter"})
+    assert resp.status_code == 400
+    assert "already scheduled" in resp.json()["detail"].lower()
+
+
+async def test_change_plan_rejects_same_as_current_no_pending(client: httpx.AsyncClient):
+    """Selecting current tier with no pending schedule returns 400."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="dup_current@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("UPDATE users SET stripe_subscription_id = :sid WHERE email = :email"),
+            {"sid": "sub_y", "email": "dup_current@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.post("/api/billing/change-plan", json={"tier": "pro"})
+    assert resp.status_code == 400
+    assert "already on this plan" in resp.json()["detail"].lower()
+
+
+async def test_cancel_releases_pending_schedule_first(client: httpx.AsyncClient):
+    """Cancel while a downgrade is pending: release schedule, then cancel_at_period_end."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="cancel_with_sched@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET stripe_subscription_id = :sid, stripe_schedule_id = :schid,
+                                 pending_tier = :pt, pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {"sid": "sub_cancel_1", "schid": "sch_cancel_1", "pt": "starter",
+             "pte": "2026-05-09 00:00:00", "email": "cancel_with_sched@example.com"},
+        )
+        await db.commit()
+
+    with (
+        patch("stripe.SubscriptionSchedule.release") as mock_release,
+        patch("stripe.Subscription.modify") as mock_modify,
+    ):
+        resp = await client.post("/api/billing/cancel")
+
+    assert resp.status_code == 200, resp.text
+    mock_release.assert_called_once_with("sch_cancel_1")
+    mock_modify.assert_called_once_with("sub_cancel_1", cancel_at_period_end=True)
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "cancel_with_sched@example.com"))).scalar_one()
+        assert u.stripe_schedule_id is None
+        assert u.pending_tier is None
+        assert u.pending_tier_effective_at is None
+
+
+async def test_webhook_clears_pending_when_transition_completes(client: httpx.AsyncClient):
+    """When customer.subscription.updated arrives with the pending_tier's price,
+    clear all three pending columns."""
+    import json
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="tx_complete@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET stripe_customer_id = :cid, stripe_subscription_id = :sid,
+                                 stripe_schedule_id = :schid, pending_tier = :pt,
+                                 pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {"cid": "cus_tx", "sid": "sub_tx", "schid": "sch_tx", "pt": "starter",
+             "pte": "2026-05-09 00:00:00", "email": "tx_complete@example.com"},
+        )
+        await db.commit()
+
+    event_payload = {
+        "id": "evt_tx_1",
+        "type": "customer.subscription.updated",
+        "data": {"object": {
+            "id": "sub_tx",
+            "customer": "cus_tx",
+            "status": "active",
+            "metadata": {"tier": "starter"},
+        }},
+    }
+
+    with patch("stripe.Webhook.construct_event", return_value=event_payload):
+        with patch.dict("os.environ", {"STRIPE_WEBHOOK_SECRET": "whsec_test", "STRIPE_SECRET_KEY": "sk_test"}):
+            resp = await client.post(
+                "/api/billing/webhook",
+                content=json.dumps(event_payload),
+                headers={"stripe-signature": "t=1,v1=fake"},
+            )
+    assert resp.status_code == 200
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "tx_complete@example.com"))).scalar_one()
+        assert u.subscription_tier == "starter"
+        assert u.pending_tier is None
+        assert u.stripe_schedule_id is None
+        assert u.pending_tier_effective_at is None
+
+
+async def test_webhook_subscription_schedule_released_clears_pending(client: httpx.AsyncClient):
+    """subscription_schedule.released event clears pending columns defensively."""
+    import json
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="sch_released@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET stripe_customer_id = :cid, stripe_subscription_id = :sid,
+                                 stripe_schedule_id = :schid, pending_tier = :pt,
+                                 pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {"cid": "cus_r", "sid": "sub_r", "schid": "sch_r_1", "pt": "starter",
+             "pte": "2026-05-09 00:00:00", "email": "sch_released@example.com"},
+        )
+        await db.commit()
+
+    event_payload = {
+        "id": "evt_sch_r_1",
+        "type": "subscription_schedule.released",
+        "data": {"object": {"id": "sch_r_1"}},
+    }
+
+    with patch("stripe.Webhook.construct_event", return_value=event_payload):
+        with patch.dict("os.environ", {"STRIPE_WEBHOOK_SECRET": "whsec_test", "STRIPE_SECRET_KEY": "sk_test"}):
+            resp = await client.post(
+                "/api/billing/webhook",
+                content=json.dumps(event_payload),
+                headers={"stripe-signature": "t=1,v1=fake"},
+            )
+    assert resp.status_code == 200
+
+    async with AsyncSessionLocal() as db:
+        from app.models import User
+        from sqlalchemy import select
+        u = (await db.execute(select(User).where(User.email == "sch_released@example.com"))).scalar_one()
+        assert u.pending_tier is None
+        assert u.stripe_schedule_id is None
+        assert u.pending_tier_effective_at is None
+
+
+async def test_billing_status_includes_pending_fields(client: httpx.AsyncClient):
+    """GET /billing/status returns pending_tier and pending_tier_effective_at."""
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+
+    await register_and_login(client, email="status_pending@example.com", subscription_tier="pro")
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            text("""
+                UPDATE users SET pending_tier = :pt, pending_tier_effective_at = :pte
+                WHERE email = :email
+            """),
+            {"pt": "starter", "pte": "2026-05-09 00:00:00", "email": "status_pending@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.get("/api/billing/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["pending_tier"] == "starter"
+    assert data["pending_tier_effective_at"] is not None
+    assert data["pending_tier_effective_at"].startswith("2026-05-09")
+
+
+async def test_billing_status_pending_null_when_unset(client: httpx.AsyncClient):
+    """Users without a scheduled downgrade see null pending fields."""
+    await register_and_login(client, email="status_nopending@example.com", subscription_tier="pro")
+    resp = await client.get("/api/billing/status")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["pending_tier"] is None
+    assert data["pending_tier_effective_at"] is None

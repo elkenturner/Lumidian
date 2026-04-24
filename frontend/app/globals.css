@@ -456,9 +456,24 @@ body {
   }
 }
 
-@keyframes diamond-pulse {
-  0%   { transform: scale(0.6); opacity: 0.9; }
-  100% { transform: scale(2.4); opacity: 0; }
+.diamond-pulse-active {
+  animation: diamond-pulse-glow 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes diamond-pulse-glow {
+  0% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 4px var(--accent));
+  }
+  50% {
+    transform: scale(1.5);
+    filter: drop-shadow(0 0 14px var(--accent))
+            drop-shadow(0 0 8px var(--accent-light));
+  }
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 4px var(--accent));
+  }
 }
 
 /* ── Mobile responsive utilities ──────────────────────────────────────────── */

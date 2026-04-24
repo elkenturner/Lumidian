@@ -11,7 +11,7 @@ export function ScheduledPanel(props: ContentTabPanelsProps) {
     return (
       <EmptyState
         icon={<Clock size={26} className="text-[var(--accent-foreground)]" />}
-        title="No scheduled drafts yet"
+        title="No saved drafts yet"
         description="Approve a draft from the Queue — it will appear here ready to post."
       />
     );

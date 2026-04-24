@@ -9,6 +9,7 @@ GET  /api/content/draft/{draft_id}              — get draft detail with platfo
 PUT  /api/content/draft/{draft_id}              — update draft text / status
 POST /api/content/draft/{draft_id}/post         — mark as posted
 DELETE /api/content/draft/{draft_id}            — delete draft
+GET    /draft/{draft_id}/prompt-suggestions     - rank brand's prompts by similarity to this draft's text
 GET  /api/content/{brand_id}/settings           — get all platform settings for brand
 PUT  /api/content/{brand_id}/settings/{platform} — update platform settings
 GET  /api/content/{brand_id}/attribution        — get all attribution records for brand
@@ -32,7 +33,7 @@ from app.dependencies import (
     require_active_subscription,
     require_brand_active,
 )
-from app.models import Brand, BrandContentSettings, ContentAttribution, ContentDraft, TrackingRun, utcnow
+from app.models import Brand, BrandContentSettings, ContentAttribution, ContentDraft, Prompt, TrackingRun, utcnow
 from app.schemas import (
     BrandContentSettingsSchema,
     ContentAttributionSchema,
@@ -41,6 +42,7 @@ from app.schemas import (
     CreateDraftRequest,
     GenerateNowRequest,
     PostDraftRequest,
+    PromptSuggestion,
     UpdateContentSettingsRequest,
     UpdateDraftRequest,
 )
@@ -55,6 +57,7 @@ from app.services.drafting_service import (
     auto_draft_top_gaps,
     generate_gap_draft,
     get_draft_cap,
+    rank_prompts_by_similarity,
 )
 
 SCHEDULED_CAP = 100  # max approved/scheduled drafts queued at once (pro tier default)
@@ -344,6 +347,33 @@ async def _create_draft_attribution(db: AsyncSession, draft: ContentDraft) -> No
     await db.commit()
 
 
+async def _create_late_attach_attribution(db: AsyncSession, draft: ContentDraft) -> None:
+    """Create a null-baseline DraftAttribution row for a draft that was posted
+    before having a prompt attached. Safe to call when a row already exists — no-ops."""
+    if draft.prompt_id is None:
+        return
+    from app.models import DraftAttribution
+
+    existing_result = await db.execute(
+        select(DraftAttribution).where(DraftAttribution.draft_id == draft.id)
+    )
+    if existing_result.scalar_one_or_none() is not None:
+        return
+
+    attribution = DraftAttribution(
+        draft_id=draft.id,
+        brand_id=draft.brand_id,
+        prompt_id=draft.prompt_id,
+        posted_at=draft.posted_at or utcnow(),
+        score_at_posting=None,
+        current_score=None,
+        delta=None,
+        runs_since_posting=0,
+    )
+    db.add(attribution)
+    await db.flush()
+
+
 # ── Draft update ──────────────────────────────────────────────────────────────
 
 @router.put("/draft/{draft_id}", response_model=ContentDraftSchema)
@@ -361,6 +391,22 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
         draft.edited_count = (draft.edited_count or 0) + 1
     if request.platform_guidelines_applied is not None:
         draft.platform_guidelines_applied = request.platform_guidelines_applied
+    if request.prompt_id is not None:
+        prompt_result = await db.execute(
+            select(Prompt).where(Prompt.id == request.prompt_id)
+        )
+        target_prompt = prompt_result.scalar_one_or_none()
+        if target_prompt is None or target_prompt.brand_id != draft.brand_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="prompt_id must reference a prompt on the same brand as the draft",
+            )
+        draft.prompt_id = request.prompt_id
+        # Late attach: draft was already posted — create null-baseline attribution
+        if old_status == "posted":
+            # Flush the prompt_id assignment so the helper sees the updated draft
+            await db.flush()
+            await _create_late_attach_attribution(db, draft)
     if request.status is not None:
         allowed_statuses = {"draft", "approved", "posted", "failed"}
         if request.status not in allowed_statuses:
@@ -412,6 +458,16 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
     from app.services.analytics_service import log_event
     if content_changed:
         await log_event("draft_edited", {"draft_id": draft.id, "platform": draft.platform}, brand_id=draft.brand_id)
+    if request.prompt_id is not None:
+        await log_event(
+            "draft_prompt_attached",
+            {
+                "draft_id": draft.id,
+                "prompt_id": request.prompt_id,
+                "late_attach": old_status == "posted",
+            },
+            brand_id=draft.brand_id,
+        )
     if request.status == "approved" and old_status != "approved":
         await log_event(
             "draft_approved",
@@ -483,6 +539,44 @@ async def delete_draft(draft_id: int, db: DbDep, user: CurrentUser):
         {"draft_id": draft_id, "platform": platform, "time_since_created_seconds": secs},
         brand_id=brand_id,
     )
+
+
+# ── Prompt suggestions for orphan drafts ─────────────────────────────────────
+
+# Jaccard similarity thresholds for prompt-suggestion labels.
+# Tuned for short prompt text vs. draft paragraphs — revisit if length distributions change.
+_VERY_RELEVANT_THRESHOLD = 0.35
+_SOMEWHAT_THRESHOLD = 0.15
+
+
+def _label_for_similarity(score: float) -> str:
+    if score >= _VERY_RELEVANT_THRESHOLD:
+        return "very_relevant"
+    if score >= _SOMEWHAT_THRESHOLD:
+        return "somewhat"
+    return "loose"
+
+
+@router.get("/draft/{draft_id}/prompt-suggestions", response_model=list[PromptSuggestion])
+async def get_prompt_suggestions_for_draft(draft_id: int, db: DbDep, user: CurrentUser):
+    """Return up to 3 tracked prompts ranked by similarity to the draft's content."""
+    draft = await _get_draft_for_user(db, draft_id, user)
+    prompt_result = await db.execute(
+        select(Prompt).where(Prompt.brand_id == draft.brand_id).order_by(Prompt.id)
+    )
+    prompts = list(prompt_result.scalars().all())
+    if not prompts:
+        return []
+    ranked = rank_prompts_by_similarity(draft.content_text or "", prompts)[:3]
+    return [
+        PromptSuggestion(
+            prompt_id=p.id,
+            text=p.text,
+            score=round(score, 4),
+            label=_label_for_similarity(score),
+        )
+        for p, score in ranked
+    ]
 
 
 # ── Bulk approve ─────────────────────────────────────────────────────────────

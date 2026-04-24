@@ -74,6 +74,7 @@ import {
   AttachPromptPopover,
   HelpModal,
   ImpactExplainerModal,
+  MarkAsPostedModal,
   QualityChecklist,
   runQualityChecks,
 } from './components';
@@ -1513,6 +1514,7 @@ export default function ContentHubPage() {
   const [postingPlatform, setPostingPlatform] = useState<'reddit' | 'quora' | 'medium' | 'wikipedia'>('reddit');
   const [explainerOpen, setExplainerOpen] = useState(false);
   const [attachPopoverDraftId, setAttachPopoverDraftId] = useState<number | null>(null);
+  const [markPostedModalDraftId, setMarkPostedModalDraftId] = useState<number | null>(null);
 
   // Upgrade modal (shown on 402 responses)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
@@ -1725,6 +1727,13 @@ export default function ContentHubPage() {
   }
 
   async function handleMarkAsPosted(id: number) {
+    const draft = scheduledItems.find((d) => d.id === id);
+    const isOrphan = draft && !draft.prompt_id;
+    const hasPromptsToSuggest = brandPrompts.length > 0;
+    if (isOrphan && hasPromptsToSuggest) {
+      setMarkPostedModalDraftId(id);
+      return;
+    }
     await updateDraft(id, { status: 'posted' });
     if (selectedBrandId) loadAll(selectedBrandId);
   }
@@ -2086,6 +2095,22 @@ export default function ContentHubPage() {
             />
           </div>
         </div>
+      )}
+      {markPostedModalDraftId != null && (
+        <MarkAsPostedModal
+          draftId={markPostedModalDraftId}
+          allPrompts={brandPrompts}
+          onAttachAndPost={async (promptId) => {
+            await updateDraft(markPostedModalDraftId, { prompt_id: promptId, status: 'posted' });
+            if (selectedBrandId) loadAll(selectedBrandId);
+            setToast({ message: 'Attached and marked as posted', type: 'success' });
+          }}
+          onPostWithoutAttach={async () => {
+            await updateDraft(markPostedModalDraftId, { status: 'posted' });
+            if (selectedBrandId) loadAll(selectedBrandId);
+          }}
+          onClose={() => setMarkPostedModalDraftId(null)}
+        />
       )}
       {oppHelpOpen && (
         <HelpModal title="Visibility Opportunities" onClose={() => setOppHelpOpen(false)}>

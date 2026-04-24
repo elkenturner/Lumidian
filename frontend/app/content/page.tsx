@@ -26,8 +26,6 @@ import {
   Check,
   PenLine,
   BookOpen,
-  ArrowRight,
-  BarChart2,
   Lightbulb,
   Shield,
 } from 'lucide-react';
@@ -72,7 +70,14 @@ import { useBrand } from '@/contexts/BrandContext';
 import Link from 'next/link';
 import { ContentTabPanels } from '@/components/content/ContentTabPanels';
 import { AppToast, ToastData } from '@/components/AppToast';
-import { HelpModal, QualityChecklist, runQualityChecks } from './components';
+import {
+  AttachPromptPopover,
+  HelpModal,
+  ImpactExplainerModal,
+  MarkAsPostedModal,
+  QualityChecklist,
+  runQualityChecks,
+} from './components';
 import {
   relativeTime,
   generateAvailableLabel,
@@ -1427,131 +1432,6 @@ function ScheduledCard({
   );
 }
 
-// ── Posted card ───────────────────────────────────────────────────────────────
-
-function PostedCard({ draft, attribution }: { draft: ContentDraft; attribution?: DraftAttribution }) {
-  const [expanded, setExpanded] = useState(false);
-  const title = draft.title ?? draft.content_text.slice(0, 80) + (draft.content_text.length > 80 ? '…' : '');
-
-  // Confidence tier based on number of tracking runs since posting
-  type ConfidenceTier = 'awaiting' | 'early' | 'developing' | 'established';
-  function getConfidenceTier(runs: number): ConfidenceTier {
-    if (runs === 0) return 'awaiting';
-    if (runs <= 2) return 'early';
-    if (runs <= 5) return 'developing';
-    return 'established';
-  }
-  const TIER_LABELS: Record<ConfidenceTier, string> = {
-    awaiting: 'Awaiting next report',
-    early: 'Early data',
-    developing: 'Developing',
-    established: 'Established',
-  };
-  const TIER_COLORS: Record<ConfidenceTier, string> = {
-    awaiting: 'var(--text-faint)',
-    early: 'var(--text-muted)',
-    developing: 'var(--accent-foreground)',
-    established: 'var(--success)',
-  };
-
-  let attributionNode: JSX.Element | null = null;
-  if (attribution) {
-    const tier = getConfidenceTier(attribution.runs_since_posting);
-    const tierColor = TIER_COLORS[tier];
-    const tierLabel = TIER_LABELS[tier];
-
-    if (tier === 'awaiting') {
-      attributionNode = (
-        <div className="flex items-center gap-1.5 mt-1">
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full border" style={{ color: tierColor, borderColor: `${tierColor}40`, backgroundColor: `${tierColor}10` }}>
-            {tierLabel}
-          </span>
-          <span className="text-xs text-[var(--text-faint)]">Next tracking run will measure visibility change.</span>
-        </div>
-      );
-    } else {
-      const scoreBefore = attribution.score_at_posting;
-      const scoreNow = attribution.current_score ?? 0;
-      const delta = attribution.delta;
-      const deltaColor = delta == null ? 'var(--text-secondary)' : delta > 0 ? 'var(--success)' : delta < 0 ? 'var(--danger)' : 'var(--text-secondary)';
-      const deltaLabel = delta == null ? '—' : delta > 0 ? `+${delta.toFixed(1)}pp` : `${delta.toFixed(1)}pp`;
-      const runs = attribution.runs_since_posting;
-
-      attributionNode = (
-        <div className="mt-2 flex flex-col gap-1.5">
-          <div className="flex items-center gap-3 flex-wrap">
-            {scoreBefore != null && (
-              <div className="flex items-center gap-1">
-                <span className="text-[10px] text-[var(--text-faint)]">At posting</span>
-                <span className="text-xs font-medium font-mono text-[var(--text-secondary)]">{scoreBefore.toFixed(1)}%</span>
-              </div>
-            )}
-            {scoreBefore != null && <ArrowRight size={10} className="text-[var(--text-faint)]" />}
-            <div className="flex items-center gap-1">
-              <span className="text-[10px] text-[var(--text-faint)]">Now</span>
-              <span className="text-xs font-medium font-mono text-[var(--text-primary)]">{scoreNow.toFixed(1)}%</span>
-            </div>
-            {delta != null && (
-              <span className="text-xs font-semibold" style={{ color: deltaColor }}>{deltaLabel}</span>
-            )}
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full border ml-auto" style={{ color: tierColor, borderColor: `${tierColor}40`, backgroundColor: `${tierColor}10` }}>
-              {tierLabel}
-            </span>
-          </div>
-          <p className="text-[10px] text-[var(--text-faint)] leading-relaxed">
-            Based on {runs} tracking run{runs !== 1 ? 's' : ''} since posting.{' '}
-            {tier === 'early' && 'More data needed before drawing conclusions.'}
-            {tier === 'developing' && 'Trend is forming — keep an eye on the next few runs.'}
-            {tier === 'established' && 'Sufficient data to observe a trend (correlation, not causation).'}
-          </p>
-        </div>
-      );
-    }
-  } else if (draft.visibility_at_post != null) {
-    attributionNode = (
-      <div className="flex items-center gap-1 mt-1">
-        <span className="text-[10px] text-[var(--text-faint)]">Brand visibility at time of posting:</span>
-        <span className="text-xs font-medium font-mono text-[var(--text-secondary)]">{draft.visibility_at_post.toFixed(1)}%</span>
-      </div>
-    );
-  }
-
-  return (
-    <div className="card p-4 flex flex-col gap-2 hover:border-[rgba(255,255,255,0.14)] transition-colors">
-      {/* Top row */}
-      <div className="flex items-center gap-2">
-        <PlatformBadge platform={draft.platform} />
-        <p className="flex-1 text-sm text-[var(--text-secondary)] truncate">{title}</p>
-        <button
-          onClick={() => setExpanded(!expanded)}
-          className="text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors shrink-0"
-        >
-          {expanded ? 'Hide' : 'View'}
-        </button>
-        <span className="text-xs text-[var(--text-faint)] shrink-0">{relativeTime(draft.updated_at)}</span>
-      </div>
-
-      {/* Expanded content */}
-      {expanded && (
-        <div className="bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3">
-          <pre className="text-xs text-[var(--text-muted)] whitespace-pre-wrap leading-relaxed font-mono">{draft.content_text}</pre>
-        </div>
-      )}
-
-      {/* Attribution */}
-      {attributionNode && (
-        <div className="border-t border-[rgba(255,255,255,0.05)] pt-2">
-          <p className="text-[10px] text-[var(--text-faint)] uppercase tracking-wide mb-1 flex items-center gap-1">
-            <BarChart2 size={9} />
-            Visibility change since posting
-          </p>
-          {attributionNode}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ContentHubPage() {
@@ -1581,7 +1461,7 @@ export default function ContentHubPage() {
     } else if (tab === 'drafts') {
       setActivePrimaryTab('content_drafts');
       setActiveSubTab('queue');
-    } else if (tab === 'scheduled') {
+    } else if (tab === 'scheduled' || tab === 'saved') {
       setActivePrimaryTab('content_drafts');
       setActiveSubTab('scheduled');
     } else if (tab === 'posted') {
@@ -1632,6 +1512,9 @@ export default function ContentHubPage() {
   const [oppHelpOpen, setOppHelpOpen] = useState(false);
   const [postingGuideOpen, setPostingGuideOpen] = useState(false);
   const [postingPlatform, setPostingPlatform] = useState<'reddit' | 'quora' | 'medium' | 'wikipedia'>('reddit');
+  const [explainerOpen, setExplainerOpen] = useState(false);
+  const [attachPopoverDraftId, setAttachPopoverDraftId] = useState<number | null>(null);
+  const [markPostedModalDraftId, setMarkPostedModalDraftId] = useState<number | null>(null);
 
   // Upgrade modal (shown on 402 responses)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
@@ -1850,6 +1733,13 @@ export default function ContentHubPage() {
   }
 
   async function handleMarkAsPosted(id: number) {
+    const draft = scheduledItems.find((d) => d.id === id);
+    const isOrphan = draft && !draft.prompt_id;
+    const hasPromptsToSuggest = brandPrompts.length > 0;
+    if (isOrphan && hasPromptsToSuggest) {
+      setMarkPostedModalDraftId(id);
+      return;
+    }
     await updateDraft(id, { status: 'posted' });
     if (selectedBrandId) loadAll(selectedBrandId);
   }
@@ -1860,15 +1750,19 @@ export default function ContentHubPage() {
   }
 
   async function handleDelete(id: number) {
+    const wasInDraftQueue = draftItems.some((d) => d.id === id);
     await deleteDraft(id);
     setDraftItems((prev) => prev.filter((d) => d.id !== id));
     setScheduledItems((prev) => prev.filter((d) => d.id !== id));
-    setDraftStatus((prev) => {
-      if (!prev) return prev;
-      const newCount = Math.max(0, prev.draft_count - 1);
-      return { ...prev, draft_count: newCount, draft_queue_full: newCount >= prev.draft_cap };
-    });
-    setToast({ message: 'Draft dismissed', type: 'info' });
+    setPostedItems((prev) => prev.filter((d) => d.id !== id));
+    if (wasInDraftQueue) {
+      setDraftStatus((prev) => {
+        if (!prev) return prev;
+        const newCount = Math.max(0, prev.draft_count - 1);
+        return { ...prev, draft_count: newCount, draft_queue_full: newCount >= prev.draft_cap };
+      });
+    }
+    setToast({ message: 'Draft removed', type: 'info' });
   }
 
   function handleSaved(updated: ContentDraft) {
@@ -2182,11 +2076,50 @@ export default function ContentHubPage() {
             <li><span className="text-[var(--text-primary)] font-medium">Regenerate Drafts</span> — replaces all existing drafts with a fresh batch across your tracked prompts and platforms.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Visibility Opportunities</span> tab shows threads across Reddit, Quora, LinkedIn, and X matching your tracked prompts. Use &quot;Scan for Opportunities&quot; to refresh.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Queue</span> — review, edit, and approve AI drafts before they go live.</li>
-            <li><span className="text-[var(--text-primary)] font-medium">Scheduled</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
+            <li><span className="text-[var(--text-primary)] font-medium">Saved</span> — approved drafts ready to post. Copy the text, post it manually, then click Mark as Posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Posted tab</span> — content that has been marked as posted.</li>
             <li><span className="text-[var(--text-primary)] font-medium">Brand Settings</span> — control which platforms generate drafts and how frequently.</li>
           </ul>
         </HelpModal>
+      )}
+      {explainerOpen && <ImpactExplainerModal onClose={() => setExplainerOpen(false)} />}
+      {attachPopoverDraftId != null && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 px-4">
+          <button
+            type="button"
+            aria-label="Close attach prompt dialog"
+            className="absolute inset-0 bg-black/40 cursor-default"
+            onClick={() => setAttachPopoverDraftId(null)}
+          />
+          <div className="relative">
+            <AttachPromptPopover
+              draftId={attachPopoverDraftId}
+              allPrompts={brandPrompts}
+              onAttach={async (promptId) => {
+                await updateDraft(attachPopoverDraftId, { prompt_id: promptId });
+                if (selectedBrandId) loadAll(selectedBrandId);
+                setToast({ message: 'Attached to prompt', type: 'success' });
+              }}
+              onClose={() => setAttachPopoverDraftId(null)}
+            />
+          </div>
+        </div>
+      )}
+      {markPostedModalDraftId != null && (
+        <MarkAsPostedModal
+          draftId={markPostedModalDraftId}
+          allPrompts={brandPrompts}
+          onAttachAndPost={async (promptId) => {
+            await updateDraft(markPostedModalDraftId, { prompt_id: promptId, status: 'posted' });
+            if (selectedBrandId) loadAll(selectedBrandId);
+            setToast({ message: 'Attached and marked as posted', type: 'success' });
+          }}
+          onPostWithoutAttach={async () => {
+            await updateDraft(markPostedModalDraftId, { status: 'posted' });
+            if (selectedBrandId) loadAll(selectedBrandId);
+          }}
+          onClose={() => setMarkPostedModalDraftId(null)}
+        />
       )}
       {oppHelpOpen && (
         <HelpModal title="Visibility Opportunities" onClose={() => setOppHelpOpen(false)}>
@@ -2555,7 +2488,7 @@ export default function ContentHubPage() {
               <div className="flex gap-1 mb-5 pl-0.5">
                 {([
                   { key: 'queue' as ContentDraftsSubTab, label: 'Queue', count: tabCounts.drafts },
-                  { key: 'scheduled' as ContentDraftsSubTab, label: 'Scheduled', count: tabCounts.scheduled },
+                  { key: 'scheduled' as ContentDraftsSubTab, label: 'Saved', count: tabCounts.scheduled },
                 ]).map((sub) => (
                   <button
                     key={sub.key}
@@ -2616,6 +2549,8 @@ export default function ContentHubPage() {
               setOppHelpOpen={setOppHelpOpen}
               user={user}
               onRequestDraft={() => setRequestDraftOpen(true)}
+              onOpenAttach={(draftId) => setAttachPopoverDraftId(draftId)}
+              onOpenExplainer={() => setExplainerOpen(true)}
             />
           </div>
 
@@ -2730,7 +2665,7 @@ export default function ContentHubPage() {
                   <>
                     {([
                       { label: 'Drafts', count: draftStatus.draft_count, cap: draftStatus.draft_cap },
-                      { label: 'Scheduled', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
+                      { label: 'Saved', count: draftStatus.scheduled_count, cap: draftStatus.scheduled_cap },
                     ] as Array<{ label: string; count: number; cap: number }>).map(({ label, count, cap }) => {
                       const pct = cap > 0 ? count / cap : 0;
                       const barColor = 'var(--accent)';

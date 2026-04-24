@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   ComposedChart,
   Area,
@@ -32,6 +32,7 @@ interface PromptImpactTimelineProps {
   contentEvents: ContentEventItem[];
   drafts?: PromptDraftSnapshot[];
   height?: number;
+  highlightDraftId?: number;
 }
 
 type Timeframe = '7d' | '30d' | '90d' | 'all';
@@ -41,6 +42,7 @@ export default function PromptImpactTimeline({
   contentEvents,
   drafts = [],
   height = 320,
+  highlightDraftId,
 }: PromptImpactTimelineProps) {
   const [timeframe, setTimeframe] = useState<Timeframe>('90d');
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
@@ -76,6 +78,27 @@ export default function PromptImpactTimeline({
         ),
       }));
   }, [timeline, timeframe]);
+
+  // If the highlighted draft's event lies outside the current timeframe, switch to 'all'.
+  useEffect(() => {
+    if (highlightDraftId == null) return;
+    const event = contentEvents.find(
+      (e) =>
+        e.event_type === 'draft_posted' &&
+        (e.data as Record<string, unknown>)?.draft_id === highlightDraftId,
+    );
+    if (!event) return;
+    const eventTime = parseUTCISO(event.created_at).getTime();
+    const cutoffs: Record<Timeframe, number> = {
+      '7d': Date.now() - 7 * 86400000,
+      '30d': Date.now() - 30 * 86400000,
+      '90d': Date.now() - 90 * 86400000,
+      all: 0,
+    };
+    if (eventTime < cutoffs[timeframe]) {
+      setTimeframe('all');
+    }
+  }, [highlightDraftId, contentEvents, timeframe]);
 
   // Build marker index: map data index → array of drafts (supports multiple per day)
   const markersByIndex = useMemo(() => {
@@ -118,6 +141,34 @@ export default function PromptImpactTimeline({
       prev && prev.drafts[0]?.id === matchedDrafts[0]?.id ? null : { drafts: matchedDrafts },
     );
   }, [markersByIndex, draftsById]);
+
+  // Deep-link: find the marker whose draft matches the highlight param.
+  // Baked into a memo (not state) because Recharts' Customized caches its
+  // output and won't reflect state changes after the initial render — so the
+  // pulse has to be present in the first render's JSX.
+  const pulsingIndex = useMemo(() => {
+    if (highlightDraftId == null) return null;
+    let target: number | null = null;
+    markersByIndex.forEach((markers, idx) => {
+      if (markers.some((m) => m.draftId === highlightDraftId)) target = idx;
+    });
+    return target;
+  }, [highlightDraftId, markersByIndex]);
+
+  // Auto-expand the draft panel when deep-linked. Direct setState (not the
+  // toggling click handler) because StrictMode's double-invoke would collapse
+  // a toggle. The pulse animation is CSS-driven with `forwards` fill, so no
+  // timer is needed to clean it up — the final keyframe matches the resting
+  // diamond state.
+  useEffect(() => {
+    if (highlightDraftId == null || pulsingIndex == null) return;
+    const markers = markersByIndex.get(pulsingIndex);
+    if (!markers) return;
+    const matched = markers
+      .map((m) => draftsById.get(m.draftId))
+      .filter((d): d is PromptDraftSnapshot => d != null);
+    if (matched.length > 0) setExpandedDraft({ drafts: matched });
+  }, [highlightDraftId, pulsingIndex, markersByIndex, draftsById]);
 
   // Custom renderer that draws diamonds pinned to the top of the chart
   // Uses Recharts internal xAxisMap/yAxisMap props passed to Customized components
@@ -178,11 +229,20 @@ export default function PromptImpactTimeline({
               />
               {/* Diamond */}
               <polygon
+                data-marker-idx={idx}
                 points={`${cx},${diamondY - size} ${cx + size},${diamondY} ${cx},${diamondY + size} ${cx - size},${diamondY}`}
                 fill="var(--accent-light)"
                 stroke="rgba(255,255,255,0.8)"
                 strokeWidth={1.2}
-                style={{ filter: 'drop-shadow(0 0 4px var(--accent))' }}
+                style={{
+                  filter: 'drop-shadow(0 0 4px var(--accent))',
+                  transformBox: 'fill-box',
+                  transformOrigin: 'center',
+                  animation:
+                    idx === pulsingIndex
+                      ? 'diamond-pulse-glow 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards'
+                      : undefined,
+                }}
               />
               {/* Count badge for multiple posts */}
               {count > 1 && (
@@ -217,7 +277,7 @@ export default function PromptImpactTimeline({
         })}
       </g>
     );
-  }, [filteredData, markersByIndex, hasMarkers, handleMarkerClick]);
+  }, [filteredData, markersByIndex, hasMarkers, handleMarkerClick, pulsingIndex]);
 
   const toggleModel = (model: string) => {
     setHiddenModels((prev) => {

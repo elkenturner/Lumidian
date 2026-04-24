@@ -437,7 +437,7 @@ export async function generateDraft(
 
 export async function updateDraft(
   draftId: number,
-  data: { title?: string; content_text?: string; status?: string }
+  data: { title?: string; content_text?: string; status?: string; prompt_id?: number }
 ): Promise<ContentDraft> {
   const res = await api.put<ContentDraft>(`/content/draft/${draftId}`, data);
   invalidateCache('/content/');
@@ -455,6 +455,18 @@ export async function postDraft(
 export async function deleteDraft(draftId: number): Promise<void> {
   await api.delete(`/content/draft/${draftId}`);
   invalidateCache('/content/');
+}
+
+export interface PromptSuggestion {
+  prompt_id: number;
+  text: string;
+  score: number;
+  label: 'very_relevant' | 'somewhat' | 'loose';
+}
+
+export async function getPromptSuggestions(draftId: number): Promise<PromptSuggestion[]> {
+  const res = await api.get<PromptSuggestion[]>(`/content/draft/${draftId}/prompt-suggestions`);
+  return res.data;
 }
 
 export async function approveAllDrafts(
@@ -971,6 +983,8 @@ export interface BillingStatus {
   brand_limits: { standard: number; pitch: number };
   is_admin: boolean;
   has_payment_method: boolean;
+  pending_tier: 'basic' | 'starter' | 'pro' | null;
+  pending_tier_effective_at: string | null;
 }
 
 export interface BillingUsage {

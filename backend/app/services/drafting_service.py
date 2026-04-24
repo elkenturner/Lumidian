@@ -343,6 +343,63 @@ async def _estimate_impact(
     return estimate_visibility_impact(gap_score, visibility_pct, recent_posts)
 
 
+# ── Text similarity (orphan-draft matching) ──────────────────────────────────
+
+_SIMILARITY_STOPWORDS = frozenset({
+    "the", "and", "for", "with", "from", "that", "this", "these", "those",
+    "have", "has", "had", "but", "not", "are", "was", "were", "will", "would",
+    "can", "could", "should", "may", "might", "about", "into", "onto", "than",
+    "what", "when", "where", "which", "who", "why", "how", "all", "any",
+    "some", "one", "two", "out", "off", "over", "under", "also", "just",
+    "like", "very", "more", "most", "such", "you", "your", "our", "their",
+    "his", "her", "its", "them", "they", "his", "been", "being",
+})
+
+
+def _tokenize_for_similarity(text: str) -> set[str]:
+    """Lowercase → split on non-alphanumeric → keep tokens length ≥3 that are not stopwords."""
+    out: set[str] = set()
+    lowered = text.lower()
+    buf: list[str] = []
+    for ch in lowered:
+        if ch.isalnum():
+            buf.append(ch)
+        else:
+            if buf:
+                tok = "".join(buf)
+                if len(tok) >= 3 and tok not in _SIMILARITY_STOPWORDS:
+                    out.add(tok)
+                buf = []
+    if buf:
+        tok = "".join(buf)
+        if len(tok) >= 3 and tok not in _SIMILARITY_STOPWORDS:
+            out.add(tok)
+    return out
+
+
+def rank_prompts_by_similarity(draft_text: str, prompts: list) -> list[tuple[object, float]]:
+    """
+    Rank prompts by Jaccard token-overlap similarity to draft_text, descending.
+
+    Returns a list of (prompt, score) tuples. `prompt` is the input object
+    unchanged — any object with `.id` and `.text` attributes works.
+    Deterministic: no LLM, no external deps.
+    """
+    draft_tokens = _tokenize_for_similarity(draft_text)
+    scored: list[tuple[object, float]] = []
+    for p in prompts:
+        prompt_tokens = _tokenize_for_similarity(getattr(p, "text", "") or "")
+        union = draft_tokens | prompt_tokens
+        if not union:
+            score = 0.0
+        else:
+            intersection = draft_tokens & prompt_tokens
+            score = len(intersection) / len(union)
+        scored.append((p, score))
+    scored.sort(key=lambda t: t[1], reverse=True)
+    return scored
+
+
 # ── Draft creation helpers ────────────────────────────────────────────────────
 
 async def _store_draft(

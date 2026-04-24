@@ -33,19 +33,17 @@ function computeSummary(
       unattachedCount += 1;
     }
     const attr = attributions[d.id];
-    if (!attr || attr.runs_since_posting === 0) {
+    if (!attr || attr.runs_since_posting === 0 || attr.delta == null) {
       awaitingCount += 1;
       continue;
     }
-    if (attr.delta != null) {
-      deltas.push(attr.delta);
-      if (!best || attr.delta > best.delta) {
-        best = {
-          delta: attr.delta,
-          platform: d.platform,
-          promptHint: d.content_brief ?? null,
-        };
-      }
+    deltas.push(attr.delta);
+    if (attr.delta > 0 && (!best || attr.delta > best.delta)) {
+      best = {
+        delta: attr.delta,
+        platform: d.platform,
+        promptHint: d.content_brief ?? null,
+      };
     }
   }
 
@@ -103,7 +101,7 @@ export function PostedSummaryStrip({
       <span className="leading-relaxed">
         {parts.map((p, i) => (
           <span key={i}>
-            {i > 0 && <span className="mx-1.5 text-[var(--text-faint)]">·</span>}
+            {i > 0 && <span className="mx-1.5 text-[var(--text-faint)]" aria-hidden="true">·</span>}
             <span className={i === 0 ? 'text-[var(--text-primary)] font-medium' : ''}>{p}</span>
           </span>
         ))}
@@ -112,7 +110,7 @@ export function PostedSummaryStrip({
         onClick={onOpenExplainer}
         className="ml-auto flex items-center gap-1 text-[11px] text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors"
       >
-        <HelpCircle size={11} />
+        <HelpCircle size={11} aria-hidden="true" />
         How impact works
       </button>
     </div>

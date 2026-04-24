@@ -47,7 +47,6 @@ export default function PromptImpactTimeline({
   const [timeframe, setTimeframe] = useState<Timeframe>('90d');
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
   const [expandedDraft, setExpandedDraft] = useState<ExpandedDraftData | null>(null);
-  const [pulsingIndex, setPulsingIndex] = useState<number | null>(null);
 
   // Map draft_id to draft data for click expansion
   const draftsById = useMemo(() => {
@@ -143,22 +142,33 @@ export default function PromptImpactTimeline({
     );
   }, [markersByIndex, draftsById]);
 
-  // Deep-link: auto-expand panel + one-shot pulse on the matching diamond
-  useEffect(() => {
-    if (highlightDraftId == null) return;
-    let targetIndex: number | null = null;
+  // Deep-link: find the marker whose draft matches the highlight param.
+  // Baked into a memo (not state) because Recharts' Customized caches its
+  // output and won't reflect state changes after the initial render — so the
+  // pulse has to be present in the first render's JSX.
+  const pulsingIndex = useMemo(() => {
+    if (highlightDraftId == null) return null;
+    let target: number | null = null;
     markersByIndex.forEach((markers, idx) => {
-      if (markers.some((m) => m.draftId === highlightDraftId)) {
-        targetIndex = idx;
-      }
+      if (markers.some((m) => m.draftId === highlightDraftId)) target = idx;
     });
-    if (targetIndex == null) return;
+    return target;
+  }, [highlightDraftId, markersByIndex]);
 
-    handleMarkerClick(targetIndex);
-    setPulsingIndex(targetIndex);
-    const timer = setTimeout(() => setPulsingIndex(null), 1400);
-    return () => clearTimeout(timer);
-  }, [highlightDraftId, markersByIndex, handleMarkerClick]);
+  // Auto-expand the draft panel when deep-linked. Direct setState (not the
+  // toggling click handler) because StrictMode's double-invoke would collapse
+  // a toggle. The pulse animation is CSS-driven with `forwards` fill, so no
+  // timer is needed to clean it up — the final keyframe matches the resting
+  // diamond state.
+  useEffect(() => {
+    if (highlightDraftId == null || pulsingIndex == null) return;
+    const markers = markersByIndex.get(pulsingIndex);
+    if (!markers) return;
+    const matched = markers
+      .map((m) => draftsById.get(m.draftId))
+      .filter((d): d is PromptDraftSnapshot => d != null);
+    if (matched.length > 0) setExpandedDraft({ drafts: matched });
+  }, [highlightDraftId, pulsingIndex, markersByIndex, draftsById]);
 
   // Custom renderer that draws diamonds pinned to the top of the chart
   // Uses Recharts internal xAxisMap/yAxisMap props passed to Customized components
@@ -217,29 +227,22 @@ export default function PromptImpactTimeline({
                 strokeDasharray="4 3"
                 strokeOpacity={0.4}
               />
-              {/* One-shot pulse ring for deep-linked draft */}
-              {idx === pulsingIndex && (
-                <circle
-                  cx={cx}
-                  cy={diamondY}
-                  r={8}
-                  fill="none"
-                  stroke="var(--accent)"
-                  strokeWidth={2}
-                  opacity={0.9}
-                  style={{
-                    transformOrigin: `${cx}px ${diamondY}px`,
-                    animation: 'diamond-pulse 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards',
-                  }}
-                />
-              )}
               {/* Diamond */}
               <polygon
+                data-marker-idx={idx}
                 points={`${cx},${diamondY - size} ${cx + size},${diamondY} ${cx},${diamondY + size} ${cx - size},${diamondY}`}
                 fill="var(--accent-light)"
                 stroke="rgba(255,255,255,0.8)"
                 strokeWidth={1.2}
-                style={{ filter: 'drop-shadow(0 0 4px var(--accent))' }}
+                style={{
+                  filter: 'drop-shadow(0 0 4px var(--accent))',
+                  transformBox: 'fill-box',
+                  transformOrigin: 'center',
+                  animation:
+                    idx === pulsingIndex
+                      ? 'diamond-pulse-glow 1.2s cubic-bezier(0.22, 1, 0.36, 1) forwards'
+                      : undefined,
+                }}
               />
               {/* Count badge for multiple posts */}
               {count > 1 && (

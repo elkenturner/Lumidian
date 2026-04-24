@@ -70,7 +70,13 @@ import { useBrand } from '@/contexts/BrandContext';
 import Link from 'next/link';
 import { ContentTabPanels } from '@/components/content/ContentTabPanels';
 import { AppToast, ToastData } from '@/components/AppToast';
-import { HelpModal, ImpactExplainerModal, QualityChecklist, runQualityChecks } from './components';
+import {
+  AttachPromptPopover,
+  HelpModal,
+  ImpactExplainerModal,
+  QualityChecklist,
+  runQualityChecks,
+} from './components';
 import {
   relativeTime,
   generateAvailableLabel,
@@ -2059,6 +2065,28 @@ export default function ContentHubPage() {
         </HelpModal>
       )}
       {explainerOpen && <ImpactExplainerModal onClose={() => setExplainerOpen(false)} />}
+      {attachPopoverDraftId != null && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 px-4">
+          <button
+            type="button"
+            aria-label="Close attach prompt dialog"
+            className="absolute inset-0 bg-black/40 cursor-default"
+            onClick={() => setAttachPopoverDraftId(null)}
+          />
+          <div className="relative">
+            <AttachPromptPopover
+              draftId={attachPopoverDraftId}
+              allPrompts={brandPrompts}
+              onAttach={async (promptId) => {
+                await updateDraft(attachPopoverDraftId, { prompt_id: promptId });
+                if (selectedBrandId) loadAll(selectedBrandId);
+                setToast({ message: 'Attached to prompt', type: 'success' });
+              }}
+              onClose={() => setAttachPopoverDraftId(null)}
+            />
+          </div>
+        </div>
+      )}
       {oppHelpOpen && (
         <HelpModal title="Visibility Opportunities" onClose={() => setOppHelpOpen(false)}>
           <p>Threads and discussions across Reddit, Quora, LinkedIn, and X where your brand can meaningfully contribute.</p>

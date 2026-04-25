@@ -915,16 +915,16 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Row 4: Citation Gaps */}
-              {analytics && analytics.citation_gaps && analytics.citation_gaps.length > 0 && (
+              {/* Row 4: Sources you're missing from */}
+              {analytics && analytics.total_responses_analyzed > 0 && selectedBrand && (
                 <div className="mb-4">
                   <div className="card p-5">
                     <div className="flex items-center gap-2 mb-4">
                       <Link2 size={15} className="text-[var(--accent)]" />
-                      <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Citation Gaps</h3>
-                      <HelpTooltip text="Domains frequently cited by AI models in responses that don't mention your brand. High gap scores indicate sources where your brand is absent but competitors may be present." />
+                      <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Sources you&apos;re missing from</h3>
+                      <HelpTooltip text="Draftable sources AI cites for your prompts — ranked by how many times they were cited without mentioning your brand." />
                     </div>
-                    <CitationGaps gaps={analytics.citation_gaps} />
+                    <CitationGaps gaps={analytics.citation_gaps} brandId={selectedBrand.id} />
                   </div>
                 </div>
               )}

@@ -137,13 +137,13 @@ Append to `backend/tests/test_dashboard_citation_gaps.py`:
 ```python
 @pytest.mark.asyncio
 async def test_twitter_com_normalized_to_x_com(client: httpx.AsyncClient):
-    brand_id, _ = await _setup_brand(client)
+    brand_id = await _setup_brand(client)
     await _seed_run(brand_id, [
         {"response_text": "See https://twitter.com/example for more.", "mentioned": False},
         {"response_text": "See https://twitter.com/another for context.", "mentioned": False},
         {"response_text": "Also https://x.com/yet_another offers details.", "mentioned": False},
     ])
-    resp = await client.get("/api/dashboard", params={"brand_id": brand_id})
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
     assert resp.status_code == 200
     gaps = resp.json()["citation_gaps"]
     x_rows = [g for g in gaps if g["domain"] == "x.com"]
@@ -155,12 +155,12 @@ async def test_twitter_com_normalized_to_x_com(client: httpx.AsyncClient):
 
 @pytest.mark.asyncio
 async def test_wikipedia_subdomains_normalized(client: httpx.AsyncClient):
-    brand_id, _ = await _setup_brand(client)
+    brand_id = await _setup_brand(client)
     await _seed_run(brand_id, [
         {"response_text": "Per https://en.wikipedia.org/wiki/Foo it's clear.", "mentioned": False},
         {"response_text": "And https://fr.wikipedia.org/wiki/Foo agrees.", "mentioned": False},
     ])
-    resp = await client.get("/api/dashboard", params={"brand_id": brand_id})
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
     assert resp.status_code == 200
     gaps = resp.json()["citation_gaps"]
     wiki_rows = [g for g in gaps if g["domain"] == "wikipedia.org"]
@@ -266,13 +266,13 @@ Append to `backend/tests/test_dashboard_citation_gaps.py`:
 ```python
 @pytest.mark.asyncio
 async def test_non_actionable_domains_excluded(client: httpx.AsyncClient):
-    brand_id, _ = await _setup_brand(client)
+    brand_id = await _setup_brand(client)
     await _seed_run(brand_id, [
         {"response_text": "Per https://techcrunch.com/article and https://reddit.com/r/foo it's clear.", "mentioned": False},
         {"response_text": "Also https://nytimes.com/x noted.", "mentioned": False},
         {"response_text": "https://reddit.com/r/bar adds context.", "mentioned": False},
     ])
-    resp = await client.get("/api/dashboard", params={"brand_id": brand_id})
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
     assert resp.status_code == 200
     gaps = resp.json()["citation_gaps"]
     domains = [g["domain"] for g in gaps]
@@ -283,24 +283,24 @@ async def test_non_actionable_domains_excluded(client: httpx.AsyncClient):
 
 @pytest.mark.asyncio
 async def test_no_actionable_citations_returns_empty_list(client: httpx.AsyncClient):
-    brand_id, _ = await _setup_brand(client)
+    brand_id = await _setup_brand(client)
     await _seed_run(brand_id, [
         {"response_text": "https://techcrunch.com/a and https://nytimes.com/b only.", "mentioned": False},
         {"response_text": "https://forbes.com/c is also relevant.", "mentioned": False},
     ])
-    resp = await client.get("/api/dashboard", params={"brand_id": brand_id})
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
     assert resp.status_code == 200
     assert resp.json()["citation_gaps"] == []
 
 
 @pytest.mark.asyncio
 async def test_platform_field_populated(client: httpx.AsyncClient):
-    brand_id, _ = await _setup_brand(client)
+    brand_id = await _setup_brand(client)
     await _seed_run(brand_id, [
         {"response_text": "https://reddit.com/r/x and https://medium.com/p/y.", "mentioned": False},
         {"response_text": "https://reddit.com/r/z again.", "mentioned": False},
     ])
-    resp = await client.get("/api/dashboard", params={"brand_id": brand_id})
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
     gaps = resp.json()["citation_gaps"]
     by_domain = {g["domain"]: g for g in gaps}
     assert by_domain["reddit.com"]["platform"] == "reddit"
@@ -422,7 +422,7 @@ Append to `backend/tests/test_dashboard_citation_gaps.py`:
 @pytest.mark.asyncio
 async def test_ranking_by_missed_mentions(client: httpx.AsyncClient):
     """reddit (8 missed) > medium (3 missed, partial) > linkedin (3 missed, zero presence)."""
-    brand_id, _ = await _setup_brand(client)
+    brand_id = await _setup_brand(client)
 
     # 8 reddit citations, 0 with brand → 8 missed
     reddit_rows = [
@@ -441,7 +441,7 @@ async def test_ranking_by_missed_mentions(client: httpx.AsyncClient):
     ]
     await _seed_run(brand_id, reddit_rows + medium_rows + linkedin_rows)
 
-    resp = await client.get("/api/dashboard", params={"brand_id": brand_id})
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
     gaps = resp.json()["citation_gaps"]
     domains_in_order = [g["domain"] for g in gaps]
     assert domains_in_order[0] == "reddit.com"           # 8 missed
@@ -451,7 +451,7 @@ async def test_ranking_by_missed_mentions(client: httpx.AsyncClient):
 @pytest.mark.asyncio
 async def test_full_coverage_excluded(client: httpx.AsyncClient):
     """If brand appears in every citation of a domain, it's not a gap — drop it."""
-    brand_id, _ = await _setup_brand(client)
+    brand_id = await _setup_brand(client)
     rows = [
         # reddit: brand in all 5 citations → no gap, must be excluded
         *[{"response_text": f"https://reddit.com/r/{i}", "mentioned": True} for i in range(5)],
@@ -459,7 +459,7 @@ async def test_full_coverage_excluded(client: httpx.AsyncClient):
         *[{"response_text": f"https://medium.com/p/{i}", "mentioned": False} for i in range(3)],
     ]
     await _seed_run(brand_id, rows)
-    resp = await client.get("/api/dashboard", params={"brand_id": brand_id})
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
     domains = [g["domain"] for g in resp.json()["citation_gaps"]]
     assert "medium.com" in domains
     assert "reddit.com" not in domains
@@ -468,7 +468,7 @@ async def test_full_coverage_excluded(client: httpx.AsyncClient):
 @pytest.mark.asyncio
 async def test_max_six_rows(client: httpx.AsyncClient):
     """Slice to 6 even if all 6 platforms qualify (defense-in-depth)."""
-    brand_id, _ = await _setup_brand(client)
+    brand_id = await _setup_brand(client)
     rows = []
     for dom in ("reddit.com", "quora.com", "medium.com", "wikipedia.org", "linkedin.com", "x.com"):
         rows.extend([
@@ -476,7 +476,7 @@ async def test_max_six_rows(client: httpx.AsyncClient):
             {"response_text": f"https://{dom}/b", "mentioned": False},
         ])
     await _seed_run(brand_id, rows)
-    resp = await client.get("/api/dashboard", params={"brand_id": brand_id})
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
     assert len(resp.json()["citation_gaps"]) <= 6
 ```
 

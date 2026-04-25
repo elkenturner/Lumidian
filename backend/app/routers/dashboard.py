@@ -183,6 +183,15 @@ _DOMAIN_ALIASES: dict[str, str] = {
     "twitter.com": "x.com",
 }
 
+_ACTIONABLE_DOMAIN_MAP: dict[str, str] = {
+    "reddit.com": "reddit",
+    "quora.com": "quora",
+    "medium.com": "medium",
+    "wikipedia.org": "wikipedia",
+    "linkedin.com": "linkedin",
+    "x.com": "x",
+}
+
 
 def _normalize_domain(domain: str) -> str:
     """Collapse domain variants to a canonical form before aggregation.
@@ -456,21 +465,19 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
                 domain_with[normalized] += 1
 
     _MIN_CITATIONS = 2  # ignore domains that appear only once
-    citation_gaps = sorted(
-        [
-            CitationGap(
-                domain=dom,
-                domain_type=_classify_domain(dom),
-                cited_total=cnt,
-                cited_with_brand=domain_with.get(dom, 0),
-                gap_score=round(1.0 - (domain_with.get(dom, 0) / cnt), 4),
-            )
-            for dom, cnt in domain_total_counts.items()
-            if cnt >= _MIN_CITATIONS
-        ],
-        key=lambda g: (g.gap_score, g.cited_total),
-        reverse=True,
-    )[:10]
+    citation_gaps = [
+        CitationGap(
+            domain=dom,
+            domain_type=_classify_domain(dom),
+            cited_total=cnt,
+            cited_with_brand=domain_with.get(dom, 0),
+            gap_score=round(1.0 - (domain_with.get(dom, 0) / cnt), 4),
+            platform=_ACTIONABLE_DOMAIN_MAP[dom],
+        )
+        for dom, cnt in domain_total_counts.items()
+        if cnt >= _MIN_CITATIONS and dom in _ACTIONABLE_DOMAIN_MAP
+    ]
+    # Sort + slice happens in Task 4 — leave default order for now
 
     final_total = total_analyzed if total_analyzed > 0 else total
     if final_total >= 100:

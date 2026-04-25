@@ -118,3 +118,46 @@ async def test_same_response_twitter_and_x_count_once(client: httpx.AsyncClient)
     x_rows = [g for g in gaps if g["domain"] == "x.com"]
     assert len(x_rows) == 1
     assert x_rows[0]["cited_total"] == 2  # NOT 3 — the first response dedupes twitter+x to a single x.com count
+
+
+@pytest.mark.asyncio
+async def test_non_actionable_domains_excluded(client: httpx.AsyncClient):
+    brand_id = await _setup_brand(client)
+    await _seed_run(brand_id, [
+        {"response_text": "Per https://techcrunch.com/article and https://reddit.com/r/foo it's clear.", "mentioned": False},
+        {"response_text": "Also https://nytimes.com/x noted.", "mentioned": False},
+        {"response_text": "https://reddit.com/r/bar adds context.", "mentioned": False},
+    ])
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
+    assert resp.status_code == 200
+    gaps = resp.json()["citation_gaps"]
+    domains = [g["domain"] for g in gaps]
+    assert "reddit.com" in domains
+    assert "techcrunch.com" not in domains
+    assert "nytimes.com" not in domains
+
+
+@pytest.mark.asyncio
+async def test_no_actionable_citations_returns_empty_list(client: httpx.AsyncClient):
+    brand_id = await _setup_brand(client)
+    await _seed_run(brand_id, [
+        {"response_text": "https://techcrunch.com/a and https://nytimes.com/b only.", "mentioned": False},
+        {"response_text": "https://forbes.com/c is also relevant.", "mentioned": False},
+    ])
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
+    assert resp.status_code == 200
+    assert resp.json()["citation_gaps"] == []
+
+
+@pytest.mark.asyncio
+async def test_platform_field_populated(client: httpx.AsyncClient):
+    brand_id = await _setup_brand(client)
+    await _seed_run(brand_id, [
+        {"response_text": "https://reddit.com/r/x and https://medium.com/p/y.", "mentioned": False},
+        {"response_text": "https://reddit.com/r/z and https://medium.com/p/w again.", "mentioned": False},
+    ])
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
+    gaps = resp.json()["citation_gaps"]
+    by_domain = {g["domain"]: g for g in gaps}
+    assert by_domain["reddit.com"]["platform"] == "reddit"
+    assert by_domain["medium.com"]["platform"] == "medium"

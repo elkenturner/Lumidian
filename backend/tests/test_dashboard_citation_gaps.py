@@ -102,3 +102,19 @@ async def test_wikipedia_subdomains_normalized(client: httpx.AsyncClient):
     wiki_rows = [g for g in gaps if g["domain"] == "wikipedia.org"]
     assert len(wiki_rows) == 1
     assert wiki_rows[0]["cited_total"] == 2
+
+
+@pytest.mark.asyncio
+async def test_same_response_twitter_and_x_count_once(client: httpx.AsyncClient):
+    """A single response containing both twitter.com and x.com counts as one x.com citation."""
+    brand_id = await _setup_brand(client)
+    await _seed_run(brand_id, [
+        {"response_text": "Both https://twitter.com/a and https://x.com/b appear here.", "mentioned": False},
+        {"response_text": "Just https://x.com/c on its own.", "mentioned": False},
+    ])
+    resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
+    assert resp.status_code == 200
+    gaps = resp.json()["citation_gaps"]
+    x_rows = [g for g in gaps if g["domain"] == "x.com"]
+    assert len(x_rows) == 1
+    assert x_rows[0]["cited_total"] == 2  # NOT 3 — the first response dedupes twitter+x to a single x.com count

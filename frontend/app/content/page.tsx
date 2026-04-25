@@ -1433,6 +1433,8 @@ function ScheduledCard({
   );
 }
 
+const SUPPORTED_PLATFORM_PARAMS = ['reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'] as const;
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ContentHubPage() {
@@ -1539,13 +1541,13 @@ export default function ContentHubPage() {
   const searchParams = useSearchParams();
 
   // Capture ?platform= query param at first render — consumed once after the brand loads
-  // (see the selectedBrandId effect below). This survives the activeTab/selectedBrandId
-  // resets that fire on initial mount.
-  const _initialPlatformParam = searchParams?.get('platform');
-  const _SUPPORTED_PLATFORMS = ['reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'];
+  // (see the selectedBrandId effect below). A ref (not state) survives the activeTab and
+  // selectedBrandId effects that reset draftPlatformFilter on initial mount; neither
+  // effect touches this ref.
+  const initialPlatformParam = searchParams?.get('platform');
   const pendingPlatformRef = useRef<string | null>(
-    _initialPlatformParam && _SUPPORTED_PLATFORMS.includes(_initialPlatformParam)
-      ? _initialPlatformParam
+    initialPlatformParam && (SUPPORTED_PLATFORM_PARAMS as readonly string[]).includes(initialPlatformParam)
+      ? initialPlatformParam
       : null
   );
 

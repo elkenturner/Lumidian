@@ -722,6 +722,7 @@ export interface CitationGap {
   cited_total: number;
   cited_with_brand: number;
   gap_score: number;
+  platform?: string;
 }
 
 export interface DashboardAnalytics {

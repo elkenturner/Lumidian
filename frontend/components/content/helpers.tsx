@@ -18,6 +18,15 @@ export const PLATFORM_DISPLAY: Record<string, string> = {
   x: 'X', x_thread: 'X', x_post: 'X', x_reply: 'X',
 };
 
+const PLATFORM_BASE_MAP: Record<string, string> = {
+  linkedin_article: 'linkedin', linkedin_post: 'linkedin', linkedin_reply: 'linkedin',
+  x_thread: 'x', x_post: 'x', x_reply: 'x',
+};
+
+export function getBasePlatform(platform: string): string {
+  return PLATFORM_BASE_MAP[platform] ?? platform;
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted';

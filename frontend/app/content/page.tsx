@@ -44,6 +44,7 @@ import {
   getDraftStatusFresh,
   getBrandProfile,
   getContentSettings,
+  updateContentSettings,
   getDraftAttributions,
   getQuoraQuestions,
   triggerScan,
@@ -86,7 +87,7 @@ import {
   extractSubreddit,
   computeUrgency,
 } from './utils';
-import { renderPreviewHtml } from '@/components/content/helpers';
+import { renderPreviewHtml, getBasePlatform } from '@/components/content/helpers';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -1483,7 +1484,7 @@ export default function ContentHubPage() {
   const [pinnedDraftId, setPinnedDraftId] = useState<number | null>(null);
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [brandPrompts, setBrandPrompts] = useState<Prompt[]>([]);
-  const [contentSettings, setContentSettings] = useState<BrandContentSettings[]>([]); // backend draft-generation prefs (loaded but not used for sidebar toggles)
+  const [contentSettings, setContentSettings] = useState<BrandContentSettings[]>([]);
 
   // Report-running guard (set by dashboard via localStorage)
   const [reportRunning, setReportRunning] = useState(false);
@@ -1523,16 +1524,9 @@ export default function ContentHubPage() {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
   const [upgradeModalReason, setUpgradeModalReason] = useState('');
 
-  // Per-tab platform toggles (local view filters, independent per tab)
-  const [tabDisabledPlatforms, setTabDisabledPlatforms] = useState<Record<QueueTab, string[]>>({
-    drafts: [],
-    scheduled: [],
-    opportunities: [],
-    posted: [],
-  });
-
-  // Disabled platforms for the active tab
-  const _disabledPlatforms = new Set(tabDisabledPlatforms[activeTab]);
+  const _disabledPlatforms = new Set(
+    contentSettings.filter((s) => !s.enabled).map((s) => s.platform)
+  );
 
   // Active platform filters (independent per tab)
   const [draftPlatformFilter, setDraftPlatformFilter] = useState<string>('all');
@@ -2031,27 +2025,53 @@ export default function ContentHubPage() {
     }
   }, [selectedBrandId, scanning, brandPrompts.length]);
 
-  function handleTogglePlatform(platform: string) {
-    setTabDisabledPlatforms((prev) => {
-      const current = prev[activeTab];
-      const isDisabled = current.includes(platform);
-      return {
-        ...prev,
-        [activeTab]: isDisabled
-          ? current.filter((p) => p !== platform)
-          : [...current, platform],
-      };
+  async function handleTogglePlatform(platform: string) {
+    if (selectedBrandId == null) return;
+    const current = contentSettings.find((s) => s.platform === platform);
+    const nextEnabled = !(current?.enabled ?? true);
+
+    setContentSettings((prev) => {
+      const idx = prev.findIndex((s) => s.platform === platform);
+      if (idx === -1) {
+        return [
+          ...prev,
+          { id: -1, brand_id: selectedBrandId, platform, enabled: nextEnabled, auto_post: false } as BrandContentSettings,
+        ];
+      }
+      const next = [...prev];
+      next[idx] = { ...next[idx], enabled: nextEnabled };
+      return next;
     });
+
+    try {
+      const updated = await updateContentSettings(selectedBrandId, platform, { enabled: nextEnabled });
+      setContentSettings((prev) => {
+        const idx = prev.findIndex((s) => s.platform === platform);
+        if (idx === -1) return [...prev, updated];
+        const next = [...prev];
+        next[idx] = updated;
+        return next;
+      });
+    } catch (err) {
+      logError(err, `Content: toggle platform ${platform}`);
+      setContentSettings((prev) => {
+        const idx = prev.findIndex((s) => s.platform === platform);
+        if (idx === -1) return prev;
+        const next = [...prev];
+        next[idx] = { ...next[idx], enabled: !nextEnabled };
+        return next;
+      });
+      setToast({ type: 'error', message: `Couldn't update ${platform} setting. Try again.` });
+    }
   }
 
-  // Filter drafts to only show enabled platforms + active platform filter
   const visibleDraftItems = draftItems.filter(
-    (d) => !_disabledPlatforms.has(d.platform) && (draftPlatformFilter === 'all' || d.platform === draftPlatformFilter)
+    (d) => !_disabledPlatforms.has(getBasePlatform(d.platform)) && (draftPlatformFilter === 'all' || d.platform === draftPlatformFilter)
   );
-  const visibleScheduledItems = scheduledItems.filter((d) => !_disabledPlatforms.has(d.platform));
-  const visiblePostedItems = postedItems.filter((d) => !_disabledPlatforms.has(d.platform));
+  const visibleScheduledItems = scheduledItems.filter((d) => !_disabledPlatforms.has(getBasePlatform(d.platform)));
+  const visiblePostedItems = postedItems.filter((d) => !_disabledPlatforms.has(getBasePlatform(d.platform)));
   const visibleOpportunities = opportunities.filter(
-    (o) => !_disabledPlatforms.has(o.platform) && (oppPlatformFilter === 'all' || o.platform === oppPlatformFilter)
+    (o) => !_disabledPlatforms.has(getBasePlatform(o.platform)) && (oppPlatformFilter === 'all' || o.platform === oppPlatformFilter)
   );
 
   const PRIMARY_TABS: { key: PrimaryTab; label: string }[] = [

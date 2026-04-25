@@ -1538,16 +1538,16 @@ export default function ContentHubPage() {
 
   const searchParams = useSearchParams();
 
-  // Pre-select platform from ?platform= query param on mount (from dashboard CTAs)
-  useEffect(() => {
-    const queryPlatform = searchParams?.get('platform');
-    const SUPPORTED = ['reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'];
-    if (queryPlatform && SUPPORTED.includes(queryPlatform)) {
-      setDraftPlatformFilter(queryPlatform);
-    }
-    // run once on mount only — explicit empty deps + searchParams ref
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Capture ?platform= query param at first render — consumed once after the brand loads
+  // (see the selectedBrandId effect below). This survives the activeTab/selectedBrandId
+  // resets that fire on initial mount.
+  const _initialPlatformParam = searchParams?.get('platform');
+  const _SUPPORTED_PLATFORMS = ['reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'];
+  const pendingPlatformRef = useRef<string | null>(
+    _initialPlatformParam && _SUPPORTED_PLATFORMS.includes(_initialPlatformParam)
+      ? _initialPlatformParam
+      : null
+  );
 
   useEffect(() => {
     setDraftPlatformFilter('all');
@@ -1627,7 +1627,12 @@ export default function ContentHubPage() {
       generatePollRef.current = null;
       setGenerating(false);
     }
-    setDraftPlatformFilter('all');
+    if (pendingPlatformRef.current) {
+      setDraftPlatformFilter(pendingPlatformRef.current);
+      pendingPlatformRef.current = null;
+    } else {
+      setDraftPlatformFilter('all');
+    }
     setOppPlatformFilter('all');
     loadAbortRef.current?.abort();
     const controller = new AbortController();

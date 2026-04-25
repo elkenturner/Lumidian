@@ -122,19 +122,22 @@ async def test_same_response_twitter_and_x_count_once(client: httpx.AsyncClient)
 
 @pytest.mark.asyncio
 async def test_non_actionable_domains_excluded(client: httpx.AsyncClient):
+    """Non-actionable domains are dropped even when they meet _MIN_CITATIONS."""
     brand_id = await _setup_brand(client)
     await _seed_run(brand_id, [
-        {"response_text": "Per https://techcrunch.com/article and https://reddit.com/r/foo it's clear.", "mentioned": False},
-        {"response_text": "Also https://nytimes.com/x noted.", "mentioned": False},
-        {"response_text": "https://reddit.com/r/bar adds context.", "mentioned": False},
+        # techcrunch and nytimes both get 2+ citations to clear _MIN_CITATIONS,
+        # so the only remaining filter that excludes them is the actionable map.
+        {"response_text": "Per https://techcrunch.com/a and https://reddit.com/r/foo it's clear.", "mentioned": False},
+        {"response_text": "Also https://techcrunch.com/b and https://nytimes.com/x noted.", "mentioned": False},
+        {"response_text": "https://nytimes.com/y plus https://reddit.com/r/bar.", "mentioned": False},
     ])
     resp = await client.get(f"/api/dashboard/{brand_id}/analytics")
     assert resp.status_code == 200
     gaps = resp.json()["citation_gaps"]
     domains = [g["domain"] for g in gaps]
     assert "reddit.com" in domains
-    assert "techcrunch.com" not in domains
-    assert "nytimes.com" not in domains
+    assert "techcrunch.com" not in domains, "techcrunch met _MIN_CITATIONS — should be excluded by actionable filter only"
+    assert "nytimes.com" not in domains, "nytimes met _MIN_CITATIONS — should be excluded by actionable filter only"
 
 
 @pytest.mark.asyncio

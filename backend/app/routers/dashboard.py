@@ -465,19 +465,27 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
                 domain_with[normalized] += 1
 
     _MIN_CITATIONS = 2  # ignore domains that appear only once
-    citation_gaps = [
-        CitationGap(
-            domain=dom,
-            domain_type=_classify_domain(dom),
-            cited_total=cnt,
-            cited_with_brand=domain_with.get(dom, 0),
-            gap_score=round(1.0 - (domain_with.get(dom, 0) / cnt), 4),
-            platform=_ACTIONABLE_DOMAIN_MAP[dom],
-        )
-        for dom, cnt in domain_total_counts.items()
-        if cnt >= _MIN_CITATIONS and dom in _ACTIONABLE_DOMAIN_MAP
-    ]
-    # Sort + slice happens in Task 4 — leave default order for now
+    citation_gaps = sorted(
+        [
+            CitationGap(
+                domain=dom,
+                domain_type=_classify_domain(dom),
+                cited_total=cnt,
+                cited_with_brand=domain_with.get(dom, 0),
+                gap_score=round(1.0 - (domain_with.get(dom, 0) / cnt), 4),
+                platform=_ACTIONABLE_DOMAIN_MAP[dom],
+            )
+            for dom, cnt in domain_total_counts.items()
+            if cnt >= _MIN_CITATIONS
+            and dom in _ACTIONABLE_DOMAIN_MAP
+            and domain_with.get(dom, 0) < cnt  # exclude full coverage
+        ],
+        key=lambda g: (
+            g.cited_total - g.cited_with_brand,        # missed mentions, DESC
+            1 if g.cited_with_brand > 0 else 0,        # partial presence tiebreaker, DESC
+        ),
+        reverse=True,
+    )[:6]
 
     final_total = total_analyzed if total_analyzed > 0 else total
     if final_total >= 100:

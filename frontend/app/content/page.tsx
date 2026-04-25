@@ -68,6 +68,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ContentTabPanels } from '@/components/content/ContentTabPanels';
 import { AppToast, ToastData } from '@/components/AppToast';
 import {
@@ -1534,6 +1535,19 @@ export default function ContentHubPage() {
   // Active platform filters (independent per tab)
   const [draftPlatformFilter, setDraftPlatformFilter] = useState<string>('all');
   const [oppPlatformFilter, setOppPlatformFilter] = useState<string>('all');
+
+  const searchParams = useSearchParams();
+
+  // Pre-select platform from ?platform= query param on mount (from dashboard CTAs)
+  useEffect(() => {
+    const queryPlatform = searchParams?.get('platform');
+    const SUPPORTED = ['reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'];
+    if (queryPlatform && SUPPORTED.includes(queryPlatform)) {
+      setDraftPlatformFilter(queryPlatform);
+    }
+    // run once on mount only — explicit empty deps + searchParams ref
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     setDraftPlatformFilter('all');

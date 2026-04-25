@@ -52,7 +52,7 @@ export default function CitationGaps({ gaps, brandId }: CitationGapsProps) {
         const ctaLabel = PLATFORM_LABELS[platform] ?? `Draft for ${platform}`;
         const isWiki = platform === 'wikipedia';
         const typeColor = DOMAIN_TYPE_COLORS[g.domain_type] ?? 'var(--accent)';
-        const presenceClass = partial ? 'text-[var(--warning,#f59e0b)]' : 'text-[var(--danger-text,#ef4444)]';
+        const presenceClass = partial ? 'text-[var(--warning,#f59e0b)]' : 'text-[var(--danger-text,#f87171)]';
 
         return (
           <div
@@ -81,7 +81,7 @@ export default function CitationGaps({ gaps, brandId }: CitationGapsProps) {
               href={`/content/${brandId}?platform=${encodeURIComponent(platform)}`}
               className={`text-[10px] font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap transition-colors ${
                 isWiki
-                  ? 'bg-[var(--surface-2,#3f3f46)] text-[var(--text-primary)] hover:bg-[var(--surface-3,#52525b)]'
+                  ? 'bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.10)]'
                   : 'bg-[var(--accent)] text-white hover:opacity-90'
               }`}
             >

@@ -68,6 +68,7 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { ContentTabPanels } from '@/components/content/ContentTabPanels';
 import { AppToast, ToastData } from '@/components/AppToast';
 import {
@@ -1432,6 +1433,8 @@ function ScheduledCard({
   );
 }
 
+const SUPPORTED_PLATFORM_PARAMS = ['reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'] as const;
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ContentHubPage() {
@@ -1535,6 +1538,19 @@ export default function ContentHubPage() {
   const [draftPlatformFilter, setDraftPlatformFilter] = useState<string>('all');
   const [oppPlatformFilter, setOppPlatformFilter] = useState<string>('all');
 
+  const searchParams = useSearchParams();
+
+  // Capture ?platform= query param at first render — consumed once after the brand loads
+  // (see the selectedBrandId effect below). A ref (not state) survives the activeTab and
+  // selectedBrandId effects that reset draftPlatformFilter on initial mount; neither
+  // effect touches this ref.
+  const initialPlatformParam = searchParams?.get('platform');
+  const pendingPlatformRef = useRef<string | null>(
+    initialPlatformParam && (SUPPORTED_PLATFORM_PARAMS as readonly string[]).includes(initialPlatformParam)
+      ? initialPlatformParam
+      : null
+  );
+
   useEffect(() => {
     setDraftPlatformFilter('all');
     setOppPlatformFilter('all');
@@ -1613,7 +1629,12 @@ export default function ContentHubPage() {
       generatePollRef.current = null;
       setGenerating(false);
     }
-    setDraftPlatformFilter('all');
+    if (pendingPlatformRef.current) {
+      setDraftPlatformFilter(pendingPlatformRef.current);
+      pendingPlatformRef.current = null;
+    } else {
+      setDraftPlatformFilter('all');
+    }
     setOppPlatformFilter('all');
     loadAbortRef.current?.abort();
     const controller = new AbortController();

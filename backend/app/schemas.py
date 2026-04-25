@@ -550,6 +550,7 @@ class CitationGap(BaseModel):
     cited_total: int          # times this domain appears across all responses
     cited_with_brand: int     # subset where brand IS mentioned
     gap_score: float          # fraction of citations that don't mention brand (0–1)
+    platform: str | None = None  # supported drafting platform slug if domain maps to one
 
 
 class DashboardAnalytics(BaseModel):

@@ -179,6 +179,34 @@ def _classify_domain(domain: str) -> str:
     return "Corporate"
 
 
+_DOMAIN_ALIASES: dict[str, str] = {
+    "twitter.com": "x.com",
+}
+
+_ACTIONABLE_DOMAIN_MAP: dict[str, str] = {
+    "reddit.com": "reddit",
+    "quora.com": "quora",
+    "medium.com": "medium",
+    "wikipedia.org": "wikipedia",
+    "linkedin.com": "linkedin",
+    "x.com": "x",
+}
+
+
+def _normalize_domain(domain: str) -> str:
+    """Collapse domain variants to a canonical form before aggregation.
+
+    twitter.com → x.com.
+    *.wikipedia.org → wikipedia.org (any language subdomain).
+    """
+    d = domain.lower()
+    if d in _DOMAIN_ALIASES:
+        return _DOMAIN_ALIASES[d]
+    if d.endswith(".wikipedia.org"):
+        return "wikipedia.org"
+    return d
+
+
 # ── Main endpoint ─────────────────────────────────────────────────────────────
 
 @router.get("/{brand_id}/analytics", response_model=DashboardAnalytics)
@@ -424,10 +452,17 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         if not qr.response_text:
             continue
         domains_in_response = _extract_domains(qr.response_text)
-        for domain in domains_in_response:
-            domain_total_counts[domain] += 1
+        seen_normalized: set[str] = set()
+        for raw in domains_in_response:
+            normalized = _normalize_domain(raw)
+            # de-dupe within a single response so two variants (e.g.,
+            # twitter.com + x.com in the same answer) only count once.
+            if normalized in seen_normalized:
+                continue
+            seen_normalized.add(normalized)
+            domain_total_counts[normalized] += 1
             if qr.mentioned:
-                domain_with[domain] += 1
+                domain_with[normalized] += 1
 
     _MIN_CITATIONS = 2  # ignore domains that appear only once
     citation_gaps = sorted(
@@ -438,13 +473,19 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
                 cited_total=cnt,
                 cited_with_brand=domain_with.get(dom, 0),
                 gap_score=round(1.0 - (domain_with.get(dom, 0) / cnt), 4),
+                platform=_ACTIONABLE_DOMAIN_MAP[dom],
             )
             for dom, cnt in domain_total_counts.items()
             if cnt >= _MIN_CITATIONS
+            and dom in _ACTIONABLE_DOMAIN_MAP
+            and domain_with.get(dom, 0) < cnt  # exclude full coverage
         ],
-        key=lambda g: (g.gap_score, g.cited_total),
+        key=lambda g: (
+            g.cited_total - g.cited_with_brand,        # missed mentions, DESC
+            1 if g.cited_with_brand > 0 else 0,        # partial presence tiebreaker, DESC
+        ),
         reverse=True,
-    )[:10]
+    )[:6]
 
     final_total = total_analyzed if total_analyzed > 0 else total
     if final_total >= 100:

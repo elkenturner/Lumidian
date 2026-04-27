@@ -47,25 +47,25 @@ from fastapi.responses import JSONResponse
 from app.database import cleanup_stale_runs, create_tables, run_migrations
 from app.routers import (
     accounts,
+    admin,
+    analytics,
+    auth,
+    billing,
     brand_profile,
     brands,
     content,
     dashboard,
+    errors,
     gaps,
+    notifications,
     opportunities,
+    reports,
     results,
     settings,
+    support,
+    team,
     tracking,
 )
-from app.routers import admin as admin_router
-from app.routers import analytics as analytics_router
-from app.routers import auth as auth_router
-from app.routers import billing as billing_router
-from app.routers import errors as errors_router
-from app.routers import notifications as notifications_router
-from app.routers import reports as reports_router
-from app.routers import support as support_router
-from app.routers import team as team_router
 from app.scheduler import start_scheduler, stop_scheduler
 from app.schemas import HealthResponse
 
@@ -206,25 +206,12 @@ class CSRFOriginMiddleware(BaseHTTPMiddleware):
 app.add_middleware(CSRFOriginMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-app.include_router(brands.router, prefix="/api")
-app.include_router(brand_profile.router, prefix="/api")
-app.include_router(tracking.router, prefix="/api")
-app.include_router(results.router, prefix="/api")
-app.include_router(content.router, prefix="/api")
-app.include_router(accounts.router, prefix="/api")
-app.include_router(dashboard.router, prefix="/api")
-app.include_router(gaps.router, prefix="/api")
-app.include_router(opportunities.router, prefix="/api")
-app.include_router(settings.router, prefix="/api")
-app.include_router(auth_router.router, prefix="/api")
-app.include_router(billing_router.router, prefix="/api")
-app.include_router(analytics_router.router, prefix="/api")
-app.include_router(admin_router.router, prefix="/api")
-app.include_router(reports_router.router, prefix="/api")
-app.include_router(team_router.router, prefix="/api")
-app.include_router(errors_router.router, prefix="/api")
-app.include_router(notifications_router.router, prefix="/api")
-app.include_router(support_router.router, prefix="/api")
+for module in (
+    brands, brand_profile, tracking, results, content, accounts,
+    dashboard, gaps, opportunities, settings, auth, billing,
+    analytics, admin, reports, team, errors, notifications, support,
+):
+    app.include_router(module.router, prefix="/api")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

@@ -29,7 +29,7 @@ engine = create_async_engine(
 
 # Enable FK constraints for every new SQLite connection (aiosqlite uses the sync
 # driver under the hood, so the sync `connect` event fires reliably).
-if "sqlite" in DATABASE_URL:
+if _is_sqlite:
 
     @event.listens_for(engine.sync_engine, "connect")
     def _set_sqlite_pragma(dbapi_conn, _connection_record):

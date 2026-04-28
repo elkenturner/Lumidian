@@ -7,12 +7,10 @@ GET    /api/accounts                   — list all account connections
 POST   /api/accounts/connect           — connect or update an account
 DELETE /api/accounts/{platform}        — disconnect an account
 GET    /api/accounts/{platform}        — get a specific account's status
-GET    /api/settings/api-keys          — which LLM API keys are configured (bool per key)
 """
 from __future__ import annotations
 
 import json
-import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -24,7 +22,7 @@ from app.dependencies import CurrentUser
 from app.models import AccountConnection, utcnow
 from app.schemas import AccountConnectionSchema, ConnectAccountRequest
 
-router = APIRouter(tags=["accounts"])
+router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
@@ -49,7 +47,7 @@ async def _get_account_or_404(db: AsyncSession, user_id: int, platform: str) -> 
 
 # ── List all accounts ─────────────────────────────────────────────────────────
 
-@router.get("/accounts", response_model=list[AccountConnectionSchema])
+@router.get("", response_model=list[AccountConnectionSchema])
 async def list_accounts(db: DbDep, user: CurrentUser):
     """Return all account connections for the current user."""
     result = await db.execute(
@@ -63,7 +61,7 @@ async def list_accounts(db: DbDep, user: CurrentUser):
 
 # ── Connect / update account ──────────────────────────────────────────────────
 
-@router.post("/accounts/connect", response_model=AccountConnectionSchema, status_code=status.HTTP_200_OK)
+@router.post("/connect", response_model=AccountConnectionSchema, status_code=status.HTTP_200_OK)
 async def connect_account(request: ConnectAccountRequest, db: DbDep, user: CurrentUser):
     """
     Connect or update an account connection for the current user.
@@ -125,7 +123,7 @@ async def connect_account(request: ConnectAccountRequest, db: DbDep, user: Curre
 
 # ── Disconnect account ────────────────────────────────────────────────────────
 
-@router.delete("/accounts/{platform}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{platform}", status_code=status.HTTP_204_NO_CONTENT)
 async def disconnect_account(platform: str, db: DbDep, user: CurrentUser):
     """Disconnect an account (clears credentials, sets status to disconnected)."""
     account = await _get_account_or_404(db, user.id, platform)
@@ -141,23 +139,8 @@ async def disconnect_account(platform: str, db: DbDep, user: CurrentUser):
 
 # ── Get specific account ──────────────────────────────────────────────────────
 
-@router.get("/accounts/{platform}", response_model=AccountConnectionSchema)
+@router.get("/{platform}", response_model=AccountConnectionSchema)
 async def get_account(platform: str, db: DbDep, user: CurrentUser):
     """Return status of a specific account connection."""
     account = await _get_account_or_404(db, user.id, platform)
     return AccountConnectionSchema.model_validate(account)
-
-
-# ── API key status ────────────────────────────────────────────────────────────
-
-@router.get("/settings/api-keys")
-async def get_api_key_status(user: CurrentUser):
-    """
-    Return which LLM API keys are configured (True/False, never the values).
-    """
-    return {
-        "openai": bool(os.getenv("OPENAI_API_KEY", "").strip()),
-        "anthropic": bool(os.getenv("ANTHROPIC_API_KEY", "").strip()),
-        "perplexity": bool(os.getenv("PERPLEXITY_API_KEY", "").strip()),
-        "gemini": bool(os.getenv("GEMINI_API_KEY", "").strip()),
-    }

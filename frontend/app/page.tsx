@@ -809,11 +809,20 @@ function PricingSection() {
               <thead>
                 <tr className="bg-[#1e293b]">
                   <th className="text-left text-sm font-semibold text-[#f8fafc] p-3 md:p-4 rounded-tl-xl sticky left-0 bg-[#1e293b] z-10">Feature</th>
-                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Free</th>
-                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Starter</th>
-                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4">Growth</th>
-                  <th className="text-center text-sm font-semibold text-[#f8fafc] p-4 rounded-tr-xl bg-[rgba(95,126,166,0.2)] border-b-2 border-[#5f7ea6]">
-                    Pro
+                  <th className="text-center p-4">
+                    <div className="text-sm font-semibold text-[#f8fafc]">Free</div>
+                  </th>
+                  <th className="text-center p-4">
+                    <div className="text-sm font-semibold text-[#f8fafc]">Starter</div>
+                    <div className="text-md font-medium text-[#f8fafc] mt-1">{tierMeta.basic.price}</div>
+                  </th>
+                  <th className="text-center p-4">
+                    <div className="text-sm font-semibold text-[#f8fafc]">Growth</div>
+                    <div className="text-md font-medium text-[#f8fafc] mt-1">{tierMeta.starter.price}</div>
+                  </th>
+                  <th className="text-center p-4 rounded-tr-xl bg-[rgba(95,126,166,0.2)] border-b-2 border-[#5f7ea6]">
+                    <div className="text-sm font-semibold text-[#f8fafc]">Pro</div>
+                    <div className="text-md font-medium text-[#f8fafc] mt-1">{tierMeta.pro.price}</div>
                   </th>
                 </tr>
               </thead>

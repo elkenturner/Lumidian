@@ -42,27 +42,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.database import cleanup_stale_runs, create_tables, run_migrations
-from app.routers import (
-    accounts,
-    admin,
-    analytics,
-    auth,
-    billing,
-    brand_profile,
-    brands,
-    content,
-    dashboard,
-    errors,
-    gaps,
-    notifications,
-    opportunities,
-    reports,
-    results,
-    settings,
-    support,
-    team,
-    tracking,
-)
+from app.routers import routers
 from app.scheduler import start_scheduler, stop_scheduler
 from app.schemas import HealthResponse
 
@@ -203,12 +183,8 @@ class CSRFOriginMiddleware(BaseHTTPMiddleware):
 app.add_middleware(CSRFOriginMiddleware)
 
 # ── Routers ───────────────────────────────────────────────────────────────────
-for module in (
-    brands, brand_profile, tracking, results, content, accounts,
-    dashboard, gaps, opportunities, settings, auth, billing,
-    analytics, admin, reports, team, errors, notifications, support,
-):
-    app.include_router(module.router, prefix="/api")
+for router in routers:
+    app.include_router(router, prefix="/api")
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

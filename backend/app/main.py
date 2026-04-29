@@ -30,15 +30,12 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
 
 import sentry_sdk
-
-_sentry_dsn = os.getenv("SENTRY_DSN", "")
-if _sentry_dsn:
-    sentry_sdk.init(
-        dsn=_sentry_dsn,
-        traces_sample_rate=0.1 if os.getenv("ENVIRONMENT") == "production" else 1.0,
-        send_default_pii=False,
-        environment=os.getenv("ENVIRONMENT", "development"),
-    )
+sentry_sdk.init(
+    dsn=os.getenv("SENTRY_DSN"),
+    traces_sample_rate=0.1 if os.getenv("ENVIRONMENT") == "production" else 1.0,
+    send_default_pii=False,
+    environment=os.getenv("ENVIRONMENT", "development"),
+)
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware

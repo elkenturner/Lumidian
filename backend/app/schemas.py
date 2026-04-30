@@ -589,7 +589,7 @@ class BrandProfileUpdate(BaseModel):
     approved_language: list[str] | None = None
     publications: list[Publication] | None = None
 
-    @field_validator("key_stats", "what_not_to_say", "approved_language")
+    @field_validator("key_stats", "what_not_to_say")
     @classmethod
     def validate_list_lengths(cls, v: list[str] | None) -> list[str] | None:
         if v is not None:
@@ -598,6 +598,19 @@ class BrandProfileUpdate(BaseModel):
             for item in v:
                 if len(item) > 1000:
                     raise ValueError("Each item must be 1000 characters or less")
+        return v
+
+    @field_validator("approved_language")
+    @classmethod
+    def validate_approved_language(cls, v: list[str] | None) -> list[str] | None:
+        # Approved language often contains full disclaimers/disclosures, which
+        # legitimately run longer than terse bullet items. Cap matches company_description.
+        if v is not None:
+            if len(v) > 50:
+                raise ValueError("Maximum 50 items allowed")
+            for item in v:
+                if len(item) > 5000:
+                    raise ValueError("Each item must be 5000 characters or less")
         return v
 
     @field_validator("publications")

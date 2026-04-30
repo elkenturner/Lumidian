@@ -16,12 +16,13 @@ import BrandAvatar from '@/components/BrandAvatar';
 import LumidianLogo from '@/components/LumidianLogo';
 import PlatformIcon from '@/components/PlatformIcon';
 import ImpersonationBanner from '@/components/admin/ImpersonationBanner';
+import BillingPausedBanner from '@/components/BillingPausedBanner';
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.bgColor, text: v.color }])
 );
 
-const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/methodology'];
+const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/methodology', '/account-paused'];
 
 /* ── Premium animated report-running banner ─────────────────────────────────── */
 function ReportRunningBanner({ modelScores, isMobile, promptCount }: { modelScores: Array<{ model: string; score: number }>; isMobile: boolean; promptCount: number }) {
@@ -824,6 +825,7 @@ function AppShellInner({
         }}
       >
         <ImpersonationBanner />
+        <BillingPausedBanner />
         {/* Global status banners — written by dashboard/content pages via localStorage */}
         {reportRunning && <ReportRunningBanner modelScores={modelScores} isMobile={isMobile} promptCount={promptCount} />}
         {draftsGenerating && <DraftsGeneratingBanner isMobile={isMobile} isPaid={!!user?.subscription_tier || !!user?.is_admin} />}

@@ -282,6 +282,14 @@ class TestValidateSubredditExists:
             assert await validate_subreddit_exists("nonexistentsubreddit") is False
 
     @pytest.mark.asyncio
+    async def test_403_fails_open(self):
+        # Reddit returns 403 to datacenter IPs (e.g. Railway egress). We can't
+        # tell "sub doesn't exist" from "blocked," so fail-open.
+        resp = _mock_httpx_response(403, None)
+        with _patch_httpx_get(resp):
+            assert await validate_subreddit_exists("startups") is True
+
+    @pytest.mark.asyncio
     async def test_listing_response_returns_false(self):
         # Reddit returns kind="Listing" when the slug doesn't resolve and the
         # request is treated as a search.

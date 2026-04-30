@@ -20,7 +20,9 @@ export default function SubscriptionBanner({ status, daysRemaining, trialEnd }: 
 
   if (dismissed) return null;
 
-  const isTrialEndingSoon = status === 'trialing' && typeof daysRemaining === 'number' && daysRemaining < 7;
+  const trialEndsAt = trialEnd ? new Date(trialEnd + (trialEnd.endsWith('Z') ? '' : 'Z')).getTime() : null;
+  const trialStillHasTime = trialEndsAt !== null && !Number.isNaN(trialEndsAt) && trialEndsAt > Date.now();
+  const isTrialEndingSoon = status === 'trialing' && typeof daysRemaining === 'number' && daysRemaining < 7 && trialStillHasTime;
   if (!isTrialEndingSoon) return null;
 
   const chargeDate = trialEnd

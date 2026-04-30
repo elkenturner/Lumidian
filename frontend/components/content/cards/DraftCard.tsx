@@ -381,14 +381,14 @@ export function DraftCard({
               <>
                 {sub ? (
                   <a
-                    href={`https://www.reddit.com/r/${sub}/submit`}
+                    href={`https://www.reddit.com/r/${sub}/`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 bg-[color-mix(in_srgb,var(--color-claude)_7%,transparent)] border border-[color-mix(in_srgb,var(--color-claude)_20%,transparent)] rounded-lg px-3 py-2 group transition-colors hover:border-[color-mix(in_srgb,var(--color-claude)_35%,transparent)] hover:bg-[color-mix(in_srgb,var(--color-claude)_11%,transparent)]"
                   >
                     <span className="text-[var(--color-claude)] text-xs flex-shrink-0">↗</span>
                     <span className="text-xs text-[var(--color-claude)] font-medium flex-1 min-w-0 truncate">
-                      Post in r/{sub}
+                      Open r/{sub}
                     </span>
                     <ExternalLink size={11} className="text-[var(--color-claude)]/60 flex-shrink-0 group-hover:text-[var(--color-claude)]" />
                   </a>

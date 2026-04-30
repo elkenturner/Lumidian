@@ -230,12 +230,14 @@ def clear_auth_cookies(response: Response) -> None:
 
 def user_to_dict(user: User) -> dict:
     limit = 999999 if user.is_admin else TIER_LIMITS.get(user.subscription_tier or "", 10)
+    trial_end = getattr(user, "subscription_trial_end", None)
     return {
         "id": user.id,
         "email": user.email,
         "name": user.name,
         "subscription_tier": user.subscription_tier,
         "subscription_status": user.subscription_status,
+        "subscription_trial_end": trial_end.isoformat() if trial_end else None,
         "is_admin": user.is_admin,
         "prompt_limit": limit,
         "totp_enabled": bool(user.totp_enabled),

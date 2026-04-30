@@ -484,8 +484,8 @@ export default function DashboardPage() {
           />
         </div>
       )}
-      {/* Subscription status / trial banner */}
-      {user?.subscription_status && ['past_due', 'canceled', 'unpaid', 'trialing'].includes(user.subscription_status) && (
+      {/* Trial-ending-soon nudge (blocking states handled by global BillingPausedBanner) */}
+      {user?.subscription_status === 'trialing' && (
         <div className="-mx-8 -mt-8 mb-6">
           <SubscriptionBanner
             status={user.subscription_status}

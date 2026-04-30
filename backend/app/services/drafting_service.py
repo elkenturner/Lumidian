@@ -626,7 +626,10 @@ async def generate_gap_draft(
     # Determine suggested subreddit for Reddit drafts
     suggested_subreddit: str | None = None
     if platform == "reddit":
-        from app.services.reddit_scanner_service import get_relevant_subreddits
+        from app.services.reddit_scanner_service import (
+            find_first_valid_subreddit,
+            get_relevant_subreddits,
+        )
         profile_result = await db.execute(
             select(BrandProfile).where(BrandProfile.brand_id == brand_id)
         )
@@ -643,12 +646,21 @@ async def generate_gap_draft(
                 extra_parts.extend(key_stats)
             except Exception:
                 pass
+        # Ask for more candidates than we need — the LLM hallucinates
+        # subreddit names, so we validate each against Reddit's about.json
+        # and pick the first one that actually exists.
         subs = get_relevant_subreddits(
-            desc, [p.text for p in all_prompts], limit=3,
+            desc, [p.text for p in all_prompts], limit=5,
             extra_profile_text=" ".join(extra_parts)
         )
         if subs:
-            suggested_subreddit = subs[0]
+            suggested_subreddit = await find_first_valid_subreddit(subs)
+            if suggested_subreddit is None:
+                logger.warning(
+                    "generate_gap_draft: no valid subreddit found among %r "
+                    "for brand_id=%d — draft will omit subreddit",
+                    subs, brand_id,
+                )
 
     # For restricted subreddits, brand name must NOT appear — skip mention retry
     _reddit_strategy: str | None = None
@@ -788,6 +800,11 @@ async def generate_gap_draft(
         )
     elif platform == "reddit" and suggested_subreddit:
         brief = f"r/{suggested_subreddit} — {prompt.text}"
+    elif platform == "reddit":
+        brief = (
+            f'Find a relevant subreddit about "{prompt.text}" '
+            f"and post this answer there."
+        )
     elif platform in ("linkedin_article", "linkedin_post"):
         brief = custom_brief or f'LinkedIn draft for: "{prompt.text}"'
     elif platform in ("x_thread", "x_post"):

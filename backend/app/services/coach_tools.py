@@ -387,7 +387,40 @@ async def get_competitor_comparison(db: AsyncSession, user_id: int, brand_id: in
     }
 
 
-from app.models import ContentGap
+from app.models import ContentDraft, ContentGap
+
+
+@register_tool(
+    name="get_drafts_summary",
+    schema={
+        "name": "get_drafts_summary",
+        "description": (
+            "Summary of the brand's content drafts: counts per status and the "
+            "5 most recently created drafts. Includes a deep link to the content "
+            "page so you can point the user there."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    token_budget=1500,
+)
+async def get_drafts_summary(db: AsyncSession, user_id: int, brand_id: int) -> dict:
+    drafts = (await db.execute(
+        select(ContentDraft).where(ContentDraft.brand_id == brand_id).order_by(ContentDraft.id.desc())
+    )).scalars().all()
+
+    counts = {"draft": 0, "approved": 0, "posted": 0, "failed": 0}
+    for d in drafts:
+        if d.status in counts:
+            counts[d.status] += 1
+
+    return {
+        "counts": counts,
+        "recent": [
+            {"id": d.id, "title": d.title, "platform": d.platform, "status": d.status}
+            for d in drafts[:5]
+        ],
+        "link": f"/content/{brand_id}",
+    }
 
 
 @register_tool(

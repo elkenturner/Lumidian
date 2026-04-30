@@ -885,6 +885,7 @@ export interface AuthUser {
   name: string | null;
   subscription_tier: 'basic' | 'starter' | 'pro' | null;
   subscription_status: string | null;
+  subscription_trial_end: string | null;
   is_admin: boolean;
   prompt_limit: number;
   totp_enabled: boolean;

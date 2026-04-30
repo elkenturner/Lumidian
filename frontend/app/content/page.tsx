@@ -62,7 +62,6 @@ import {
 } from '@/lib/api';
 import PlatformBadge from '@/components/PlatformBadge';
 import PlatformIcon from '@/components/PlatformIcon';
-import SubscriptionBanner from '@/components/SubscriptionBanner';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -2087,13 +2086,6 @@ export default function ContentHubPage() {
       animate="visible"
       className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px]"
     >
-      {/* Subscription status banner */}
-      {user?.subscription_status && ['past_due', 'canceled', 'unpaid'].includes(user.subscription_status) && (
-        <div className="-mx-8 -mt-8 mb-6">
-          <SubscriptionBanner status={user.subscription_status} />
-        </div>
-      )}
-
       {/* Progress banners removed — AppShell shows global status banners for generating/scanning */}
 
       {/* Request Draft modal */}

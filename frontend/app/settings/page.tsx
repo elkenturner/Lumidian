@@ -686,8 +686,17 @@ export default function SettingsPage() {
       setToast({ message: 'Profile saved', type: 'success' });
       setTimeout(() => setProfileSaved(false), 2500);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } } };
-      setProfileSaveError(err?.response?.data?.detail ?? 'Failed to save profile. Please try again.');
+      const err = e as { response?: { data?: { detail?: unknown } } };
+      const detail = err?.response?.data?.detail;
+      let msg = 'Failed to save profile. Please try again.';
+      if (typeof detail === 'string') {
+        msg = detail;
+      } else if (Array.isArray(detail)) {
+        msg = detail
+          .map((d) => (d && typeof d === 'object' && 'msg' in d ? String((d as { msg: unknown }).msg) : 'Validation error'))
+          .join('; ');
+      }
+      setProfileSaveError(msg);
     } finally {
       setProfileSaving(false);
     }

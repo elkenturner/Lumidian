@@ -2,6 +2,10 @@
 Unit tests for drafting service components.
 Tests prompt construction, sanitization, and platform rules without LLM calls.
 """
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
+
 from app.services.drafting.pipeline import (
     estimate_visibility_impact,
     extract_title_and_body,
@@ -13,6 +17,10 @@ from app.services.drafting.platforms import (
     classify_subreddit,
 )
 from app.services.drafting.prompts import build_prompt
+from app.services.reddit_scanner_service import (
+    find_first_valid_subreddit,
+    validate_subreddit_exists,
+)
 
 
 class TestSubredditClassification:
@@ -235,3 +243,141 @@ class TestBuildPrompt:
         )
         assert isinstance(result, str)
         assert len(result) > 100
+
+
+def _mock_httpx_response(status_code: int, body: dict | None):
+    """Build a mocked httpx.Response with the given status and JSON body."""
+    resp = MagicMock()
+    resp.status_code = status_code
+    if body is None:
+        resp.json.side_effect = ValueError("not json")
+    else:
+        resp.json.return_value = body
+    return resp
+
+
+def _patch_httpx_get(resp):
+    """Return a patch object for httpx.AsyncClient.get returning resp."""
+    client = MagicMock()
+    client.__aenter__ = AsyncMock(return_value=client)
+    client.__aexit__ = AsyncMock(return_value=None)
+    client.get = AsyncMock(return_value=resp)
+    return patch("app.services.reddit_scanner_service.httpx.AsyncClient", return_value=client)
+
+
+class TestValidateSubredditExists:
+    @pytest.mark.asyncio
+    async def test_valid_subreddit_returns_true(self):
+        resp = _mock_httpx_response(
+            200,
+            {"kind": "t5", "data": {"display_name": "startups", "subscribers": 1_000_000}},
+        )
+        with _patch_httpx_get(resp):
+            assert await validate_subreddit_exists("startups") is True
+
+    @pytest.mark.asyncio
+    async def test_404_returns_false(self):
+        resp = _mock_httpx_response(404, {"error": 404, "message": "Not Found"})
+        with _patch_httpx_get(resp):
+            assert await validate_subreddit_exists("nonexistentsubreddit") is False
+
+    @pytest.mark.asyncio
+    async def test_listing_response_returns_false(self):
+        # Reddit returns kind="Listing" when the slug doesn't resolve and the
+        # request is treated as a search.
+        resp = _mock_httpx_response(200, {"kind": "Listing", "data": {"children": []}})
+        with _patch_httpx_get(resp):
+            assert await validate_subreddit_exists("medical_technology") is False
+
+    @pytest.mark.asyncio
+    async def test_private_subreddit_returns_false(self):
+        resp = _mock_httpx_response(
+            200,
+            {"kind": "t5", "data": {"reason": "private", "display_name": "secret"}},
+        )
+        with _patch_httpx_get(resp):
+            assert await validate_subreddit_exists("secret") is False
+
+    @pytest.mark.asyncio
+    async def test_redirect_returns_false(self):
+        # follow_redirects=False, so a 302 indicates the slug does not exist
+        # exactly as written (Reddit redirects to the canonical capitalization).
+        resp = _mock_httpx_response(302, None)
+        with _patch_httpx_get(resp):
+            assert await validate_subreddit_exists("MedicalTechnology") is False
+
+    @pytest.mark.asyncio
+    async def test_strips_r_prefix(self):
+        resp = _mock_httpx_response(
+            200,
+            {"kind": "t5", "data": {"display_name": "startups", "subscribers": 1}},
+        )
+        with _patch_httpx_get(resp) as mock_client_factory:
+            assert await validate_subreddit_exists("r/startups") is True
+            # Verify the URL doesn't have 'r/r/'
+            call = mock_client_factory.return_value.get.call_args
+            assert "r/r/" not in call.args[0]
+            assert "r/startups/about.json" in call.args[0]
+
+    @pytest.mark.asyncio
+    async def test_empty_string_returns_false(self):
+        # Should short-circuit without making an HTTP call.
+        assert await validate_subreddit_exists("") is False
+        assert await validate_subreddit_exists("   ") is False
+        assert await validate_subreddit_exists("r/") is False
+
+    @pytest.mark.asyncio
+    async def test_network_error_fails_open(self):
+        # Transient network failures must not block draft creation.
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+        client.get = AsyncMock(side_effect=Exception("network down"))
+        with patch(
+            "app.services.reddit_scanner_service.httpx.AsyncClient",
+            return_value=client,
+        ):
+            assert await validate_subreddit_exists("anything") is True
+
+
+class TestFindFirstValidSubreddit:
+    @pytest.mark.asyncio
+    async def test_returns_first_valid(self):
+        async def fake_validate(sub):
+            return sub == "real_sub"
+
+        with patch(
+            "app.services.reddit_scanner_service.validate_subreddit_exists",
+            side_effect=fake_validate,
+        ):
+            result = await find_first_valid_subreddit(["fake1", "fake2", "real_sub", "real2"])
+            assert result == "real_sub"
+
+    @pytest.mark.asyncio
+    async def test_returns_none_when_all_invalid(self):
+        async def fake_validate(_):
+            return False
+
+        with patch(
+            "app.services.reddit_scanner_service.validate_subreddit_exists",
+            side_effect=fake_validate,
+        ):
+            result = await find_first_valid_subreddit(["a", "b", "c"])
+            assert result is None
+
+    @pytest.mark.asyncio
+    async def test_returns_none_for_empty_list(self):
+        result = await find_first_valid_subreddit([])
+        assert result is None
+
+    @pytest.mark.asyncio
+    async def test_strips_r_prefix_from_result(self):
+        async def fake_validate(_):
+            return True
+
+        with patch(
+            "app.services.reddit_scanner_service.validate_subreddit_exists",
+            side_effect=fake_validate,
+        ):
+            result = await find_first_valid_subreddit(["r/startups"])
+            assert result == "startups"

@@ -132,3 +132,36 @@ async def test_get_brand_overview_returns_expected_shape():
     assert all(set(p.keys()) == {"id", "text"} for p in result["prompts"])
     assert result["latest_score"] is None  # no runs yet
     assert result["total_runs"] == 0
+
+
+@pytest.mark.asyncio
+async def test_get_score_breakdown_returns_per_model_and_per_prompt():
+    user_id = await _create_user("sb@example.com")
+    brand = await _create_brand(user_id, "Brand SB")
+
+    async with AsyncSessionLocal() as db:
+        from app.models import Prompt, TrackingRun, RunModelScore, QueryResult
+        prompt = Prompt(brand_id=brand["id"], text="best CRMs", prompt_type="standard")
+        db.add(prompt)
+        await db.flush()
+        run = TrackingRun(brand_id=brand["id"], status="completed", overall_score=50.0, total_queries=4, total_mentions=2)
+        db.add(run)
+        await db.flush()
+        db.add(RunModelScore(tracking_run_id=run.id, model="perplexity", total_queries=2, total_mentions=2, score=100.0))
+        db.add(RunModelScore(tracking_run_id=run.id, model="gemini", total_queries=2, total_mentions=0, score=0.0))
+        db.add(QueryResult(tracking_run_id=run.id, prompt_id=prompt.id, model="perplexity", run_number=1, response_text="...", mentioned=True))
+        db.add(QueryResult(tracking_run_id=run.id, prompt_id=prompt.id, model="perplexity", run_number=2, response_text="...", mentioned=True))
+        db.add(QueryResult(tracking_run_id=run.id, prompt_id=prompt.id, model="gemini", run_number=1, response_text="...", mentioned=False))
+        db.add(QueryResult(tracking_run_id=run.id, prompt_id=prompt.id, model="gemini", run_number=2, response_text="...", mentioned=False))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_score_breakdown", tool_args={})
+
+    assert result["overall_score"] == 50.0
+    by_model = {m["model"]: m for m in result["per_model"]}
+    assert by_model["perplexity"]["score"] == 100.0
+    assert by_model["gemini"]["score"] == 0.0
+    assert len(result["per_prompt"]) == 1
+    assert result["per_prompt"][0]["prompt_text"] == "best CRMs"
+    assert result["per_prompt"][0]["score"] == 50.0

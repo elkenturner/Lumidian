@@ -145,6 +145,85 @@ async def get_brand_overview(db: AsyncSession, user_id: int, brand_id: int) -> d
     }
 
 
+from app.models import RunModelScore, QueryResult
+
+
+@register_tool(
+    name="get_score_breakdown",
+    schema={
+        "name": "get_score_breakdown",
+        "description": (
+            "Get per-model and per-prompt scores for a specific tracking run "
+            "(defaults to the latest completed run). Use when the user asks "
+            "'why X%' or 'which models/prompts are weak'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "run_id": {"type": "integer", "description": "Specific run to inspect; omit for the latest run."},
+            },
+        },
+    },
+    token_budget=2000,
+)
+async def get_score_breakdown(db: AsyncSession, user_id: int, brand_id: int, run_id: int | None = None) -> dict:
+    if run_id is None:
+        latest = (await db.execute(
+            select(TrackingRun)
+            .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+            .order_by(TrackingRun.completed_at.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        if latest is None:
+            return {"error": "No completed runs yet for this brand."}
+        run = latest
+    else:
+        run = (await db.execute(
+            select(TrackingRun).where(TrackingRun.id == run_id, TrackingRun.brand_id == brand_id)
+        )).scalar_one_or_none()
+        if run is None:
+            return {"error": f"Run {run_id} not found for this brand."}
+
+    model_scores = (await db.execute(
+        select(RunModelScore).where(RunModelScore.tracking_run_id == run.id)
+    )).scalars().all()
+
+    qrs = (await db.execute(
+        select(QueryResult).where(QueryResult.tracking_run_id == run.id)
+    )).scalars().all()
+
+    # Aggregate per prompt
+    prompt_ids = {qr.prompt_id for qr in qrs}
+    prompts_map = {p.id: p.text for p in (await db.execute(select(Prompt).where(Prompt.id.in_(prompt_ids)))).scalars().all()}
+
+    per_prompt: dict[int, dict] = {}
+    for qr in qrs:
+        if qr.error:
+            continue
+        slot = per_prompt.setdefault(qr.prompt_id, {"prompt_id": qr.prompt_id, "prompt_text": prompts_map.get(qr.prompt_id, ""), "queries": 0, "mentions": 0})
+        slot["queries"] += 1
+        if qr.mentioned:
+            slot["mentions"] += 1
+
+    per_prompt_list = []
+    for slot in per_prompt.values():
+        score = (slot["mentions"] / slot["queries"]) * 100.0 if slot["queries"] else 0.0
+        per_prompt_list.append({**slot, "score": round(score, 2)})
+
+    return {
+        "run_id": run.id,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "overall_score": run.overall_score,
+        "total_queries": run.total_queries,
+        "total_mentions": run.total_mentions,
+        "per_model": [
+            {"model": ms.model, "queries": ms.total_queries, "mentions": ms.total_mentions, "score": ms.score}
+            for ms in model_scores
+        ],
+        "per_prompt": per_prompt_list,
+    }
+
+
 async def dispatch_tool(
     db: AsyncSession,
     *,

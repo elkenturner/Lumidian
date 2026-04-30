@@ -636,3 +636,25 @@ async def test_resend_verification_no_enumeration(client: httpx.AsyncClient):
     """Resend for unknown email returns 200 (no enumeration)."""
     resp = await client.post("/api/auth/resend-verification", json={"email": "nobody@example.com"})
     assert resp.status_code == 200
+
+
+# ── Paused account ────────────────────────────────────────────────────────────
+
+async def test_paused_user_gets_structured_403(client: httpx.AsyncClient):
+    """Paused users hit /auth/me with a structured detail object so the
+    frontend can detect this case via a stable code, not a brittle string match."""
+    await register_and_login(client, email="paused@example.com")
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        await db.execute(
+            text("UPDATE users SET is_paused = 1 WHERE email = :e"),
+            {"e": "paused@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 403
+    body = resp.json()
+    assert isinstance(body["detail"], dict), f"detail should be dict, got: {body['detail']}"
+    assert body["detail"]["code"] == "account_paused"
+    assert "paused" in body["detail"]["message"].lower()

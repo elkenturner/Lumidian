@@ -64,6 +64,59 @@ def _is_blocked_subreddit(subreddit: str) -> bool:
     return any(sig in lower for sig in _BLOCKED_SUB_SIGNALS)
 
 
+# ── Subreddit existence validation ───────────────────────────────────────────
+# LLM-suggested subreddit names are often hallucinated (wrong spelling,
+# capitalization, or fully invented). Validating against Reddit's about.json
+# before storing the name in a draft prevents users from clicking links that
+# land on Reddit's "this subreddit does not exist" search page.
+
+_REDDIT_USER_AGENT = "Lumidian/1.0 (subreddit-validator)"
+
+
+async def validate_subreddit_exists(sub: str) -> bool:
+    """Return True if r/{sub} resolves to a real, accessible subreddit.
+
+    Hits Reddit's public about.json endpoint with no auth. Treats network
+    failures as valid (fail-open) so transient errors don't block draft
+    creation — the worst case is we keep today's behavior for that one draft.
+    """
+    cleaned = (sub or "").strip().lstrip("/").removeprefix("r/").removeprefix("R/")
+    if not cleaned:
+        return False
+    url = f"https://www.reddit.com/r/{cleaned}/about.json"
+    try:
+        async with httpx.AsyncClient(
+            timeout=8.0, follow_redirects=False
+        ) as client:
+            resp = await client.get(url, headers={"User-Agent": _REDDIT_USER_AGENT})
+    except Exception as exc:
+        logger.debug("validate_subreddit_exists(%s) network error: %s", cleaned, exc)
+        return True  # fail-open
+    if resp.status_code != 200:
+        return False
+    try:
+        data = resp.json()
+    except Exception:
+        return False
+    # Real subreddit responses use kind="t5". Search/redirect responses use
+    # kind="Listing" or omit it entirely.
+    if data.get("kind") != "t5":
+        return False
+    sub_data = data.get("data") or {}
+    # Banned/private subs return 200 with a reason field — not usable.
+    if sub_data.get("reason"):
+        return False
+    return sub_data.get("display_name") is not None
+
+
+async def find_first_valid_subreddit(candidates: list[str]) -> str | None:
+    """Return the first candidate that passes validate_subreddit_exists, else None."""
+    for cand in candidates:
+        if await validate_subreddit_exists(cand):
+            return cand.strip().lstrip("/").removeprefix("r/").removeprefix("R/")
+    return None
+
+
 _SERPER_URL = "https://google.serper.dev/search"
 
 _cache: dict[int, tuple[float, list[dict]]] = {}

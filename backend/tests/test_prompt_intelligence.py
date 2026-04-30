@@ -96,6 +96,138 @@ async def test_prompt_run_scores_populated(db_session):
 
 
 @pytest.mark.asyncio
+async def test_manual_run_persists_prompt_run_scores(client):
+    """_execute_run_with_id (manual run path) writes PromptRunScore rows."""
+    from unittest.mock import AsyncMock, patch
+    from datetime import datetime, UTC
+
+    from sqlalchemy import select
+
+    from app.models import PromptRunScore, TrackingRun
+
+    await register_and_login(client, email="manualpr@test.com", password="Password123")
+    brand = await create_brand(
+        client, name="ManualPRBrand", prompts=["best testing tool", "top dev platform"]
+    )
+    brand_id = brand["id"]
+
+    async with AsyncSessionLocal() as db:
+        run = TrackingRun(
+            brand_id=brand_id,
+            status="running",
+            run_type="manual",
+            started_at=datetime.now(UTC).replace(tzinfo=None),
+        )
+        db.add(run)
+        await db.commit()
+        run_id = run.id
+
+    with patch(
+        "app.services.llm_service.query_model",
+        new_callable=AsyncMock,
+        return_value={
+            "response_text": "ManualPRBrand is great",
+            "mentioned": True,
+            "latency_ms": 100,
+            "error": None,
+        },
+    ), patch(
+        "app.services.sentiment_service.classify_sentiments_for_run",
+        new_callable=AsyncMock,
+    ), patch(
+        "app.services.gap_analysis_service.run_gap_analysis",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        from app.routers.tracking import _execute_run_with_id
+
+        await _execute_run_with_id(run_id=run_id, brand_id=brand_id)
+
+    async with AsyncSessionLocal() as check_db:
+        result = await check_db.execute(
+            select(PromptRunScore).where(PromptRunScore.tracking_run_id == run_id)
+        )
+        scores = result.scalars().all()
+        assert len(scores) > 0, "Manual run must persist PromptRunScore rows"
+        for s in scores:
+            assert s.brand_id == brand_id
+            assert s.score == 100.0  # all queries mentioned the brand
+
+
+@pytest.mark.asyncio
+async def test_single_prompt_run_persists_prompt_run_scores(client):
+    """_background_prompt_run (single-prompt path) writes PromptRunScore rows."""
+    from unittest.mock import AsyncMock, patch
+    from datetime import datetime, UTC
+
+    from sqlalchemy import select
+
+    from app.models import Prompt, PromptRunScore, TrackingRun
+
+    await register_and_login(client, email="promptpr@test.com", password="Password123")
+    brand = await create_brand(
+        client, name="PromptPRBrand", prompts=["original prompt"]
+    )
+    brand_id = brand["id"]
+
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(Prompt).where(Prompt.brand_id == brand_id))
+        prompt = result.scalars().first()
+        prompt_id = prompt.id
+        prompt_text = prompt.text
+
+        run = TrackingRun(
+            brand_id=brand_id,
+            status="pending",
+            run_type="prompt",
+            started_at=datetime.now(UTC).replace(tzinfo=None),
+        )
+        db.add(run)
+        await db.commit()
+        run_id = run.id
+
+    with patch(
+        "app.services.llm_service.query_model",
+        new_callable=AsyncMock,
+        return_value={
+            "response_text": "PromptPRBrand is great",
+            "mentioned": True,
+            "latency_ms": 100,
+            "error": None,
+        },
+    ), patch(
+        "app.services.sentiment_service.classify_sentiments_for_run",
+        new_callable=AsyncMock,
+    ), patch(
+        "app.services.gap_analysis_service.run_gap_analysis",
+        new_callable=AsyncMock,
+        return_value=[],
+    ):
+        from app.routers.tracking import _background_prompt_run
+
+        await _background_prompt_run(
+            run_id=run_id,
+            brand_id=brand_id,
+            prompt_id=prompt_id,
+            prompt_text=prompt_text,
+            brand_name="PromptPRBrand",
+            tier=None,
+            brand_type="standard",
+        )
+
+    async with AsyncSessionLocal() as check_db:
+        result = await check_db.execute(
+            select(PromptRunScore).where(PromptRunScore.tracking_run_id == run_id)
+        )
+        scores = result.scalars().all()
+        assert len(scores) > 0, "Prompt-run must persist PromptRunScore rows"
+        for s in scores:
+            assert s.brand_id == brand_id
+            assert s.prompt_id == prompt_id
+            assert s.score == 100.0
+
+
+@pytest.mark.asyncio
 async def test_heuristic_model_gap():
     """model_gap heuristic fires when one model scores >=30pp above another."""
     from app.services.heuristic_service import evaluate_heuristics

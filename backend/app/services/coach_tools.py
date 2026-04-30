@@ -1,0 +1,445 @@
+"""Declarative tool definitions and dispatch for the AI visibility coach.
+
+Each tool is registered via @register_tool(name, schema, token_budget).
+Handlers take (db, user_id, brand_id, **kwargs), enforce ownership, query
+the DB, and return a dict. The dispatch wrapper truncates oversized
+results.
+"""
+import json
+from dataclasses import dataclass
+from typing import Any, Awaitable, Callable
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import Brand
+
+
+class ToolNotFoundError(Exception):
+    pass
+
+
+class BrandNotOwnedError(Exception):
+    pass
+
+
+ToolHandler = Callable[..., Awaitable[dict[str, Any]]]
+
+
+@dataclass
+class ToolDef:
+    name: str
+    schema: dict
+    token_budget: int
+    handler: ToolHandler
+
+
+_REGISTRY: dict[str, ToolDef] = {}
+
+
+def register_tool(*, name: str, schema: dict, token_budget: int):
+    """Decorator. Registers a coach tool by name."""
+    def _wrap(handler: ToolHandler) -> ToolHandler:
+        _REGISTRY[name] = ToolDef(name=name, schema=schema, token_budget=token_budget, handler=handler)
+        return handler
+    return _wrap
+
+
+def all_tool_schemas() -> list[dict]:
+    """Returns the Anthropic-format schema for every registered tool."""
+    return [t.schema for t in _REGISTRY.values()]
+
+
+def _approx_tokens(payload: Any) -> int:
+    """Rough token estimate: 1 token per ~4 characters of JSON."""
+    return max(1, len(json.dumps(payload, default=str)) // 4)
+
+
+def _truncate_to_budget(payload: dict[str, Any], budget: int) -> dict[str, Any]:
+    """If payload exceeds budget, truncate list-valued fields from the end and mark."""
+    if _approx_tokens(payload) <= budget:
+        return payload
+    trimmed = dict(payload)
+    # Iteratively shorten the longest list field until under budget or all empty
+    for _ in range(50):
+        list_fields = [(k, v) for k, v in trimmed.items() if isinstance(v, list) and v]
+        if not list_fields:
+            break
+        longest_key, longest_val = max(list_fields, key=lambda kv: len(kv[1]))
+        trimmed[longest_key] = longest_val[: max(1, len(longest_val) - max(1, len(longest_val) // 4))]
+        if _approx_tokens(trimmed) <= budget:
+            break
+    trimmed["_truncated"] = True
+    trimmed["_note"] = (
+        "Result was truncated to fit token budget. "
+        "Ask a narrower follow-up question if you need more."
+    )
+    return trimmed
+
+
+async def _verify_brand_ownership(db: AsyncSession, user_id: int, brand_id: int) -> Brand:
+    result = await db.execute(
+        select(Brand).where(Brand.id == brand_id, Brand.user_id == user_id)
+    )
+    brand = result.scalar_one_or_none()
+    if brand is None:
+        raise BrandNotOwnedError(f"Brand {brand_id} not found for user {user_id}")
+    return brand
+
+
+from datetime import datetime, timezone, timedelta
+from app.models import Prompt, TrackingRun, User
+
+# Internal-tier → display-name mapping (mirrors billing.py)
+_TIER_DISPLAY = {None: "Free", "basic": "Starter", "starter": "Growth", "pro": "Pro"}
+
+
+@register_tool(
+    name="get_brand_overview",
+    schema={
+        "name": "get_brand_overview",
+        "description": (
+            "Get the brand's identity, configured prompts, and a recent-score snapshot. "
+            "CALL THIS FIRST in nearly every conversation to establish context."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    token_budget=1500,
+)
+async def get_brand_overview(db: AsyncSession, user_id: int, brand_id: int) -> dict:
+    brand = (await db.execute(select(Brand).where(Brand.id == brand_id))).scalar_one()
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one()
+
+    # Prompts
+    prompts = (await db.execute(select(Prompt).where(Prompt.brand_id == brand_id))).scalars().all()
+
+    # Latest completed runs ordered most-recent first
+    runs = (await db.execute(
+        select(TrackingRun)
+        .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+        .order_by(TrackingRun.completed_at.desc())
+    )).scalars().all()
+
+    now = datetime.now(timezone.utc)
+
+    def _score_at(cutoff_days: int) -> float | None:
+        cutoff = now - timedelta(days=cutoff_days)
+        for r in runs:
+            if r.completed_at and r.completed_at <= cutoff:
+                return r.overall_score
+        return None
+
+    latest = runs[0] if runs else None
+    return {
+        "brand_name": brand.name,
+        "brand_type": brand.brand_type,
+        "tier": user.subscription_tier,
+        "tier_display": _TIER_DISPLAY.get(user.subscription_tier, "Free"),
+        "website_url": brand.website_url,
+        "prompt_count": len(prompts),
+        "prompts": [{"id": p.id, "text": p.text} for p in prompts],
+        "latest_score": latest.overall_score if latest else None,
+        "score_7d_ago": _score_at(7),
+        "score_30d_ago": _score_at(30),
+        "total_runs": len(runs),
+    }
+
+
+from app.models import RunModelScore, QueryResult
+
+
+@register_tool(
+    name="get_score_breakdown",
+    schema={
+        "name": "get_score_breakdown",
+        "description": (
+            "Get per-model and per-prompt scores for a specific tracking run "
+            "(defaults to the latest completed run). Use when the user asks "
+            "'why X%' or 'which models/prompts are weak'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "run_id": {"type": "integer", "description": "Specific run to inspect; omit for the latest run."},
+            },
+        },
+    },
+    token_budget=2000,
+)
+async def get_score_breakdown(db: AsyncSession, user_id: int, brand_id: int, run_id: int | None = None) -> dict:
+    if run_id is None:
+        latest = (await db.execute(
+            select(TrackingRun)
+            .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+            .order_by(TrackingRun.completed_at.desc())
+            .limit(1)
+        )).scalar_one_or_none()
+        if latest is None:
+            return {"error": "No completed runs yet for this brand."}
+        run = latest
+    else:
+        run = (await db.execute(
+            select(TrackingRun).where(TrackingRun.id == run_id, TrackingRun.brand_id == brand_id)
+        )).scalar_one_or_none()
+        if run is None:
+            return {"error": f"Run {run_id} not found for this brand."}
+
+    model_scores = (await db.execute(
+        select(RunModelScore).where(RunModelScore.tracking_run_id == run.id)
+    )).scalars().all()
+
+    qrs = (await db.execute(
+        select(QueryResult).where(QueryResult.tracking_run_id == run.id)
+    )).scalars().all()
+
+    # Aggregate per prompt
+    prompt_ids = {qr.prompt_id for qr in qrs}
+    prompts_map = {p.id: p.text for p in (await db.execute(select(Prompt).where(Prompt.id.in_(prompt_ids)))).scalars().all()}
+
+    per_prompt: dict[int, dict] = {}
+    for qr in qrs:
+        if qr.error:
+            continue
+        slot = per_prompt.setdefault(qr.prompt_id, {"prompt_id": qr.prompt_id, "prompt_text": prompts_map.get(qr.prompt_id, ""), "queries": 0, "mentions": 0})
+        slot["queries"] += 1
+        if qr.mentioned:
+            slot["mentions"] += 1
+
+    per_prompt_list = []
+    for slot in per_prompt.values():
+        score = (slot["mentions"] / slot["queries"]) * 100.0 if slot["queries"] else 0.0
+        per_prompt_list.append({**slot, "score": round(score, 2)})
+
+    return {
+        "run_id": run.id,
+        "completed_at": run.completed_at.isoformat() if run.completed_at else None,
+        "overall_score": run.overall_score,
+        "total_queries": run.total_queries,
+        "total_mentions": run.total_mentions,
+        "per_model": [
+            {"model": ms.model, "queries": ms.total_queries, "mentions": ms.total_mentions, "score": ms.score}
+            for ms in model_scores
+        ],
+        "per_prompt": per_prompt_list,
+    }
+
+
+@register_tool(
+    name="get_score_trend",
+    schema={
+        "name": "get_score_trend",
+        "description": (
+            "Get the last N completed runs for the brand, with overall and per-model "
+            "scores. Use when the user asks if their score is improving, getting worse, "
+            "or what changed recently. The runs are returned newest-first."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"n": {"type": "integer", "description": "Number of runs (default 10).", "default": 10}},
+        },
+    },
+    token_budget=1500,
+)
+async def get_score_trend(db: AsyncSession, user_id: int, brand_id: int, n: int = 10) -> dict:
+    n = max(1, min(int(n or 10), 30))
+    runs = (await db.execute(
+        select(TrackingRun)
+        .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+        .order_by(TrackingRun.completed_at.desc())
+        .limit(n)
+    )).scalars().all()
+
+    if not runs:
+        return {"runs": [], "note": "No completed runs yet."}
+
+    run_ids = [r.id for r in runs]
+    scores = (await db.execute(
+        select(RunModelScore).where(RunModelScore.tracking_run_id.in_(run_ids))
+    )).scalars().all()
+    by_run: dict[int, dict[str, float]] = {}
+    for s in scores:
+        by_run.setdefault(s.tracking_run_id, {})[s.model] = s.score
+
+    return {
+        "runs": [
+            {
+                "run_id": r.id,
+                "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                "overall_score": r.overall_score,
+                "per_model": by_run.get(r.id, {}),
+            }
+            for r in runs
+        ]
+    }
+
+
+async def dispatch_tool(
+    db: AsyncSession,
+    *,
+    user_id: int,
+    brand_id: int,
+    tool_name: str,
+    tool_args: dict[str, Any],
+) -> dict[str, Any]:
+    """Run a registered tool. Enforces brand ownership; truncates oversized results."""
+    if tool_name not in _REGISTRY:
+        raise ToolNotFoundError(tool_name)
+    tool = _REGISTRY[tool_name]
+    # Enforce ownership before running the handler
+    await _verify_brand_ownership(db, user_id, brand_id)
+    # Strip brand_id/user_id from tool_args — we always inject the URL-bound values
+    safe_args = {k: v for k, v in tool_args.items() if k not in ("brand_id", "user_id")}
+    result = await tool.handler(db, user_id, brand_id, **safe_args)
+    return _truncate_to_budget(result, tool.token_budget)
+
+
+from app.models import Competitor, CompetitorMention
+
+
+@register_tool(
+    name="get_competitor_comparison",
+    schema={
+        "name": "get_competitor_comparison",
+        "description": (
+            "Compare the brand to its tracked competitors using the latest "
+            "completed run. Returns each competitor's mention rate on the same "
+            "prompts and how many prompts each one wins or loses head-to-head."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    token_budget=2500,
+)
+async def get_competitor_comparison(db: AsyncSession, user_id: int, brand_id: int) -> dict:
+    latest = (await db.execute(
+        select(TrackingRun)
+        .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+        .order_by(TrackingRun.completed_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+    if latest is None:
+        return {"competitors": [], "note": "No completed runs yet."}
+
+    qrs = (await db.execute(
+        select(QueryResult).where(QueryResult.tracking_run_id == latest.id)
+    )).scalars().all()
+    competitors = (await db.execute(select(Competitor).where(Competitor.brand_id == brand_id))).scalars().all()
+    if not competitors:
+        return {"competitors": [], "note": "No competitors tracked for this brand."}
+
+    mentions = (await db.execute(
+        select(CompetitorMention).where(CompetitorMention.tracking_run_id == latest.id)
+    )).scalars().all()
+
+    # Brand overall mention rate
+    brand_qs = [q for q in qrs if not q.error]
+    brand_total = len(brand_qs)
+    brand_mentions_count = sum(1 for q in brand_qs if q.mentioned)
+    brand_rate = round(brand_mentions_count / brand_total * 100.0, 2) if brand_total else 0.0
+
+    # Per-prompt brand mention rate (across all models/runs)
+    brand_prompt_hits: dict[int, list[bool]] = {}
+    for q in brand_qs:
+        brand_prompt_hits.setdefault(q.prompt_id, []).append(q.mentioned)
+    brand_per_prompt_rate: dict[int, float] = {
+        pid: sum(hits) / len(hits) for pid, hits in brand_prompt_hits.items()
+    }
+
+    # Per-competitor stats
+    out = []
+    for c in competitors:
+        cms = [m for m in mentions if m.competitor_id == c.id]
+        total = len(cms)
+        hits = sum(1 for m in cms if m.mentioned)
+        rate = round(hits / total * 100.0, 2) if total else 0.0
+
+        # Per-prompt competitor mention rate
+        comp_prompt_hits: dict[int, list[bool]] = {}
+        for m in cms:
+            comp_prompt_hits.setdefault(m.prompt_id, []).append(m.mentioned)
+        comp_per_prompt_rate: dict[int, float] = {
+            pid: sum(h) / len(h) for pid, h in comp_prompt_hits.items()
+        }
+
+        wins = 0
+        losses = 0
+        ties = 0
+        for pid, comp_rate_p in comp_per_prompt_rate.items():
+            brand_rate_p = brand_per_prompt_rate.get(pid, 0.0)
+            if comp_rate_p > brand_rate_p:
+                wins += 1
+            elif brand_rate_p > comp_rate_p:
+                losses += 1
+            else:
+                ties += 1
+
+        out.append({
+            "name": c.name,
+            "mention_rate": rate,
+            "wins_on_prompts": wins,
+            "losses_on_prompts": losses,
+            "ties_on_prompts": ties,
+        })
+
+    return {
+        "run_id": latest.id,
+        "brand_mention_rate": brand_rate,
+        "competitors": out,
+    }
+
+
+from app.models import ContentGap
+
+
+@register_tool(
+    name="get_content_gaps",
+    schema={
+        "name": "get_content_gaps",
+        "description": (
+            "Get the top N content gaps for the brand, sorted by severity. "
+            "Each gap is a (prompt, model) pair where the brand is missing AND "
+            "competitors are present. Use when the user asks 'what should I do' "
+            "or 'where am I weak'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"n": {"type": "integer", "default": 10}},
+        },
+    },
+    token_budget=2500,
+)
+async def get_content_gaps(db: AsyncSession, user_id: int, brand_id: int, n: int = 10) -> dict:
+    n = max(1, min(int(n or 10), 25))
+    gaps = (await db.execute(
+        select(ContentGap)
+        .where(ContentGap.brand_id == brand_id)
+        .order_by(ContentGap.severity_score.desc())
+        .limit(n)
+    )).scalars().all()
+    if not gaps:
+        return {"gaps": [], "note": "No gaps detected yet — gaps are computed after a tracking run."}
+
+    prompt_ids = {g.prompt_id for g in gaps}
+    prompts_map = {p.id: p.text for p in (await db.execute(select(Prompt).where(Prompt.id.in_(prompt_ids)))).scalars().all()}
+
+    def _parse_json(val: str | None, default):
+        if not val:
+            return default
+        try:
+            return json.loads(val)
+        except (ValueError, TypeError):
+            return default
+
+    return {
+        "gaps": [
+            {
+                "prompt_id": g.prompt_id,
+                "prompt_text": prompts_map.get(g.prompt_id, ""),
+                "model": g.model,
+                "severity_score": g.severity_score,
+                "opportunity_score": g.opportunity_score,
+                "platforms_lacking": _parse_json(g.platforms_lacking, []),
+                "competitor_mentions": _parse_json(g.competitor_mentions, [])[:5],
+            }
+            for g in gaps
+        ]
+    }

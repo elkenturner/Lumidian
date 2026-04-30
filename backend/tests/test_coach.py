@@ -196,3 +196,38 @@ async def test_get_score_trend_returns_runs_in_descending_order():
     assert result["runs"][0]["overall_score"] >= result["runs"][1]["overall_score"]
     assert "per_model" in result["runs"][0]
     assert "perplexity" in result["runs"][0]["per_model"]
+
+
+@pytest.mark.asyncio
+async def test_get_competitor_comparison_returns_head_to_head():
+    user_id = await _create_user("cc@example.com")
+    brand = await _create_brand(user_id, "Brand CC")
+
+    async with AsyncSessionLocal() as db:
+        from app.models import Prompt, TrackingRun, QueryResult, Competitor, CompetitorMention
+        prompt = Prompt(brand_id=brand["id"], text="best CRMs", prompt_type="standard")
+        db.add(prompt)
+        comp = Competitor(brand_id=brand["id"], name="Acme")
+        db.add(comp)
+        await db.flush()
+        run = TrackingRun(brand_id=brand["id"], status="completed", overall_score=50.0)
+        db.add(run)
+        await db.flush()
+        # Brand mentioned in 1 of 2 queries
+        db.add(QueryResult(tracking_run_id=run.id, prompt_id=prompt.id, model="perplexity", run_number=1, response_text="...", mentioned=True))
+        db.add(QueryResult(tracking_run_id=run.id, prompt_id=prompt.id, model="perplexity", run_number=2, response_text="...", mentioned=False))
+        # Acme mentioned in 2 of 2 queries
+        db.add(CompetitorMention(tracking_run_id=run.id, competitor_id=comp.id, prompt_id=prompt.id, model="perplexity", run_number=1, mentioned=True))
+        db.add(CompetitorMention(tracking_run_id=run.id, competitor_id=comp.id, prompt_id=prompt.id, model="perplexity", run_number=2, mentioned=True))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_competitor_comparison", tool_args={})
+
+    competitors = result["competitors"]
+    assert len(competitors) == 1
+    assert competitors[0]["name"] == "Acme"
+    assert competitors[0]["mention_rate"] == 100.0  # 2/2
+    assert result["brand_mention_rate"] == 50.0     # 1/2
+    # Head-to-head: competitor wins on this prompt
+    assert competitors[0]["wins_on_prompts"] >= 1

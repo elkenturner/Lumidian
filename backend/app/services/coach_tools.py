@@ -291,3 +291,97 @@ async def dispatch_tool(
     safe_args = {k: v for k, v in tool_args.items() if k not in ("brand_id", "user_id")}
     result = await tool.handler(db, user_id, brand_id, **safe_args)
     return _truncate_to_budget(result, tool.token_budget)
+
+
+from app.models import Competitor, CompetitorMention
+
+
+@register_tool(
+    name="get_competitor_comparison",
+    schema={
+        "name": "get_competitor_comparison",
+        "description": (
+            "Compare the brand to its tracked competitors using the latest "
+            "completed run. Returns each competitor's mention rate on the same "
+            "prompts and how many prompts each one wins or loses head-to-head."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    token_budget=2500,
+)
+async def get_competitor_comparison(db: AsyncSession, user_id: int, brand_id: int) -> dict:
+    latest = (await db.execute(
+        select(TrackingRun)
+        .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+        .order_by(TrackingRun.completed_at.desc())
+        .limit(1)
+    )).scalar_one_or_none()
+    if latest is None:
+        return {"competitors": [], "note": "No completed runs yet."}
+
+    qrs = (await db.execute(
+        select(QueryResult).where(QueryResult.tracking_run_id == latest.id)
+    )).scalars().all()
+    competitors = (await db.execute(select(Competitor).where(Competitor.brand_id == brand_id))).scalars().all()
+    if not competitors:
+        return {"competitors": [], "note": "No competitors tracked for this brand."}
+
+    mentions = (await db.execute(
+        select(CompetitorMention).where(CompetitorMention.tracking_run_id == latest.id)
+    )).scalars().all()
+
+    # Brand overall mention rate
+    brand_qs = [q for q in qrs if not q.error]
+    brand_total = len(brand_qs)
+    brand_mentions_count = sum(1 for q in brand_qs if q.mentioned)
+    brand_rate = round(brand_mentions_count / brand_total * 100.0, 2) if brand_total else 0.0
+
+    # Per-prompt brand mention rate (across all models/runs)
+    brand_prompt_hits: dict[int, list[bool]] = {}
+    for q in brand_qs:
+        brand_prompt_hits.setdefault(q.prompt_id, []).append(q.mentioned)
+    brand_per_prompt_rate: dict[int, float] = {
+        pid: sum(hits) / len(hits) for pid, hits in brand_prompt_hits.items()
+    }
+
+    # Per-competitor stats
+    out = []
+    for c in competitors:
+        cms = [m for m in mentions if m.competitor_id == c.id]
+        total = len(cms)
+        hits = sum(1 for m in cms if m.mentioned)
+        rate = round(hits / total * 100.0, 2) if total else 0.0
+
+        # Per-prompt competitor mention rate
+        comp_prompt_hits: dict[int, list[bool]] = {}
+        for m in cms:
+            comp_prompt_hits.setdefault(m.prompt_id, []).append(m.mentioned)
+        comp_per_prompt_rate: dict[int, float] = {
+            pid: sum(h) / len(h) for pid, h in comp_prompt_hits.items()
+        }
+
+        wins = 0
+        losses = 0
+        ties = 0
+        for pid, comp_rate_p in comp_per_prompt_rate.items():
+            brand_rate_p = brand_per_prompt_rate.get(pid, 0.0)
+            if comp_rate_p > brand_rate_p:
+                wins += 1
+            elif brand_rate_p > comp_rate_p:
+                losses += 1
+            else:
+                ties += 1
+
+        out.append({
+            "name": c.name,
+            "mention_rate": rate,
+            "wins_on_prompts": wins,
+            "losses_on_prompts": losses,
+            "ties_on_prompts": ties,
+        })
+
+    return {
+        "run_id": latest.id,
+        "brand_mention_rate": brand_rate,
+        "competitors": out,
+    }

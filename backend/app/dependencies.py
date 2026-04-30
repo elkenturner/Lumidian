@@ -129,7 +129,10 @@ async def get_current_user(
         logger.warning(f"get_current_user: BLOCKED - account paused for user {user.id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account has been paused. Contact support to restore access.",
+            detail={
+                "code": "account_paused",
+                "message": "Your account has been paused. Contact support to restore access.",
+            },
         )
     if not getattr(user, "email_verified", True) and not user.is_admin and not is_impersonated:
         logger.warning(f"get_current_user: BLOCKED - email not verified for user {user.id}")
@@ -162,7 +165,10 @@ async def get_current_user_allow_unverified(
     if getattr(user, "is_paused", False) and not user.is_admin and not is_impersonated:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account has been paused. Contact support to restore access.",
+            detail={
+                "code": "account_paused",
+                "message": "Your account has been paused. Contact support to restore access.",
+            },
         )
     return user
 

@@ -245,87 +245,106 @@ class TestBuildPrompt:
         assert len(result) > 100
 
 
-def _mock_httpx_response(status_code: int, body: dict | None):
-    """Build a mocked httpx.Response with the given status and JSON body."""
+def _mock_serper_response(status_code: int, organic: list[dict] | None):
+    """Build a mocked httpx.Response from a Serper search."""
     resp = MagicMock()
     resp.status_code = status_code
-    if body is None:
-        resp.json.side_effect = ValueError("not json")
+    if status_code >= 400:
+        import httpx as _httpx
+        resp.raise_for_status.side_effect = _httpx.HTTPStatusError(
+            "error", request=MagicMock(), response=resp,
+        )
     else:
-        resp.json.return_value = body
+        resp.raise_for_status.return_value = None
+    resp.json.return_value = {"organic": organic or []}
     return resp
-
-
-def _patch_httpx_get(resp):
-    """Return a patch object for httpx.AsyncClient.get returning resp."""
-    client = MagicMock()
-    client.__aenter__ = AsyncMock(return_value=client)
-    client.__aexit__ = AsyncMock(return_value=None)
-    client.get = AsyncMock(return_value=resp)
-    return patch("app.services.reddit_scanner_service.httpx.AsyncClient", return_value=client)
 
 
 class TestValidateSubredditExists:
     @pytest.mark.asyncio
     async def test_valid_subreddit_returns_true(self):
-        resp = _mock_httpx_response(
-            200,
-            {"kind": "t5", "data": {"display_name": "startups", "subscribers": 1_000_000}},
-        )
-        with _patch_httpx_get(resp):
+        resp = _mock_serper_response(200, [
+            {"link": "https://www.reddit.com/r/startups/comments/abc/foo/", "title": "..."},
+            {"link": "https://www.reddit.com/r/startups/", "title": "r/startups"},
+        ])
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+        client.post = AsyncMock(return_value=resp)
+        with patch(
+            "app.services.reddit_scanner_service.httpx.AsyncClient",
+            return_value=client,
+        ), patch.dict("os.environ", {"SERPER_API_KEY": "test-key"}):
             assert await validate_subreddit_exists("startups") is True
 
     @pytest.mark.asyncio
-    async def test_404_returns_false(self):
-        resp = _mock_httpx_response(404, {"error": 404, "message": "Not Found"})
-        with _patch_httpx_get(resp):
-            assert await validate_subreddit_exists("nonexistentsubreddit") is False
-
-    @pytest.mark.asyncio
-    async def test_403_fails_open(self):
-        # Reddit returns 403 to datacenter IPs (e.g. Railway egress). We can't
-        # tell "sub doesn't exist" from "blocked," so fail-open.
-        resp = _mock_httpx_response(403, None)
-        with _patch_httpx_get(resp):
-            assert await validate_subreddit_exists("startups") is True
-
-    @pytest.mark.asyncio
-    async def test_listing_response_returns_false(self):
-        # Reddit returns kind="Listing" when the slug doesn't resolve and the
-        # request is treated as a search.
-        resp = _mock_httpx_response(200, {"kind": "Listing", "data": {"children": []}})
-        with _patch_httpx_get(resp):
+    async def test_no_matching_results_returns_false(self):
+        # Hallucinated subreddit: Serper returns no URLs under reddit.com/r/{sub}/
+        resp = _mock_serper_response(200, [
+            {"link": "https://www.reddit.com/r/AskReddit/comments/xyz/", "title": "..."},
+        ])
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+        client.post = AsyncMock(return_value=resp)
+        with patch(
+            "app.services.reddit_scanner_service.httpx.AsyncClient",
+            return_value=client,
+        ), patch.dict("os.environ", {"SERPER_API_KEY": "test-key"}):
             assert await validate_subreddit_exists("medical_technology") is False
 
     @pytest.mark.asyncio
-    async def test_private_subreddit_returns_false(self):
-        resp = _mock_httpx_response(
-            200,
-            {"kind": "t5", "data": {"reason": "private", "display_name": "secret"}},
-        )
-        with _patch_httpx_get(resp):
-            assert await validate_subreddit_exists("secret") is False
+    async def test_empty_organic_returns_false(self):
+        resp = _mock_serper_response(200, [])
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+        client.post = AsyncMock(return_value=resp)
+        with patch(
+            "app.services.reddit_scanner_service.httpx.AsyncClient",
+            return_value=client,
+        ), patch.dict("os.environ", {"SERPER_API_KEY": "test-key"}):
+            assert await validate_subreddit_exists("nonexistentsubreddit") is False
 
     @pytest.mark.asyncio
-    async def test_redirect_returns_false(self):
-        # follow_redirects=False, so a 302 indicates the slug does not exist
-        # exactly as written (Reddit redirects to the canonical capitalization).
-        resp = _mock_httpx_response(302, None)
-        with _patch_httpx_get(resp):
-            assert await validate_subreddit_exists("MedicalTechnology") is False
+    async def test_serper_error_fails_open(self):
+        # Serper transient failures must not block draft creation.
+        resp = _mock_serper_response(500, None)
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+        client.post = AsyncMock(return_value=resp)
+        with patch(
+            "app.services.reddit_scanner_service.httpx.AsyncClient",
+            return_value=client,
+        ), patch.dict("os.environ", {"SERPER_API_KEY": "test-key"}):
+            assert await validate_subreddit_exists("startups") is True
+
+    @pytest.mark.asyncio
+    async def test_missing_api_key_fails_open(self):
+        # No SERPER_API_KEY → can't validate, fail-open to preserve old behavior.
+        with patch.dict("os.environ", {"SERPER_API_KEY": ""}, clear=False):
+            assert await validate_subreddit_exists("anything") is True
 
     @pytest.mark.asyncio
     async def test_strips_r_prefix(self):
-        resp = _mock_httpx_response(
-            200,
-            {"kind": "t5", "data": {"display_name": "startups", "subscribers": 1}},
-        )
-        with _patch_httpx_get(resp) as mock_client_factory:
+        resp = _mock_serper_response(200, [
+            {"link": "https://www.reddit.com/r/startups/comments/abc/foo/", "title": "..."},
+        ])
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+        client.post = AsyncMock(return_value=resp)
+        with patch(
+            "app.services.reddit_scanner_service.httpx.AsyncClient",
+            return_value=client,
+        ) as mock_factory, patch.dict("os.environ", {"SERPER_API_KEY": "test-key"}):
             assert await validate_subreddit_exists("r/startups") is True
-            # Verify the URL doesn't have 'r/r/'
-            call = mock_client_factory.return_value.get.call_args
-            assert "r/r/" not in call.args[0]
-            assert "r/startups/about.json" in call.args[0]
+            # Verify the query doesn't have 'r/r/'
+            call = mock_factory.return_value.post.call_args
+            query = call.kwargs["json"]["q"]
+            assert "r/r/" not in query
+            assert "site:reddit.com/r/startups" in query
 
     @pytest.mark.asyncio
     async def test_empty_string_returns_false(self):
@@ -340,12 +359,29 @@ class TestValidateSubredditExists:
         client = MagicMock()
         client.__aenter__ = AsyncMock(return_value=client)
         client.__aexit__ = AsyncMock(return_value=None)
-        client.get = AsyncMock(side_effect=Exception("network down"))
+        client.post = AsyncMock(side_effect=Exception("network down"))
         with patch(
             "app.services.reddit_scanner_service.httpx.AsyncClient",
             return_value=client,
-        ):
+        ), patch.dict("os.environ", {"SERPER_API_KEY": "test-key"}):
             assert await validate_subreddit_exists("anything") is True
+
+    @pytest.mark.asyncio
+    async def test_other_subreddit_results_dont_match(self):
+        # Serper returned results, but none under the requested subreddit's URL.
+        resp = _mock_serper_response(200, [
+            {"link": "https://www.reddit.com/r/different/comments/abc/", "title": "..."},
+            {"link": "https://www.reddit.com/r/another_one/", "title": "..."},
+        ])
+        client = MagicMock()
+        client.__aenter__ = AsyncMock(return_value=client)
+        client.__aexit__ = AsyncMock(return_value=None)
+        client.post = AsyncMock(return_value=resp)
+        with patch(
+            "app.services.reddit_scanner_service.httpx.AsyncClient",
+            return_value=client,
+        ), patch.dict("os.environ", {"SERPER_API_KEY": "test-key"}):
+            assert await validate_subreddit_exists("madeupname") is False
 
 
 class TestFindFirstValidSubreddit:

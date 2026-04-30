@@ -64,58 +64,60 @@ def _is_blocked_subreddit(subreddit: str) -> bool:
     return any(sig in lower for sig in _BLOCKED_SUB_SIGNALS)
 
 
+_SERPER_URL = "https://google.serper.dev/search"
+
+
 # ── Subreddit existence validation ───────────────────────────────────────────
 # LLM-suggested subreddit names are often hallucinated (wrong spelling,
-# capitalization, or fully invented). Validating against Reddit's about.json
-# before storing the name in a draft prevents users from clicking links that
-# land on Reddit's "this subreddit does not exist" search page.
-
-_REDDIT_USER_AGENT = "Lumidian/1.0 (subreddit-validator)"
+# capitalization, or fully invented). Validating before storing the name in a
+# draft prevents users from clicking links that land on Reddit's "this
+# subreddit does not exist" search page.
+#
+# We use Serper (Google search) rather than hitting Reddit directly because
+# Reddit blocks datacenter egress IPs (Railway) with 403 across all subdomains.
+# A real subreddit has many indexed pages under reddit.com/r/{sub}/; a
+# hallucinated name returns no matches.
 
 
 async def validate_subreddit_exists(sub: str) -> bool:
-    """Return True if r/{sub} resolves to a real, accessible subreddit.
+    """Return True if r/{sub} appears in Google search via Serper.dev.
 
-    Hits Reddit's public about.json endpoint with no auth. Treats network
-    failures as valid (fail-open) so transient errors don't block draft
-    creation — the worst case is we keep today's behavior for that one draft.
+    Fails open (returns True) on missing API key or transient errors so
+    validation outages don't block draft creation.
     """
     cleaned = (sub or "").strip().lstrip("/").removeprefix("r/").removeprefix("R/")
     if not cleaned:
         return False
-    url = f"https://www.reddit.com/r/{cleaned}/about.json"
-    try:
-        async with httpx.AsyncClient(
-            timeout=8.0, follow_redirects=False
-        ) as client:
-            resp = await client.get(url, headers={"User-Agent": _REDDIT_USER_AGENT})
-    except Exception as exc:
-        logger.debug("validate_subreddit_exists(%s) network error: %s", cleaned, exc)
-        return True  # fail-open on transient errors
-    # 403 means Reddit is blocking us (common from datacenter IPs like Railway).
-    # We can't differentiate "sub doesn't exist" from "Reddit blocked us," so
-    # fail-open and trust the upstream LLM suggestion.
-    if resp.status_code == 403:
-        logger.debug(
-            "validate_subreddit_exists(%s): 403 from Reddit — assuming valid",
+
+    api_key = os.getenv("SERPER_API_KEY", "").strip()
+    if not api_key:
+        logger.warning(
+            "validate_subreddit_exists(%s): SERPER_API_KEY missing — fail-open",
             cleaned,
         )
         return True
-    if resp.status_code != 200:
-        return False
+
     try:
-        data = resp.json()
-    except Exception:
-        return False
-    # Real subreddit responses use kind="t5". Search/redirect responses use
-    # kind="Listing" or omit it entirely.
-    if data.get("kind") != "t5":
-        return False
-    sub_data = data.get("data") or {}
-    # Banned/private subs return 200 with a reason field — not usable.
-    if sub_data.get("reason"):
-        return False
-    return sub_data.get("display_name") is not None
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            resp = await client.post(
+                _SERPER_URL,
+                headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
+                json={"q": f"site:reddit.com/r/{cleaned}", "num": 5},
+            )
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception as exc:
+        logger.debug(
+            "validate_subreddit_exists(%s): Serper error — fail-open: %s",
+            cleaned, exc,
+        )
+        return True
+
+    organic = data.get("organic", []) or []
+    pattern = re.compile(
+        rf"reddit\.com/r/{re.escape(cleaned)}(/|$)", re.IGNORECASE
+    )
+    return any(pattern.search(item.get("link", "") or "") for item in organic)
 
 
 async def find_first_valid_subreddit(candidates: list[str]) -> str | None:
@@ -124,9 +126,6 @@ async def find_first_valid_subreddit(candidates: list[str]) -> str | None:
         if await validate_subreddit_exists(cand):
             return cand.strip().lstrip("/").removeprefix("r/").removeprefix("R/")
     return None
-
-
-_SERPER_URL = "https://google.serper.dev/search"
 
 _cache: dict[int, tuple[float, list[dict]]] = {}
 _CACHE_TTL = 86_400.0  # 24 hours

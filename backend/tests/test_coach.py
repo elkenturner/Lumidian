@@ -268,3 +268,27 @@ async def test_get_content_gaps_returns_top_by_severity():
     # Sorted by severity descending
     assert result["gaps"][0]["severity_score"] >= result["gaps"][1]["severity_score"]
     assert result["gaps"][0]["prompt_text"] == "best CRMs"
+
+
+@pytest.mark.asyncio
+async def test_get_drafts_summary_returns_counts_and_recent():
+    user_id = await _create_user("ds@example.com")
+    brand = await _create_brand(user_id, "Brand DS")
+
+    async with AsyncSessionLocal() as db:
+        from app.models import Prompt, ContentDraft
+        prompt = Prompt(brand_id=brand["id"], text="best CRMs", prompt_type="standard")
+        db.add(prompt)
+        await db.flush()
+        for status in ("draft", "draft", "approved", "posted"):
+            db.add(ContentDraft(brand_id=brand["id"], prompt_id=prompt.id, platform="reddit", status=status, title=f"t-{status}", content_text="..."))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_drafts_summary", tool_args={})
+
+    assert result["counts"]["draft"] == 2
+    assert result["counts"]["approved"] == 1
+    assert result["counts"]["posted"] == 1
+    assert len(result["recent"]) <= 5
+    assert result["link"] == f"/content/{brand['id']}"

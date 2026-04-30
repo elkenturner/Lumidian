@@ -12,17 +12,21 @@ scan_all_brands()                  -> None  (runs for every brand)
 """
 from __future__ import annotations
 
-import asyncio
 import logging
 import math
-import os
 import re
-import time
 from datetime import UTC, datetime, timedelta
 
-import httpx
+from app.services.serper_search_service import (
+    clean_title,
+    invalidate_cache as _invalidate_site_cache,
+    parse_serper_date as _parse_serper_date,
+    search_site_async,
+)
 
 logger = logging.getLogger(__name__)
+
+_SITE = "reddit.com"
 
 # ── Blocked subreddits ────────────────────────────────────────────────────────
 # Posts from these communities are filtered out regardless of relevance score.
@@ -64,15 +68,9 @@ def _is_blocked_subreddit(subreddit: str) -> bool:
     return any(sig in lower for sig in _BLOCKED_SUB_SIGNALS)
 
 
-_SERPER_URL = "https://google.serper.dev/search"
-
-_cache: dict[int, tuple[float, list[dict]]] = {}
-_CACHE_TTL = 86_400.0  # 24 hours
-
-
 def invalidate_cache(key: int) -> None:
     """Remove a cached result so the next call fetches fresh data from Serper."""
-    _cache.pop(key, None)
+    _invalidate_site_cache(_SITE, key)
 
 # ── Relevance scoring ─────────────────────────────────────────────────────────
 
@@ -400,60 +398,33 @@ def _score_thread(
 
 # ── Serper search + helpers ──────────────────────────────────────────────────
 
-_RELATIVE_RE = re.compile(
-    r"(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago",
-    re.IGNORECASE,
-)
-_MONTHS_MAP = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
-}
-
-
-def _parse_serper_date(date_str: str | None) -> datetime | None:
-    """Parse Serper.dev date field into a UTC-naive datetime."""
-    if not date_str:
-        return None
-    now = datetime.now(UTC)
-
-    m = _RELATIVE_RE.match(date_str.strip())
-    if m:
-        n, unit = int(m.group(1)), m.group(2).lower()
-        delta_map = {
-            "second": timedelta(seconds=n), "minute": timedelta(minutes=n),
-            "hour": timedelta(hours=n), "day": timedelta(days=n),
-            "week": timedelta(weeks=n), "month": timedelta(days=30 * n),
-            "year": timedelta(days=365 * n),
-        }
-        return (now - delta_map.get(unit, timedelta(0))).replace(tzinfo=None)
-
-    abs_m = re.match(r"([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})", date_str.strip())
-    if abs_m:
-        month = _MONTHS_MAP.get(abs_m.group(1)[:3].lower())
-        if month:
-            try:
-                return datetime(int(abs_m.group(3)), month, int(abs_m.group(2)))
-            except ValueError:
-                pass
-    return None
-
-
 def _extract_subreddit(url: str) -> str:
     """Extract subreddit name from a Reddit URL."""
     m = re.search(r"reddit\.com/r/([^/]+)", url)
     return m.group(1) if m else ""
 
 
-def _clean_title(title: str) -> str:
-    """Strip trailing Reddit/subreddit branding from a Serper result title."""
-    for suffix in (" - Reddit", " — Reddit", " – Reddit", " | Reddit"):
-        if title.endswith(suffix):
-            title = title[: -len(suffix)].strip()
-            break
+def _is_reddit_post_url(url: str) -> bool:
+    """Reject subreddit/wiki/user pages — only accept actual post URLs."""
+    return "/comments/" in url
+
+
+def _reddit_extras(item: dict) -> dict:
+    """
+    Reddit-specific post-processing:
+      - extract subreddit from URL
+      - re-clean title to strip the trailing ``: r/<sub>`` suffix that Serper
+        sometimes appends after the standard branding suffix
+    """
+    url = item.get("link", "")
+    title = clean_title(item.get("title", ""), _SITE)
     idx = title.rfind(" : r/")
     if idx > 0:
         title = title[:idx].strip()
-    return title
+    return {
+        "title": title,
+        "subreddit": _extract_subreddit(url),
+    }
 
 
 async def _search_reddit_posts(
@@ -461,114 +432,18 @@ async def _search_reddit_posts(
     num_results: int = 10,
     cache_key: int | None = None,
 ) -> list[dict]:
-    """
-    Search for Reddit posts matching *query* via Serper.dev (site:reddit.com).
-
-    Returns a list of dicts: {title, url, snippet, date, subreddit}
-    Returns [] gracefully on missing credentials, API errors, or no matches.
-    """
-    if cache_key is not None:
-        entry = _cache.get(cache_key)
-        if entry and time.monotonic() < entry[0]:
-            logger.debug("reddit_search: cache hit for key=%s", cache_key)
-            return entry[1]
-
-    api_key = os.getenv("SERPER_API_KEY", "").strip()
-    if not api_key:
-        logger.warning(
-            "reddit_search: SERPER_API_KEY not configured — "
-            "Reddit post finder disabled, returning empty list"
-        )
-        return []
-
-    _TRANSIENT_CODES = {429, 500, 502, 503}
-    _MAX_ATTEMPTS = 2
-    _RETRY_DELAY = 2.0  # seconds
-
-    data = None
-    for attempt in range(1, _MAX_ATTEMPTS + 1):
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.post(
-                    _SERPER_URL,
-                    headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
-                    json={"q": f"site:reddit.com {query}", "num": 25},
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                break  # success
-        except httpx.HTTPStatusError as exc:
-            status_code = exc.response.status_code
-            try:
-                error_body = exc.response.json()
-            except Exception:
-                error_body = exc.response.text
-
-            if status_code in _TRANSIENT_CODES and attempt < _MAX_ATTEMPTS:
-                logger.warning(
-                    "reddit_search: HTTP %s from Serper (attempt %d/%d), retrying in %.0fs — %s",
-                    status_code, attempt, _MAX_ATTEMPTS, _RETRY_DELAY, error_body,
-                )
-                await asyncio.sleep(_RETRY_DELAY)
-                continue
-
-            logger.error(
-                "reddit_search: HTTP %s from Serper (attempt %d/%d, giving up) — %s",
-                status_code, attempt, _MAX_ATTEMPTS, error_body,
-            )
-            return []
-        except Exception as exc:
-            if attempt < _MAX_ATTEMPTS:
-                logger.warning(
-                    "reddit_search: request failed (attempt %d/%d), retrying in %.0fs — %s",
-                    attempt, _MAX_ATTEMPTS, _RETRY_DELAY, exc,
-                )
-                await asyncio.sleep(_RETRY_DELAY)
-                continue
-
-            logger.error(
-                "reddit_search: request failed (attempt %d/%d, giving up) — %s",
-                attempt, _MAX_ATTEMPTS, exc,
-            )
-            return []
-
-    if data is None:
-        return []
-
-    items = data.get("organic", [])
-    results: list[dict] = []
-
-    for item in items:
-        url: str = item.get("link", "")
-        title: str = item.get("title", "")
-        snippet: str = item.get("snippet", "")
-
-        # Must be an actual Reddit post, not a subreddit/wiki/user page
-        if not url or "/comments/" not in url:
-            continue
-
-        subreddit = _extract_subreddit(url)
-
-        results.append({
-            "title": _clean_title(title),
-            "url": url,
-            "snippet": snippet,
-            "date": item.get("date", ""),
-            "subreddit": subreddit,
-        })
-
-        if len(results) >= num_results:
-            break
-
-    logger.info(
-        "reddit_search: %d posts found for query=%r (%d raw Serper results)",
-        len(results), query, len(items),
+    """Search for Reddit posts matching *query* via Serper.dev (site:reddit.com)."""
+    return await search_site_async(
+        site=_SITE,
+        query=query,
+        num_results=num_results,
+        cache_key=cache_key,
+        raw_num=25,
+        timeout=10.0,
+        url_filter=_is_reddit_post_url,
+        extras_fn=_reddit_extras,
+        log_label="reddit_search",
     )
-
-    if cache_key is not None:
-        _cache[cache_key] = (time.monotonic() + _CACHE_TTL, results)
-
-    return results
 
 
 # ── Subreddit suggestion ─────────────────────────────────────────────────────

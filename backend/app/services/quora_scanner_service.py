@@ -13,8 +13,9 @@ scan_all_brands()                  -> None  (runs for every brand)
 from __future__ import annotations
 
 import logging
-import re
 from datetime import UTC, datetime, timedelta
+
+from app.services.serper_search_service import parse_serper_date as _parse_serper_date
 
 logger = logging.getLogger(__name__)
 
@@ -22,60 +23,6 @@ logger = logging.getLogger(__name__)
 # A real Quora question URL + at least 1 prompt keyword hit counts.
 _MIN_SCORE = 45.0
 _LEAD_CAP = 20  # keep top N "new" leads per brand (by relevance_score)
-
-
-_RELATIVE_RE = re.compile(
-    r"(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago",
-    re.IGNORECASE,
-)
-_MONTHS = {
-    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12,
-}
-
-
-def _parse_serper_date(date_str: str | None) -> datetime | None:
-    """
-    Parse Serper.dev `date` field into a UTC-naive datetime.
-    Handles:
-      - Relative: "3 days ago", "2 weeks ago", "1 month ago"
-      - Absolute: "Dec 15, 2023" / "December 15, 2023"
-    Returns None if unparseable.
-    """
-    if not date_str:
-        return None
-    now = datetime.now(UTC)
-
-    m = _RELATIVE_RE.match(date_str.strip())
-    if m:
-        n, unit = int(m.group(1)), m.group(2).lower()
-        delta_map = {
-            "second": timedelta(seconds=n),
-            "minute": timedelta(minutes=n),
-            "hour":   timedelta(hours=n),
-            "day":    timedelta(days=n),
-            "week":   timedelta(weeks=n),
-            "month":  timedelta(days=30 * n),
-            "year":   timedelta(days=365 * n),
-        }
-        dt = now - delta_map.get(unit, timedelta(0))
-        return dt.replace(tzinfo=None)
-
-    # Absolute: "Dec 15, 2023" or "December 15, 2023"
-    abs_m = re.match(
-        r"([A-Za-z]+)\s+(\d{1,2}),?\s+(\d{4})",
-        date_str.strip(),
-    )
-    if abs_m:
-        month_str, day_str, year_str = abs_m.group(1), abs_m.group(2), abs_m.group(3)
-        month = _MONTHS.get(month_str[:3].lower())
-        if month:
-            try:
-                return datetime(int(year_str), month, int(day_str))
-            except ValueError:
-                pass
-
-    return None
 
 
 def _score_question(

@@ -163,6 +163,7 @@ async def get_current_user_allow_unverified(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
     is_impersonated = bool(payload.get("impersonated_by"))
     if getattr(user, "is_paused", False) and not user.is_admin and not is_impersonated:
+        logger.warning(f"get_current_user_allow_unverified: BLOCKED - account paused for user {user.id}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail={

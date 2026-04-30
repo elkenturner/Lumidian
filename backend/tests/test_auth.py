@@ -658,3 +658,31 @@ async def test_paused_user_gets_structured_403(client: httpx.AsyncClient):
     assert isinstance(body["detail"], dict), f"detail should be dict, got: {body['detail']}"
     assert body["detail"]["code"] == "account_paused"
     assert "paused" in body["detail"]["message"].lower()
+
+
+async def test_paused_user_unverified_dep_gets_structured_403(client: httpx.AsyncClient):
+    """The allow_unverified dependency is used by /auth/me and should also
+    return the structured paused error so the same frontend handler works.
+
+    We exercise the AllowUnverifiedUser dependency specifically by logging in
+    with a verified account (to get a session cookie), then flipping
+    email_verified back to 0 and is_paused to 1 in the DB.  The dep allows
+    unverified users through but must still block paused ones.
+    """
+    # register_and_login gives us a valid session cookie
+    await register_and_login(client, email="paused-unverified@example.com")
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        # Simulate an unverified-but-paused account: flip both flags
+        await db.execute(
+            text("UPDATE users SET is_paused = 1, email_verified = 0 WHERE email = :e"),
+            {"e": "paused-unverified@example.com"},
+        )
+        await db.commit()
+
+    # /auth/me uses AllowUnverifiedUser — should return structured 403 for paused
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 403
+    body = resp.json()
+    assert isinstance(body["detail"], dict)
+    assert body["detail"]["code"] == "account_paused"

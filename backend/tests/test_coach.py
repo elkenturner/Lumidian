@@ -165,3 +165,34 @@ async def test_get_score_breakdown_returns_per_model_and_per_prompt():
     assert len(result["per_prompt"]) == 1
     assert result["per_prompt"][0]["prompt_text"] == "best CRMs"
     assert result["per_prompt"][0]["score"] == 50.0
+
+
+@pytest.mark.asyncio
+async def test_get_score_trend_returns_runs_in_descending_order():
+    user_id = await _create_user("st@example.com")
+    brand = await _create_brand(user_id, "Brand ST")
+
+    async with AsyncSessionLocal() as db:
+        from app.models import TrackingRun, RunModelScore
+        from datetime import datetime, timedelta, timezone
+        base = datetime.now(timezone.utc)
+        for i in range(3):
+            run = TrackingRun(
+                brand_id=brand["id"],
+                status="completed",
+                overall_score=20.0 + i * 10,
+                completed_at=base - timedelta(days=2 - i),
+            )
+            db.add(run)
+            await db.flush()
+            db.add(RunModelScore(tracking_run_id=run.id, model="perplexity", total_queries=4, total_mentions=int(i + 1), score=25.0 * (i + 1)))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_score_trend", tool_args={})
+
+    assert len(result["runs"]) == 3
+    # Most recent first
+    assert result["runs"][0]["overall_score"] >= result["runs"][1]["overall_score"]
+    assert "per_model" in result["runs"][0]
+    assert "perplexity" in result["runs"][0]["per_model"]

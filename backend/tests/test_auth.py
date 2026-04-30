@@ -686,3 +686,58 @@ async def test_paused_user_unverified_dep_gets_structured_403(client: httpx.Asyn
     body = resp.json()
     assert isinstance(body["detail"], dict)
     assert body["detail"]["code"] == "account_paused"
+
+
+async def test_paused_admin_not_blocked(client: httpx.AsyncClient):
+    """Admin users bypass the paused 403 check entirely."""
+    await register_and_login(client, email="paused-admin@example.com")
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        await db.execute(
+            text("UPDATE users SET is_paused = 1, is_admin = 1 WHERE email = :e"),
+            {"e": "paused-admin@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 200
+    assert resp.json()["email"] == "paused-admin@example.com"
+
+
+async def test_paused_user_can_still_logout(client: httpx.AsyncClient):
+    """Logout endpoint must work for paused users — it doesn't depend on
+    get_current_user, but this test guards against a future regression."""
+    await register_and_login(client, email="paused-logout@example.com")
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        await db.execute(
+            text("UPDATE users SET is_paused = 1 WHERE email = :e"),
+            {"e": "paused-logout@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.post("/api/auth/logout")
+    assert resp.status_code == 200
+    # Cookie cleared in response
+    set_cookie = resp.headers.get("set-cookie", "")
+    assert "clarity_token=" in set_cookie
+    assert "Max-Age=0" in set_cookie or "max-age=0" in set_cookie or "expires=" in set_cookie.lower()
+
+
+async def test_paused_user_cannot_call_protected_endpoints(client: httpx.AsyncClient):
+    """Sanity: a paused user gets the structured 403 from any
+    get_current_user-dependent endpoint, not just /auth/me."""
+    await register_and_login(client, email="paused-protected@example.com")
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        await db.execute(
+            text("UPDATE users SET is_paused = 1 WHERE email = :e"),
+            {"e": "paused-protected@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.get("/api/brands")  # uses get_current_user
+    assert resp.status_code == 403
+    body = resp.json()
+    assert isinstance(body["detail"], dict)
+    assert body["detail"]["code"] == "account_paused"

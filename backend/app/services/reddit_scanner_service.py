@@ -91,7 +91,16 @@ async def validate_subreddit_exists(sub: str) -> bool:
             resp = await client.get(url, headers={"User-Agent": _REDDIT_USER_AGENT})
     except Exception as exc:
         logger.debug("validate_subreddit_exists(%s) network error: %s", cleaned, exc)
-        return True  # fail-open
+        return True  # fail-open on transient errors
+    # 403 means Reddit is blocking us (common from datacenter IPs like Railway).
+    # We can't differentiate "sub doesn't exist" from "Reddit blocked us," so
+    # fail-open and trust the upstream LLM suggestion.
+    if resp.status_code == 403:
+        logger.debug(
+            "validate_subreddit_exists(%s): 403 from Reddit — assuming valid",
+            cleaned,
+        )
+        return True
     if resp.status_code != 200:
         return False
     try:

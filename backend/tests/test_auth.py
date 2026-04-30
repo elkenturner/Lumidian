@@ -741,3 +741,29 @@ async def test_paused_user_cannot_call_protected_endpoints(client: httpx.AsyncCl
     body = resp.json()
     assert isinstance(body["detail"], dict)
     assert body["detail"]["code"] == "account_paused"
+
+
+async def test_auth_me_includes_subscription_trial_end(client: httpx.AsyncClient):
+    """The frontend BillingPausedBanner reads subscription_trial_end from
+    /auth/me to detect 'trial ended' (status=trialing, trial_end in past)."""
+    from datetime import datetime, timedelta, timezone
+
+    await register_and_login(client, email="trial@example.com")
+    trial_end = (datetime.now(timezone.utc) + timedelta(days=3)).replace(microsecond=0)
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        await db.execute(
+            text(
+                "UPDATE users SET subscription_status = 'trialing', "
+                "subscription_trial_end = :te WHERE email = :e"
+            ),
+            {"te": trial_end, "e": "trial@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "subscription_trial_end" in data, f"missing field; got keys: {list(data.keys())}"
+    assert data["subscription_trial_end"] is not None
+    assert data["subscription_status"] == "trialing"

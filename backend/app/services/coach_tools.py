@@ -87,6 +87,64 @@ async def _verify_brand_ownership(db: AsyncSession, user_id: int, brand_id: int)
     return brand
 
 
+from datetime import datetime, timezone, timedelta
+from app.models import Prompt, TrackingRun, User
+
+# Internal-tier → display-name mapping (mirrors billing.py)
+_TIER_DISPLAY = {None: "Free", "basic": "Starter", "starter": "Growth", "pro": "Pro"}
+
+
+@register_tool(
+    name="get_brand_overview",
+    schema={
+        "name": "get_brand_overview",
+        "description": (
+            "Get the brand's identity, configured prompts, and a recent-score snapshot. "
+            "CALL THIS FIRST in nearly every conversation to establish context."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    token_budget=1500,
+)
+async def get_brand_overview(db: AsyncSession, user_id: int, brand_id: int) -> dict:
+    brand = (await db.execute(select(Brand).where(Brand.id == brand_id))).scalar_one()
+    user = (await db.execute(select(User).where(User.id == user_id))).scalar_one()
+
+    # Prompts
+    prompts = (await db.execute(select(Prompt).where(Prompt.brand_id == brand_id))).scalars().all()
+
+    # Latest completed runs ordered most-recent first
+    runs = (await db.execute(
+        select(TrackingRun)
+        .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+        .order_by(TrackingRun.completed_at.desc())
+    )).scalars().all()
+
+    now = datetime.now(timezone.utc)
+
+    def _score_at(cutoff_days: int) -> float | None:
+        cutoff = now - timedelta(days=cutoff_days)
+        for r in runs:
+            if r.completed_at and r.completed_at <= cutoff:
+                return r.overall_score
+        return None
+
+    latest = runs[0] if runs else None
+    return {
+        "brand_name": brand.name,
+        "brand_type": brand.brand_type,
+        "tier": user.subscription_tier,
+        "tier_display": _TIER_DISPLAY.get(user.subscription_tier, "Free"),
+        "website_url": brand.website_url,
+        "prompt_count": len(prompts),
+        "prompts": [{"id": p.id, "text": p.text} for p in prompts],
+        "latest_score": latest.overall_score if latest else None,
+        "score_7d_ago": _score_at(7),
+        "score_30d_ago": _score_at(30),
+        "total_runs": len(runs),
+    }
+
+
 async def dispatch_tool(
     db: AsyncSession,
     *,

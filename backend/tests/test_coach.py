@@ -107,3 +107,28 @@ async def test_dispatch_tool_truncates_oversize_results():
     serialized = json.dumps(result)
     assert len(serialized) <= 50 * 4 + 200, f"Expected truncation, got {len(serialized)} chars"
     assert result.get("_truncated") is True
+
+
+@pytest.mark.asyncio
+async def test_get_brand_overview_returns_expected_shape():
+    user_id = await _create_user("o@example.com")
+    brand = await _create_brand(user_id, "Brand O")
+
+    async with AsyncSessionLocal() as db:
+        # Add a couple of prompts so the list isn't empty
+        from app.models import Prompt
+        for text in ("best CRMs", "top sales tools"):
+            db.add(Prompt(brand_id=brand["id"], text=text, prompt_type="standard"))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_brand_overview", tool_args={})
+
+    assert result["brand_name"] == "Brand O"
+    assert result["brand_type"] in ("standard", "pitch")
+    assert "tier" in result and "tier_display" in result
+    assert result["prompt_count"] == 2
+    assert isinstance(result["prompts"], list) and len(result["prompts"]) == 2
+    assert all(set(p.keys()) == {"id", "text"} for p in result["prompts"])
+    assert result["latest_score"] is None  # no runs yet
+    assert result["total_runs"] == 0

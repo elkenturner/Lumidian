@@ -224,6 +224,55 @@ async def get_score_breakdown(db: AsyncSession, user_id: int, brand_id: int, run
     }
 
 
+@register_tool(
+    name="get_score_trend",
+    schema={
+        "name": "get_score_trend",
+        "description": (
+            "Get the last N completed runs for the brand, with overall and per-model "
+            "scores. Use when the user asks if their score is improving, getting worse, "
+            "or what changed recently. The runs are returned newest-first."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"n": {"type": "integer", "description": "Number of runs (default 10).", "default": 10}},
+        },
+    },
+    token_budget=1500,
+)
+async def get_score_trend(db: AsyncSession, user_id: int, brand_id: int, n: int = 10) -> dict:
+    n = max(1, min(int(n or 10), 30))
+    runs = (await db.execute(
+        select(TrackingRun)
+        .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+        .order_by(TrackingRun.completed_at.desc())
+        .limit(n)
+    )).scalars().all()
+
+    if not runs:
+        return {"runs": [], "note": "No completed runs yet."}
+
+    run_ids = [r.id for r in runs]
+    scores = (await db.execute(
+        select(RunModelScore).where(RunModelScore.tracking_run_id.in_(run_ids))
+    )).scalars().all()
+    by_run: dict[int, dict[str, float]] = {}
+    for s in scores:
+        by_run.setdefault(s.tracking_run_id, {})[s.model] = s.score
+
+    return {
+        "runs": [
+            {
+                "run_id": r.id,
+                "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                "overall_score": r.overall_score,
+                "per_model": by_run.get(r.id, {}),
+            }
+            for r in runs
+        ]
+    }
+
+
 async def dispatch_tool(
     db: AsyncSession,
     *,

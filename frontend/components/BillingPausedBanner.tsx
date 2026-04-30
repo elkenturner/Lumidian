@@ -19,14 +19,14 @@ export default function BillingPausedBanner() {
   const pathname = usePathname();
 
   if (!user) return null;
-  if (pathname === '/settings/billing') return null;
+  if (pathname?.startsWith('/settings/billing')) return null;
 
   const reason = getBillingPausedReason(user);
   if (!reason) return null;
 
   return (
     <div
-      role="status"
+      role="alert"
       className="mx-8 mt-4 mb-0 flex items-center gap-3 rounded-xl border border-[#7f1d1d]/40 bg-[#7f1d1d]/15 px-4 py-3"
     >
       <AlertTriangle size={16} className="shrink-0 text-[var(--danger)]" />

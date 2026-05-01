@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { fadeIn, slideIn } from '@/lib/motion';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
 import { logError } from '@/lib/utils/errors';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -64,13 +64,40 @@ import { AppToast, ToastData } from '@/components/AppToast';
 
 type SettingsTab = 'general' | 'profile' | 'team';
 
+const PROFILE_FIELD_LABELS: Record<string, string> = {
+  company_description: 'Company description',
+  key_stats: 'Key stats',
+  tone_of_voice: 'Tone of voice',
+  what_not_to_say: 'What not to say',
+  target_audience: 'Target audience',
+  approved_language: 'Approved language',
+  publications: 'Publications',
+};
+
+function formatProfileValidationError(d: unknown): string {
+  if (!d || typeof d !== 'object') return 'Validation error';
+  const obj = d as { loc?: unknown[]; msg?: unknown };
+  const rawMsg = typeof obj.msg === 'string' ? obj.msg : 'Validation error';
+  const msg = rawMsg.replace(/^Value error,\s*/, '');
+  const loc = Array.isArray(obj.loc) ? obj.loc : [];
+  // loc is typically ["body", "<field>"] or ["body", "<field>", <index>]
+  const fieldRaw = loc.find((p): p is string => typeof p === 'string' && p !== 'body');
+  if (!fieldRaw) return msg;
+  const fieldLabel = PROFILE_FIELD_LABELS[fieldRaw] ?? fieldRaw;
+  const index = loc.find((p) => typeof p === 'number');
+  const where = typeof index === 'number' ? `${fieldLabel} item ${index + 1}` : fieldLabel;
+  return `${where}: ${msg}`;
+}
+
 // ── Auto-growing textarea ─────────────────────────────────────────────────────
 
-function AutoTextarea({ value, onChange, placeholder, className }: {
+function AutoTextarea({ value, onChange, placeholder, className, maxLength, minRows = 4 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   className?: string;
+  maxLength?: number;
+  minRows?: number;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -79,40 +106,76 @@ function AutoTextarea({ value, onChange, placeholder, className }: {
       ref.current.style.height = ref.current.scrollHeight + 'px';
     }
   }, [value]);
+  const charsUsed = value.length;
+  const showCounter = maxLength !== undefined;
+  const ratio = showCounter ? charsUsed / (maxLength as number) : 0;
+  const counterColor = ratio >= 1
+    ? 'text-[var(--danger)]'
+    : ratio >= 0.85
+      ? 'text-[var(--warning)]'
+      : 'text-[var(--text-faint)]';
   return (
-    <textarea
-      ref={ref}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      rows={4}
-      className={`mobile-input ${className ?? ''}`}
-      style={{ overflow: 'hidden' }}
-    />
+    <div>
+      <textarea
+        ref={ref}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        rows={minRows}
+        maxLength={maxLength}
+        className={`mobile-input ${className ?? ''}`}
+        style={{ overflow: 'hidden' }}
+      />
+      {showCounter && (
+        <div className={`mt-1 text-xs text-right ${counterColor}`}>
+          {charsUsed.toLocaleString()} / {(maxLength as number).toLocaleString()}
+        </div>
+      )}
+    </div>
   );
 }
 
 // ── Editable list ─────────────────────────────────────────────────────────────
 
-function EditableList({
-  items,
-  onChange,
-  placeholder,
-}: {
+type EditableListHandle = { flush: () => string[] };
+
+const EditableList = forwardRef<EditableListHandle, {
   items: string[];
   onChange: (items: string[]) => void;
   placeholder: string;
-}) {
+  maxLength?: number;
+  maxItems?: number;
+}>(function EditableList({ items, onChange, placeholder, maxLength, maxItems = 50 }, ref) {
   const [inputVal, setInputVal] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const atItemCap = items.length >= maxItems;
 
   const addItem = () => {
     const trimmed = inputVal.trim();
     if (!trimmed) return;
+    if (items.length >= maxItems) return;
     onChange([...items, trimmed]);
     setInputVal('');
-    inputRef.current?.focus();
   };
+
+  useImperativeHandle(ref, () => ({
+    flush: (): string[] => {
+      const trimmed = inputVal.trim();
+      if (trimmed && items.length < maxItems) {
+        const next = [...items, trimmed];
+        onChange(next);
+        setInputVal('');
+        return next;
+      }
+      return items;
+    },
+  }), [inputVal, items, onChange, maxItems]);
+
+  const charsUsed = inputVal.length;
+  const showCharCounter = maxLength !== undefined && charsUsed > 0;
+  const overLimit = maxLength !== undefined && charsUsed > maxLength;
+  const hasPendingText = inputVal.trim().length > 0;
 
   return (
     <div className="space-y-2">
@@ -120,12 +183,13 @@ function EditableList({
         {items.map((item, idx) => (
           <span
             key={idx}
-            className="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-md text-xs text-[var(--accent-foreground)] leading-snug"
+            className="inline-flex items-start gap-1.5 pl-2.5 pr-1.5 py-1 bg-[var(--accent)]/10 border border-[var(--accent)]/30 rounded-md text-xs text-[var(--accent-foreground)] leading-snug max-w-full"
           >
-            {item}
+            <span className="break-words whitespace-pre-wrap">{item}</span>
             <button
+              type="button"
               onClick={() => onChange(items.filter((_, i) => i !== idx))}
-              className="shrink-0 text-[var(--accent)]/50 hover:text-[var(--danger)] transition-colors"
+              className="shrink-0 mt-0.5 text-[var(--accent)]/50 hover:text-[var(--danger)] transition-colors"
             >
               <X size={11} />
             </button>
@@ -138,19 +202,36 @@ function EditableList({
           value={inputVal}
           onChange={(e) => setInputVal(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addItem(); } }}
-          placeholder={placeholder}
-          className="mobile-input flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 transition-colors"
+          onBlur={addItem}
+          placeholder={atItemCap ? `Maximum ${maxItems} items reached` : placeholder}
+          maxLength={maxLength}
+          disabled={atItemCap}
+          className="mobile-input flex-1 px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         />
         <button
+          type="button"
           onClick={addItem}
-          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent-muted)] transition-[color,border-color,background-color] duration-150"
+          disabled={atItemCap || !hasPendingText}
+          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent-muted)] transition-[color,border-color,background-color] duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)] disabled:hover:border-[var(--border-subtle)] disabled:hover:bg-[rgba(255,255,255,0.06)]"
         >
           <Plus size={16} />
         </button>
       </div>
+      <div className="flex items-center justify-between text-xs text-[var(--text-faint)] min-h-[16px]">
+        <span>
+          {hasPendingText
+            ? <span className="text-[var(--accent-foreground)]">Press Enter or click + to add</span>
+            : `${items.length} of ${maxItems}`}
+        </span>
+        {showCharCounter && (
+          <span className={overLimit ? 'text-[var(--danger)]' : ''}>
+            {charsUsed.toLocaleString()} / {(maxLength as number).toLocaleString()}
+          </span>
+        )}
+      </div>
     </div>
   );
-}
+});
 
 // ── Completion bar ─────────────────────────────────────────────────────────────
 
@@ -326,6 +407,46 @@ export default function SettingsPage() {
   const [profileSaveError, setProfileSaveError] = useState<string | null>(null);
   const [aiFilling, setAiFilling] = useState(false);
   const [aiFillError, setAiFillError] = useState<string | null>(null);
+
+  // Refs to flush pending typed-but-not-committed input from EditableLists on save
+  const keyStatsListRef = useRef<EditableListHandle>(null);
+  const whatNotToSayListRef = useRef<EditableListHandle>(null);
+  const approvedLanguageListRef = useRef<EditableListHandle>(null);
+
+  const hasUnsavedProfileChanges = useMemo(() => {
+    if (!profile) {
+      // No saved profile loaded — any non-empty content counts as unsaved.
+      return Boolean(
+        companyDescription.trim() ||
+          toneOfVoice.trim() ||
+          targetAudience.trim() ||
+          keyStats.length ||
+          whatNotToSay.length ||
+          approvedLanguage.length ||
+          publications.length,
+      );
+    }
+    const norm = (s: string | null | undefined) => (s ?? '').trim();
+    if (norm(companyDescription) !== norm(profile.company_description)) return true;
+    if (norm(toneOfVoice) !== norm(profile.tone_of_voice)) return true;
+    if (norm(targetAudience) !== norm(profile.target_audience)) return true;
+    if (JSON.stringify(keyStats) !== JSON.stringify(profile.key_stats)) return true;
+    if (JSON.stringify(whatNotToSay) !== JSON.stringify(profile.what_not_to_say)) return true;
+    if (JSON.stringify(approvedLanguage) !== JSON.stringify(profile.approved_language)) return true;
+    if (JSON.stringify(publications) !== JSON.stringify(profile.publications)) return true;
+    return false;
+  }, [profile, companyDescription, toneOfVoice, targetAudience, keyStats, whatNotToSay, approvedLanguage, publications]);
+
+  // Warn before navigating away with unsaved profile changes
+  useEffect(() => {
+    if (!hasUnsavedProfileChanges) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasUnsavedProfileChanges]);
 
   // Account tab state
   const [displayName, setDisplayName] = useState('');
@@ -668,17 +789,27 @@ export default function SettingsPage() {
   }
 
   async function handleProfileSave() {
-    if (!brandId) return;
+    if (!brandId) {
+      setProfileSaveError('Add a brand first before saving its profile.');
+      return;
+    }
     setProfileSaving(true);
     setProfileSaveError(null);
+
+    // Flush any text the user typed into list inputs but didn't press Enter on,
+    // so they don't lose work when clicking Save.
+    const finalKeyStats = keyStatsListRef.current?.flush() ?? keyStats;
+    const finalWhatNotToSay = whatNotToSayListRef.current?.flush() ?? whatNotToSay;
+    const finalApprovedLanguage = approvedLanguageListRef.current?.flush() ?? approvedLanguage;
+
     try {
       const updated = await updateBrandProfile(brandId, {
         company_description: companyDescription,
-        key_stats: keyStats,
+        key_stats: finalKeyStats,
         tone_of_voice: toneOfVoice,
-        what_not_to_say: whatNotToSay,
+        what_not_to_say: finalWhatNotToSay,
         target_audience: targetAudience,
-        approved_language: approvedLanguage,
+        approved_language: finalApprovedLanguage,
         publications,
       });
       setProfile(updated);
@@ -691,10 +822,8 @@ export default function SettingsPage() {
       let msg = 'Failed to save profile. Please try again.';
       if (typeof detail === 'string') {
         msg = detail;
-      } else if (Array.isArray(detail)) {
-        msg = detail
-          .map((d) => (d && typeof d === 'object' && 'msg' in d ? String((d as { msg: unknown }).msg) : 'Validation error'))
-          .join('; ');
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        msg = detail.map(formatProfileValidationError).join('\n');
       }
       setProfileSaveError(msg);
     } finally {
@@ -1115,6 +1244,7 @@ export default function SettingsPage() {
                 value={companyDescription}
                 onChange={setCompanyDescription}
                 placeholder="Describe the company, its products, mission, and what makes it unique…"
+                maxLength={5000}
                 className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
               />
             </SectionCard>
@@ -1125,9 +1255,11 @@ export default function SettingsPage() {
               description="Specific data points and statistics that can be cited in content"
             >
               <EditableList
+                ref={keyStatsListRef}
                 items={keyStats}
                 onChange={setKeyStats}
                 placeholder="Add a stat or claim, then press Enter…"
+                maxLength={1000}
               />
             </SectionCard>
 
@@ -1136,12 +1268,13 @@ export default function SettingsPage() {
               title="Tone of Voice"
               description="How the brand should sound — guides the style of all drafted content"
             >
-              <textarea
+              <AutoTextarea
                 value={toneOfVoice}
-                onChange={(e) => setToneOfVoice(e.target.value)}
+                onChange={setToneOfVoice}
                 placeholder="e.g. Professional but approachable. Confident without being arrogant…"
-                rows={3}
-                className="mobile-input w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
+                minRows={3}
+                maxLength={2000}
+                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
               />
             </SectionCard>
 
@@ -1151,9 +1284,11 @@ export default function SettingsPage() {
               description="Phrases, claims, or topics to avoid — legal or brand restrictions"
             >
               <EditableList
+                ref={whatNotToSayListRef}
                 items={whatNotToSay}
                 onChange={setWhatNotToSay}
                 placeholder="Add a phrase or claim to avoid…"
+                maxLength={1000}
               />
             </SectionCard>
 
@@ -1162,12 +1297,13 @@ export default function SettingsPage() {
               title="Target Audience"
               description="Who the brand is trying to reach — informs framing in drafts"
             >
-              <textarea
+              <AutoTextarea
                 value={targetAudience}
-                onChange={(e) => setTargetAudience(e.target.value)}
+                onChange={setTargetAudience}
                 placeholder="e.g. Healthcare professionals and clinical researchers…"
-                rows={3}
-                className="mobile-input w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
+                minRows={3}
+                maxLength={2000}
+                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
               />
             </SectionCard>
 
@@ -1177,9 +1313,11 @@ export default function SettingsPage() {
               description="Pre-approved phrases, disclaimers, and citations for regulated claims"
             >
               <EditableList
+                ref={approvedLanguageListRef}
                 items={approvedLanguage}
                 onChange={setApprovedLanguage}
                 placeholder="Add an approved phrase or disclaimer…"
+                maxLength={5000}
               />
             </SectionCard>
 
@@ -1192,9 +1330,21 @@ export default function SettingsPage() {
             </SectionCard>
           </div>
 
-          <div className="mt-6 flex items-center justify-end gap-3">
-            {profileSaveError && (
-              <p className="text-xs text-[var(--danger)]">{profileSaveError}</p>
+          {profileSaveError && (
+            <div className="mt-6 px-3 py-2.5 rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10">
+              <p className="text-xs text-[var(--danger)] whitespace-pre-line leading-relaxed">{profileSaveError}</p>
+            </div>
+          )}
+
+          <div className="mt-4 flex items-center justify-end gap-3">
+            {!profileSaving && !profileSaved && hasUnsavedProfileChanges && (
+              <span className="text-xs text-[var(--warning)] flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--warning)]" />
+                Unsaved changes
+              </span>
+            )}
+            {!profileSaving && !profileSaved && !hasUnsavedProfileChanges && profile && (
+              <span className="text-xs text-[var(--text-faint)]">All changes saved</span>
             )}
             <button
               onClick={handleProfileSave}
@@ -1203,7 +1353,7 @@ export default function SettingsPage() {
                 'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                 profileSaved
                   ? 'bg-[var(--success)]/15 text-[var(--success)] border border-[var(--success)]/25'
-                  : 'bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] hover:border-[var(--accent-muted)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_var(--accent-muted)] disabled:opacity-50'
+                  : 'bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] hover:border-[var(--accent-muted)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] hover:shadow-[0_0_24px_var(--accent-muted)] disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
               {profileSaved ? (

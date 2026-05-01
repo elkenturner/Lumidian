@@ -40,6 +40,16 @@ async def _create_brand_direct(db, user_id: int, name: str, prompts: list[str]) 
     return brand.id, prompt_ids
 
 
+async def _set_user_tier(db, user_id: int, tier: str | None) -> None:
+    """Force a user's subscription_tier directly in the DB."""
+    from sqlalchemy import text
+    await db.execute(
+        text("UPDATE users SET subscription_tier = :t WHERE id = :uid"),
+        {"t": tier, "uid": user_id},
+    )
+    await db.commit()
+
+
 async def _insert_drafts(db, brand_id: int, prompt_id: int, count: int,
                           status: str = "approved", source: str = "manual"):
     """Bulk-insert drafts for testing quota checks."""
@@ -248,3 +258,85 @@ async def test_auto_draft_dynamic_combo_cap_fills_queue():
 
     # Dynamic cap: ceil(20 / 4) = 5 per combo.  4 combos × 5 = 20.
     assert len(drafts) == 20, f"Expected 20 but got {len(drafts)}"
+
+
+# ── Per-tier cap enforcement at draft-creation level ────────────────────────
+
+
+async def test_generate_gap_draft_blocks_at_basic_tier_cap():
+    """generate_gap_draft must respect the basic-tier cap (10), not DRAFT_CAP (20).
+    Regression: beseen-health (basic tier) generated 20 drafts because the inner
+    cap check was hardcoded to DRAFT_CAP."""
+    async with AsyncSessionLocal() as db:
+        uid = await _get_or_create_user(db, "basic_cap@test.com")
+        await _set_user_tier(db, uid, "basic")
+        bid, pids = await _create_brand_direct(
+            db, uid, "BasicCapTest", ["basic cap prompt?"]
+        )
+        # Fill the queue to exactly the basic-tier cap (10)
+        await _insert_drafts(db, bid, pids[0], 10, status="draft")
+
+    from app.services.drafting_service import generate_gap_draft
+
+    with patch("app.services.drafting_service.call_claude", new_callable=AsyncMock) as mock:
+        mock.return_value = "irrelevant — should never be called"
+        async with AsyncSessionLocal() as db:
+            with pytest.raises(ValueError, match=r"queue is full|10/10"):
+                await generate_gap_draft(
+                    db=db, brand_id=bid, prompt_id=pids[0], platform="reddit",
+                )
+
+
+async def test_generate_opportunity_draft_blocks_at_basic_tier_cap():
+    """generate_opportunity_draft must respect the per-tier cap.
+    Basic tier cap is 10 — fill to 10 and the next opportunity draft must fail.
+    (Using basic tier exposes the bug; starter cap=20 equals DRAFT_CAP and would mask it.)"""
+    from app.models import ContentOpportunity
+
+    async with AsyncSessionLocal() as db:
+        uid = await _get_or_create_user(db, "opp_cap@test.com")
+        await _set_user_tier(db, uid, "basic")
+        bid, pids = await _create_brand_direct(
+            db, uid, "OppCapTest", ["opp cap prompt?"]
+        )
+        await _insert_drafts(db, bid, pids[0], 10, status="draft")
+        opp = ContentOpportunity(
+            brand_id=bid, prompt_id=pids[0], platform="reddit",
+            thread_url="https://reddit.com/r/test/x", thread_title="test thread",
+            subreddit="test", relevance_score=80.0, status="new",
+        )
+        db.add(opp)
+        await db.commit()
+        await db.refresh(opp)
+        opp_id = opp.id
+
+    from app.services.drafting_service import generate_opportunity_draft
+
+    with patch("app.services.drafting_service.call_claude", new_callable=AsyncMock) as mock:
+        mock.return_value = "irrelevant"
+        async with AsyncSessionLocal() as db:
+            with pytest.raises(ValueError, match=r"queue is full|10/10"):
+                await generate_opportunity_draft(db=db, opportunity_id=opp_id)
+
+
+async def test_store_draft_atomic_recount_uses_tier_cap():
+    """The atomic recount inside _store_draft must compare against the per-tier
+    cap, not DRAFT_CAP. Insert (cap) drafts, then call _store_draft directly —
+    must raise. Regression for the line-430 hardcode."""
+    async with AsyncSessionLocal() as db:
+        uid = await _get_or_create_user(db, "atomic_cap@test.com")
+        await _set_user_tier(db, uid, "basic")
+        bid, pids = await _create_brand_direct(
+            db, uid, "AtomicCapTest", ["atomic cap prompt?"]
+        )
+        await _insert_drafts(db, bid, pids[0], 10, status="draft")
+
+    from app.services.drafting_service import _store_draft
+
+    async with AsyncSessionLocal() as db:
+        with pytest.raises(ValueError, match=r"queue is full|10/10"):
+            await _store_draft(
+                db=db, brand_id=bid, prompt_id=pids[0], platform="reddit",
+                title="t", content_body="b", brief="x",
+                visibility_pct=0.0, estimated_impact=0.0,
+            )

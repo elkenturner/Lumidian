@@ -701,6 +701,12 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
             remaining = min(request.max_gaps, effective_remaining)
         else:
             remaining = request.max_gaps
+
+        # Clamp against the per-tier draft cap so the frontend can't request
+        # more drafts than the user's plan allows. Admins bypass.
+        if not user.is_admin:
+            tier_cap = get_draft_cap(user.subscription_tier, brand.brand_type or "standard")
+            remaining = min(remaining, tier_cap)
     except Exception:
         _state.generating_brands.discard(brand_id)
         raise

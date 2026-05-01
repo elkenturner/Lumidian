@@ -154,6 +154,29 @@ async def _load_publications(db: AsyncSession, brand_id: int) -> list[dict]:
     return _extract_publications(profile) if profile else []
 
 
+async def _load_prohibited_phrases(db: AsyncSession, brand_id: int) -> list[str]:
+    """Load what_not_to_say list for a brand."""
+    result = await db.execute(
+        select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+    )
+    profile: BrandProfile | None = result.scalar_one_or_none()
+    if not profile or not profile.what_not_to_say:
+        return []
+    try:
+        items = json.loads(profile.what_not_to_say)
+        return [str(p).strip() for p in items if isinstance(p, str) and p.strip()]
+    except Exception:
+        return []
+
+
+def _find_prohibited_matches(text: str, prohibited: list[str]) -> list[str]:
+    """Return any prohibited phrases present in text (case-insensitive substring)."""
+    if not prohibited or not text:
+        return []
+    lowered = text.lower()
+    return [p for p in prohibited if p.lower() in lowered]
+
+
 DRAFT_CAP = 20  # default / max cap (pro tier)
 
 TIER_DRAFT_CAPS: dict[str | None, int] = {
@@ -540,11 +563,12 @@ async def generate_gap_draft(
             f"Approve or dismiss existing drafts before generating another."
         )
 
-    profile_context, response_analysis, visibility_pct, estimated_impact = await asyncio.gather(
+    profile_context, response_analysis, visibility_pct, estimated_impact, _publications = await asyncio.gather(
         _load_profile_context(db, brand_id),
         _analyze_responses_for_prompt(db, brand_id, prompt_id),
         _get_prompt_visibility(db, prompt_id),
         _estimate_impact(db, brand_id, prompt_id, platform),
+        _load_publications(db, brand_id),
     )
 
     # Build context about existing drafts so Claude takes a different angle
@@ -748,6 +772,7 @@ async def generate_gap_draft(
         platform_spec=spec,
         opportunity_context=effective_opportunity_context,
         existing_drafts_context=existing_drafts_context,
+        has_publications=bool(_publications),
     )
 
     raw_text = await call_claude(claude_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500))
@@ -774,6 +799,28 @@ async def generate_gap_draft(
             )
             raw_text = (
                 "[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
+            )
+
+    # Brand-safety check: enforce what_not_to_say. One retry on hit, otherwise log.
+    _prohibited = await _load_prohibited_phrases(db, brand_id)
+    _matched = _find_prohibited_matches(raw_text, _prohibited)
+    if _matched:
+        _safe_prompt = (
+            claude_prompt
+            + f"\n\n⚠ BRAND VIOLATION: Your previous output contained forbidden phrases: {_matched}."
+            f" Rewrite WITHOUT any of those phrases or close paraphrases. The 'Do NOT use' rules are absolute."
+        )
+        _safe_raw = await call_claude(_safe_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500))
+        _safe_raw = remove_hedging(_safe_raw)
+        _safe_raw = enforce_x_char_limit(_safe_raw, platform_key)
+        _retry_matched = _find_prohibited_matches(_safe_raw, _prohibited)
+        if not _retry_matched and (brand.name.lower() in _safe_raw.lower() or _reddit_strategy == "restricted"):
+            raw_text = _safe_raw
+        else:
+            logger.warning(
+                "generate_gap_draft: prohibited phrases %s persisted after retry — "
+                "brand_id=%d platform=%s prompt_id=%d",
+                _retry_matched or _matched, brand_id, platform, prompt_id,
             )
 
     title, body = extract_title_and_body(raw_text, platform_key)
@@ -863,6 +910,7 @@ async def generate_opportunity_draft(
         )
 
     profile_context = await _load_profile_context(db, opp.brand_id)
+    _opp_publications = await _load_publications(db, opp.brand_id)
 
     prompt_text = ""
     visibility_pct = 0.0
@@ -916,6 +964,7 @@ async def generate_opportunity_draft(
         response_analysis=response_analysis,
         platform_spec=spec,
         opportunity_context=opportunity_context,
+        has_publications=bool(_opp_publications),
     )
 
     # Use haiku for short reply formats — cheaper and fast enough for short content
@@ -949,6 +998,29 @@ async def generate_opportunity_draft(
                 brand.name, opportunity_id,
             )
             raw_text = "[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
+
+    # Brand-safety check: enforce what_not_to_say. One retry on hit, otherwise log.
+    _prohibited = await _load_prohibited_phrases(db, opp.brand_id)
+    _matched = _find_prohibited_matches(raw_text, _prohibited)
+    if _matched:
+        _safe_prompt = (
+            claude_prompt
+            + f"\n\n⚠ BRAND VIOLATION: Your previous output contained forbidden phrases: {_matched}."
+            f" Rewrite WITHOUT any of those phrases or close paraphrases. The 'Do NOT use' rules are absolute."
+        )
+        _safe_raw = await call_claude(_safe_prompt, max_tokens=max_tokens, model=_opp_model)
+        _safe_raw = remove_hedging(_safe_raw)
+        if platform_key.startswith("x_"):
+            from app.services.drafting import enforce_x_char_limit
+            _safe_raw = enforce_x_char_limit(_safe_raw, platform_key)
+        _retry_matched = _find_prohibited_matches(_safe_raw, _prohibited)
+        if not _retry_matched and (brand.name.lower() in _safe_raw.lower() or promo_strategy == "restricted"):
+            raw_text = _safe_raw
+        else:
+            logger.warning(
+                "generate_opportunity_draft: prohibited phrases %s persisted after retry — opp_id=%d",
+                _retry_matched or _matched, opportunity_id,
+            )
 
     _, body = extract_title_and_body(raw_text, platform_key)
 

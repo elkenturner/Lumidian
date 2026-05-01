@@ -69,7 +69,6 @@ const PROFILE_FIELD_LABELS: Record<string, string> = {
   key_stats: 'Key stats',
   tone_of_voice: 'Tone of voice',
   what_not_to_say: 'What not to say',
-  target_audience: 'Target audience',
   approved_language: 'Approved language',
   publications: 'Publications',
 };
@@ -399,7 +398,6 @@ export default function SettingsPage() {
   const [keyStats, setKeyStats] = useState<string[]>([]);
   const [toneOfVoice, setToneOfVoice] = useState('');
   const [whatNotToSay, setWhatNotToSay] = useState<string[]>([]);
-  const [targetAudience, setTargetAudience] = useState('');
   const [approvedLanguage, setApprovedLanguage] = useState<string[]>([]);
   const [publications, setPublications] = useState<Publication[]>([]);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -419,7 +417,6 @@ export default function SettingsPage() {
       return Boolean(
         companyDescription.trim() ||
           toneOfVoice.trim() ||
-          targetAudience.trim() ||
           keyStats.length ||
           whatNotToSay.length ||
           approvedLanguage.length ||
@@ -429,13 +426,12 @@ export default function SettingsPage() {
     const norm = (s: string | null | undefined) => (s ?? '').trim();
     if (norm(companyDescription) !== norm(profile.company_description)) return true;
     if (norm(toneOfVoice) !== norm(profile.tone_of_voice)) return true;
-    if (norm(targetAudience) !== norm(profile.target_audience)) return true;
     if (JSON.stringify(keyStats) !== JSON.stringify(profile.key_stats)) return true;
     if (JSON.stringify(whatNotToSay) !== JSON.stringify(profile.what_not_to_say)) return true;
     if (JSON.stringify(approvedLanguage) !== JSON.stringify(profile.approved_language)) return true;
     if (JSON.stringify(publications) !== JSON.stringify(profile.publications)) return true;
     return false;
-  }, [profile, companyDescription, toneOfVoice, targetAudience, keyStats, whatNotToSay, approvedLanguage, publications]);
+  }, [profile, companyDescription, toneOfVoice, keyStats, whatNotToSay, approvedLanguage, publications]);
 
   // Warn before navigating away with unsaved profile changes
   useEffect(() => {
@@ -528,7 +524,6 @@ export default function SettingsPage() {
           setKeyStats(prof.key_stats ?? []);
           setToneOfVoice(prof.tone_of_voice ?? '');
           setWhatNotToSay(prof.what_not_to_say ?? []);
-          setTargetAudience(prof.target_audience ?? '');
           setApprovedLanguage(prof.approved_language ?? []);
           setPublications(prof.publications ?? []);
         }
@@ -774,7 +769,6 @@ export default function SettingsPage() {
     try {
       const result = await aiFillProfile(brandId);
       if (result.company_description) setCompanyDescription(result.company_description);
-      if (result.target_audience) setTargetAudience(result.target_audience);
       if (result.tone_of_voice) setToneOfVoice(result.tone_of_voice);
       if (result.key_stats.length > 0) setKeyStats((prev) => {
         const combined = [...prev, ...result.key_stats.filter((s) => !prev.includes(s))];
@@ -808,7 +802,6 @@ export default function SettingsPage() {
         key_stats: finalKeyStats,
         tone_of_voice: toneOfVoice,
         what_not_to_say: finalWhatNotToSay,
-        target_audience: targetAudience,
         approved_language: finalApprovedLanguage,
         publications,
       });
@@ -1289,21 +1282,6 @@ export default function SettingsPage() {
                 onChange={setWhatNotToSay}
                 placeholder="Add a phrase or claim to avoid…"
                 maxLength={1000}
-              />
-            </SectionCard>
-
-            <SectionCard
-              icon={Users}
-              title="Target Audience"
-              description="Who the brand is trying to reach — informs framing in drafts"
-            >
-              <AutoTextarea
-                value={targetAudience}
-                onChange={setTargetAudience}
-                placeholder="e.g. Healthcare professionals and clinical researchers…"
-                minRows={3}
-                maxLength={2000}
-                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
               />
             </SectionCard>
 

@@ -626,8 +626,6 @@ async def suggest_prompts(brand_id: int, db: DbDep, user: CurrentUser):
     if profile:
         if profile.company_description:
             context_parts.append(f"Company description: {profile.company_description}")
-        if profile.target_audience:
-            context_parts.append(f"Target audience: {profile.target_audience}")
 
     # Load competitors
     comp_result = await db.execute(

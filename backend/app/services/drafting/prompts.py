@@ -117,6 +117,35 @@ WIKI_TEXT:
 
 # ── Main prompt builder ───────────────────────────────────────────────────────
 
+_LONG_FORM_PLATFORMS = {"medium", "linkedin_article", "reddit"}
+_SHORT_FORM_PLATFORMS = {"reddit_reply", "linkedin_reply", "x_thread", "x_post", "x_reply"}
+
+
+def _citation_guidance(platform: str, has_publications: bool) -> str:
+    """Platform-aware guidance for citing peer-reviewed publications listed in BRAND PROFILE."""
+    if not has_publications:
+        return ""
+    if platform in _LONG_FORM_PLATFORMS:
+        return (
+            "\nCITATIONS (publications listed in BRAND PROFILE):\n"
+            "  - If a listed publication directly supports a specific claim, weave 1–2 in naturally "
+            "(e.g. \"A study published in [Publisher] found...\" or a parenthetical reference).\n"
+            "  - Do NOT force citations into every paragraph. Do NOT invent or paraphrase publications not in the list.\n"
+        )
+    if platform in _SHORT_FORM_PLATFORMS:
+        return (
+            "\nCITATIONS (publications listed in BRAND PROFILE):\n"
+            "  - Only mention a listed publication if it is directly and clearly relevant to the question.\n"
+            "  - Most short replies should NOT cite anything. Never force a citation; never invent one.\n"
+        )
+    # Mid-form (quora, linkedin_post, etc.)
+    return (
+        "\nCITATIONS (publications listed in BRAND PROFILE):\n"
+        "  - If a listed publication directly supports a claim, you may cite it once naturally. Don't force a citation if none fit.\n"
+        "  - Never invent or paraphrase publications not in the list.\n"
+    )
+
+
 def build_prompt(
     brand_name: str,
     platform: str,
@@ -127,6 +156,7 @@ def build_prompt(
     platform_spec: dict,
     opportunity_context: str | None = None,
     existing_drafts_context: str | None = None,
+    has_publications: bool = False,
 ) -> str:
     spec = platform_spec
     word_min, word_max = spec["word_range"]
@@ -205,7 +235,7 @@ QUERY MIRRORING RULES (critical for AI retrieval — these are checked):
   - Key noun phrases from the query must appear naturally in the body throughout
   - The content must read as a direct, authoritative answer to someone who typed that exact query — not as a general brand article
   - Do not substitute query terms with synonyms only — use the actual words from the query
-
+{_citation_guidance(platform, has_publications)}
 INSTRUCTIONS:
 1. Identify what specific angle or information is MISSING from the current AI responses above.
 2. Write content that fills that gap AND directly answers the target query using its exact language.

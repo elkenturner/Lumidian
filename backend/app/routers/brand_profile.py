@@ -32,7 +32,6 @@ ALL_FIELDS = [
     "key_stats",
     "tone_of_voice",
     "what_not_to_say",
-    "target_audience",
     "approved_language",
     "publications",
 ]
@@ -58,8 +57,6 @@ def _compute_completion(profile: BrandProfile) -> float:
                 filled += 1
         except Exception:
             logger.warning("Failed to parse what_not_to_say for brand_profile %d", profile.id)
-    if profile.target_audience and profile.target_audience.strip():
-        filled += 1
     if profile.approved_language:
         try:
             items = json.loads(profile.approved_language)
@@ -102,7 +99,6 @@ def _profile_to_response(profile: BrandProfile) -> BrandProfileResponse:
         key_stats=_parse_list(profile.key_stats),
         tone_of_voice=profile.tone_of_voice,
         what_not_to_say=_parse_list(profile.what_not_to_say),
-        target_audience=profile.target_audience,
         approved_language=_parse_list(profile.approved_language),
         publications=_parse_publications(profile.publications),
         completion_pct=_compute_completion(profile),
@@ -157,8 +153,6 @@ async def update_brand_profile(brand_id: int, payload: BrandProfileUpdate, db: D
         profile.tone_of_voice = payload.tone_of_voice
     if payload.what_not_to_say is not None:
         profile.what_not_to_say = json.dumps(payload.what_not_to_say)
-    if payload.target_audience is not None:
-        profile.target_audience = payload.target_audience
     if payload.approved_language is not None:
         profile.approved_language = json.dumps(payload.approved_language)
     if payload.publications is not None:
@@ -229,7 +223,6 @@ Website content for brand "{brand.name}":
 Return a JSON object with exactly these keys (use null for anything you cannot determine):
 {{
   "company_description": "2-3 sentence description of what the company does, its products/services, and what makes it unique",
-  "target_audience": "1-2 sentence description of who the primary customers/users are",
   "tone_of_voice": "1-2 sentence description of the brand's communication style and personality",
   "key_stats": ["list", "of", "up to 5 specific facts, numbers, or claims found on the site"]
 }}
@@ -262,7 +255,6 @@ Return ONLY the JSON object, no markdown, no explanation. Never refuse or explai
 
     return AiFillProfileResponse(
         company_description=data.get("company_description") or None,
-        target_audience=data.get("target_audience") or None,
         tone_of_voice=data.get("tone_of_voice") or None,
         key_stats=[s for s in (data.get("key_stats") or []) if isinstance(s, str)],
     )

@@ -39,6 +39,9 @@ async def create_test_db():
     async with engine.begin() as conn:
         import app.models  # noqa: F401 — registers models
         await conn.run_sync(Base.metadata.create_all)
+    # Apply raw-SQL migrations (e.g. rate_limits, processed_webhook_events)
+    from app.database import run_migrations
+    await run_migrations()
     yield
     await engine.dispose()
     try:
@@ -85,6 +88,7 @@ async def clean_tables():
             "brand_content_settings", "account_connections",
             "notifications", "team_members", "password_reset_tokens",
             "system_settings", "brands", "users",
+            "rate_limits",
         ]:
             await db.execute(text(f"DELETE FROM {table}"))
         await db.commit()

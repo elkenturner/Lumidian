@@ -327,3 +327,26 @@ async def test_get_brand_profile_returns_filled_fields():
     assert result["has_profile"] is True
     assert result["company_description"] == "We make CRMs."
     assert result["target_audience"] == "SMB sales teams"
+
+
+def test_build_system_prompt_includes_all_blocks():
+    from app.services.coach_prompt import build_system_prompt
+    prompt = build_system_prompt(brand_name="Acme", tier_display="Free", brand_type="standard")
+    for marker in (
+        "ROLE & MISSION",
+        "WHAT LUMIDIAN DOES",
+        "INTERPRETATION RULES",
+        "COACHING STYLE",
+        "ANTI-PATTERNS",
+        "FEW-SHOT EXAMPLES",
+        "DOMAIN HEURISTICS",
+    ):
+        assert marker in prompt, f"Missing block: {marker}"
+    assert "Acme" in prompt
+    assert "Free" in prompt
+
+
+def test_build_system_prompt_pro_tier_mentions_claude():
+    from app.services.coach_prompt import build_system_prompt
+    prompt = build_system_prompt(brand_name="Acme", tier_display="Pro", brand_type="standard")
+    assert "Claude" in prompt

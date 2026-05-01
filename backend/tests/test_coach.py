@@ -383,3 +383,143 @@ def test_daily_caps_match_spec():
     assert DAILY_CAPS["basic"] == 25
     assert DAILY_CAPS["starter"] == 75
     assert DAILY_CAPS["pro"] == 250
+
+
+from unittest.mock import MagicMock, patch
+
+
+class _FakeStream:
+    """Mimics anthropic.AsyncMessageStreamManager. Yields text deltas, then finalizes."""
+    def __init__(self, text_chunks: list[str], final_message):
+        self._chunks = text_chunks
+        self._final = final_message
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    @property
+    def text_stream(self):
+        async def _gen():
+            for c in self._chunks:
+                yield c
+        return _gen()
+
+    async def get_final_message(self):
+        return self._final
+
+
+def _make_final(stop_reason, content):
+    m = MagicMock()
+    m.stop_reason = stop_reason
+    m.content = content
+    return m
+
+
+def _text_block(t):
+    b = MagicMock()
+    b.type = "text"
+    b.text = t
+    return b
+
+
+def _tool_use_block(name, input_, tool_use_id="t1"):
+    b = MagicMock()
+    b.type = "tool_use"
+    b.name = name
+    b.input = input_
+    b.id = tool_use_id
+    return b
+
+
+@pytest.mark.asyncio
+async def test_run_turn_streams_text_then_done():
+    from app.services import coach_service
+    from sqlalchemy import select
+    from app.models import User
+    user_id = await _create_user("ag@example.com")
+    brand = await _create_brand(user_id, "Brand AG")
+
+    final = _make_final("end_turn", [_text_block("Hello.")])
+    fake_stream = _FakeStream(["Hel", "lo."], final)
+    fake_client = MagicMock()
+    fake_client.messages.stream = MagicMock(return_value=fake_stream)
+
+    events = []
+    async with AsyncSessionLocal() as db:
+        user = (await db.execute(select(User).where(User.id == user_id))).scalar_one()
+        with patch("anthropic.AsyncAnthropic", return_value=fake_client), \
+             patch.object(coach_service, "ANTHROPIC_API_KEY", "test-key"):
+            async for ev in coach_service.run_turn(
+                db=db, user=user, brand_id=brand["id"],
+                messages=[{"role": "user", "content": "hi"}],
+            ):
+                events.append(ev)
+
+    types = [e["type"] for e in events]
+    assert types[0] == "text_delta"
+    assert types[-1] == "done"
+    text = "".join(e["data"]["text"] for e in events if e["type"] == "text_delta")
+    assert text == "Hello."
+
+
+@pytest.mark.asyncio
+async def test_run_turn_dispatches_tool_then_finishes():
+    from app.services import coach_service
+    from sqlalchemy import select
+    from app.models import User
+    user_id = await _create_user("ag2@example.com")
+    brand = await _create_brand(user_id, "Brand AG2")
+
+    stream1 = _FakeStream([], _make_final("tool_use", [_tool_use_block("get_brand_overview", {})]))
+    stream2 = _FakeStream(["Done."], _make_final("end_turn", [_text_block("Done.")]))
+    fake_client = MagicMock()
+    fake_client.messages.stream = MagicMock(side_effect=[stream1, stream2])
+
+    events = []
+    async with AsyncSessionLocal() as db:
+        user = (await db.execute(select(User).where(User.id == user_id))).scalar_one()
+        with patch("anthropic.AsyncAnthropic", return_value=fake_client), \
+             patch.object(coach_service, "ANTHROPIC_API_KEY", "test-key"):
+            async for ev in coach_service.run_turn(
+                db=db, user=user, brand_id=brand["id"],
+                messages=[{"role": "user", "content": "tell me about my brand"}],
+            ):
+                events.append(ev)
+
+    types = [e["type"] for e in events]
+    assert "tool_status" in types
+    assert types[-1] == "done"
+
+
+@pytest.mark.asyncio
+async def test_run_turn_force_ends_after_8_tool_cycles():
+    from app.services import coach_service
+    from sqlalchemy import select
+    from app.models import User
+    user_id = await _create_user("ag3@example.com")
+    brand = await _create_brand(user_id, "Brand AG3")
+
+    def make_stream():
+        return _FakeStream([], _make_final("tool_use", [_tool_use_block("get_brand_overview", {})]))
+
+    fake_client = MagicMock()
+    fake_client.messages.stream = MagicMock(side_effect=lambda **kw: make_stream())
+
+    events = []
+    async with AsyncSessionLocal() as db:
+        user = (await db.execute(select(User).where(User.id == user_id))).scalar_one()
+        with patch("anthropic.AsyncAnthropic", return_value=fake_client), \
+             patch.object(coach_service, "ANTHROPIC_API_KEY", "test-key"):
+            async for ev in coach_service.run_turn(
+                db=db, user=user, brand_id=brand["id"],
+                messages=[{"role": "user", "content": "loop please"}],
+            ):
+                events.append(ev)
+
+    assert events[-1]["type"] == "done"
+    text = "".join(e["data"]["text"] for e in events if e["type"] == "text_delta")
+    assert any(s in text.lower() for s in ("trouble", "rephrase", "progress")), \
+        f"Expected an apology message, got: {text!r}"

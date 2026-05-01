@@ -393,7 +393,7 @@ function BrandCard({
 export default function AdminUserDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const { user: authUser, loading: authLoading, refresh } = useAuth();
+  const { user: authUser, loading: authLoading } = useAuth();
 
   const rawId = params.userId as string;
   const userId = Number(rawId);
@@ -518,8 +518,9 @@ export default function AdminUserDetailPage() {
       sessionStorage.setItem('admin_restore_token', result.admin_token);
       // Set cookie via Next.js Route Handler (reliable, bypasses rewrite proxy)
       await swapSessionToken(result.target_token);
-      await refresh();
-      router.push('/dashboard');
+      // Full reload — resets BrandContext, api.ts _cache, and all module
+      // state so the dashboard fetches fresh data as the impersonated user.
+      window.location.href = '/dashboard';
     } catch (err) {
       logError(err, 'AdminUserDetail: impersonate');
       setToast({ message: 'Failed to impersonate user.', type: 'error' });

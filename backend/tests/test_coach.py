@@ -292,3 +292,38 @@ async def test_get_drafts_summary_returns_counts_and_recent():
     assert result["counts"]["posted"] == 1
     assert len(result["recent"]) <= 5
     assert result["link"] == f"/content/{brand['id']}"
+
+
+@pytest.mark.asyncio
+async def test_get_brand_profile_returns_nulls_when_missing():
+    user_id = await _create_user("bp@example.com")
+    brand = await _create_brand(user_id, "Brand BP")
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_brand_profile", tool_args={})
+
+    assert "company_description" in result
+    assert result["has_profile"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_brand_profile_returns_filled_fields():
+    user_id = await _create_user("bp2@example.com")
+    brand = await _create_brand(user_id, "Brand BP2")
+
+    async with AsyncSessionLocal() as db:
+        from app.models import BrandProfile
+        db.add(BrandProfile(
+            brand_id=brand["id"],
+            company_description="We make CRMs.",
+            target_audience="SMB sales teams",
+            tone_of_voice="friendly",
+        ))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_brand_profile", tool_args={})
+
+    assert result["has_profile"] is True
+    assert result["company_description"] == "We make CRMs."
+    assert result["target_audience"] == "SMB sales teams"

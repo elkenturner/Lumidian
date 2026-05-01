@@ -476,3 +476,45 @@ async def get_content_gaps(db: AsyncSession, user_id: int, brand_id: int, n: int
             for g in gaps
         ]
     }
+
+
+from app.models import BrandProfile
+
+
+@register_tool(
+    name="get_brand_profile",
+    schema={
+        "name": "get_brand_profile",
+        "description": (
+            "Get the brand's profile fields (company description, target audience, "
+            "tone of voice, what-not-to-say, publications). Use when you need this "
+            "context to give content advice. Many fields may be null."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    token_budget=1500,
+)
+async def get_brand_profile(db: AsyncSession, user_id: int, brand_id: int) -> dict:
+    profile = (await db.execute(
+        select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+    )).scalar_one_or_none()
+    if profile is None:
+        return {
+            "has_profile": False,
+            "company_description": None,
+            "target_audience": None,
+            "tone_of_voice": None,
+            "what_not_to_say": None,
+            "publications": None,
+            "note": "No brand profile filled in yet — recommend the user fill it in via the Brand Profile tab in Settings.",
+        }
+    return {
+        "has_profile": True,
+        "company_description": profile.company_description,
+        "target_audience": profile.target_audience,
+        "tone_of_voice": profile.tone_of_voice,
+        "what_not_to_say": profile.what_not_to_say,
+        "publications": json.loads(profile.publications) if profile.publications else None,
+        "approved_language": json.loads(profile.approved_language) if profile.approved_language else None,
+        "internal_brand_context": profile.internal_brand_context,
+    }

@@ -540,7 +540,7 @@ function DraftExpansionRow({
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
-            className="flex items-center gap-1 text-[10px] text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors"
+            className="flex items-center gap-1 text-[10px] text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors capitalize"
           >
             <ExternalLink size={10} />
             View on {draft.platform}

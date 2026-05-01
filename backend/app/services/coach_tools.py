@@ -385,3 +385,136 @@ async def get_competitor_comparison(db: AsyncSession, user_id: int, brand_id: in
         "brand_mention_rate": brand_rate,
         "competitors": out,
     }
+
+
+from app.models import ContentDraft, ContentGap
+
+
+@register_tool(
+    name="get_drafts_summary",
+    schema={
+        "name": "get_drafts_summary",
+        "description": (
+            "Summary of the brand's content drafts: counts per status and the "
+            "5 most recently created drafts. Includes a deep link to the content "
+            "page so you can point the user there."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    token_budget=1500,
+)
+async def get_drafts_summary(db: AsyncSession, user_id: int, brand_id: int) -> dict:
+    drafts = (await db.execute(
+        select(ContentDraft).where(ContentDraft.brand_id == brand_id).order_by(ContentDraft.id.desc())
+    )).scalars().all()
+
+    counts = {"draft": 0, "approved": 0, "posted": 0, "failed": 0}
+    for d in drafts:
+        if d.status in counts:
+            counts[d.status] += 1
+
+    return {
+        "counts": counts,
+        "recent": [
+            {"id": d.id, "title": d.title, "platform": d.platform, "status": d.status}
+            for d in drafts[:5]
+        ],
+        "link": f"/content/{brand_id}",
+    }
+
+
+@register_tool(
+    name="get_content_gaps",
+    schema={
+        "name": "get_content_gaps",
+        "description": (
+            "Get the top N content gaps for the brand, sorted by severity. "
+            "Each gap is a (prompt, model) pair where the brand is missing AND "
+            "competitors are present. Use when the user asks 'what should I do' "
+            "or 'where am I weak'."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"n": {"type": "integer", "default": 10}},
+        },
+    },
+    token_budget=2500,
+)
+async def get_content_gaps(db: AsyncSession, user_id: int, brand_id: int, n: int = 10) -> dict:
+    n = max(1, min(int(n or 10), 25))
+    gaps = (await db.execute(
+        select(ContentGap)
+        .where(ContentGap.brand_id == brand_id)
+        .order_by(ContentGap.severity_score.desc())
+        .limit(n)
+    )).scalars().all()
+    if not gaps:
+        return {"gaps": [], "note": "No gaps detected yet — gaps are computed after a tracking run."}
+
+    prompt_ids = {g.prompt_id for g in gaps}
+    prompts_map = {p.id: p.text for p in (await db.execute(select(Prompt).where(Prompt.id.in_(prompt_ids)))).scalars().all()}
+
+    def _parse_json(val: str | None, default):
+        if not val:
+            return default
+        try:
+            return json.loads(val)
+        except (ValueError, TypeError):
+            return default
+
+    return {
+        "gaps": [
+            {
+                "prompt_id": g.prompt_id,
+                "prompt_text": prompts_map.get(g.prompt_id, ""),
+                "model": g.model,
+                "severity_score": g.severity_score,
+                "opportunity_score": g.opportunity_score,
+                "platforms_lacking": _parse_json(g.platforms_lacking, []),
+                "competitor_mentions": _parse_json(g.competitor_mentions, [])[:5],
+            }
+            for g in gaps
+        ]
+    }
+
+
+from app.models import BrandProfile
+
+
+@register_tool(
+    name="get_brand_profile",
+    schema={
+        "name": "get_brand_profile",
+        "description": (
+            "Get the brand's profile fields (company description, target audience, "
+            "tone of voice, what-not-to-say, publications). Use when you need this "
+            "context to give content advice. Many fields may be null."
+        ),
+        "input_schema": {"type": "object", "properties": {}},
+    },
+    token_budget=1500,
+)
+async def get_brand_profile(db: AsyncSession, user_id: int, brand_id: int) -> dict:
+    profile = (await db.execute(
+        select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+    )).scalar_one_or_none()
+    if profile is None:
+        return {
+            "has_profile": False,
+            "company_description": None,
+            "target_audience": None,
+            "tone_of_voice": None,
+            "what_not_to_say": None,
+            "publications": None,
+            "note": "No brand profile filled in yet — recommend the user fill it in via the Brand Profile tab in Settings.",
+        }
+    return {
+        "has_profile": True,
+        "company_description": profile.company_description,
+        "target_audience": profile.target_audience,
+        "tone_of_voice": profile.tone_of_voice,
+        "what_not_to_say": profile.what_not_to_say,
+        "publications": json.loads(profile.publications) if profile.publications else None,
+        "approved_language": json.loads(profile.approved_language) if profile.approved_language else None,
+        "internal_brand_context": profile.internal_brand_context,
+    }

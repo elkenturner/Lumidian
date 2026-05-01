@@ -636,3 +636,134 @@ async def test_resend_verification_no_enumeration(client: httpx.AsyncClient):
     """Resend for unknown email returns 200 (no enumeration)."""
     resp = await client.post("/api/auth/resend-verification", json={"email": "nobody@example.com"})
     assert resp.status_code == 200
+
+
+# ── Paused account ────────────────────────────────────────────────────────────
+
+async def test_paused_user_gets_structured_403(client: httpx.AsyncClient):
+    """Paused users hit /auth/me with a structured detail object so the
+    frontend can detect this case via a stable code, not a brittle string match."""
+    await register_and_login(client, email="paused@example.com")
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        await db.execute(
+            text("UPDATE users SET is_paused = 1 WHERE email = :e"),
+            {"e": "paused@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 403
+    body = resp.json()
+    assert isinstance(body["detail"], dict), f"detail should be dict, got: {body['detail']}"
+    assert body["detail"]["code"] == "account_paused"
+    assert "paused" in body["detail"]["message"].lower()
+
+
+async def test_paused_user_unverified_dep_gets_structured_403(client: httpx.AsyncClient):
+    """The allow_unverified dependency is used by /auth/me and should also
+    return the structured paused error so the same frontend handler works.
+
+    We exercise the AllowUnverifiedUser dependency specifically by logging in
+    with a verified account (to get a session cookie), then flipping
+    email_verified back to 0 and is_paused to 1 in the DB.  The dep allows
+    unverified users through but must still block paused ones.
+    """
+    # register_and_login gives us a valid session cookie
+    await register_and_login(client, email="paused-unverified@example.com")
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        # Simulate an unverified-but-paused account: flip both flags
+        await db.execute(
+            text("UPDATE users SET is_paused = 1, email_verified = 0 WHERE email = :e"),
+            {"e": "paused-unverified@example.com"},
+        )
+        await db.commit()
+
+    # /auth/me uses AllowUnverifiedUser — should return structured 403 for paused
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 403
+    body = resp.json()
+    assert isinstance(body["detail"], dict)
+    assert body["detail"]["code"] == "account_paused"
+
+
+async def test_paused_admin_not_blocked(client: httpx.AsyncClient):
+    """Admin users bypass the paused 403 check entirely."""
+    await register_and_login(client, email="paused-admin@example.com")
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        await db.execute(
+            text("UPDATE users SET is_paused = 1, is_admin = 1 WHERE email = :e"),
+            {"e": "paused-admin@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 200
+    assert resp.json()["email"] == "paused-admin@example.com"
+
+
+async def test_paused_user_can_still_logout(client: httpx.AsyncClient):
+    """Logout endpoint must work for paused users — it doesn't depend on
+    get_current_user, but this test guards against a future regression."""
+    await register_and_login(client, email="paused-logout@example.com")
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        await db.execute(
+            text("UPDATE users SET is_paused = 1 WHERE email = :e"),
+            {"e": "paused-logout@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.post("/api/auth/logout")
+    assert resp.status_code == 200
+    # Cookie cleared in response
+    set_cookie = resp.headers.get("set-cookie", "")
+    assert "clarity_token=" in set_cookie
+    assert "Max-Age=0" in set_cookie or "max-age=0" in set_cookie or "expires=" in set_cookie.lower()
+
+
+async def test_paused_user_cannot_call_protected_endpoints(client: httpx.AsyncClient):
+    """Sanity: a paused user gets the structured 403 from any
+    get_current_user-dependent endpoint, not just /auth/me."""
+    await register_and_login(client, email="paused-protected@example.com")
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        await db.execute(
+            text("UPDATE users SET is_paused = 1 WHERE email = :e"),
+            {"e": "paused-protected@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.get("/api/brands")  # uses get_current_user
+    assert resp.status_code == 403
+    body = resp.json()
+    assert isinstance(body["detail"], dict)
+    assert body["detail"]["code"] == "account_paused"
+
+
+async def test_auth_me_includes_subscription_trial_end(client: httpx.AsyncClient):
+    """The frontend BillingPausedBanner reads subscription_trial_end from
+    /auth/me to detect 'trial ended' (status=trialing, trial_end in past)."""
+    from datetime import datetime, timedelta, timezone
+
+    await register_and_login(client, email="trial@example.com")
+    trial_end = (datetime.now(timezone.utc) + timedelta(days=3)).replace(microsecond=0)
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import text
+        await db.execute(
+            text(
+                "UPDATE users SET subscription_status = 'trialing', "
+                "subscription_trial_end = :te WHERE email = :e"
+            ),
+            {"te": trial_end, "e": "trial@example.com"},
+        )
+        await db.commit()
+
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "subscription_trial_end" in data, f"missing field; got keys: {list(data.keys())}"
+    assert data["subscription_trial_end"] is not None
+    assert data["subscription_status"] == "trialing"

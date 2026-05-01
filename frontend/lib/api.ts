@@ -10,26 +10,40 @@ const api = axios.create({
   timeout: 30_000,
 });
 
-// ── 401 response interceptor ─────────────────────────────────────────────────
-// When a session expires, redirect to /login automatically.
-// Skip redirect for /auth/me (AuthContext handles it) and /auth/logout (expected).
+// ── Response interceptor: 401 (session) and 403 (paused account) ─────────────
+// 401: redirect to /login on session expiry. Skip for /auth/me (AuthContext
+//      owns that flow) and /auth/logout (expected to fail when not logged in).
+// 403 with detail.code === 'account_paused': redirect to /account-paused.
+//      Skip if already on that page (prevents redirect loop) or if the failing
+//      request was /auth/logout (so the paused page can still log the user out).
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (
-      error?.response?.status === 401 &&
-      typeof window !== 'undefined'
-    ) {
-      const url: string = error.config?.url ?? '';
-      const isAuthMe = url.includes('/auth/me');
-      const isAuthLogout = url.includes('/auth/logout');
+    if (typeof window === 'undefined') return Promise.reject(error);
 
+    const status: number | undefined = error?.response?.status;
+    const url: string = error.config?.url ?? '';
+    const isAuthMe = url.includes('/auth/me');
+    const isAuthLogout = url.includes('/auth/logout');
+
+    if (status === 403) {
+      const detail = error?.response?.data?.detail;
+      const code = detail && typeof detail === 'object' ? detail.code : null;
+      if (
+        code === 'account_paused' &&
+        !isAuthLogout &&
+        window.location.pathname !== '/account-paused'
+      ) {
+        window.location.href = '/account-paused';
+      }
+    } else if (status === 401) {
       if (!isAuthMe && !isAuthLogout) {
         // Clear the JS-readable session cookie so middleware stops treating user as logged-in
         document.cookie = 'clarity_session=; path=/; max-age=0';
         window.location.href = '/login';
       }
     }
+
     return Promise.reject(error);
   },
 );
@@ -885,6 +899,7 @@ export interface AuthUser {
   name: string | null;
   subscription_tier: 'basic' | 'starter' | 'pro' | null;
   subscription_status: string | null;
+  subscription_trial_end: string | null;
   is_admin: boolean;
   prompt_limit: number;
   totp_enabled: boolean;

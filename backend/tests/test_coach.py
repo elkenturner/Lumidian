@@ -231,3 +231,155 @@ async def test_get_competitor_comparison_returns_head_to_head():
     assert result["brand_mention_rate"] == 50.0     # 1/2
     # Head-to-head: competitor wins on this prompt
     assert competitors[0]["wins_on_prompts"] >= 1
+
+
+@pytest.mark.asyncio
+async def test_get_content_gaps_returns_top_by_severity():
+    user_id = await _create_user("cg@example.com")
+    brand = await _create_brand(user_id, "Brand CG")
+
+    async with AsyncSessionLocal() as db:
+        from app.models import Prompt, TrackingRun, ContentGap
+        prompt = Prompt(brand_id=brand["id"], text="best CRMs", prompt_type="standard")
+        db.add(prompt)
+        await db.flush()
+        run = TrackingRun(brand_id=brand["id"], status="completed")
+        db.add(run)
+        await db.flush()
+        for sev, model in [(0.9, "perplexity"), (0.4, "gemini"), (0.6, "perplexity")]:
+            db.add(ContentGap(
+                brand_id=brand["id"],
+                prompt_id=prompt.id,
+                tracking_run_id=run.id,
+                model=model,
+                severity_score=sev,
+                opportunity_score=0.5,
+                gap_score=sev,
+                competitor_mentions=json.dumps([]),
+                platforms_lacking=json.dumps(["reddit"]),
+                quora_questions=json.dumps([]),
+            ))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_content_gaps", tool_args={"n": 2})
+
+    assert len(result["gaps"]) == 2
+    # Sorted by severity descending
+    assert result["gaps"][0]["severity_score"] >= result["gaps"][1]["severity_score"]
+    assert result["gaps"][0]["prompt_text"] == "best CRMs"
+
+
+@pytest.mark.asyncio
+async def test_get_drafts_summary_returns_counts_and_recent():
+    user_id = await _create_user("ds@example.com")
+    brand = await _create_brand(user_id, "Brand DS")
+
+    async with AsyncSessionLocal() as db:
+        from app.models import Prompt, ContentDraft
+        prompt = Prompt(brand_id=brand["id"], text="best CRMs", prompt_type="standard")
+        db.add(prompt)
+        await db.flush()
+        for status in ("draft", "draft", "approved", "posted"):
+            db.add(ContentDraft(brand_id=brand["id"], prompt_id=prompt.id, platform="reddit", status=status, title=f"t-{status}", content_text="..."))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_drafts_summary", tool_args={})
+
+    assert result["counts"]["draft"] == 2
+    assert result["counts"]["approved"] == 1
+    assert result["counts"]["posted"] == 1
+    assert len(result["recent"]) <= 5
+    assert result["link"] == f"/content/{brand['id']}"
+
+
+@pytest.mark.asyncio
+async def test_get_brand_profile_returns_nulls_when_missing():
+    user_id = await _create_user("bp@example.com")
+    brand = await _create_brand(user_id, "Brand BP")
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_brand_profile", tool_args={})
+
+    assert "company_description" in result
+    assert result["has_profile"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_brand_profile_returns_filled_fields():
+    user_id = await _create_user("bp2@example.com")
+    brand = await _create_brand(user_id, "Brand BP2")
+
+    async with AsyncSessionLocal() as db:
+        from app.models import BrandProfile
+        db.add(BrandProfile(
+            brand_id=brand["id"],
+            company_description="We make CRMs.",
+            target_audience="SMB sales teams",
+            tone_of_voice="friendly",
+        ))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_brand_profile", tool_args={})
+
+    assert result["has_profile"] is True
+    assert result["company_description"] == "We make CRMs."
+    assert result["target_audience"] == "SMB sales teams"
+
+
+def test_build_system_prompt_includes_all_blocks():
+    from app.services.coach_prompt import build_system_prompt
+    prompt = build_system_prompt(brand_name="Acme", tier_display="Free", brand_type="standard")
+    for marker in (
+        "ROLE & MISSION",
+        "WHAT LUMIDIAN DOES",
+        "INTERPRETATION RULES",
+        "COACHING STYLE",
+        "ANTI-PATTERNS",
+        "FEW-SHOT EXAMPLES",
+        "DOMAIN HEURISTICS",
+    ):
+        assert marker in prompt, f"Missing block: {marker}"
+    assert "Acme" in prompt
+    assert "Free" in prompt
+
+
+def test_build_system_prompt_pro_tier_mentions_claude():
+    from app.services.coach_prompt import build_system_prompt
+    prompt = build_system_prompt(brand_name="Acme", tier_display="Pro", brand_type="standard")
+    assert "Claude" in prompt
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_enforces_tier_caps():
+    from app.services.coach_rate_limit import check_and_increment, get_usage, DAILY_CAPS
+
+    user_id = await _create_user("rl@example.com")
+    # Default tier is None → "Free" → 5/day
+    async with AsyncSessionLocal() as db:
+        for i in range(5):
+            ok, used, limit = await check_and_increment(db, user_id=user_id, tier=None)
+            assert ok is True, f"Should be allowed at {i + 1}/{limit}"
+            assert used == i + 1
+            assert limit == DAILY_CAPS[None]
+
+        # 6th must be blocked
+        ok, used, limit = await check_and_increment(db, user_id=user_id, tier=None)
+        assert ok is False
+        assert used == 5
+        assert limit == 5
+
+    async with AsyncSessionLocal() as db:
+        usage = await get_usage(db, user_id=user_id, tier=None)
+    assert usage["used"] == 5
+    assert usage["limit"] == 5
+
+
+def test_daily_caps_match_spec():
+    from app.services.coach_rate_limit import DAILY_CAPS
+    assert DAILY_CAPS[None] == 5
+    assert DAILY_CAPS["basic"] == 25
+    assert DAILY_CAPS["starter"] == 75
+    assert DAILY_CAPS["pro"] == 250

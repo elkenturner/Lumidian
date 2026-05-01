@@ -25,6 +25,11 @@ os.environ["ENVIRONMENT"] = "development"
 os.environ["ADMIN_EMAILS"] = "admin@test.com"
 os.environ["STRIPE_SECRET_KEY"] = "sk_test_placeholder"
 os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test_placeholder"
+# Force email service into console-mode so tests never call the real Resend API.
+# Without this, every test that registers a user blocks ~5s on a real HTTPS call
+# (and sends real verification emails to fake test addresses).
+os.environ["RESEND_API_KEY"] = ""
+os.environ["SMTP_PASS"] = ""
 # Prevent auto-seeding admin user during tests (no ADMIN_PASSWORD set)
 
 # App imports after env vars are configured
@@ -115,8 +120,15 @@ async def client():
             "app.services.auth_seeder.seed_admin_user",
             new_callable=lambda: lambda: AsyncMock(return_value=None),
         ),
-        # Mock email background sender to prevent dangling async tasks
+        # Mock email senders to prevent dangling async tasks AND real outbound HTTP.
+        # send_email_awaited is used for blocking sends (registration verification, password
+        # reset) — left unmocked, it would call the Resend API and tie each test up for ~5s.
         patch("app.services.email_service.send_email_background"),
+        patch("app.services.email_service.send_email_awaited", new=AsyncMock(return_value=True)),
+        # log_event opens its own session and contends with the request's session
+        # for the SQLite write lock. With the default 5s busy_timeout this adds
+        # ~5s to every endpoint that logs an analytics event. Skip it in tests.
+        patch("app.services.analytics_service.log_event", new=AsyncMock(return_value=None)),
     ):
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),

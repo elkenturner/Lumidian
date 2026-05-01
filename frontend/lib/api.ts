@@ -1520,3 +1520,10 @@ export async function getPromptTimeline(brandId: number, promptId: number, days?
 export async function getPromptDetail(brandId: number, promptId: number): Promise<PromptDetailData> {
   return dedupedGet<PromptDetailData>(`/results/${brandId}/prompt/${promptId}/detail`);
 }
+
+// ── AI Visibility Coach ────────────────────────────────────────────────────────
+
+export async function getCoachUsage(brandId: number): Promise<{ used: number; limit: number; resets_at: string }> {
+  const { data } = await api.get<{ used: number; limit: number; resets_at: string }>(`/coach/${brandId}/usage`);
+  return data;
+}

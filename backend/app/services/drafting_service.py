@@ -171,6 +171,24 @@ def get_draft_cap(subscription_tier: str | None = None, brand_type: str = "stand
     return TIER_DRAFT_CAPS.get(subscription_tier, 5)
 
 
+async def _resolve_brand_draft_cap(db: AsyncSession, brand_id: int) -> int:
+    """Resolve the per-tier draft cap for a brand by loading its owner.
+    Falls back to the free-tier cap if brand or owner can't be loaded."""
+    from app.models import User as _User
+
+    row = (
+        await db.execute(
+            select(Brand, _User)
+            .join(_User, Brand.user_id == _User.id)
+            .where(Brand.id == brand_id)
+        )
+    ).first()
+    if row is None:
+        return get_draft_cap(None, "standard")
+    brand, user = row
+    return get_draft_cap(user.subscription_tier, brand.brand_type or "standard")
+
+
 async def _get_existing_drafts_for_prompt(
     db: AsyncSession, brand_id: int, prompt_id: int, platform: str
 ) -> list[ContentDraft]:
@@ -421,15 +439,16 @@ async def _store_draft(
 
     # Final atomic recount immediately before INSERT — catches concurrent requests
     # that both passed the earlier cap check before either committed.
+    cap = await _resolve_brand_draft_cap(db, brand_id)
     final_count_result = await db.execute(
         select(sqlfunc.count(ContentDraft.id)).where(
             ContentDraft.brand_id == brand_id,
             ContentDraft.status == "draft",
         )
     )
-    if final_count_result.scalar_one() >= DRAFT_CAP:
+    if final_count_result.scalar_one() >= cap:
         raise ValueError(
-            f"Draft queue is full ({DRAFT_CAP}/{DRAFT_CAP}). "
+            f"Draft queue is full ({cap}/{cap}). "
             "Another draft was just created — try again after approving or dismissing one."
         )
 
@@ -520,11 +539,12 @@ async def generate_gap_draft(
     if prompt is None:
         raise ValueError(f"Prompt {prompt_id} not found for brand {brand_id}")
 
-    # Check draft cap before generating
+    # Check draft cap before generating (per-tier, not the hardcoded max)
+    cap = await _resolve_brand_draft_cap(db, brand_id)
     current_draft_count = await _count_drafts_by_status(db, brand_id, "draft")
-    if current_draft_count >= DRAFT_CAP:
+    if current_draft_count >= cap:
         raise ValueError(
-            f"Draft queue is full ({DRAFT_CAP}/{DRAFT_CAP}). "
+            f"Draft queue is full ({cap}/{cap}). "
             f"Approve or dismiss existing drafts before generating new ones."
         )
 
@@ -848,7 +868,8 @@ async def generate_opportunity_draft(
     if brand is None:
         raise ValueError(f"Brand {opp.brand_id} not found")
 
-    # Enforce DRAFT_CAP — opportunity drafts count toward the same queue
+    # Enforce per-tier draft cap — opportunity drafts count toward the same queue
+    cap = await _resolve_brand_draft_cap(db, opp.brand_id)
     draft_count_result = await db.execute(
         select(sqlfunc.count(ContentDraft.id)).where(
             ContentDraft.brand_id == opp.brand_id,
@@ -856,9 +877,9 @@ async def generate_opportunity_draft(
         )
     )
     draft_count = draft_count_result.scalar_one()
-    if draft_count >= DRAFT_CAP:
+    if draft_count >= cap:
         raise ValueError(
-            f"Draft queue is full ({DRAFT_CAP}/{DRAFT_CAP}). "
+            f"Draft queue is full ({cap}/{cap}). "
             "Approve or dismiss existing drafts before creating new ones."
         )
 

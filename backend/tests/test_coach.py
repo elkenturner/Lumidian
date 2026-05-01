@@ -523,3 +523,73 @@ async def test_run_turn_force_ends_after_8_tool_cycles():
     text = "".join(e["data"]["text"] for e in events if e["type"] == "text_delta")
     assert any(s in text.lower() for s in ("trouble", "rephrase", "progress")), \
         f"Expected an apology message, got: {text!r}"
+
+
+# ── HTTP endpoint tests ───────────────────────────────────────────────────────
+
+async def _create_pitch_brand(client, name: str) -> dict:
+    """Create a pitch brand (allowed on free tier)."""
+    resp = await client.post(
+        "/api/brands",
+        json={
+            "name": name,
+            "brand_type": "pitch",
+            "website_url": "https://example.com",
+            "prompts": ["What are the best tools for X?"],
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()
+
+
+@pytest.mark.asyncio
+async def test_usage_endpoint_returns_zero_for_fresh_user(client):
+    from tests.conftest import register_and_login
+    await register_and_login(client, "u@example.com", "PassU12345!", subscription_tier=None)
+    brand = await _create_pitch_brand(client, "Brand U")
+    resp = await client.get(f"/api/coach/{brand['id']}/usage")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["used"] == 0
+    assert body["limit"] == 5
+    assert "resets_at" in body
+
+
+@pytest.mark.asyncio
+async def test_usage_endpoint_returns_404_for_other_users_brand(client):
+    from tests.conftest import register_and_login
+    # User A creates a brand
+    await register_and_login(client, "v@example.com", "PassV12345!", subscription_tier=None)
+    other_brand = await _create_pitch_brand(client, "Other Brand")
+    # Logout (clear cookies) and log in as user B
+    client.cookies.clear()
+    await register_and_login(client, "w@example.com", "PassW12345!", subscription_tier=None)
+    resp = await client.get(f"/api/coach/{other_brand['id']}/usage")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_message_endpoint_429_when_limit_reached(client):
+    """Pre-fill the rate limit, then call message — should 429 before any LLM call."""
+    from tests.conftest import register_and_login
+    from app.services.coach_rate_limit import check_and_increment
+    await register_and_login(client, "x@example.com", "PassX12345!", subscription_tier=None)
+    brand = await _create_pitch_brand(client, "Brand X")
+
+    # Bump the counter to the cap directly via the rate limiter
+    # We need the user_id; fetch it from /auth/me
+    me = await client.get("/api/auth/me")
+    user_id = me.json()["id"]
+
+    async with AsyncSessionLocal() as db:
+        for _ in range(5):
+            await check_and_increment(db, user_id=user_id, tier=None)
+
+    resp = await client.post(
+        f"/api/coach/{brand['id']}/message",
+        json={"messages": [{"role": "user", "content": "hi"}]},
+    )
+    assert resp.status_code == 429
+    detail = resp.json()["detail"]
+    assert detail["limit"] == 5
+    assert detail["used"] == 5

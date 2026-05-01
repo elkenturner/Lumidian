@@ -13,7 +13,7 @@ import {
   Customized,
 } from 'recharts';
 import { format } from 'date-fns';
-import { ChevronDown, X } from 'lucide-react';
+import { ChevronDown, X, ExternalLink } from 'lucide-react';
 import { MODEL_ORDER, getModelConfig } from '@/lib/constants/models';
 import { parseUTCISO } from '@/lib/utils/formatting';
 import type { PromptTimelinePoint, ContentEventItem, PromptDraftSnapshot } from '@/lib/api';
@@ -446,7 +446,12 @@ export default function PromptImpactTimeline({
           </div>
           <div className="flex flex-col">
             {expandedDraft.drafts.map((draft, i) => (
-              <DraftExpansionRow key={draft.id} draft={draft} showBorder={i > 0} />
+              <DraftExpansionRow
+                key={draft.id}
+                draft={draft}
+                showBorder={i > 0}
+                defaultExpanded={expandedDraft.drafts.length === 1}
+              />
             ))}
           </div>
         </div>
@@ -494,8 +499,16 @@ export default function PromptImpactTimeline({
 }
 
 /** Expandable row showing a single posted draft */
-function DraftExpansionRow({ draft, showBorder }: { draft: PromptDraftSnapshot; showBorder: boolean }) {
-  const [expanded, setExpanded] = useState(false);
+function DraftExpansionRow({
+  draft,
+  showBorder,
+  defaultExpanded = false,
+}: {
+  draft: PromptDraftSnapshot;
+  showBorder: boolean;
+  defaultExpanded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
 
   return (
     <div className={showBorder ? 'border-t border-[var(--border-subtle)]' : ''}>
@@ -521,6 +534,18 @@ function DraftExpansionRow({ draft, showBorder }: { draft: PromptDraftSnapshot; 
             {draft.score_snapshot.delta > 0 ? '+' : ''}{Math.round(draft.score_snapshot.delta)}pp
           </span>
         )}
+        {draft.post_url && (
+          <a
+            href={draft.post_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="flex items-center gap-1 text-[10px] text-[var(--accent-light)] hover:text-[var(--accent)] transition-colors"
+          >
+            <ExternalLink size={10} />
+            View on {draft.platform}
+          </a>
+        )}
         <ChevronDown
           size={12}
           className={`ml-auto text-[var(--text-faint)] transition-transform ${expanded ? 'rotate-180' : ''}`}
@@ -528,9 +553,11 @@ function DraftExpansionRow({ draft, showBorder }: { draft: PromptDraftSnapshot; 
       </button>
       {expanded && draft.content_preview && (
         <div className="px-4 py-3 border-t border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)]">
-          <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
-            {draft.content_preview}
-          </p>
+          <div className="max-h-96 overflow-y-auto">
+            <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed whitespace-pre-wrap">
+              {draft.content_preview}
+            </p>
+          </div>
         </div>
       )}
     </div>

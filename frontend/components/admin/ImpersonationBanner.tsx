@@ -1,15 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Shield, X } from 'lucide-react';
 import { adminExitImpersonation, swapSessionToken } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppToast, ToastData } from '@/components/AppToast';
 
 export default function ImpersonationBanner() {
-  const router = useRouter();
-  const { user, refresh } = useAuth();
+  const { user } = useAuth();
   const [exiting, setExiting] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
   useEffect(() => {
@@ -31,8 +29,9 @@ export default function ImpersonationBanner() {
       // Set admin cookie via Next.js Route Handler (reliable, bypasses rewrite proxy)
       await swapSessionToken(result.admin_token);
       sessionStorage.removeItem('admin_restore_token');
-      await refresh();
-      router.push('/admin');
+      // Full reload — resets BrandContext, api.ts _cache, and all module
+      // state so /admin re-renders as the admin (not the impersonated user).
+      window.location.href = '/admin';
     } catch {
       setToast({ message: 'Failed to exit impersonation. Try logging out and back in.', type: 'error' });
       setExiting(false);

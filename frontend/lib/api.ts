@@ -1466,6 +1466,7 @@ export interface PromptDraftSnapshot {
   posted_at: string | null;
   visibility_at_post: number | null;
   content_preview: string;
+  post_url: string | null;
   score_snapshot: {
     at_posting: number | null;
     current: number | null;

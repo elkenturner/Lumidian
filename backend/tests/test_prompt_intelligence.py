@@ -526,3 +526,91 @@ async def test_log_score_change_events(db_session):
         assert data["old_score"] == 40.0
         assert data["new_score"] == 60.0
         assert data["delta"] == 20.0
+
+
+@pytest.mark.asyncio
+async def test_prompt_detail_returns_full_body_and_post_url(client, db_session):
+    """Posted draft snapshots return the full content_text (not truncated) and the post_url."""
+    from datetime import datetime, timezone
+    from app.models import ContentDraft, ContentPost
+
+    await register_and_login(client)
+    brand_data = await create_brand(client, "FullBodyBrand", ["best CRM software"])
+    brand_id = brand_data["id"]
+
+    brand_resp = await client.get(f"/api/brands/{brand_id}")
+    prompt_id = brand_resp.json()["prompts"][0]["id"]
+
+    long_body = "Lorem ipsum dolor sit amet. " * 100  # ~2700 chars
+    draft = ContentDraft(
+        brand_id=brand_id,
+        prompt_id=prompt_id,
+        platform="reddit",
+        status="posted",
+        title="long post",
+        content_text=long_body,
+        content_brief="brief",
+        visibility_score_at_draft=0.0,
+        estimated_impact=0.0,
+        source="manual",
+        posted_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    await db_session.commit()
+    await db_session.refresh(draft)
+
+    post = ContentPost(
+        draft_id=draft.id,
+        platform="reddit",
+        post_url="https://reddit.com/r/test/comments/abc123",
+        posted_at=datetime.now(timezone.utc),
+    )
+    db_session.add(post)
+    await db_session.commit()
+
+    resp = await client.get(f"/api/results/{brand_id}/prompt/{prompt_id}/detail")
+    assert resp.status_code == 200
+    drafts = resp.json()["drafts"]
+    snapshot = next(d for d in drafts if d["id"] == draft.id)
+
+    assert snapshot["content_preview"] == long_body
+    assert len(snapshot["content_preview"]) > 1000
+    assert snapshot["post_url"] == "https://reddit.com/r/test/comments/abc123"
+
+
+@pytest.mark.asyncio
+async def test_prompt_detail_post_url_null_when_no_content_post(client, db_session):
+    """A posted draft with no ContentPost row returns post_url=None (legacy mark-as-posted)."""
+    from datetime import datetime, timezone
+    from app.models import ContentDraft
+
+    await register_and_login(client)
+    brand_data = await create_brand(client, "NoUrlBrand", ["test query"])
+    brand_id = brand_data["id"]
+
+    brand_resp = await client.get(f"/api/brands/{brand_id}")
+    prompt_id = brand_resp.json()["prompts"][0]["id"]
+
+    draft = ContentDraft(
+        brand_id=brand_id,
+        prompt_id=prompt_id,
+        platform="quora",
+        status="posted",
+        title="no-url post",
+        content_text="short body",
+        content_brief="brief",
+        visibility_score_at_draft=0.0,
+        estimated_impact=0.0,
+        source="manual",
+        posted_at=datetime.now(timezone.utc),
+    )
+    db_session.add(draft)
+    await db_session.commit()
+    await db_session.refresh(draft)
+
+    resp = await client.get(f"/api/results/{brand_id}/prompt/{prompt_id}/detail")
+    assert resp.status_code == 200
+    drafts = resp.json()["drafts"]
+    snapshot = next(d for d in drafts if d["id"] == draft.id)
+    assert snapshot["post_url"] is None
+    assert snapshot["content_preview"] == "short body"

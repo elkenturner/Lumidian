@@ -795,7 +795,8 @@ class PromptDraftSnapshot(BaseModel):
     status: str
     posted_at: datetime | None
     visibility_at_post: float | None
-    content_preview: str
+    content_preview: str  # full body — historically capped at 1000 chars, now uncapped
+    post_url: str | None = None
     score_snapshot: dict
 
 class PromptCompetitorSummary(BaseModel):

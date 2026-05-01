@@ -27,7 +27,7 @@ from app.dependencies import CurrentUser, get_brand_for_user
 from app.services.heuristic_service import evaluate_heuristics
 from app.models import (
     Brand, Competitor, CompetitorMention, ContentAttribution, ContentDraft,
-    ContentEvent, DraftAttribution, Prompt, PromptRunScore, QueryResult,
+    ContentEvent, ContentPost, DraftAttribution, Prompt, PromptRunScore, QueryResult,
     RunModelScore, TrackingRun,
 )
 from app.schemas import (
@@ -600,12 +600,22 @@ async def get_prompt_detail(
     # Batch-fetch DraftAttribution for posted drafts (avoids N+1)
     posted_draft_ids = [d.id for d in drafts if d.status == "posted"]
     attrs_by_draft: dict[int, DraftAttribution] = {}
+    posts_by_draft: dict[int, ContentPost] = {}
     if posted_draft_ids:
         attr_result = await db.execute(
             select(DraftAttribution).where(DraftAttribution.draft_id.in_(posted_draft_ids))
         )
         for attr in attr_result.scalars().all():
             attrs_by_draft[attr.draft_id] = attr
+
+        post_result = await db.execute(
+            select(ContentPost)
+            .where(ContentPost.draft_id.in_(posted_draft_ids))
+            .order_by(ContentPost.posted_at.desc())
+        )
+        # Most-recent ContentPost wins per draft (rows are ordered desc above).
+        for post in post_result.scalars().all():
+            posts_by_draft.setdefault(post.draft_id, post)
 
     draft_snapshots = []
     for d in drafts:
@@ -618,13 +628,15 @@ async def get_prompt_detail(
                 "delta": attr.delta,
                 "runs_since": attr.runs_since_posting,
             }
+        post = posts_by_draft.get(d.id)
         draft_snapshots.append(PromptDraftSnapshot(
             id=d.id,
             platform=d.platform,
             status=d.status,
             posted_at=d.posted_at,
             visibility_at_post=d.visibility_at_post,
-            content_preview=d.content_text[:1000] if d.content_text else "",
+            content_preview=d.content_text or "",
+            post_url=post.post_url if post else None,
             score_snapshot=snapshot,
         ))
 

@@ -164,59 +164,71 @@ def _mock_openai_response(content: str):
     return resp
 
 
+def _mock_responses_response(content: str):
+    """Mock for client.responses.create — returns an object with output_text."""
+    resp = MagicMock()
+    resp.output_text = content
+    return resp
+
+
 @pytest.mark.asyncio
-async def test_query_chatgpt_search_variant_uses_web_search_options():
-    """Pro/search model call must include web_search_options={}."""
-    fake_response = _mock_openai_response("Acme is great. https://acme.com")
+async def test_query_chatgpt_search_variant_uses_web_search_tool():
+    """Pro/search model call must use Responses API with the hosted web_search tool."""
+    fake_response = _mock_responses_response("Acme is great. https://acme.com")
 
     with patch.object(llm_service, "OPENAI_API_KEY", "sk-test"):
         with patch("openai.AsyncOpenAI") as mock_cls:
             client = mock_cls.return_value
-            client.chat.completions.create = AsyncMock(return_value=fake_response)
+            client.responses.create = AsyncMock(return_value=fake_response)
+            client.chat.completions.create = AsyncMock()  # must NOT be called
 
             result = await llm_service._query_chatgpt(
-                "is acme good?", "Acme", model_version="gpt-4o-mini-search-preview"
+                "is acme good?", "Acme", model_version="gpt-4o-mini"
             )
 
-    create_kwargs = client.chat.completions.create.await_args.kwargs
-    assert create_kwargs["model"] == "gpt-4o-mini-search-preview"
-    assert "web_search_options" in create_kwargs
-    assert create_kwargs["web_search_options"] == {}
-    # Non-search params that the preview model rejects must be absent
-    assert "temperature" not in create_kwargs
+    client.chat.completions.create.assert_not_called()
+    create_kwargs = client.responses.create.await_args.kwargs
+    assert create_kwargs["model"] == "gpt-4o-mini"
+    tools = create_kwargs["tools"]
+    assert isinstance(tools, list) and len(tools) == 1
+    assert tools[0]["type"] == "web_search"
+    assert tools[0]["search_context_size"] == "medium"
     assert result["mentioned"] is True
 
 
 @pytest.mark.asyncio
-async def test_query_chatgpt_default_variant_does_not_send_web_search_options():
-    """Default (non-search) model must NOT pass web_search_options."""
+async def test_query_chatgpt_default_variant_uses_chat_completions_no_tools():
+    """Non-search model (gpt-4.1-mini) keeps the legacy chat.completions path."""
     fake_response = _mock_openai_response("Plain text response about Acme.")
     with patch.object(llm_service, "OPENAI_API_KEY", "sk-test"):
         with patch("openai.AsyncOpenAI") as mock_cls:
             client = mock_cls.return_value
             client.chat.completions.create = AsyncMock(return_value=fake_response)
+            client.responses.create = AsyncMock()  # must NOT be called
 
             await llm_service._query_chatgpt(
                 "test", "Acme", model_version="gpt-4.1-mini"
             )
 
+    client.responses.create.assert_not_called()
     create_kwargs = client.chat.completions.create.await_args.kwargs
     assert "web_search_options" not in create_kwargs
+    assert "tools" not in create_kwargs
 
 
 @pytest.mark.asyncio
 async def test_query_chatgpt_strips_citations_before_mention_check():
     """A brand whose name appears ONLY inside a citation URL must NOT count."""
-    fake_response = _mock_openai_response(
+    fake_response = _mock_responses_response(
         "I recommend Notion and Coda. Sources: https://stripe.com/blog"
     )
     with patch.object(llm_service, "OPENAI_API_KEY", "sk-test"):
         with patch("openai.AsyncOpenAI") as mock_cls:
             client = mock_cls.return_value
-            client.chat.completions.create = AsyncMock(return_value=fake_response)
+            client.responses.create = AsyncMock(return_value=fake_response)
 
             result = await llm_service._query_chatgpt(
-                "best note-taking?", "Stripe", model_version="gpt-4o-mini-search-preview"
+                "best note-taking?", "Stripe", model_version="gpt-4o-mini"
             )
 
     assert result["mentioned"] is False, (
@@ -227,18 +239,18 @@ async def test_query_chatgpt_strips_citations_before_mention_check():
 @pytest.mark.asyncio
 async def test_query_chatgpt_search_variant_uses_higher_token_cap():
     """Search responses include long citation footers — token cap must be bumped."""
-    fake_response = _mock_openai_response("ok")
+    fake_response = _mock_responses_response("ok")
     with patch.object(llm_service, "OPENAI_API_KEY", "sk-test"):
         with patch("openai.AsyncOpenAI") as mock_cls:
             client = mock_cls.return_value
-            client.chat.completions.create = AsyncMock(return_value=fake_response)
+            client.responses.create = AsyncMock(return_value=fake_response)
 
             await llm_service._query_chatgpt(
-                "test", "Acme", model_version="gpt-4o-mini-search-preview"
+                "test", "Acme", model_version="gpt-4o-mini"
             )
 
-    create_kwargs = client.chat.completions.create.await_args.kwargs
-    assert create_kwargs["max_completion_tokens"] >= 2048
+    create_kwargs = client.responses.create.await_args.kwargs
+    assert create_kwargs["max_output_tokens"] >= 2048
 
 
 def test_tracking_service_detect_mention_strips_citations():

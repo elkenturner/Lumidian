@@ -128,6 +128,7 @@ export interface Prompt {
   brand_id: number;
   text: string;
   prompt_type: 'standard' | 'pitch';
+  has_history: boolean;
 }
 
 export interface BrandDetail extends Brand {
@@ -337,6 +338,21 @@ export async function addPrompt(brandId: number, text: string): Promise<Prompt> 
 export async function deletePrompt(brandId: number, promptId: number): Promise<void> {
   await api.delete(`/brands/${brandId}/prompts/${promptId}`);
   invalidateCache(`/brands/${brandId}`);
+}
+
+export async function updatePrompt(brandId: number, promptId: number, text: string): Promise<Prompt> {
+  const res = await api.patch<Prompt>(`/brands/${brandId}/prompts/${promptId}`, { text });
+  return res.data;
+}
+
+export interface InferScopeResult {
+  market_scope: 'local' | 'national' | 'global' | 'niche';
+  geography: string | null;
+}
+
+export async function inferBrandScope(brandId: number): Promise<InferScopeResult> {
+  const res = await api.post<InferScopeResult>(`/brands/${brandId}/infer-scope`);
+  return res.data;
 }
 
 export async function triggerRun(brandId: number): Promise<{ run_id: number }> {
@@ -803,6 +819,8 @@ export interface BrandProfile {
   completion_pct: number;
   internal_brand_context: string | null;
   website_context_last_fetched: string | null;
+  market_scope: 'local' | 'national' | 'global' | 'niche' | null;
+  geography: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -822,6 +840,8 @@ export async function updateBrandProfile(
     approved_language: string[];
     publications: Publication[];
     internal_brand_context: string;
+    market_scope: 'local' | 'national' | 'global' | 'niche' | null;
+    geography: string | null;
   }>
 ): Promise<BrandProfile> {
   const res = await api.put<BrandProfile>(`/brands/${brandId}/profile`, data);

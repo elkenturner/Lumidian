@@ -708,7 +708,7 @@ export default function SettingsPage() {
     if (!brandId) return;
     setBrand((prev) => {
       if (!prev) return prev;
-      return { ...prev, prompts: [...prev.prompts, { id: Date.now(), brand_id: prev.id, text, prompt_type: 'standard' as const }], prompt_count: prev.prompt_count + 1 };
+      return { ...prev, prompts: [...prev.prompts, { id: Date.now(), brand_id: prev.id, text, prompt_type: 'standard' as const, has_history: false }], prompt_count: prev.prompt_count + 1 };
     });
     setSuggestions((prev) => prev.filter((s) => s !== text));
     try {

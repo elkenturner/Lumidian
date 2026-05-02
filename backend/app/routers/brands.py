@@ -20,6 +20,15 @@ from typing import Annotated
 
 logger = logging.getLogger(__name__)
 
+
+def _ensure_question_mark(text: str) -> str:
+    """Strip trailing whitespace and trailing terminal punctuation, then append '?'."""
+    cleaned = text.strip().rstrip("?.!,;:")
+    if not cleaned:
+        return cleaned
+    return cleaned + "?"
+
+
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -650,6 +659,7 @@ async def suggest_prompts(brand_id: int, db: DbDep, user: CurrentUser):
 {context}
 
 Return ONLY a valid JSON array of strings — no explanation, no markdown, no comments. 12-15 prompts total.
+EVERY prompt MUST be phrased as a question and end with "?".
 
 GENERATE ONLY these types of queries:
 1. Category/solution queries — "What are the best [category] options?", "Which [category] tools are worth it?"
@@ -687,7 +697,8 @@ The goal is to find queries where a user is researching a problem or category, a
             suggestions = _json.loads(m.group())
         else:
             suggestions = _json.loads(text)
-        return [s for s in suggestions if isinstance(s, str)][:15]
+        cleaned = [_ensure_question_mark(s) for s in suggestions if isinstance(s, str)]
+        return [s for s in cleaned if s][:15]
     except Exception as exc:
         logger.exception("suggest_prompts failed")
         raise HTTPException(
@@ -803,6 +814,7 @@ async def suggest_prompts_preview(payload: _SuggestPreviewReq, db: DbDep, user: 
 {context}
 
 Return ONLY a valid JSON array of 12 strings — no explanation, no markdown.
+EVERY prompt MUST be phrased as a question and end with "?".
 
 Generate category queries, comparison queries, problem-seeking queries, and buying-decision queries. NEVER include the brand name in any question."""
 
@@ -817,7 +829,8 @@ Generate category queries, comparison queries, problem-seeking queries, and buyi
         text = response.content[0].text.strip() if response.content else "[]"
         m = re.search(r"\[[\s\S]*\]", text)
         suggestions = _json.loads(m.group() if m else text)
-        return [s for s in suggestions if isinstance(s, str)][:12]
+        cleaned = [_ensure_question_mark(s) for s in suggestions if isinstance(s, str)]
+        return [s for s in cleaned if s][:12]
     except Exception as exc:
         logger.exception("suggest_prompts_preview failed")
         raise HTTPException(

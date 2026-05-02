@@ -304,3 +304,53 @@ async def test_brand_profile_rejects_invalid_market_scope(client: httpx.AsyncCli
         json={"market_scope": "interplanetary"},
     )
     assert resp.status_code == 422
+
+
+# ── Question-mark enforcement on suggested prompts ────────────────────────────
+
+from unittest.mock import AsyncMock, MagicMock, patch
+
+
+def _mock_anthropic_returning(json_text: str):
+    """Patch context manager that makes anthropic.AsyncAnthropic return json_text from messages.create."""
+    msg = MagicMock()
+    msg.content = [MagicMock(text=json_text)]
+    fake_client = AsyncMock()
+    fake_client.messages.create = AsyncMock(return_value=msg)
+    return patch("anthropic.AsyncAnthropic", return_value=fake_client), patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "test-key"}
+    )
+
+
+@pytest.mark.asyncio
+async def test_suggest_prompts_appends_missing_question_mark(client: httpx.AsyncClient):
+    await register_and_login(client, email="qmark@example.com")
+    brand = await create_brand(client, name="QMark Brand")
+
+    bad_payload = '["Best CRM for startups", "Top sales tools.", "Comparison of A and B!"]'
+    anth_patch, env_patch = _mock_anthropic_returning(bad_payload)
+    with anth_patch, env_patch:
+        resp = await client.post(f"/api/brands/{brand['id']}/suggest-prompts")
+    assert resp.status_code == 200, resp.text
+    suggestions = resp.json()
+    assert len(suggestions) == 3
+    for s in suggestions:
+        assert s.endswith("?"), f"Suggestion missing '?': {s!r}"
+    # Trailing punctuation should be cleaned, not duplicated
+    assert "?" in suggestions[1] and not suggestions[1].endswith(".?")
+    assert not suggestions[2].endswith("!?")
+
+
+@pytest.mark.asyncio
+async def test_suggest_prompts_preview_appends_missing_question_mark(client: httpx.AsyncClient):
+    await register_and_login(client, email="qmark2@example.com")
+    bad_payload = '["What about X", "Y comparison"]'
+    anth_patch, env_patch = _mock_anthropic_returning(bad_payload)
+    with anth_patch, env_patch:
+        resp = await client.post(
+            "/api/brands/suggest-prompts-preview",
+            json={"name": "Acme", "description": "", "website_context": ""},
+        )
+    assert resp.status_code == 200, resp.text
+    for s in resp.json():
+        assert s.endswith("?")

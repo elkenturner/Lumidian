@@ -4,11 +4,18 @@ Generic Serper.dev search — site-scoped.
 Used by LinkedIn and X scanners. The Quora scanner has its own implementation
 in quora_search_service.py (predates this module).
 
+Also exposes SERPER_SEMAPHORE — a shared concurrency guard used by every
+Serper-calling scanner. Without this, 4 scanners running in parallel via
+asyncio.gather can flood Serper enough to trip rate limits, which return
+HTTP 400 with the misleading body "Query not allowed. Contact support."
+instead of a 429.
+
 Environment variable required:
   SERPER_API_KEY — API key from https://serper.dev
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
@@ -18,6 +25,11 @@ import httpx
 logger = logging.getLogger(__name__)
 
 _SERPER_URL = "https://google.serper.dev/search"
+
+# Cap concurrent Serper requests across the whole process. 4 scanners run
+# in parallel; allow 3 of them in-flight at once so we trade ~25% of the
+# burst speed for predictable rate-limit behavior.
+SERPER_SEMAPHORE = asyncio.Semaphore(3)
 
 # In-process cache: (site, cache_key) -> (expires_at, results)
 _cache: dict[tuple[str, int], tuple[float, list[dict]]] = {}

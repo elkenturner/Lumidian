@@ -21,6 +21,8 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 
+from app.services.serper_search_service import SERPER_SEMAPHORE
+
 logger = logging.getLogger(__name__)
 
 # Minimum relevance score — slightly lower than Quora because LinkedIn posts can
@@ -247,7 +249,7 @@ async def _search_linkedin_posts(
         return []
 
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
+        async with SERPER_SEMAPHORE, httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.post(
                 _SERPER_URL,
                 headers={

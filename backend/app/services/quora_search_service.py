@@ -16,6 +16,8 @@ import time
 
 import httpx
 
+from app.services.serper_search_service import SERPER_SEMAPHORE
+
 logger = logging.getLogger(__name__)
 
 # ── Stop-word list for keyword extraction ──────────────────────────────────────
@@ -98,7 +100,7 @@ async def search_quora_questions(
     data = None
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
-            async with httpx.AsyncClient(timeout=8.0) as client:
+            async with SERPER_SEMAPHORE, httpx.AsyncClient(timeout=8.0) as client:
                 resp = await client.post(
                     _SERPER_URL,
                     headers={

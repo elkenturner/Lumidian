@@ -273,3 +273,34 @@ async def test_competitor_access_control(client: httpx.AsyncClient):
     await register_and_login(client, email="compb@example.com")
     resp = await client.get(f"/api/brands/{brand['id']}/competitors")
     assert resp.status_code == 403
+
+
+# ── Brand Profile: market_scope and geography ─────────────────────────────────
+
+async def test_brand_profile_persists_market_scope_and_geography(client: httpx.AsyncClient):
+    await register_and_login(client, email="scope_persist@example.com")
+    brand = await create_brand(client, name="Scope Brand")
+
+    resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"market_scope": "local", "geography": "Portland, OR"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["market_scope"] == "local"
+    assert resp.json()["geography"] == "Portland, OR"
+
+    # Round-trip via GET
+    get_resp = await client.get(f"/api/brands/{brand['id']}/profile")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["market_scope"] == "local"
+    assert get_resp.json()["geography"] == "Portland, OR"
+
+
+async def test_brand_profile_rejects_invalid_market_scope(client: httpx.AsyncClient):
+    await register_and_login(client, email="scope_bad@example.com")
+    brand = await create_brand(client, name="Bad Scope")
+    resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"market_scope": "interplanetary"},
+    )
+    assert resp.status_code == 422

@@ -72,7 +72,7 @@ Copy `backend/.env.example` → `backend/.env`. **`JWT_SECRET` (≥32 chars) is 
 ### Stack
 - **Backend:** Python 3.11+, FastAPI 0.115, SQLAlchemy 2.0 (async), SQLite + aiosqlite, APScheduler, bcrypt, PyJWT, Stripe, ReportLab, pyotp
 - **Frontend:** Next.js 15, React 18, TypeScript (strict), Tailwind CSS, Radix UI, Recharts, Axios, date-fns, lucide-react
-- **LLM providers:** OpenAI (gpt-4.1-mini default, gpt-4o-mini-search-preview for paid subscribers), Anthropic (claude-haiku-4-5-20251001 with web_search_20250305 — Pro tier only), Google GenAI (gemini-2.5-flash for all tiers), Perplexity (sonar default, sonar-pro for paid subscribers)
+- **LLM providers:** OpenAI (gpt-4.1-mini default, gpt-4o-mini + hosted web_search tool via Responses API for paid subscribers), Anthropic (claude-haiku-4-5-20251001 with web_search_20250305 — Pro tier only), Google GenAI (gemini-2.5-flash for all tiers), Perplexity (sonar default, sonar-pro for paid subscribers)
 
 ### Backend Layout
 ```
@@ -206,7 +206,7 @@ JWT issued with 7-day expiry, stored in httpOnly `clarity_token` cookie. Compani
 
 ### LLM Model Selection
 All four models query the live web:
-- **ChatGPT** (`gpt-4o-mini-search-preview`, paid tiers only) — OpenAI native web search
+- **ChatGPT** (`gpt-4o-mini` + hosted `web_search` tool via Responses API, paid tiers only) — OpenAI hosted web search with `search_context_size="medium"`
 - **Claude** (`claude-haiku-4-5-20251001` + `web_search_20250305` tool, Pro tier only) — Anthropic server-side web search
 - **Perplexity** (`sonar` free, `sonar-pro` paid) — search-native model
 - **Gemini** (`gemini-2.5-flash` with `google_search` grounding tool) — Google search grounding

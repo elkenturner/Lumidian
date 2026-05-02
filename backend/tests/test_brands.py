@@ -611,3 +611,28 @@ async def test_patch_prompt_422_on_empty_text(client: httpx.AsyncClient):
         json={"text": "   "},
     )
     assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_brand_profile_market_scope_can_be_cleared(client: httpx.AsyncClient):
+    """User can reset market_scope to null via the 'Not set' dropdown option."""
+    await register_and_login(client, email="scope_clear@example.com")
+    brand = await create_brand(client, name="Clearable Brand")
+
+    # Set scope
+    set_resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"market_scope": "local", "geography": "Portland, OR"},
+    )
+    assert set_resp.status_code == 200
+    assert set_resp.json()["market_scope"] == "local"
+
+    # Clear scope by sending null
+    clear_resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"market_scope": None},
+    )
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["market_scope"] is None
+    # Geography should NOT be touched (we didn't send it)
+    assert clear_resp.json()["geography"] == "Portland, OR"

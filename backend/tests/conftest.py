@@ -36,6 +36,17 @@ os.environ["SMTP_PASS"] = ""
 from app.database import AsyncSessionLocal, Base, engine
 from app.main import app
 
+# Force SQLite into WAL mode for tests. WAL lets readers coexist with writers,
+# which eliminates the reader-writer lock contention between fire-and-forget
+# background tasks (scanners, drafters) and the cleanup fixture's truncates.
+from sqlalchemy import event as _sa_event
+
+@_sa_event.listens_for(engine.sync_engine, "connect")
+def _set_test_pragmas(dbapi_conn, _connection_record):
+    cur = dbapi_conn.cursor()
+    cur.execute("PRAGMA journal_mode=WAL")
+    cur.close()
+
 # ── Database setup ────────────────────────────────────────────────────────────
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
@@ -59,6 +70,17 @@ async def create_test_db():
 async def clean_tables():
     """Truncate all data-bearing tables and reset rate store between tests."""
     yield
+    # Cancel any fire-and-forget tasks the test spawned (scanners, draft generators,
+    # tracking runs, etc.) before truncating tables. Otherwise their in-flight
+    # writes contend with our DELETEs and hit SQLite's busy_timeout.
+    import asyncio
+    current = asyncio.current_task()
+    pending = [t for t in asyncio.all_tasks() if t is not current and not t.done()]
+    for task in pending:
+        task.cancel()
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+
     # Reset in-memory rate limiters so tests don't affect each other
     from app.dependencies import _rate_store
     _rate_store.clear()

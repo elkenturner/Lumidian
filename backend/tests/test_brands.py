@@ -492,3 +492,122 @@ async def test_prompt_response_has_history_flag(client: httpx.AsyncClient, db_se
     detail2 = await client.get(f"/api/brands/{brand['id']}")
     p = next(x for x in detail2.json()["prompts"] if x["id"] == prompts[0]["id"])
     assert p["has_history"] is True
+
+
+# ── PATCH /api/brands/{id}/prompts/{pid} ─────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_patch_prompt_succeeds_when_no_history(client: httpx.AsyncClient):
+    await register_and_login(client, email="patch1@example.com")
+    brand = await create_brand(client, name="Patch Brand", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "What is the best X?"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["text"] == "What is the best X?"
+    assert resp.json()["has_history"] is False
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_409_when_history_exists(client: httpx.AsyncClient, db_session):
+    await register_and_login(client, email="patch2@example.com")
+    brand = await create_brand(client, name="Patch History", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+
+    # Seed a query result against the prompt
+    from app.models import QueryResult, TrackingRun
+    run = TrackingRun(brand_id=brand["id"], status="completed", run_type="manual")
+    db_session.add(run)
+    await db_session.flush()
+    db_session.add(QueryResult(
+        tracking_run_id=run.id, prompt_id=prompt_id, model="chatgpt",
+        run_number=1, response_text="hi", mentioned=False,
+    ))
+    await db_session.commit()
+
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "What is the best X?"},
+    )
+    assert resp.status_code == 409
+    assert "history" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_409_during_active_run(client: httpx.AsyncClient, db_session):
+    await register_and_login(client, email="patch3@example.com")
+    brand = await create_brand(client, name="Patch Active", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+
+    from app.models import TrackingRun
+    from datetime import datetime, UTC
+    db_session.add(TrackingRun(
+        brand_id=brand["id"], status="running", run_type="manual",
+        created_at=datetime.now(UTC).replace(tzinfo=None),
+    ))
+    await db_session.commit()
+
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "Anything"},
+    )
+    assert resp.status_code == 409
+    assert "report is running" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_409_on_duplicate_text(client: httpx.AsyncClient):
+    await register_and_login(client, email="patch4@example.com")
+    brand = await create_brand(
+        client, name="Patch Dup",
+        prompts=["What is X?", "What is Y?"],
+    )
+    target_id = brand["prompts"][0]["id"]
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{target_id}",
+        json={"text": "What is Y?"},
+    )
+    assert resp.status_code == 409
+    assert "already exists" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_same_text_is_noop_success(client: httpx.AsyncClient):
+    await register_and_login(client, email="patch5@example.com")
+    brand = await create_brand(client, name="Patch Noop", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "What is X?"},
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_403_for_other_users_brand(client: httpx.AsyncClient):
+    await register_and_login(client, email="patchowner@example.com")
+    brand = await create_brand(client, name="Owner", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+
+    await client.post("/api/auth/logout")
+    await register_and_login(client, email="patchintruder@example.com")
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "Pwned"},
+    )
+    assert resp.status_code in (403, 404)
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_422_on_empty_text(client: httpx.AsyncClient):
+    await register_and_login(client, email="patch6@example.com")
+    brand = await create_brand(client, name="Patch Empty", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "   "},
+    )
+    assert resp.status_code == 422

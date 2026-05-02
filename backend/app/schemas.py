@@ -20,6 +20,10 @@ class PromptCreate(PromptBase):
         return v
 
 
+class PromptUpdate(BaseModel):
+    text: str
+
+
 class PromptResponse(PromptBase):
     id: int
     brand_id: int

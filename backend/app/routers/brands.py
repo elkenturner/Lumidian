@@ -656,18 +656,18 @@ async def suggest_prompts(brand_id: int, db: DbDep, user: CurrentUser):
     scope_block = ""
     if profile and profile.market_scope:
         geo_line = f"\nGeography: {profile.geography}" if profile.geography else ""
+        if profile.geography:
+            geo_examples = f"'best X in {profile.geography}', '{profile.geography}-area X'"
+        else:
+            geo_examples = "geographically scoped phrasings appropriate to the brand's locale"
         scope_block = (
             f"\n\nMarket scope: {profile.market_scope}{geo_line}\n\n"
             "When generating queries, scope them to where this brand actually competes. "
-            "For local scope, use the geography in queries (e.g. 'best X in {geo}', "
-            "'{geo}-area X'). For national, prefer country-specific phrasings. "
+            f"For local scope, use the geography in queries (e.g. {geo_examples}). "
+            "For national, prefer country-specific phrasings. "
             "For niche B2B, use vertical-specific phrasings rather than geographic ones. "
             "Avoid global/national phrasings the brand has no realistic chance of appearing in."
         )
-        if profile.geography:
-            scope_block = scope_block.replace("{geo}", profile.geography)
-        else:
-            scope_block = scope_block.replace("'best X in {geo}', '{geo}-area X'", "geographically scoped phrasings")
 
     context = "\n".join(context_parts) + scope_block
 

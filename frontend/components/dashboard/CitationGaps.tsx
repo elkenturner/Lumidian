@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { CitationGap } from '@/lib/api';
+import { AskCoachButton } from '@/components/coach/AskCoachButton';
 
 interface CitationGapsProps {
   gaps: CitationGap[];
@@ -57,7 +58,7 @@ export default function CitationGaps({ gaps, brandId }: CitationGapsProps) {
         return (
           <div
             key={g.domain}
-            className="grid grid-cols-[20px_1fr_auto_auto_auto] items-center gap-3 py-2.5 text-xs"
+            className="grid grid-cols-[20px_1fr_auto_auto_auto_auto] items-center gap-3 py-2.5 text-xs"
           >
             <span className="text-[10px] tabular-nums text-[var(--text-faint)]">{idx + 1}</span>
 
@@ -87,6 +88,14 @@ export default function CitationGaps({ gaps, brandId }: CitationGapsProps) {
             >
               {ctaLabel}
             </Link>
+
+            <AskCoachButton
+              brandId={brandId}
+              question={`How can I get my brand cited on ${g.domain}?`}
+              className="text-[10px] text-[var(--text-faint)] hover:text-[var(--accent)] underline underline-offset-2 transition-colors whitespace-nowrap"
+            >
+              Explain
+            </AskCoachButton>
           </div>
         );
       })}

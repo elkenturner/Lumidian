@@ -74,6 +74,7 @@ import {
   MethodologyCallout,
   buildPromptGroups,
 } from '@/components/dashboard';
+import { AskCoachButton } from '@/components/coach/AskCoachButton';
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 
@@ -717,6 +718,7 @@ export default function DashboardPage() {
                   loadingAnalytics={loadingAnalytics}
                   scoreConfidence={analytics?.score_confidence}
                   activeModels={analytics?.active_models}
+                  brandId={selectedBrandId ?? undefined}
                 />
 
                 {/* Right column: Best Prompt + Sentiment on top, SOV below */}
@@ -820,6 +822,15 @@ export default function DashboardPage() {
                                     style={{ width: `${pct}%`, background: barColor }}
                                   />
                                 </div>
+                                {!s.is_primary && selectedBrandId != null && (
+                                  <AskCoachButton
+                                    brandId={selectedBrandId}
+                                    question={`Why is ${s.name} outperforming us in AI visibility?`}
+                                    className="text-[10px] text-[var(--text-faint)] hover:text-[var(--accent)] underline underline-offset-2 transition-colors text-left"
+                                  >
+                                    Why are they ahead?
+                                  </AskCoachButton>
+                                )}
                               </div>
                             );
                           })}

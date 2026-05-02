@@ -121,6 +121,14 @@ def test_low_relevance_scores_zero():
 from unittest.mock import AsyncMock, patch
 
 
+@pytest.fixture(autouse=True)
+def _disable_niche_sub_discovery():
+    """Niche-sub discovery calls Anthropic for real; stub it out in unit tests."""
+    from app.services import reddit_scanner_service
+    with patch.object(reddit_scanner_service, "get_relevant_subreddits", return_value=[]):
+        yield
+
+
 def _make_serper_result(url, title, subreddit="SaaS", snippet="", date="1 day ago"):
     """Create a Serper-format result dict for test mocking."""
     return {
@@ -140,7 +148,7 @@ async def test_scan_uses_prompt_text_as_search_query(tmp_db):
     searched_queries: list[str] = []
     orig_search = reddit_scanner_service._search_reddit_posts
 
-    def fake_search(query, num_results=10, cache_key=None):
+    def fake_search(query, num_results=10, cache_key=None, subreddit=None):
         searched_queries.append(query)
         return []
 
@@ -163,7 +171,7 @@ async def test_brand_name_is_also_searched(tmp_db):
 
     searched_queries: list[str] = []
 
-    def fake_search(query, num_results=10, cache_key=None):
+    def fake_search(query, num_results=10, cache_key=None, subreddit=None):
         searched_queries.append(query)
         return []
 
@@ -190,7 +198,7 @@ async def test_blocked_subreddit_not_stored(tmp_db):
         subreddit="depression",
     )
 
-    def fake_search(query, num_results=10, cache_key=None):
+    def fake_search(query, num_results=10, cache_key=None, subreddit=None):
         return [result]
 
     brand_id = await tmp_db.create_brand_with_prompt(
@@ -215,7 +223,7 @@ async def test_relevant_post_stored(tmp_db):
         subreddit="SaaS",
     )
 
-    def fake_search(query, num_results=10, cache_key=None):
+    def fake_search(query, num_results=10, cache_key=None, subreddit=None):
         return [result]
 
     brand_id = await tmp_db.create_brand_with_prompt(
@@ -240,7 +248,7 @@ async def test_deduplication(tmp_db):
         subreddit="SaaS",
     )
 
-    def fake_search(query, num_results=10, cache_key=None):
+    def fake_search(query, num_results=10, cache_key=None, subreddit=None):
         return [result]
 
     brand_id = await tmp_db.create_brand_with_prompt(
@@ -266,7 +274,7 @@ async def test_works_with_no_industry_match(tmp_db):
         subreddit="WeAreTheMusicMakers",
     )
 
-    def fake_search(query, num_results=10, cache_key=None):
+    def fake_search(query, num_results=10, cache_key=None, subreddit=None):
         return [result]
 
     brand_id = await tmp_db.create_brand_with_prompt(
@@ -410,7 +418,7 @@ async def test_haiku_rejected_post_not_stored(tmp_db):
         subreddit="SaaS",
     )
 
-    def fake_search(query, num_results=10, cache_key=None):
+    def fake_search(query, num_results=10, cache_key=None, subreddit=None):
         return [result]
 
     brand_id = await tmp_db.create_brand_with_prompt(

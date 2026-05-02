@@ -215,7 +215,8 @@ async def _scan_and_log(brand_id: int, user_tier: str | None = None, is_admin: b
         quora_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True),
     ]
 
-    if is_admin or user_tier == "pro":
+    from app.services.llm_service import is_paid_tier
+    if is_admin or is_paid_tier(user_tier):
         from app.services import linkedin_scanner_service, x_scanner_service
         scan_tasks.append(linkedin_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True))
         scan_tasks.append(x_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True))

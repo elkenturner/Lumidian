@@ -13,6 +13,7 @@ import { TrendPoint } from '@/lib/api';
 import { useCountUp } from '@/lib/motion';
 import HelpTooltip from './HelpTooltip';
 import SparklineTooltip from './SparklineTooltip';
+import { AskCoachButton } from '@/components/coach/AskCoachButton';
 
 interface VisibilityChartProps {
   score: number | null;
@@ -23,6 +24,7 @@ interface VisibilityChartProps {
   loadingAnalytics: boolean;
   scoreConfidence?: 'low' | 'medium' | 'high';
   activeModels?: number;
+  brandId?: number;
 }
 
 const CONFIDENCE_STYLES: Record<string, { label: string; color: string; bg: string }> = {
@@ -40,6 +42,7 @@ export default function VisibilityChart({
   loadingAnalytics,
   scoreConfidence,
   activeModels,
+  brandId,
 }: VisibilityChartProps) {
   const animatedScore = useCountUp(score ?? 0);
 
@@ -74,6 +77,15 @@ export default function VisibilityChart({
                   {CONFIDENCE_STYLES[scoreConfidence].label}
                   {activeModels !== undefined && activeModels < 4 && ` \u00b7 ${activeModels}/4 models`}
                 </span>
+              )}
+              {score != null && brandId != null && (
+                <AskCoachButton
+                  brandId={brandId}
+                  question={`Why is my visibility score ${score}%?`}
+                  className="mt-1.5 block text-[11px] text-[var(--text-faint)] hover:text-[var(--accent)] underline underline-offset-2 transition-colors"
+                >
+                  Why this score?
+                </AskCoachButton>
               )}
             </>
           )}

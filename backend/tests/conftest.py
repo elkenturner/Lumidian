@@ -25,11 +25,27 @@ os.environ["ENVIRONMENT"] = "development"
 os.environ["ADMIN_EMAILS"] = "admin@test.com"
 os.environ["STRIPE_SECRET_KEY"] = "sk_test_placeholder"
 os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test_placeholder"
+# Force email service into console-mode so tests never call the real Resend API.
+# Without this, every test that registers a user blocks ~5s on a real HTTPS call
+# (and sends real verification emails to fake test addresses).
+os.environ["RESEND_API_KEY"] = ""
+os.environ["SMTP_PASS"] = ""
 # Prevent auto-seeding admin user during tests (no ADMIN_PASSWORD set)
 
 # App imports after env vars are configured
 from app.database import AsyncSessionLocal, Base, engine
 from app.main import app
+
+# Force SQLite into WAL mode for tests. WAL lets readers coexist with writers,
+# which eliminates the reader-writer lock contention between fire-and-forget
+# background tasks (scanners, drafters) and the cleanup fixture's truncates.
+from sqlalchemy import event as _sa_event
+
+@_sa_event.listens_for(engine.sync_engine, "connect")
+def _set_test_pragmas(dbapi_conn, _connection_record):
+    cur = dbapi_conn.cursor()
+    cur.execute("PRAGMA journal_mode=WAL")
+    cur.close()
 
 # ── Database setup ────────────────────────────────────────────────────────────
 
@@ -39,6 +55,9 @@ async def create_test_db():
     async with engine.begin() as conn:
         import app.models  # noqa: F401 — registers models
         await conn.run_sync(Base.metadata.create_all)
+    # Apply raw-SQL migrations (e.g. rate_limits, processed_webhook_events)
+    from app.database import run_migrations
+    await run_migrations()
     yield
     await engine.dispose()
     try:
@@ -51,6 +70,17 @@ async def create_test_db():
 async def clean_tables():
     """Truncate all data-bearing tables and reset rate store between tests."""
     yield
+    # Cancel any fire-and-forget tasks the test spawned (scanners, draft generators,
+    # tracking runs, etc.) before truncating tables. Otherwise their in-flight
+    # writes contend with our DELETEs and hit SQLite's busy_timeout.
+    import asyncio
+    current = asyncio.current_task()
+    pending = [t for t in asyncio.all_tasks() if t is not current and not t.done()]
+    for task in pending:
+        task.cancel()
+    if pending:
+        await asyncio.gather(*pending, return_exceptions=True)
+
     # Reset in-memory rate limiters so tests don't affect each other
     from app.dependencies import _rate_store
     _rate_store.clear()
@@ -85,6 +115,7 @@ async def clean_tables():
             "brand_content_settings", "account_connections",
             "notifications", "team_members", "password_reset_tokens",
             "system_settings", "brands", "users",
+            "rate_limits",
         ]:
             await db.execute(text(f"DELETE FROM {table}"))
         await db.commit()
@@ -111,8 +142,15 @@ async def client():
             "app.services.auth_seeder.seed_admin_user",
             new_callable=lambda: lambda: AsyncMock(return_value=None),
         ),
-        # Mock email background sender to prevent dangling async tasks
+        # Mock email senders to prevent dangling async tasks AND real outbound HTTP.
+        # send_email_awaited is used for blocking sends (registration verification, password
+        # reset) — left unmocked, it would call the Resend API and tie each test up for ~5s.
         patch("app.services.email_service.send_email_background"),
+        patch("app.services.email_service.send_email_awaited", new=AsyncMock(return_value=True)),
+        # log_event opens its own session and contends with the request's session
+        # for the SQLite write lock. With the default 5s busy_timeout this adds
+        # ~5s to every endpoint that logs an analytics event. Skip it in tests.
+        patch("app.services.analytics_service.log_event", new=AsyncMock(return_value=None)),
     ):
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=app),

@@ -49,6 +49,7 @@ from app.routers import (
     accounts,
     brand_profile,
     brands,
+    coach,
     content,
     dashboard,
     gaps,
@@ -225,6 +226,7 @@ app.include_router(team_router.router, prefix="/api")
 app.include_router(errors_router.router, prefix="/api")
 app.include_router(notifications_router.router, prefix="/api")
 app.include_router(support_router.router, prefix="/api")
+app.include_router(coach.router)
 
 
 # ── Health check ──────────────────────────────────────────────────────────────

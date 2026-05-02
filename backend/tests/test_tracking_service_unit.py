@@ -156,11 +156,12 @@ class TestModelVersionSelection:
         assert _get_model_version("gemini", pro=False) == "gemini-2.5-flash"
 
     def test_pro_model_versions(self):
-        """Pro variants per 2026-04-20 cost/accuracy overhaul:
-        ChatGPT → search-preview, Gemini stays on Flash (Pro killed), Perplexity → sonar-pro.
+        """Pro variants:
+        ChatGPT → gpt-4o-mini (web_search via Responses API, 2026-05-01),
+        Gemini stays on Flash (Pro killed 2026-04-20), Perplexity → sonar-pro.
         """
         from app.services.llm_service import _get_model_version
-        assert _get_model_version("chatgpt", pro=True) == "gpt-4o-mini-search-preview"
+        assert _get_model_version("chatgpt", pro=True) == "gpt-4o-mini"
         assert _get_model_version("claude", pro=True) == "claude-haiku-4-5-20251001"
         assert _get_model_version("perplexity", pro=True) == "sonar-pro"
         assert _get_model_version("gemini", pro=True) == "gemini-2.5-flash"

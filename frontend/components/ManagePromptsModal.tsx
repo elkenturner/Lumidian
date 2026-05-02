@@ -2,7 +2,16 @@
 
 import { useState } from 'react';
 import { Plus, Loader2, Sparkles, Trash2, MessageSquare, Pencil, Check, X } from 'lucide-react';
-import { addPrompt, deletePrompt, getSuggestedPrompts, updatePrompt, Prompt } from '@/lib/api';
+import {
+  addPrompt,
+  deletePrompt,
+  getSuggestedPrompts,
+  updatePrompt,
+  inferBrandScope,
+  getBrandProfile,
+  updateBrandProfile,
+  Prompt,
+} from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export function ManagePromptsModal({
@@ -32,6 +41,11 @@ export function ManagePromptsModal({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [scopeStep, setScopeStep] = useState<'idle' | 'inferring' | 'confirming'>('idle');
+  const [confirmLoading, setConfirmLoading] = useState(false);
+  const [scopeValue, setScopeValue] = useState<'local' | 'national' | 'global' | 'niche'>('national');
+  const [geographyValue, setGeographyValue] = useState('');
+  const [scopeError, setScopeError] = useState('');
 
   const atLimit = localPrompts.length >= promptLimit;
   const locked = isRunning;
@@ -101,11 +115,45 @@ export function ManagePromptsModal({
 
   async function handleSuggest() {
     setSuggesting(true);
+    setScopeError('');
     try {
+      const profile = await getBrandProfile(brandId);
+      if (profile.market_scope) {
+        const s = await getSuggestedPrompts(brandId);
+        setSuggestions(s);
+        return;
+      }
+      // No scope set — infer, then confirm
+      setScopeStep('inferring');
+      const inferred = await inferBrandScope(brandId);
+      setScopeValue(inferred.market_scope);
+      setGeographyValue(inferred.geography ?? '');
+      setScopeStep('confirming');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setScopeError(e?.response?.data?.detail || 'Could not generate suggestions.');
+      setScopeStep('idle');
+    } finally {
+      setSuggesting(false);
+    }
+  }
+
+  async function confirmScopeAndSuggest() {
+    setConfirmLoading(true);
+    setScopeError('');
+    try {
+      await updateBrandProfile(brandId, {
+        market_scope: scopeValue,
+        geography: geographyValue.trim() || null,
+      });
       const s = await getSuggestedPrompts(brandId);
       setSuggestions(s);
-    } catch { /* ignore */ } finally {
-      setSuggesting(false);
+      setScopeStep('idle');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setScopeError(e?.response?.data?.detail || 'Could not generate suggestions.');
+    } finally {
+      setConfirmLoading(false);
     }
   }
 
@@ -199,6 +247,45 @@ export function ManagePromptsModal({
           )}
         </div>
 
+        {/* Scope confirmation chip */}
+        {scopeStep === 'confirming' && (
+          <div className="mb-4 p-3 rounded-lg border border-[var(--accent)]/30 bg-[var(--accent)]/5 shrink-0">
+            <p className="text-xs text-[var(--text-secondary)] mb-2">
+              Where does this brand actually compete? Suggestions will be scoped to match.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              <select
+                value={scopeValue}
+                onChange={(e) => setScopeValue(e.target.value as typeof scopeValue)}
+                className="bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-[var(--accent)]"
+              >
+                <option value="local">Local — city/region</option>
+                <option value="national">National — single country</option>
+                <option value="global">Global — multi-country</option>
+                <option value="niche">Niche — narrow B2B vertical</option>
+              </select>
+              <input
+                type="text"
+                value={geographyValue}
+                onChange={(e) => setGeographyValue(e.target.value)}
+                placeholder={scopeValue === 'local' ? 'e.g. Portland, OR' : scopeValue === 'national' ? 'e.g. United States' : 'optional'}
+                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-md px-2 py-1.5 text-xs placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)]"
+              />
+              <button
+                onClick={confirmScopeAndSuggest}
+                disabled={confirmLoading}
+                className="text-xs bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-md px-3 py-1.5 transition-colors shrink-0 inline-flex items-center gap-1.5"
+              >
+                {confirmLoading ? <Loader2 size={11} className="animate-spin" /> : null}
+                Use & suggest
+              </button>
+            </div>
+            {scopeError && (
+              <p className="text-xs text-[var(--danger)] mt-2">{scopeError}</p>
+            )}
+          </div>
+        )}
+
         {/* Suggestions */}
         {suggestions.length > 0 && (
           <div className="mb-4 space-y-1.5 shrink-0">
@@ -247,11 +334,15 @@ export function ManagePromptsModal({
           </div>
           <button
             onClick={handleSuggest}
-            disabled={suggesting || locked}
+            disabled={suggesting || scopeStep === 'inferring' || locked}
             className="w-full flex items-center justify-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.14)] rounded-lg py-2 transition-colors"
           >
-            {suggesting ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
-            {suggesting ? 'Generating suggestions...' : 'Suggest prompts with AI'}
+            {suggesting || scopeStep === 'inferring' ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+            {scopeStep === 'inferring'
+              ? 'Detecting market scope...'
+              : suggesting
+              ? 'Generating suggestions...'
+              : 'Suggest prompts with AI'}
           </button>
         </div>
       </DialogContent>

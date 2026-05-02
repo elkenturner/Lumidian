@@ -521,9 +521,13 @@ async def _search_reddit_posts(
     query: str,
     num_results: int = 10,
     cache_key: int | None = None,
+    subreddit: str | None = None,
 ) -> list[dict]:
     """
-    Search for Reddit posts matching *query* via Serper.dev (site:reddit.com).
+    Search for Reddit posts matching *query* via Serper.dev.
+
+    When *subreddit* is given, scopes the search to that sub
+    (`site:reddit.com/r/{sub}`); otherwise searches all of reddit.com.
 
     Returns a list of dicts: {title, url, snippet, date, subreddit}
     Returns [] gracefully on missing credentials, API errors, or no matches.
@@ -546,6 +550,10 @@ async def _search_reddit_posts(
     _MAX_ATTEMPTS = 2
     _RETRY_DELAY = 2.0  # seconds
 
+    site_filter = (
+        f"site:reddit.com/r/{subreddit}" if subreddit else "site:reddit.com"
+    )
+
     data = None
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
@@ -553,7 +561,7 @@ async def _search_reddit_posts(
                 resp = await client.post(
                     _SERPER_URL,
                     headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
-                    json={"q": f"site:reddit.com {query}", "num": 25},
+                    json={"q": f"{site_filter} {query}", "num": 25},
                 )
                 resp.raise_for_status()
                 data = resp.json()
@@ -769,6 +777,19 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
         from app.services.prompt_selection import get_priority_prompts
         priority = await get_priority_prompts(brand_id, prompts, limit=10)
 
+        # Load brand description up-front so we can use it for niche-sub
+        # discovery as well as the Haiku relevance gate later.
+        from app.models import BrandProfile
+        profile_result = await db.execute(
+            select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+        )
+        profile = profile_result.scalar_one_or_none()
+        brand_description = (
+            (profile.company_description if profile and profile.company_description else None)
+            or brand.website_url
+            or brand.name
+        )
+
         all_candidates: list[tuple[dict, int | None]] = []
 
         for prompt in priority:
@@ -781,6 +802,40 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
         for r in await _search_reddit_posts(brand.name, num_results=10):
             all_candidates.append((r, None))
 
+        # ── Niche subreddit augmentation ──────────────────────────────────────
+        # Site-restricted searches surface threads that the broad
+        # `site:reddit.com` query misses entirely (small subs get drowned
+        # out by big subs in Serper's ranking). Use Claude Haiku to suggest
+        # subs aligned with the brand, then probe each with the top
+        # priority prompts.
+        niche_subs: list[str] = []
+        if priority:
+            try:
+                niche_subs = get_relevant_subreddits(
+                    description=brand_description,
+                    prompts=[p.text for p in priority],
+                    limit=8,
+                )
+            except Exception as exc:
+                logger.debug(
+                    "niche-sub discovery failed for brand_id=%d: %s", brand_id, exc
+                )
+                niche_subs = []
+
+        if niche_subs:
+            logger.info(
+                "Reddit scanner: probing %d niche subs for brand_id=%d: %s",
+                len(niche_subs[:5]), brand_id, niche_subs[:5],
+            )
+            for sub in niche_subs[:5]:
+                for prompt in priority[:3]:
+                    query = _build_search_query(prompt.text)
+                    niche_results = await _search_reddit_posts(
+                        query, num_results=5, subreddit=sub,
+                    )
+                    for r in niche_results:
+                        all_candidates.append((r, prompt.id))
+
         # Deduplicate by URL across all queries
         seen_urls: set[str] = set()
         deduped: list[tuple[dict, int | None]] = []
@@ -792,18 +847,6 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
 
         # ── Phase 1: score all candidates ─────────────────────────────────────
         default_prompt_text = prompts[0].text if prompts else ""
-
-        # Get brand description for Haiku gate
-        from app.models import BrandProfile
-        profile_result = await db.execute(
-            select(BrandProfile).where(BrandProfile.brand_id == brand_id)
-        )
-        profile = profile_result.scalar_one_or_none()
-        brand_description = (
-            (profile.company_description if profile and profile.company_description else None)
-            or brand.website_url
-            or brand.name
-        )
 
         scored: list[dict] = []  # candidates that pass keyword scoring
 

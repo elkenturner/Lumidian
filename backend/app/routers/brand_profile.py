@@ -166,7 +166,7 @@ async def update_brand_profile(brand_id: int, payload: BrandProfileUpdate, db: D
     if payload.publications is not None:
         profile.publications = json.dumps([p.model_dump() for p in payload.publications])
     if payload.market_scope is not None:
-        profile.market_scope = payload.market_scope or None
+        profile.market_scope = payload.market_scope
     if payload.geography is not None:
         profile.geography = payload.geography.strip() or None
 

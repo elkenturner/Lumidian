@@ -664,15 +664,27 @@ async def _onboarding_post_process(brand_id: int) -> None:
     from app.models import User
     from app.services.drafting_service import get_draft_cap
 
-    # ── Step 1: Draft generation ─────────────────────────────────────────────
-    state.generating_brands.add(brand_id)
+    # Resolve tier up-front in its own session so step 2 still has it
+    # available even if step 1 raises mid-way.
+    tier: str | None = None
+    brand_type: str = "standard"
     try:
         async with AsyncSessionLocal() as db:
             brand = await db.get(Brand, brand_id)
             user = await db.get(User, brand.user_id) if brand else None
             tier = user.subscription_tier if user else None
-            cap = get_draft_cap(tier, brand.brand_type if brand else "standard")
+            brand_type = brand.brand_type if brand else "standard"
+    except Exception as exc:
+        logger.warning(
+            "Onboarding post-process: failed to resolve tier for brand_id=%d (non-fatal): %s",
+            brand_id, exc,
+        )
 
+    # ── Step 1: Draft generation ─────────────────────────────────────────────
+    state.generating_brands.add(brand_id)
+    try:
+        cap = get_draft_cap(tier, brand_type)
+        async with AsyncSessionLocal() as db:
             drafts = await auto_draft_top_gaps(
                 db=db,
                 brand_id=brand_id,
@@ -693,16 +705,28 @@ async def _onboarding_post_process(brand_id: int) -> None:
         state.generating_brands.discard(brand_id)
 
     # ── Step 2: Live opportunity scan (in parallel) ──────────────────────────
+    # Reddit + Quora are scanned for all tiers; LinkedIn + X are only
+    # surfaced for paid tiers (matches the gating in /opportunities/scan).
     state.scanning_brands.add(brand_id)
     try:
-        await asyncio.gather(
+        scan_tasks = [
             reddit_scan(brand_id, clear_existing=True),
             quora_scan(brand_id, clear_existing=True),
-            return_exceptions=True,
-        )
+        ]
+        if is_paid_tier(tier):
+            from app.services.linkedin_scanner_service import (
+                scan_brand_opportunities as linkedin_scan,
+            )
+            from app.services.x_scanner_service import (
+                scan_brand_opportunities as x_scan,
+            )
+            scan_tasks.append(linkedin_scan(brand_id, clear_existing=True))
+            scan_tasks.append(x_scan(brand_id, clear_existing=True))
+
+        await asyncio.gather(*scan_tasks, return_exceptions=True)
         logger.info(
-            "Onboarding post-process: opportunity scan complete for brand_id=%d",
-            brand_id,
+            "Onboarding post-process: opportunity scan complete for brand_id=%d (tier=%s, scanners=%d)",
+            brand_id, tier, len(scan_tasks),
         )
     except Exception as exc:
         logger.warning(

@@ -184,25 +184,41 @@ def _strip_url_citations(text: str) -> str:
 async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt-4.1-mini") -> dict:
     if not OPENAI_API_KEY:
         return _api_key_placeholder("chatgpt")
-    is_search = "search" in model_version
-    logger.info("[chatgpt] querying model_version=%s is_search=%s", model_version, is_search)
+    use_websearch = model_version in _CHATGPT_WEBSEARCH_MODELS
+    logger.info(
+        "[chatgpt] querying model_version=%s use_websearch=%s",
+        model_version, use_websearch,
+    )
     start = time.monotonic()
     try:
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-        # Search-preview models reject `temperature` and require `web_search_options`.
-        # Search responses are longer because of citation footers, so bump the cap.
-        kwargs: dict = {
-            "model": model_version,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_completion_tokens": 2048 if is_search else 1024,
-        }
-        if is_search:
-            kwargs["web_search_options"] = {}
-        response = await client.chat.completions.create(**kwargs)
-        latency_ms = int((time.monotonic() - start) * 1000)
-        text = response.choices[0].message.content
+
+        if use_websearch:
+            # Responses API with hosted web_search tool. Replaces the deprecated
+            # gpt-4o-mini-search-preview chat-completions model, which returned
+            # deterministic HTTP 500s on some prompts.
+            response = await client.responses.create(
+                model=model_version,
+                input=prompt,
+                tools=[{
+                    "type": "web_search",
+                    "search_context_size": _CHATGPT_SEARCH_CONTEXT_SIZE,
+                }],
+                max_output_tokens=2048,
+            )
+            latency_ms = int((time.monotonic() - start) * 1000)
+            text = getattr(response, "output_text", None) or ""
+        else:
+            response = await client.chat.completions.create(
+                model=model_version,
+                messages=[{"role": "user", "content": prompt}],
+                max_completion_tokens=1024,
+            )
+            latency_ms = int((time.monotonic() - start) * 1000)
+            text = response.choices[0].message.content
+
         if not text:
             logger.warning(
                 "[chatgpt] API returned empty/null content for prompt %r", prompt[:100]
@@ -211,11 +227,11 @@ async def _query_chatgpt(prompt: str, brand_name: str, model_version: str = "gpt
                 None, brand_name, latency_ms,
                 error="Empty response from ChatGPT API",
             )
-        # For search responses, strip URL/citation noise BEFORE the mention check
-        # so a brand hidden inside a citation URL doesn't trigger a false positive.
-        # Store the ORIGINAL text in response_text so the user-facing transcript
-        # still shows citations.
-        if is_search:
+
+        if use_websearch:
+            # Strip URL/citation noise BEFORE mention check so brand names hidden
+            # in citation URLs do not produce false positives. Keep original text
+            # in response_text so the user-facing transcript retains citations.
             cleaned = _strip_url_citations(text)
             mentioned = _mentioned(brand_name, cleaned)
             return {

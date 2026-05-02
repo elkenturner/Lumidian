@@ -1,8 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, Loader2, Sparkles, Trash2, MessageSquare } from 'lucide-react';
-import { addPrompt, deletePrompt, getSuggestedPrompts, Prompt } from '@/lib/api';
+import { Plus, Loader2, Sparkles, Trash2, MessageSquare, Pencil, Check, X } from 'lucide-react';
+import { addPrompt, deletePrompt, getSuggestedPrompts, updatePrompt, Prompt } from '@/lib/api';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export function ManagePromptsModal({
@@ -29,6 +29,9 @@ export function ManagePromptsModal({
   const [suggesting, setSuggesting] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const atLimit = localPrompts.length >= promptLimit;
   const locked = isRunning;
@@ -66,6 +69,36 @@ export function ManagePromptsModal({
     }
   }
 
+  function startEdit(p: Prompt) {
+    setEditingId(p.id);
+    setEditText(p.text);
+    setAddError('');
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText('');
+  }
+
+  async function saveEdit() {
+    if (editingId == null || !editText.trim()) return;
+    setSavingEdit(true);
+    setAddError('');
+    try {
+      const updated = await updatePrompt(brandId, editingId, editText.trim());
+      const next = localPrompts.map((p) => (p.id === updated.id ? updated : p));
+      setLocalPrompts(next);
+      onChanged(next);
+      setEditingId(null);
+      setEditText('');
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } };
+      setAddError(e?.response?.data?.detail || 'Failed to save prompt.');
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   async function handleSuggest() {
     setSuggesting(true);
     try {
@@ -98,19 +131,71 @@ export function ManagePromptsModal({
               <p className="text-xs text-[var(--text-faint)] mt-0.5">Add your first prompt below</p>
             </div>
           ) : (
-            localPrompts.map((p) => (
-              <div key={p.id} className="flex items-start gap-3 bg-[rgba(95,126,166,0.06)] border border-[rgba(95,126,166,0.12)] rounded-lg px-3 py-2.5">
-                <p className="text-sm text-[var(--text-secondary)] flex-1 leading-snug">{p.text}</p>
-                <button
-                  onClick={() => handleDelete(p.id)}
-                  disabled={deletingId === p.id || locked}
-                  aria-label="Delete prompt"
-                  className="text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors shrink-0 disabled:opacity-40"
-                >
-                  {deletingId === p.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                </button>
-              </div>
-            ))
+            localPrompts.map((p) => {
+              const isEditing = editingId === p.id;
+              const editable = !p.has_history && !locked;
+              return (
+                <div key={p.id} className="flex items-start gap-3 bg-[rgba(95,126,166,0.06)] border border-[rgba(95,126,166,0.12)] rounded-lg px-3 py-2.5">
+                  {isEditing ? (
+                    <input
+                      type="text"
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') saveEdit();
+                        if (e.key === 'Escape') cancelEdit();
+                      }}
+                      autoFocus
+                      className="flex-1 bg-transparent border-b border-[var(--accent)]/40 text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] py-0.5"
+                    />
+                  ) : (
+                    <p className="text-sm text-[var(--text-secondary)] flex-1 leading-snug">{p.text}</p>
+                  )}
+
+                  {isEditing ? (
+                    <>
+                      <button
+                        onClick={saveEdit}
+                        disabled={savingEdit || !editText.trim()}
+                        aria-label="Save prompt"
+                        className="text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors shrink-0 disabled:opacity-40"
+                      >
+                        {savingEdit ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                      </button>
+                      <button
+                        onClick={cancelEdit}
+                        disabled={savingEdit}
+                        aria-label="Cancel edit"
+                        className="text-[var(--text-faint)] hover:text-[var(--text-secondary)] transition-colors shrink-0"
+                      >
+                        <X size={13} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      {editable && (
+                        <button
+                          onClick={() => startEdit(p)}
+                          aria-label="Edit prompt"
+                          className="text-[var(--text-faint)] hover:text-[var(--accent)] transition-colors shrink-0"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleDelete(p.id)}
+                        disabled={deletingId === p.id || locked}
+                        aria-label="Delete prompt"
+                        title={p.has_history ? 'Delete to remove tracking history.' : undefined}
+                        className="text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors shrink-0 disabled:opacity-40"
+                      >
+                        {deletingId === p.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                      </button>
+                    </>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
 

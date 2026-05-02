@@ -56,6 +56,7 @@ from app.schemas import (
     OverallSOV,
     PromptCreate,
     PromptResponse,
+    PromptUpdate,
 )
 
 router = APIRouter(prefix="/brands", tags=["brands"])
@@ -563,6 +564,98 @@ async def delete_prompt(brand_id: int, prompt_id: int, db: DbDep, user: CurrentU
 
     from app.services.analytics_service import log_event
     await log_event("prompt_removed", {"prompt_id": prompt_id, "prompt_text": prompt_text}, brand_id=brand_id)
+
+
+# ── Update prompt text ───────────────────────────────────────────────────────
+
+@router.patch(
+    "/{brand_id}/prompts/{prompt_id}",
+    response_model=PromptResponse,
+)
+async def update_prompt(
+    brand_id: int,
+    prompt_id: int,
+    payload: PromptUpdate,
+    db: DbDep,
+    user: CurrentUser,
+):
+    """Edit a prompt's text. Only allowed when the prompt has no QueryResult history."""
+    await get_brand_for_user(brand_id, db, user)
+
+    # Block edits while a run is active (mirrors add/delete)
+    await fail_stale_runs_for_brand(db, brand_id)
+    active_run = await db.execute(
+        select(TrackingRun.id).where(
+            TrackingRun.brand_id == brand_id,
+            TrackingRun.status.in_(["pending", "running"]),
+        ).limit(1)
+    )
+    if active_run.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot modify prompts while a report is running.",
+        )
+
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Prompt text cannot be empty",
+        )
+
+    # Load the prompt
+    result = await db.execute(
+        select(Prompt).where(Prompt.id == prompt_id, Prompt.brand_id == brand_id)
+    )
+    prompt = result.scalar_one_or_none()
+    if prompt is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Prompt {prompt_id} not found for brand {brand_id}",
+        )
+
+    # No-op: same text → return success without re-checking history
+    if prompt.text == text:
+        history_check = await db.execute(
+            select(QueryResult.id).where(QueryResult.prompt_id == prompt_id).limit(1)
+        )
+        prompt.has_history = history_check.scalar_one_or_none() is not None
+        return PromptResponse.model_validate(prompt)
+
+    # Block edits when the prompt already has tracking history
+    history_check = await db.execute(
+        select(QueryResult.id).where(QueryResult.prompt_id == prompt_id).limit(1)
+    )
+    if history_check.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Prompt is locked — has tracking history. Delete and re-add to change wording.",
+        )
+
+    # Duplicate check — exclude self
+    dup = await db.execute(
+        select(Prompt.id).where(
+            Prompt.brand_id == brand_id,
+            func.lower(Prompt.text) == text.lower(),
+            Prompt.id != prompt_id,
+        ).limit(1)
+    )
+    if dup.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This prompt already exists for this brand.",
+        )
+
+    prompt.text = text
+    await db.commit()
+    await db.refresh(prompt)
+
+    prompt.has_history = False  # we just confirmed above
+
+    from app.services.analytics_service import log_event
+    await log_event("prompt_edited", {"prompt_id": prompt_id, "new_text": text}, brand_id=brand_id)
+
+    return PromptResponse.model_validate(prompt)
 
 
 # ── List competitors ──────────────────────────────────────────────────────────

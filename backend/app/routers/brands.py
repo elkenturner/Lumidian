@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 def _ensure_question_mark(text: str) -> str:
     """Strip trailing whitespace and trailing terminal punctuation, then append '?'."""
-    cleaned = text.strip().rstrip("?.!,;:")
+    cleaned = text.strip().rstrip("?.!")
     if not cleaned:
         return cleaned
     return cleaned + "?"

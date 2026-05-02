@@ -7,6 +7,7 @@ Tests for brand CRUD endpoints and multi-tenant ownership isolation:
 """
 import httpx
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from tests.conftest import create_brand, register_and_login
 
@@ -307,8 +308,6 @@ async def test_brand_profile_rejects_invalid_market_scope(client: httpx.AsyncCli
 
 
 # ── Question-mark enforcement on suggested prompts ────────────────────────────
-
-from unittest.mock import AsyncMock, MagicMock, patch
 
 
 def _mock_anthropic_returning(json_text: str):

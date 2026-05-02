@@ -337,6 +337,9 @@ async def run_migrations():
         "ALTER TABLE users ADD COLUMN pending_tier VARCHAR(50)",
         "ALTER TABLE users ADD COLUMN pending_tier_effective_at DATETIME",
         "ALTER TABLE users ADD COLUMN stripe_schedule_id VARCHAR(255)",
+        # 2026-05-01: Smarter prompt suggestions — market scope on brand_profiles
+        "ALTER TABLE brand_profiles ADD COLUMN market_scope VARCHAR(20)",
+        "ALTER TABLE brand_profiles ADD COLUMN geography VARCHAR(200)",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

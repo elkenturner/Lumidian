@@ -165,7 +165,7 @@ async def update_brand_profile(brand_id: int, payload: BrandProfileUpdate, db: D
         profile.approved_language = json.dumps(payload.approved_language)
     if payload.publications is not None:
         profile.publications = json.dumps([p.model_dump() for p in payload.publications])
-    if payload.market_scope is not None:
+    if "market_scope" in payload.model_fields_set:
         profile.market_scope = payload.market_scope
     if payload.geography is not None:
         profile.geography = payload.geography.strip() or None

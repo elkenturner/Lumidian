@@ -7,6 +7,7 @@ Tests for brand CRUD endpoints and multi-tenant ownership isolation:
 """
 import httpx
 import pytest
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from tests.conftest import create_brand, register_and_login
 
@@ -273,3 +274,365 @@ async def test_competitor_access_control(client: httpx.AsyncClient):
     await register_and_login(client, email="compb@example.com")
     resp = await client.get(f"/api/brands/{brand['id']}/competitors")
     assert resp.status_code == 403
+
+
+# ── Brand Profile: market_scope and geography ─────────────────────────────────
+
+async def test_brand_profile_persists_market_scope_and_geography(client: httpx.AsyncClient):
+    await register_and_login(client, email="scope_persist@example.com")
+    brand = await create_brand(client, name="Scope Brand")
+
+    resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"market_scope": "local", "geography": "Portland, OR"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["market_scope"] == "local"
+    assert resp.json()["geography"] == "Portland, OR"
+
+    # Round-trip via GET
+    get_resp = await client.get(f"/api/brands/{brand['id']}/profile")
+    assert get_resp.status_code == 200
+    assert get_resp.json()["market_scope"] == "local"
+    assert get_resp.json()["geography"] == "Portland, OR"
+
+
+async def test_brand_profile_rejects_invalid_market_scope(client: httpx.AsyncClient):
+    await register_and_login(client, email="scope_bad@example.com")
+    brand = await create_brand(client, name="Bad Scope")
+    resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"market_scope": "interplanetary"},
+    )
+    assert resp.status_code == 422
+
+
+# ── Question-mark enforcement on suggested prompts ────────────────────────────
+
+
+def _mock_anthropic_returning(json_text: str):
+    """Patch context manager that makes anthropic.AsyncAnthropic return json_text from messages.create."""
+    msg = MagicMock()
+    msg.content = [MagicMock(text=json_text)]
+    fake_client = AsyncMock()
+    fake_client.messages.create = AsyncMock(return_value=msg)
+    return patch("anthropic.AsyncAnthropic", return_value=fake_client), patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "test-key"}
+    )
+
+
+@pytest.mark.asyncio
+async def test_suggest_prompts_appends_missing_question_mark(client: httpx.AsyncClient):
+    await register_and_login(client, email="qmark@example.com")
+    brand = await create_brand(client, name="QMark Brand")
+
+    bad_payload = '["Best CRM for startups", "Top sales tools.", "Comparison of A and B!"]'
+    anth_patch, env_patch = _mock_anthropic_returning(bad_payload)
+    with anth_patch, env_patch:
+        resp = await client.post(f"/api/brands/{brand['id']}/suggest-prompts")
+    assert resp.status_code == 200, resp.text
+    suggestions = resp.json()
+    assert len(suggestions) == 3
+    for s in suggestions:
+        assert s.endswith("?"), f"Suggestion missing '?': {s!r}"
+    # Trailing punctuation should be cleaned, not duplicated
+    assert "?" in suggestions[1] and not suggestions[1].endswith(".?")
+    assert not suggestions[2].endswith("!?")
+
+
+@pytest.mark.asyncio
+async def test_suggest_prompts_preview_appends_missing_question_mark(client: httpx.AsyncClient):
+    await register_and_login(client, email="qmark2@example.com")
+    bad_payload = '["What about X", "Y comparison"]'
+    anth_patch, env_patch = _mock_anthropic_returning(bad_payload)
+    with anth_patch, env_patch:
+        resp = await client.post(
+            "/api/brands/suggest-prompts-preview",
+            json={"name": "Acme", "description": "", "website_context": ""},
+        )
+    assert resp.status_code == 200, resp.text
+    for s in resp.json():
+        assert s.endswith("?")
+
+
+# ── infer-scope endpoint ───────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_infer_scope_returns_inferred_values_without_persisting(client: httpx.AsyncClient):
+    await register_and_login(client, email="infer@example.com")
+    brand = await create_brand(client, name="Infer Brand")
+
+    fake_json = '{"market_scope": "local", "geography": "Portland, OR"}'
+    anth_patch, env_patch = _mock_anthropic_returning(fake_json)
+    with anth_patch, env_patch:
+        resp = await client.post(f"/api/brands/{brand['id']}/infer-scope")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["market_scope"] == "local"
+    assert body["geography"] == "Portland, OR"
+
+    # Confirm we did NOT persist — profile market_scope should still be null
+    profile_resp = await client.get(f"/api/brands/{brand['id']}/profile")
+    assert profile_resp.json()["market_scope"] is None
+
+
+@pytest.mark.asyncio
+async def test_infer_scope_returns_404_for_other_users_brand(client: httpx.AsyncClient):
+    await register_and_login(client, email="owner@example.com")
+    brand = await create_brand(client, name="Owner Brand")
+
+    # Switch to a different user
+    await client.post("/api/auth/logout")
+    await register_and_login(client, email="intruder@example.com")
+    resp = await client.post(f"/api/brands/{brand['id']}/infer-scope")
+    assert resp.status_code in (403, 404)
+
+
+@pytest.mark.asyncio
+async def test_infer_scope_clamps_invalid_scope_value(client: httpx.AsyncClient):
+    await register_and_login(client, email="clamp@example.com")
+    brand = await create_brand(client, name="Clamp Brand")
+
+    fake_json = '{"market_scope": "interstellar", "geography": "Mars"}'
+    anth_patch, env_patch = _mock_anthropic_returning(fake_json)
+    with anth_patch, env_patch:
+        resp = await client.post(f"/api/brands/{brand['id']}/infer-scope")
+    assert resp.status_code == 200, resp.text
+    # Out-of-range scope falls back to "national"
+    assert resp.json()["market_scope"] == "national"
+    assert resp.json()["geography"] == "Mars"
+
+
+@pytest.mark.asyncio
+async def test_suggest_prompts_includes_scope_in_system_prompt(client: httpx.AsyncClient):
+    await register_and_login(client, email="scopeprompt@example.com")
+    brand = await create_brand(client, name="ScopePrompt Brand")
+
+    # Set scope on the profile
+    await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"market_scope": "local", "geography": "Portland, OR"},
+    )
+
+    captured: dict = {}
+    msg = MagicMock()
+    msg.content = [MagicMock(text='["What are the best widgets in Portland?"]')]
+
+    async def fake_create(**kwargs):
+        captured["messages"] = kwargs.get("messages")
+        return msg
+
+    fake_client = AsyncMock()
+    fake_client.messages.create = fake_create
+    with patch("anthropic.AsyncAnthropic", return_value=fake_client), patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "test-key"}
+    ):
+        resp = await client.post(f"/api/brands/{brand['id']}/suggest-prompts")
+
+    assert resp.status_code == 200, resp.text
+    sys_prompt = captured["messages"][0]["content"]
+    assert "local" in sys_prompt.lower()
+    assert "Portland, OR" in sys_prompt
+
+
+@pytest.mark.asyncio
+async def test_suggest_prompts_omits_scope_block_when_unset(client: httpx.AsyncClient):
+    await register_and_login(client, email="noscope@example.com")
+    brand = await create_brand(client, name="NoScope Brand")
+
+    captured: dict = {}
+    msg = MagicMock()
+    msg.content = [MagicMock(text='["What is X?"]')]
+
+    async def fake_create(**kwargs):
+        captured["messages"] = kwargs.get("messages")
+        return msg
+
+    fake_client = AsyncMock()
+    fake_client.messages.create = fake_create
+    with patch("anthropic.AsyncAnthropic", return_value=fake_client), patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "test-key"}
+    ):
+        resp = await client.post(f"/api/brands/{brand['id']}/suggest-prompts")
+
+    assert resp.status_code == 200
+    sys_prompt = captured["messages"][0]["content"]
+    # The literal scope-instruction block should not appear when no scope is set
+    assert "Market scope:" not in sys_prompt
+
+
+@pytest.mark.asyncio
+async def test_prompt_response_has_history_flag(client: httpx.AsyncClient, db_session):
+    await register_and_login(client, email="hashistory@example.com")
+    brand = await create_brand(client, name="History Brand", prompts=["What is the best X?"])
+
+    # Initially: no history → has_history is False
+    detail = await client.get(f"/api/brands/{brand['id']}")
+    prompts = detail.json()["prompts"]
+    assert all(p["has_history"] is False for p in prompts)
+
+    # Insert a fake QueryResult against the prompt
+    from app.models import QueryResult, TrackingRun
+    from datetime import datetime, UTC
+    run = TrackingRun(brand_id=brand["id"], status="completed", run_type="manual")
+    db_session.add(run)
+    await db_session.flush()
+    qr = QueryResult(
+        tracking_run_id=run.id,
+        prompt_id=prompts[0]["id"],
+        model="chatgpt",
+        run_number=1,
+        response_text="hi",
+        mentioned=False,
+    )
+    db_session.add(qr)
+    await db_session.commit()
+
+    detail2 = await client.get(f"/api/brands/{brand['id']}")
+    p = next(x for x in detail2.json()["prompts"] if x["id"] == prompts[0]["id"])
+    assert p["has_history"] is True
+
+
+# ── PATCH /api/brands/{id}/prompts/{pid} ─────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_patch_prompt_succeeds_when_no_history(client: httpx.AsyncClient):
+    await register_and_login(client, email="patch1@example.com")
+    brand = await create_brand(client, name="Patch Brand", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "What is the best X?"},
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["text"] == "What is the best X?"
+    assert resp.json()["has_history"] is False
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_409_when_history_exists(client: httpx.AsyncClient, db_session):
+    await register_and_login(client, email="patch2@example.com")
+    brand = await create_brand(client, name="Patch History", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+
+    # Seed a query result against the prompt
+    from app.models import QueryResult, TrackingRun
+    run = TrackingRun(brand_id=brand["id"], status="completed", run_type="manual")
+    db_session.add(run)
+    await db_session.flush()
+    db_session.add(QueryResult(
+        tracking_run_id=run.id, prompt_id=prompt_id, model="chatgpt",
+        run_number=1, response_text="hi", mentioned=False,
+    ))
+    await db_session.commit()
+
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "What is the best X?"},
+    )
+    assert resp.status_code == 409
+    assert "history" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_409_during_active_run(client: httpx.AsyncClient, db_session):
+    await register_and_login(client, email="patch3@example.com")
+    brand = await create_brand(client, name="Patch Active", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+
+    from app.models import TrackingRun
+    from datetime import datetime, UTC
+    db_session.add(TrackingRun(
+        brand_id=brand["id"], status="running", run_type="manual",
+        created_at=datetime.now(UTC).replace(tzinfo=None),
+    ))
+    await db_session.commit()
+
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "Anything"},
+    )
+    assert resp.status_code == 409
+    assert "report is running" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_409_on_duplicate_text(client: httpx.AsyncClient):
+    await register_and_login(client, email="patch4@example.com")
+    brand = await create_brand(
+        client, name="Patch Dup",
+        prompts=["What is X?", "What is Y?"],
+    )
+    target_id = brand["prompts"][0]["id"]
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{target_id}",
+        json={"text": "What is Y?"},
+    )
+    assert resp.status_code == 409
+    assert "already exists" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_same_text_is_noop_success(client: httpx.AsyncClient):
+    await register_and_login(client, email="patch5@example.com")
+    brand = await create_brand(client, name="Patch Noop", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "What is X?"},
+    )
+    assert resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_403_for_other_users_brand(client: httpx.AsyncClient):
+    await register_and_login(client, email="patchowner@example.com")
+    brand = await create_brand(client, name="Owner", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+
+    await client.post("/api/auth/logout")
+    await register_and_login(client, email="patchintruder@example.com")
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "Pwned"},
+    )
+    assert resp.status_code in (403, 404)
+
+
+@pytest.mark.asyncio
+async def test_patch_prompt_422_on_empty_text(client: httpx.AsyncClient):
+    await register_and_login(client, email="patch6@example.com")
+    brand = await create_brand(client, name="Patch Empty", prompts=["What is X?"])
+    prompt_id = brand["prompts"][0]["id"]
+    resp = await client.patch(
+        f"/api/brands/{brand['id']}/prompts/{prompt_id}",
+        json={"text": "   "},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_brand_profile_market_scope_can_be_cleared(client: httpx.AsyncClient):
+    """User can reset market_scope to null via the 'Not set' dropdown option."""
+    await register_and_login(client, email="scope_clear@example.com")
+    brand = await create_brand(client, name="Clearable Brand")
+
+    # Set scope
+    set_resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"market_scope": "local", "geography": "Portland, OR"},
+    )
+    assert set_resp.status_code == 200
+    assert set_resp.json()["market_scope"] == "local"
+
+    # Clear scope by sending null
+    clear_resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"market_scope": None},
+    )
+    assert clear_resp.status_code == 200
+    assert clear_resp.json()["market_scope"] is None
+    # Geography should NOT be touched (we didn't send it)
+    assert clear_resp.json()["geography"] == "Portland, OR"

@@ -20,6 +20,15 @@ from typing import Annotated
 
 logger = logging.getLogger(__name__)
 
+
+def _ensure_question_mark(text: str) -> str:
+    """Strip trailing whitespace and trailing terminal punctuation, then append '?'."""
+    cleaned = text.strip().rstrip("?.!")
+    if not cleaned:
+        return cleaned
+    return cleaned + "?"
+
+
 from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -43,9 +52,11 @@ from app.schemas import (
     CompetitorResponse,
     FetchWebsiteContextRequest,
     FetchWebsiteContextResponse,
+    InferScopeResponse,
     OverallSOV,
     PromptCreate,
     PromptResponse,
+    PromptUpdate,
 )
 
 router = APIRouter(prefix="/brands", tags=["brands"])
@@ -87,6 +98,21 @@ async def _get_brand_or_404(
             if brand.user_id != effective_owner_id:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
     return brand
+
+
+async def _attach_has_history(db: AsyncSession, brand: Brand) -> None:
+    """Set `has_history` (transient attribute) on each of the brand's prompts."""
+    if not brand.prompts:
+        return
+    prompt_ids = [p.id for p in brand.prompts]
+    rows = await db.execute(
+        select(QueryResult.prompt_id)
+        .where(QueryResult.prompt_id.in_(prompt_ids))
+        .distinct()
+    )
+    with_history = {r[0] for r in rows.all()}
+    for p in brand.prompts:
+        p.has_history = p.id in with_history
 
 
 # ── List brands with stats (for brand switcher) ───────────────────────────────
@@ -328,6 +354,7 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
         select(Brand).where(Brand.id == brand.id).options(selectinload(Brand.prompts))
     )
     brand = result.scalar_one()
+    await _attach_has_history(db, brand)
     return BrandDetail.model_validate(brand)
 
 
@@ -336,6 +363,7 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
 @router.get("/{brand_id}", response_model=BrandDetail)
 async def get_brand(brand_id: int, db: DbDep, user: CurrentUser):
     brand = await _get_brand_or_404(db, brand_id, user)
+    await _attach_has_history(db, brand)
     return BrandDetail.model_validate(brand)
 
 
@@ -389,6 +417,7 @@ async def update_brand(brand_id: int, payload: BrandUpdate, db: DbDep, user: Cur
         select(Brand).where(Brand.id == brand.id).options(selectinload(Brand.prompts))
     )
     brand = result.scalar_one()
+    await _attach_has_history(db, brand)
     return BrandDetail.model_validate(brand)
 
 
@@ -483,6 +512,7 @@ async def add_prompt(
     from app.services.analytics_service import log_event
     await log_event("prompt_added", {"prompt_text": text}, brand_id=brand_id)
 
+    prompt.has_history = False
     return PromptResponse.model_validate(prompt)
 
 
@@ -534,6 +564,98 @@ async def delete_prompt(brand_id: int, prompt_id: int, db: DbDep, user: CurrentU
 
     from app.services.analytics_service import log_event
     await log_event("prompt_removed", {"prompt_id": prompt_id, "prompt_text": prompt_text}, brand_id=brand_id)
+
+
+# ── Update prompt text ───────────────────────────────────────────────────────
+
+@router.patch(
+    "/{brand_id}/prompts/{prompt_id}",
+    response_model=PromptResponse,
+)
+async def update_prompt(
+    brand_id: int,
+    prompt_id: int,
+    payload: PromptUpdate,
+    db: DbDep,
+    user: CurrentUser,
+):
+    """Edit a prompt's text. Only allowed when the prompt has no QueryResult history."""
+    await get_brand_for_user(brand_id, db, user)
+
+    # Block edits while a run is active (mirrors add/delete)
+    await fail_stale_runs_for_brand(db, brand_id)
+    active_run = await db.execute(
+        select(TrackingRun.id).where(
+            TrackingRun.brand_id == brand_id,
+            TrackingRun.status.in_(["pending", "running"]),
+        ).limit(1)
+    )
+    if active_run.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Cannot modify prompts while a report is running.",
+        )
+
+    text = payload.text.strip()
+    if not text:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Prompt text cannot be empty",
+        )
+
+    # Load the prompt
+    result = await db.execute(
+        select(Prompt).where(Prompt.id == prompt_id, Prompt.brand_id == brand_id)
+    )
+    prompt = result.scalar_one_or_none()
+    if prompt is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Prompt {prompt_id} not found for brand {brand_id}",
+        )
+
+    # No-op: same text → return success without re-checking history
+    if prompt.text == text:
+        history_check = await db.execute(
+            select(QueryResult.id).where(QueryResult.prompt_id == prompt_id).limit(1)
+        )
+        prompt.has_history = history_check.scalar_one_or_none() is not None
+        return PromptResponse.model_validate(prompt)
+
+    # Block edits when the prompt already has tracking history
+    history_check = await db.execute(
+        select(QueryResult.id).where(QueryResult.prompt_id == prompt_id).limit(1)
+    )
+    if history_check.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Prompt is locked — has tracking history. Delete and re-add to change wording.",
+        )
+
+    # Duplicate check — exclude self
+    dup = await db.execute(
+        select(Prompt.id).where(
+            Prompt.brand_id == brand_id,
+            func.lower(Prompt.text) == text.lower(),
+            Prompt.id != prompt_id,
+        ).limit(1)
+    )
+    if dup.scalar_one_or_none() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This prompt already exists for this brand.",
+        )
+
+    prompt.text = text
+    await db.commit()
+    await db.refresh(prompt)
+
+    prompt.has_history = False  # we just confirmed above
+
+    from app.services.analytics_service import log_event
+    await log_event("prompt_edited", {"prompt_id": prompt_id, "new_text": text}, brand_id=brand_id)
+
+    return PromptResponse.model_validate(prompt)
 
 
 # ── List competitors ──────────────────────────────────────────────────────────
@@ -643,13 +765,30 @@ async def suggest_prompts(brand_id: int, db: DbDep, user: CurrentUser):
         existing_sample = "; ".join(existing[:5])
         context_parts.append(f"Already tracking (avoid duplicates): {existing_sample}")
 
-    context = "\n".join(context_parts)
+    scope_block = ""
+    if profile and profile.market_scope:
+        geo_line = f"\nGeography: {profile.geography}" if profile.geography else ""
+        if profile.geography:
+            geo_examples = f"'best X in {profile.geography}', '{profile.geography}-area X'"
+        else:
+            geo_examples = "geographically scoped phrasings appropriate to the brand's locale"
+        scope_block = (
+            f"\n\nMarket scope: {profile.market_scope}{geo_line}\n\n"
+            "When generating queries, scope them to where this brand actually competes. "
+            f"For local scope, use the geography in queries (e.g. {geo_examples}). "
+            "For national, prefer country-specific phrasings. "
+            "For niche B2B, use vertical-specific phrasings rather than geographic ones. "
+            "Avoid global/national phrasings the brand has no realistic chance of appearing in."
+        )
+
+    context = "\n".join(context_parts) + scope_block
 
     system_prompt = f"""You generate AI visibility tracking prompts for brands. Your job is to find the real search queries that consumers type into ChatGPT, Claude, or Perplexity when researching solutions — NOT when looking up a specific brand.
 
 {context}
 
 Return ONLY a valid JSON array of strings — no explanation, no markdown, no comments. 12-15 prompts total.
+EVERY prompt MUST be phrased as a question and end with "?".
 
 GENERATE ONLY these types of queries:
 1. Category/solution queries — "What are the best [category] options?", "Which [category] tools are worth it?"
@@ -687,13 +826,99 @@ The goal is to find queries where a user is researching a problem or category, a
             suggestions = _json.loads(m.group())
         else:
             suggestions = _json.loads(text)
-        return [s for s in suggestions if isinstance(s, str)][:15]
+        cleaned = [_ensure_question_mark(s) for s in suggestions if isinstance(s, str)]
+        return [s for s in cleaned if s][:15]
     except Exception as exc:
         logger.exception("suggest_prompts failed")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Suggestion generation failed. Please try again.",
         )
+
+
+@router.post("/{brand_id}/infer-scope")
+async def infer_scope(brand_id: int, db: DbDep, user: CurrentUser) -> InferScopeResponse:
+    """Use Claude to infer the brand's market scope. Does NOT persist — caller saves via PUT /profile."""
+    from app.models import BrandProfile as BrandProfileModel
+
+    check_rate_limit(user.id, limit=5)
+    brand = await _get_brand_or_404(db, brand_id, user)
+
+    profile_result = await db.execute(
+        select(BrandProfileModel).where(BrandProfileModel.brand_id == brand_id)
+    )
+    profile = profile_result.scalar_one_or_none()
+
+    comp_result = await db.execute(
+        select(Competitor).where(Competitor.brand_id == brand_id)
+    )
+    competitors = comp_result.scalars().all()
+
+    context_parts = [f"Brand name: {brand.name}"]
+    if brand.website_url:
+        context_parts.append(f"Website: {brand.website_url}")
+    if profile and profile.company_description:
+        context_parts.append(f"Description: {profile.company_description}")
+    if profile and profile.target_audience:
+        context_parts.append(f"Target audience: {profile.target_audience}")
+    if profile and profile.internal_brand_context:
+        context_parts.append(f"Website content excerpt:\n{profile.internal_brand_context[:3000]}")
+    if competitors:
+        context_parts.append(f"Known competitors: {', '.join(c.name for c in competitors)}")
+
+    api_key = _os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ANTHROPIC_API_KEY not configured.",
+        )
+
+    context = "\n".join(context_parts)
+    prompt = f"""Classify the market scope of this brand based on the context below.
+
+{context}
+
+Return ONLY a JSON object with two fields, no markdown, no explanation:
+{{
+  "market_scope": "local" | "national" | "global" | "niche",
+  "geography": "<short string describing where this brand competes — city/region for local, country for national, region(s) for global, vertical descriptor for niche>"
+}}
+
+Definitions:
+- "local"  — operates in a single city or metro area (a coffee roaster in Portland, a clinic in Berlin)
+- "national" — operates across one country (a US-only SaaS, a UK retailer)
+- "global" — operates across multiple countries (Salesforce, Notion)
+- "niche" — narrow B2B vertical that competes regardless of geography (a kubernetes operator, a pharma billing tool)
+
+If unsure, prefer "national"."""
+
+    try:
+        import anthropic
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.content[0].text.strip() if response.content else "{}"
+        m = re.search(r"\{[\s\S]*\}", text)
+        data = _json.loads(m.group() if m else text)
+    except Exception:
+        logger.exception("infer_scope failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Scope inference failed. Please try again.",
+        )
+
+    raw_scope = (data.get("market_scope") or "").lower().strip()
+    allowed = {"local", "national", "global", "niche"}
+    scope = raw_scope if raw_scope in allowed else "national"
+    geography = data.get("geography")
+    if isinstance(geography, str):
+        geography = geography.strip() or None
+    else:
+        geography = None
+    return InferScopeResponse(market_scope=scope, geography=geography)
 
 
 # ── Fetch website context without an existing brand (onboarding) ─────────────
@@ -803,6 +1028,7 @@ async def suggest_prompts_preview(payload: _SuggestPreviewReq, db: DbDep, user: 
 {context}
 
 Return ONLY a valid JSON array of 12 strings — no explanation, no markdown.
+EVERY prompt MUST be phrased as a question and end with "?".
 
 Generate category queries, comparison queries, problem-seeking queries, and buying-decision queries. NEVER include the brand name in any question."""
 
@@ -817,7 +1043,8 @@ Generate category queries, comparison queries, problem-seeking queries, and buyi
         text = response.content[0].text.strip() if response.content else "[]"
         m = re.search(r"\[[\s\S]*\]", text)
         suggestions = _json.loads(m.group() if m else text)
-        return [s for s in suggestions if isinstance(s, str)][:12]
+        cleaned = [_ensure_question_mark(s) for s in suggestions if isinstance(s, str)]
+        return [s for s in cleaned if s][:12]
     except Exception as exc:
         logger.exception("suggest_prompts_preview failed")
         raise HTTPException(

@@ -653,7 +653,23 @@ async def suggest_prompts(brand_id: int, db: DbDep, user: CurrentUser):
         existing_sample = "; ".join(existing[:5])
         context_parts.append(f"Already tracking (avoid duplicates): {existing_sample}")
 
-    context = "\n".join(context_parts)
+    scope_block = ""
+    if profile and profile.market_scope:
+        geo_line = f"\nGeography: {profile.geography}" if profile.geography else ""
+        scope_block = (
+            f"\n\nMarket scope: {profile.market_scope}{geo_line}\n\n"
+            "When generating queries, scope them to where this brand actually competes. "
+            "For local scope, use the geography in queries (e.g. 'best X in {geo}', "
+            "'{geo}-area X'). For national, prefer country-specific phrasings. "
+            "For niche B2B, use vertical-specific phrasings rather than geographic ones. "
+            "Avoid global/national phrasings the brand has no realistic chance of appearing in."
+        )
+        if profile.geography:
+            scope_block = scope_block.replace("{geo}", profile.geography)
+        else:
+            scope_block = scope_block.replace("'best X in {geo}', '{geo}-area X'", "geographically scoped phrasings")
+
+    context = "\n".join(context_parts) + scope_block
 
     system_prompt = f"""You generate AI visibility tracking prompts for brands. Your job is to find the real search queries that consumers type into ChatGPT, Claude, or Perplexity when researching solutions — NOT when looking up a specific brand.
 

@@ -402,3 +402,61 @@ async def test_infer_scope_clamps_invalid_scope_value(client: httpx.AsyncClient)
     # Out-of-range scope falls back to "national"
     assert resp.json()["market_scope"] == "national"
     assert resp.json()["geography"] == "Mars"
+
+
+@pytest.mark.asyncio
+async def test_suggest_prompts_includes_scope_in_system_prompt(client: httpx.AsyncClient):
+    await register_and_login(client, email="scopeprompt@example.com")
+    brand = await create_brand(client, name="ScopePrompt Brand")
+
+    # Set scope on the profile
+    await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"market_scope": "local", "geography": "Portland, OR"},
+    )
+
+    captured: dict = {}
+    msg = MagicMock()
+    msg.content = [MagicMock(text='["What are the best widgets in Portland?"]')]
+
+    async def fake_create(**kwargs):
+        captured["messages"] = kwargs.get("messages")
+        return msg
+
+    fake_client = AsyncMock()
+    fake_client.messages.create = fake_create
+    with patch("anthropic.AsyncAnthropic", return_value=fake_client), patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "test-key"}
+    ):
+        resp = await client.post(f"/api/brands/{brand['id']}/suggest-prompts")
+
+    assert resp.status_code == 200, resp.text
+    sys_prompt = captured["messages"][0]["content"]
+    assert "local" in sys_prompt.lower()
+    assert "Portland, OR" in sys_prompt
+
+
+@pytest.mark.asyncio
+async def test_suggest_prompts_omits_scope_block_when_unset(client: httpx.AsyncClient):
+    await register_and_login(client, email="noscope@example.com")
+    brand = await create_brand(client, name="NoScope Brand")
+
+    captured: dict = {}
+    msg = MagicMock()
+    msg.content = [MagicMock(text='["What is X?"]')]
+
+    async def fake_create(**kwargs):
+        captured["messages"] = kwargs.get("messages")
+        return msg
+
+    fake_client = AsyncMock()
+    fake_client.messages.create = fake_create
+    with patch("anthropic.AsyncAnthropic", return_value=fake_client), patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "test-key"}
+    ):
+        resp = await client.post(f"/api/brands/{brand['id']}/suggest-prompts")
+
+    assert resp.status_code == 200
+    sys_prompt = captured["messages"][0]["content"]
+    # The literal scope-instruction block should not appear when no scope is set
+    assert "Market scope:" not in sys_prompt

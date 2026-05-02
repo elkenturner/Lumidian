@@ -20,11 +20,16 @@ class PromptCreate(PromptBase):
         return v
 
 
+class PromptUpdate(BaseModel):
+    text: str
+
+
 class PromptResponse(PromptBase):
     id: int
     brand_id: int
     prompt_type: str = "standard"
     created_at: datetime
+    has_history: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -588,6 +593,18 @@ class BrandProfileUpdate(BaseModel):
     target_audience: str | None = Field(None, max_length=2000)
     approved_language: list[str] | None = None
     publications: list[Publication] | None = None
+    market_scope: str | None = Field(None, max_length=20)
+    geography: str | None = Field(None, max_length=200)
+
+    @field_validator("market_scope")
+    @classmethod
+    def validate_market_scope(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        allowed = {"local", "national", "global", "niche"}
+        if v not in allowed:
+            raise ValueError(f"market_scope must be one of {sorted(allowed)}")
+        return v
 
     @field_validator("key_stats", "what_not_to_say")
     @classmethod
@@ -631,6 +648,8 @@ class BrandProfileResponse(BaseModel):
     target_audience: str | None = None
     approved_language: list[str] = []
     publications: list[Publication] = []
+    market_scope: str | None = None
+    geography: str | None = None
     completion_pct: float = 0.0
     internal_brand_context: str | None = None
     website_context_last_fetched: datetime | None = None
@@ -638,6 +657,11 @@ class BrandProfileResponse(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class InferScopeResponse(BaseModel):
+    market_scope: str
+    geography: str | None = None
 
 
 class AiFillProfileResponse(BaseModel):

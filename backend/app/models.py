@@ -431,6 +431,8 @@ class BrandProfile(Base):
     publications: Mapped[str | None] = mapped_column(Text, nullable=True)     # JSON array of {url,title,publisher,date}
     internal_brand_context: Mapped[str | None] = mapped_column(Text, nullable=True)  # fetched from website via Jina
     website_context_last_fetched: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    market_scope: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    geography: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 

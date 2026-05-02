@@ -105,6 +105,8 @@ def _profile_to_response(profile: BrandProfile) -> BrandProfileResponse:
         target_audience=profile.target_audience,
         approved_language=_parse_list(profile.approved_language),
         publications=_parse_publications(profile.publications),
+        market_scope=profile.market_scope,
+        geography=profile.geography,
         completion_pct=_compute_completion(profile),
         internal_brand_context=profile.internal_brand_context,
         website_context_last_fetched=profile.website_context_last_fetched,
@@ -163,6 +165,10 @@ async def update_brand_profile(brand_id: int, payload: BrandProfileUpdate, db: D
         profile.approved_language = json.dumps(payload.approved_language)
     if payload.publications is not None:
         profile.publications = json.dumps([p.model_dump() for p in payload.publications])
+    if "market_scope" in payload.model_fields_set:
+        profile.market_scope = payload.market_scope
+    if payload.geography is not None:
+        profile.geography = payload.geography.strip() or None
 
     try:
         await db.commit()

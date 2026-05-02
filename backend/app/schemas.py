@@ -25,6 +25,7 @@ class PromptResponse(PromptBase):
     brand_id: int
     prompt_type: str = "standard"
     created_at: datetime
+    has_history: bool = False
 
     model_config = {"from_attributes": True}
 

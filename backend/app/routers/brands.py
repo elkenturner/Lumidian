@@ -99,6 +99,21 @@ async def _get_brand_or_404(
     return brand
 
 
+async def _attach_has_history(db: AsyncSession, brand: Brand) -> None:
+    """Set `has_history` (transient attribute) on each of the brand's prompts."""
+    if not brand.prompts:
+        return
+    prompt_ids = [p.id for p in brand.prompts]
+    rows = await db.execute(
+        select(QueryResult.prompt_id)
+        .where(QueryResult.prompt_id.in_(prompt_ids))
+        .distinct()
+    )
+    with_history = {r[0] for r in rows.all()}
+    for p in brand.prompts:
+        p.has_history = p.id in with_history
+
+
 # ── List brands with stats (for brand switcher) ───────────────────────────────
 
 @router.get("/with-stats", response_model=list[BrandWithStats])
@@ -338,6 +353,7 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
         select(Brand).where(Brand.id == brand.id).options(selectinload(Brand.prompts))
     )
     brand = result.scalar_one()
+    await _attach_has_history(db, brand)
     return BrandDetail.model_validate(brand)
 
 
@@ -346,6 +362,7 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
 @router.get("/{brand_id}", response_model=BrandDetail)
 async def get_brand(brand_id: int, db: DbDep, user: CurrentUser):
     brand = await _get_brand_or_404(db, brand_id, user)
+    await _attach_has_history(db, brand)
     return BrandDetail.model_validate(brand)
 
 
@@ -399,6 +416,7 @@ async def update_brand(brand_id: int, payload: BrandUpdate, db: DbDep, user: Cur
         select(Brand).where(Brand.id == brand.id).options(selectinload(Brand.prompts))
     )
     brand = result.scalar_one()
+    await _attach_has_history(db, brand)
     return BrandDetail.model_validate(brand)
 
 
@@ -493,6 +511,7 @@ async def add_prompt(
     from app.services.analytics_service import log_event
     await log_event("prompt_added", {"prompt_text": text}, brand_id=brand_id)
 
+    prompt.has_history = False
     return PromptResponse.model_validate(prompt)
 
 

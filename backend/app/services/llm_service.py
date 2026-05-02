@@ -102,15 +102,27 @@ TIER_RUNS = {
     "premium": RUNS_PER_PROMPT,
 }
 
-# Model versions per subscription tier. Paid tiers get upgraded ChatGPT (web
-# search) and Perplexity (sonar-pro). Claude and Gemini use the same version
-# across tiers; Claude is only queried on Pro (see models_for_tier).
+# Model versions per subscription tier. Paid tiers get upgraded ChatGPT (GA
+# gpt-4o-mini + hosted web_search tool via Responses API) and Perplexity
+# (sonar-pro). Claude and Gemini use the same version across tiers; Claude is
+# only queried on Pro (see models_for_tier).
 _MODEL_VERSIONS: dict[str, dict[str, str]] = {
-    "chatgpt":    {"default": "gpt-4.1-mini",              "pro": "gpt-4o-mini-search-preview"},
+    "chatgpt":    {"default": "gpt-4.1-mini",              "pro": "gpt-4o-mini"},
     "claude":     {"default": "claude-haiku-4-5-20251001",  "pro": "claude-haiku-4-5-20251001"},
     "perplexity": {"default": "sonar",                      "pro": "sonar-pro"},
     "gemini":     {"default": "gemini-2.5-flash",           "pro": "gemini-2.5-flash"},
 }
+
+# ChatGPT models that use the Responses API + hosted web_search tool.
+# These models do NOT support chat.completions; they require client.responses.create()
+# with tools=[{"type": "web_search", ...}]. Add new model IDs here as OpenAI ships them.
+_CHATGPT_WEBSEARCH_MODELS: frozenset[str] = frozenset({"gpt-4o-mini"})
+
+# Hosted web_search context sizing. "medium" balances grounding quality and
+# cost: ~$25/1k searches at "high" → ~$10/1k at "medium". Tracking runs care
+# about *whether* the brand appears, not exhaustive citation coverage, so
+# medium is sufficient. Bump to "high" only if mention-recall regresses.
+_CHATGPT_SEARCH_CONTEXT_SIZE: str = "medium"
 
 
 def _get_model_version(model_key: str, pro: bool = False) -> str:

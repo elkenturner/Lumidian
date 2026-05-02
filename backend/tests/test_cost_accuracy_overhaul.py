@@ -85,14 +85,14 @@ def test_fallback_models_does_not_reference_gemini_pro():
 def test_chatgpt_pro_variant_uses_search_model():
     versions = llm_service._MODEL_VERSIONS["chatgpt"]
     assert versions["default"] == "gpt-4.1-mini"
-    assert versions["pro"] == "gpt-4o-mini-search-preview", (
-        "Pro tier ChatGPT must use the OpenAI native web-search model "
-        "(spec decision #3)"
+    assert versions["pro"] == "gpt-4o-mini", (
+        "Pro tier ChatGPT must use GA gpt-4o-mini with the hosted web_search "
+        "tool via Responses API (preview search model was deprecated 2026-05)."
     )
 
 
 def test_get_model_version_for_chatgpt_pro_returns_search_variant():
-    assert llm_service._get_model_version("chatgpt", pro=True) == "gpt-4o-mini-search-preview"
+    assert llm_service._get_model_version("chatgpt", pro=True) == "gpt-4o-mini"
     assert llm_service._get_model_version("chatgpt", pro=False) == "gpt-4.1-mini"
 
 

@@ -745,9 +745,10 @@ async def infer_scope(brand_id: int, db: DbDep, user: CurrentUser) -> InferScope
             detail="ANTHROPIC_API_KEY not configured.",
         )
 
+    context = "\n".join(context_parts)
     prompt = f"""Classify the market scope of this brand based on the context below.
 
-{chr(10).join(context_parts)}
+{context}
 
 Return ONLY a JSON object with two fields, no markdown, no explanation:
 {{

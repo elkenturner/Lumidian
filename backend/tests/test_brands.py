@@ -353,3 +353,52 @@ async def test_suggest_prompts_preview_appends_missing_question_mark(client: htt
     assert resp.status_code == 200, resp.text
     for s in resp.json():
         assert s.endswith("?")
+
+
+# ── infer-scope endpoint ───────────────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_infer_scope_returns_inferred_values_without_persisting(client: httpx.AsyncClient):
+    await register_and_login(client, email="infer@example.com")
+    brand = await create_brand(client, name="Infer Brand")
+
+    fake_json = '{"market_scope": "local", "geography": "Portland, OR"}'
+    anth_patch, env_patch = _mock_anthropic_returning(fake_json)
+    with anth_patch, env_patch:
+        resp = await client.post(f"/api/brands/{brand['id']}/infer-scope")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["market_scope"] == "local"
+    assert body["geography"] == "Portland, OR"
+
+    # Confirm we did NOT persist — profile market_scope should still be null
+    profile_resp = await client.get(f"/api/brands/{brand['id']}/profile")
+    assert profile_resp.json()["market_scope"] is None
+
+
+@pytest.mark.asyncio
+async def test_infer_scope_returns_404_for_other_users_brand(client: httpx.AsyncClient):
+    await register_and_login(client, email="owner@example.com")
+    brand = await create_brand(client, name="Owner Brand")
+
+    # Switch to a different user
+    await client.post("/api/auth/logout")
+    await register_and_login(client, email="intruder@example.com")
+    resp = await client.post(f"/api/brands/{brand['id']}/infer-scope")
+    assert resp.status_code in (403, 404)
+
+
+@pytest.mark.asyncio
+async def test_infer_scope_clamps_invalid_scope_value(client: httpx.AsyncClient):
+    await register_and_login(client, email="clamp@example.com")
+    brand = await create_brand(client, name="Clamp Brand")
+
+    fake_json = '{"market_scope": "interstellar", "geography": "Mars"}'
+    anth_patch, env_patch = _mock_anthropic_returning(fake_json)
+    with anth_patch, env_patch:
+        resp = await client.post(f"/api/brands/{brand['id']}/infer-scope")
+    assert resp.status_code == 200, resp.text
+    # Out-of-range scope falls back to "national"
+    assert resp.json()["market_scope"] == "national"
+    assert resp.json()["geography"] == "Mars"

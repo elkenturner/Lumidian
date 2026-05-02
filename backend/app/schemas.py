@@ -654,6 +654,11 @@ class BrandProfileResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class InferScopeResponse(BaseModel):
+    market_scope: str
+    geography: str | None = None
+
+
 class AiFillProfileResponse(BaseModel):
     company_description: str | None = None
     target_audience: str | None = None

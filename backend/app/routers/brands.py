@@ -52,6 +52,7 @@ from app.schemas import (
     CompetitorResponse,
     FetchWebsiteContextRequest,
     FetchWebsiteContextResponse,
+    InferScopeResponse,
     OverallSOV,
     PromptCreate,
     PromptResponse,
@@ -705,6 +706,90 @@ The goal is to find queries where a user is researching a problem or category, a
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Suggestion generation failed. Please try again.",
         )
+
+
+@router.post("/{brand_id}/infer-scope")
+async def infer_scope(brand_id: int, db: DbDep, user: CurrentUser) -> InferScopeResponse:
+    """Use Claude to infer the brand's market scope. Does NOT persist — caller saves via PUT /profile."""
+    from app.models import BrandProfile as BrandProfileModel
+
+    check_rate_limit(user.id, limit=5)
+    brand = await _get_brand_or_404(db, brand_id, user)
+
+    profile_result = await db.execute(
+        select(BrandProfileModel).where(BrandProfileModel.brand_id == brand_id)
+    )
+    profile = profile_result.scalar_one_or_none()
+
+    comp_result = await db.execute(
+        select(Competitor).where(Competitor.brand_id == brand_id)
+    )
+    competitors = comp_result.scalars().all()
+
+    context_parts = [f"Brand name: {brand.name}"]
+    if brand.website_url:
+        context_parts.append(f"Website: {brand.website_url}")
+    if profile and profile.company_description:
+        context_parts.append(f"Description: {profile.company_description}")
+    if profile and profile.target_audience:
+        context_parts.append(f"Target audience: {profile.target_audience}")
+    if profile and profile.internal_brand_context:
+        context_parts.append(f"Website content excerpt:\n{profile.internal_brand_context[:3000]}")
+    if competitors:
+        context_parts.append(f"Known competitors: {', '.join(c.name for c in competitors)}")
+
+    api_key = _os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="ANTHROPIC_API_KEY not configured.",
+        )
+
+    prompt = f"""Classify the market scope of this brand based on the context below.
+
+{chr(10).join(context_parts)}
+
+Return ONLY a JSON object with two fields, no markdown, no explanation:
+{{
+  "market_scope": "local" | "national" | "global" | "niche",
+  "geography": "<short string describing where this brand competes — city/region for local, country for national, region(s) for global, vertical descriptor for niche>"
+}}
+
+Definitions:
+- "local"  — operates in a single city or metro area (a coffee roaster in Portland, a clinic in Berlin)
+- "national" — operates across one country (a US-only SaaS, a UK retailer)
+- "global" — operates across multiple countries (Salesforce, Notion)
+- "niche" — narrow B2B vertical that competes regardless of geography (a kubernetes operator, a pharma billing tool)
+
+If unsure, prefer "national"."""
+
+    try:
+        import anthropic
+        client = anthropic.AsyncAnthropic(api_key=api_key)
+        response = await client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=200,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        text = response.content[0].text.strip() if response.content else "{}"
+        m = re.search(r"\{[\s\S]*\}", text)
+        data = _json.loads(m.group() if m else text)
+    except Exception:
+        logger.exception("infer_scope failed")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Scope inference failed. Please try again.",
+        )
+
+    raw_scope = (data.get("market_scope") or "").lower().strip()
+    allowed = {"local", "national", "global", "niche"}
+    scope = raw_scope if raw_scope in allowed else "national"
+    geography = data.get("geography")
+    if isinstance(geography, str):
+        geography = geography.strip() or None
+    else:
+        geography = None
+    return InferScopeResponse(market_scope=scope, geography=geography)
 
 
 # ── Fetch website context without an existing brand (onboarding) ─────────────

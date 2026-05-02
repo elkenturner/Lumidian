@@ -542,7 +542,13 @@ def _classify_error(error: str) -> str:
         return "rate_limit"
     if "401" in e or "unauthorized" in e or "invalid api key" in e or "invalid_api_key" in e:
         return "auth"  # permanent — bad API key
-    if "503" in e or "unavailable" in e or "overloaded" in e or "timed out" in e:
+    # 500/server_error: OpenAI Responses API returns these for transient
+    # synthesis failures. Treat as overload so the retry loop backs off
+    # exponentially instead of hammering 3s flat (the 'other' bucket).
+    if (
+        "503" in e or "unavailable" in e or "overloaded" in e or "timed out" in e
+        or "500" in e or "server_error" in e or "server error" in e
+    ):
         return "overload"
     return "other"
 

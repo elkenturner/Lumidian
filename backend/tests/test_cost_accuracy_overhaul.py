@@ -456,3 +456,15 @@ async def test_run_tracking_skips_chatgpt_for_pitch_brand(monkeypatch):
     assert "claude" not in call_log, "Pitch brands must skip Claude"
     # 2 models (perplexity + gemini) × 3 runs × 1 prompt = 6 calls
     assert len(call_log) == 6, f"Expected 6 calls (2 models × 3 runs), got {len(call_log)}"
+
+
+# ── 2026-05-01 retry classification: server_error → overload ─────────────────
+
+def test_classify_error_promotes_500_to_overload():
+    """OpenAI Responses API returns HTTP 500 server_error during transient
+    failures (Be Seen Health run 67). Treat these as `overload` so they get
+    exponential backoff (5s→10s→20s) instead of the 3s flat 'other' delay."""
+    assert llm_service._classify_error("HTTP 500 server_error") == "overload"
+    assert llm_service._classify_error("BadRequestError: 500 - server_error") == "overload"
+    assert llm_service._classify_error("Status 500 from upstream") == "overload"
+    assert llm_service._classify_error("server_error: model overloaded") == "overload"

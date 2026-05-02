@@ -22,6 +22,8 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 
+from app.services.serper_search_service import SERPER_SEMAPHORE
+
 logger = logging.getLogger(__name__)
 
 # ── Blocked subreddits ────────────────────────────────────────────────────────
@@ -98,7 +100,7 @@ async def validate_subreddit_exists(sub: str) -> bool:
         return True
 
     try:
-        async with httpx.AsyncClient(timeout=8.0) as client:
+        async with SERPER_SEMAPHORE, httpx.AsyncClient(timeout=8.0) as client:
             resp = await client.post(
                 _SERPER_URL,
                 headers={"X-API-KEY": api_key, "Content-Type": "application/json"},
@@ -557,7 +559,7 @@ async def _search_reddit_posts(
     data = None
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with SERPER_SEMAPHORE, httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.post(
                     _SERPER_URL,
                     headers={"X-API-KEY": api_key, "Content-Type": "application/json"},

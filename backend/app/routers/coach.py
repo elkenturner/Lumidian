@@ -1,8 +1,9 @@
 """Coach router: SSE message endpoint + usage endpoint."""
 import json
+from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,14 +15,21 @@ from app.services.coach_service import run_turn
 
 router = APIRouter(prefix="/api/coach", tags=["coach"])
 
+# Hard limits on the request shape. The frontend only ever sends plain-text
+# messages, so locking content to `str` blocks the forged-tool_use/tool_result
+# injection vector. Sizes are generous for legitimate use, tight enough to
+# kill DoS and cost-amplification abuse.
+_MAX_CONTENT_CHARS = 16_000
+_MAX_MESSAGES = 40
+
 
 class CoachMessage(BaseModel):
-    role: str
-    content: object  # str or list of blocks
+    role: Literal["user", "assistant"]
+    content: str = Field(min_length=1, max_length=_MAX_CONTENT_CHARS)
 
 
 class CoachMessageRequest(BaseModel):
-    messages: list[CoachMessage]
+    messages: list[CoachMessage] = Field(min_length=1, max_length=_MAX_MESSAGES)
 
 
 async def _verify_brand(db: AsyncSession, *, user_id: int, brand_id: int) -> Brand:

@@ -460,3 +460,35 @@ async def test_suggest_prompts_omits_scope_block_when_unset(client: httpx.AsyncC
     sys_prompt = captured["messages"][0]["content"]
     # The literal scope-instruction block should not appear when no scope is set
     assert "Market scope:" not in sys_prompt
+
+
+@pytest.mark.asyncio
+async def test_prompt_response_has_history_flag(client: httpx.AsyncClient, db_session):
+    await register_and_login(client, email="hashistory@example.com")
+    brand = await create_brand(client, name="History Brand", prompts=["What is the best X?"])
+
+    # Initially: no history → has_history is False
+    detail = await client.get(f"/api/brands/{brand['id']}")
+    prompts = detail.json()["prompts"]
+    assert all(p["has_history"] is False for p in prompts)
+
+    # Insert a fake QueryResult against the prompt
+    from app.models import QueryResult, TrackingRun
+    from datetime import datetime, UTC
+    run = TrackingRun(brand_id=brand["id"], status="completed", run_type="manual")
+    db_session.add(run)
+    await db_session.flush()
+    qr = QueryResult(
+        tracking_run_id=run.id,
+        prompt_id=prompts[0]["id"],
+        model="chatgpt",
+        run_number=1,
+        response_text="hi",
+        mentioned=False,
+    )
+    db_session.add(qr)
+    await db_session.commit()
+
+    detail2 = await client.get(f"/api/brands/{brand['id']}")
+    p = next(x for x in detail2.json()["prompts"] if x["id"] == prompts[0]["id"])
+    assert p["has_history"] is True

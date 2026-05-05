@@ -340,6 +340,39 @@ async def run_migrations():
         # 2026-05-01: Smarter prompt suggestions — market scope on brand_profiles
         "ALTER TABLE brand_profiles ADD COLUMN market_scope VARCHAR(20)",
         "ALTER TABLE brand_profiles ADD COLUMN geography VARCHAR(200)",
+        # 2026-05-05: Agency portal
+        """CREATE TABLE IF NOT EXISTS agency_clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            slug TEXT NOT NULL UNIQUE,
+            status TEXT NOT NULL DEFAULT 'onboarding',
+            retainer_amount_usd INTEGER,
+            retainer_started_at DATETIME,
+            peec_dashboard_url TEXT,
+            primary_contact_name TEXT,
+            primary_contact_email TEXT,
+            created_at DATETIME,
+            updated_at DATETIME
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_agency_clients_slug ON agency_clients(slug)",
+        """CREATE TABLE IF NOT EXISTS agency_staff (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+            role TEXT NOT NULL DEFAULT 'contractor',
+            active INTEGER NOT NULL DEFAULT 1,
+            created_at DATETIME
+        )""",
+        """CREATE TABLE IF NOT EXISTS client_notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agency_client_id INTEGER NOT NULL REFERENCES agency_clients(id) ON DELETE CASCADE,
+            author_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            body TEXT NOT NULL,
+            created_at DATETIME
+        )""",
+        "ALTER TABLE users ADD COLUMN is_agency_staff INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE brands ADD COLUMN agency_client_id INTEGER REFERENCES agency_clients(id) ON DELETE SET NULL",
+        "CREATE INDEX IF NOT EXISTS idx_brands_agency_client ON brands(agency_client_id)",
+        "ALTER TABLE content_drafts ADD COLUMN assigned_to_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

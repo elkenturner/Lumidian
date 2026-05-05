@@ -590,7 +590,6 @@ class BrandProfileUpdate(BaseModel):
     key_stats: list[str] | None = None
     tone_of_voice: str | None = Field(None, max_length=2000)
     what_not_to_say: list[str] | None = None
-    target_audience: str | None = Field(None, max_length=2000)
     approved_language: list[str] | None = None
     publications: list[Publication] | None = None
     market_scope: str | None = Field(None, max_length=20)
@@ -645,7 +644,6 @@ class BrandProfileResponse(BaseModel):
     key_stats: list[str] = []
     tone_of_voice: str | None = None
     what_not_to_say: list[str] = []
-    target_audience: str | None = None
     approved_language: list[str] = []
     publications: list[Publication] = []
     market_scope: str | None = None
@@ -666,7 +664,6 @@ class InferScopeResponse(BaseModel):
 
 class AiFillProfileResponse(BaseModel):
     company_description: str | None = None
-    target_audience: str | None = None
     tone_of_voice: str | None = None
     key_stats: list[str] = []
 

@@ -100,18 +100,6 @@ async def test_update_profile_what_not_to_say(client):
     assert resp.json()["what_not_to_say"] == items
 
 
-async def test_update_profile_target_audience(client):
-    await register_and_login(client)
-    brand = await create_brand(client)
-
-    resp = await client.put(
-        f"/api/brands/{brand['id']}/profile",
-        json={"target_audience": "SaaS founders and marketers"},
-    )
-    assert resp.status_code == 200
-    assert resp.json()["target_audience"] == "SaaS founders and marketers"
-
-
 async def test_update_profile_approved_language(client):
     await register_and_login(client)
     brand = await create_brand(client)
@@ -150,14 +138,14 @@ async def test_update_multiple_fields_at_once(client):
         json={
             "company_description": "We do things.",
             "tone_of_voice": "Casual",
-            "target_audience": "Developers",
+            "what_not_to_say": ["never lie"],
         },
     )
     assert resp.status_code == 200
     data = resp.json()
     assert data["company_description"] == "We do things."
     assert data["tone_of_voice"] == "Casual"
-    assert data["target_audience"] == "Developers"
+    assert data["what_not_to_say"] == ["never lie"]
 
 
 async def test_update_preserves_existing_fields(client):
@@ -192,19 +180,19 @@ async def test_completion_increases_with_fields(client):
     await register_and_login(client)
     brand = await create_brand(client)
 
-    # Fill 3 of 7 fields
+    # Fill 3 of 6 fields
     await client.put(
         f"/api/brands/{brand['id']}/profile",
         json={
             "company_description": "Desc",
             "tone_of_voice": "Tone",
-            "target_audience": "Audience",
+            "key_stats": ["stat1"],
         },
     )
     resp = await client.get(f"/api/brands/{brand['id']}/profile")
     pct = resp.json()["completion_pct"]
-    # 3/7 = 42.9%
-    assert 42.0 <= pct <= 43.0
+    # 3/6 = 50.0%
+    assert pct == 50.0
 
 
 async def test_completion_100_when_all_filled(client):
@@ -218,7 +206,6 @@ async def test_completion_100_when_all_filled(client):
             "key_stats": ["stat1"],
             "tone_of_voice": "Professional",
             "what_not_to_say": ["nothing bad"],
-            "target_audience": "Everyone",
             "approved_language": ["term1"],
             "publications": [{"url": "https://example.com", "title": "T", "publisher": "P", "date": "2024"}],
         },
@@ -260,7 +247,7 @@ async def test_profile_response_shape(client):
     data = resp.json()
     expected_keys = {
         "id", "brand_id", "company_description", "key_stats",
-        "tone_of_voice", "what_not_to_say", "target_audience",
+        "tone_of_voice", "what_not_to_say",
         "approved_language", "publications", "completion_pct",
         "internal_brand_context", "website_context_last_fetched",
         "created_at", "updated_at",

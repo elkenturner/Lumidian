@@ -502,7 +502,6 @@ async def get_brand_profile(db: AsyncSession, user_id: int, brand_id: int) -> di
         return {
             "has_profile": False,
             "company_description": None,
-            "target_audience": None,
             "tone_of_voice": None,
             "what_not_to_say": None,
             "publications": None,
@@ -511,7 +510,6 @@ async def get_brand_profile(db: AsyncSession, user_id: int, brand_id: int) -> di
     return {
         "has_profile": True,
         "company_description": profile.company_description,
-        "target_audience": profile.target_audience,
         "tone_of_voice": profile.tone_of_voice,
         "what_not_to_say": profile.what_not_to_say,
         "publications": json.loads(profile.publications) if profile.publications else None,

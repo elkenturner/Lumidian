@@ -813,7 +813,6 @@ export interface BrandProfile {
   key_stats: string[];
   tone_of_voice: string | null;
   what_not_to_say: string[];
-  target_audience: string | null;
   approved_language: string[];
   publications: Publication[];
   completion_pct: number;
@@ -836,7 +835,6 @@ export async function updateBrandProfile(
     key_stats: string[];
     tone_of_voice: string;
     what_not_to_say: string[];
-    target_audience: string;
     approved_language: string[];
     publications: Publication[];
     internal_brand_context: string;
@@ -851,7 +849,6 @@ export async function updateBrandProfile(
 
 export interface AiFillProfileResult {
   company_description: string | null;
-  target_audience: string | null;
   tone_of_voice: string | null;
   key_stats: string[];
 }

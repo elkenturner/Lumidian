@@ -316,7 +316,6 @@ async def test_get_brand_profile_returns_filled_fields():
         db.add(BrandProfile(
             brand_id=brand["id"],
             company_description="We make CRMs.",
-            target_audience="SMB sales teams",
             tone_of_voice="friendly",
         ))
         await db.commit()
@@ -326,7 +325,7 @@ async def test_get_brand_profile_returns_filled_fields():
 
     assert result["has_profile"] is True
     assert result["company_description"] == "We make CRMs."
-    assert result["target_audience"] == "SMB sales teams"
+    assert result["tone_of_voice"] == "friendly"
 
 
 def test_build_system_prompt_includes_all_blocks():

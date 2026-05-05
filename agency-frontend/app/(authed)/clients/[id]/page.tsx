@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { api, type AgencyClientOut } from '@/lib/api';
 import { ClientOverviewTab } from '@/components/clients/client-overview-tab';
 import { ClientBrandTab } from '@/components/clients/client-brand-tab';
+import { ClientPipelineTab } from '@/components/clients/client-pipeline-tab';
 
 export default function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -52,7 +53,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           <ClientBrandTab brandId={client.brand_id} />
         </Tabs.Content>
         <Tabs.Content value="pipeline">
-          <p className="text-sm text-muted-foreground">Filled in by Task 14.</p>
+          <ClientPipelineTab brandId={client.brand_id} />
         </Tabs.Content>
       </Tabs.Root>
     </div>

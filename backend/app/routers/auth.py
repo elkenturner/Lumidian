@@ -202,6 +202,7 @@ def create_token(user_id: int) -> str:
 
 
 def set_auth_cookies(response: Response, token: str) -> None:
+    cookie_domain = os.getenv("COOKIE_DOMAIN") or None
     response.set_cookie(
         "clarity_token",
         token,
@@ -210,6 +211,7 @@ def set_auth_cookies(response: Response, token: str) -> None:
         samesite="lax",
         max_age=COOKIE_MAX_AGE,
         path="/",
+        domain=cookie_domain,
     )
     # Non-httpOnly session flag for Next.js middleware
     response.set_cookie(
@@ -220,12 +222,14 @@ def set_auth_cookies(response: Response, token: str) -> None:
         samesite="lax",
         max_age=COOKIE_MAX_AGE,
         path="/",
+        domain=cookie_domain,
     )
 
 
 def clear_auth_cookies(response: Response) -> None:
-    response.delete_cookie("clarity_token", path="/")
-    response.delete_cookie("clarity_session", path="/")
+    cookie_domain = os.getenv("COOKIE_DOMAIN") or None
+    response.delete_cookie("clarity_token", path="/", domain=cookie_domain)
+    response.delete_cookie("clarity_session", path="/", domain=cookie_domain)
 
 
 def user_to_dict(user: User) -> dict:

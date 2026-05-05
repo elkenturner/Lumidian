@@ -748,8 +748,6 @@ async def suggest_prompts(brand_id: int, db: DbDep, user: CurrentUser):
     if profile:
         if profile.company_description:
             context_parts.append(f"Company description: {profile.company_description}")
-        if profile.target_audience:
-            context_parts.append(f"Target audience: {profile.target_audience}")
 
     # Load competitors
     comp_result = await db.execute(
@@ -859,8 +857,6 @@ async def infer_scope(brand_id: int, db: DbDep, user: CurrentUser) -> InferScope
         context_parts.append(f"Website: {brand.website_url}")
     if profile and profile.company_description:
         context_parts.append(f"Description: {profile.company_description}")
-    if profile and profile.target_audience:
-        context_parts.append(f"Target audience: {profile.target_audience}")
     if profile and profile.internal_brand_context:
         context_parts.append(f"Website content excerpt:\n{profile.internal_brand_context[:3000]}")
     if competitors:

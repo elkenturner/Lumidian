@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **Shared context across Claude surfaces.** This file holds *stable* architecture and conventions. *Volatile* state — what Ken is actively working on, recent decisions, open questions — lives in [`CURRENT_STATE.md`](./CURRENT_STATE.md). **Every Claude session (Claude Code, Cowork, Claude in Chrome) must read `CURRENT_STATE.md` at the start and update it before ending.** That file is the single source of truth for "where are we right now."
+
 ---
 
 ## What This App Does
@@ -56,8 +58,10 @@ Copy `backend/.env.example` → `backend/.env`. **`JWT_SECRET` (≥32 chars) is 
 | `SERPER_API_KEY` | Web search (Serper.dev) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth (optional) |
 | `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | Billing |
-| `STRIPE_STARTER_PRICE_ID` / `STRIPE_PRO_PRICE_ID` | Subscription tiers |
-| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `EMAIL_FROM` | SMTP email |
+| `STRIPE_BASIC_PRICE_ID` / `STRIPE_STARTER_PRICE_ID` / `STRIPE_PRO_PRICE_ID` | Subscription tier price IDs (Starter / Growth / Pro — see tier naming convention below) |
+| `RESEND_API_KEY` / `EMAIL_FROM` | Transactional email via Resend HTTP API |
+| `SUPPORT_EMAIL` | Inbox that receives in-app support form submissions |
+| `SENTRY_DSN` | Backend error monitoring (optional) |
 | `DATABASE_URL` | Default: `sqlite+aiosqlite:///./clarity_ai.db` |
 | `FRONTEND_URL` | Default: `http://localhost:3000`; used for OAuth redirects |
 | `ENVIRONMENT` | `development` (default) or `production`; controls cookie `secure` flag |

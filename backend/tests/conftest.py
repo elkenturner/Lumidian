@@ -114,7 +114,8 @@ async def clean_tables():
             "competitors", "prompts", "brand_profiles",
             "brand_content_settings", "account_connections",
             "notifications", "team_members", "password_reset_tokens",
-            "system_settings", "brands", "users",
+            "client_notes", "agency_staff",
+            "system_settings", "brands", "agency_clients", "users",
             "rate_limits",
         ]:
             await db.execute(text(f"DELETE FROM {table}"))

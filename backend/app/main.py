@@ -59,6 +59,7 @@ from app.routers import (
     tracking,
 )
 from app.routers import admin as admin_router
+from app.routers import agency as agency_router
 from app.routers import analytics as analytics_router
 from app.routers import auth as auth_router
 from app.routers import billing as billing_router
@@ -226,6 +227,7 @@ app.include_router(team_router.router, prefix="/api")
 app.include_router(errors_router.router, prefix="/api")
 app.include_router(notifications_router.router, prefix="/api")
 app.include_router(support_router.router, prefix="/api")
+app.include_router(agency_router.router, prefix="/api")
 app.include_router(coach.router)
 
 

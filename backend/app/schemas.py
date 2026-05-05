@@ -868,3 +868,62 @@ class PromptOverviewItem(BaseModel):
 
 class PromptsOverviewResponse(BaseModel):
     prompts: list[PromptOverviewItem]
+
+
+# ── Agency portal ────────────────────────────────────────────────────────────
+
+
+class AgencyClientCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    status: str | None = None
+    retainer_amount_usd: int | None = None
+    peec_dashboard_url: str | None = None
+    primary_contact_name: str | None = None
+    primary_contact_email: str | None = None
+
+
+class AgencyClientUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    status: str | None = None
+    retainer_amount_usd: int | None = None
+    retainer_started_at: datetime | None = None
+    peec_dashboard_url: str | None = None
+    primary_contact_name: str | None = None
+    primary_contact_email: str | None = None
+
+
+class AgencyClientOut(BaseModel):
+    id: int
+    name: str
+    slug: str
+    status: str
+    retainer_amount_usd: int | None
+    retainer_started_at: datetime | None
+    peec_dashboard_url: str | None
+    primary_contact_name: str | None
+    primary_contact_email: str | None
+    brand_id: int | None
+    drafts_pending: int
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DraftAssignIn(BaseModel):
+    assigned_to_user_id: int | None  # null to unassign
+
+
+class TodayDraftOut(BaseModel):
+    draft_id: int
+    title: str | None
+    platform: str
+    client_id: int
+    client_name: str
+    assigned_to_user_id: int | None
+    created_at: datetime
+
+
+class TodayOut(BaseModel):
+    drafts_to_review: list[TodayDraftOut]
+    drafts_to_review_count: int
+    active_clients: int

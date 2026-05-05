@@ -6,12 +6,12 @@ A SaaS dashboard that helps brands track and improve their visibility in AI-gene
 
 - **Frontend**: Next.js 15, TypeScript, Tailwind CSS, Recharts
 - **Backend**: Python 3.11+, FastAPI, SQLAlchemy (async), SQLite
-- **LLMs tracked**: ChatGPT (gpt-4o-mini), Claude (claude-haiku-4-5), Perplexity (sonar), Gemini (gemini-2.5-flash)
+- **LLMs tracked**: ChatGPT (`gpt-4o-mini-search-preview`, paid tiers), Claude (`claude-haiku-4-5` + web search, Pro tier), Perplexity (`sonar` free / `sonar-pro` paid), Gemini (`gemini-2.5-flash` with Google Search grounding)
 
 ## Features
 
-- **Visibility Tracker**: Enter a brand name + prompts, run against all 4 LLM platforms
-- **Configurable query depth**: Basic (5×), Standard (10×), Premium (20×) per prompt per model
+- **Visibility Tracker**: Enter a brand name + prompts, run against the LLM platforms enabled for your tier
+- **Tier-gated model coverage**: Free runs Perplexity + Gemini; paid tiers unlock ChatGPT search and (Pro only) Claude with live web search
 - **Visibility Score**: % of total queries where the brand was mentioned
 - **Per-model breakdown**: Score per platform with trend data
 - **Historical trends**: Score tracked over time with a line chart
@@ -76,19 +76,26 @@ Open: http://localhost:3000
 ## Visibility Score
 
 ```
-score = (total queries where brand was mentioned) / (total queries run) × 100
+score = (queries with mention) / (total queries run) × 100
 ```
 
-Example for a Standard tier brand with 3 prompts, one run:
-- 3 prompts × 4 models × 10 queries = **120 total queries**
-- If brand appears in 84 of them → **70% visibility score**
+Mention detection is a case-insensitive substring check OR a fuzzy match (lowercased + non-alphanumeric stripped). Errored queries are excluded from the denominator.
+
+Example for a Pro brand with 3 prompts, one run:
+- 3 prompts × 4 models × 3 runs = **36 total queries**
+- If brand appears in 25 of them → **~69% visibility score**
 
 ---
 
 ## Tier Configuration
 
-| Tier | Queries per prompt per model |
-|------|------------------------------|
-| Basic | 5 |
-| Standard | 10 |
-| Premium | 20 |
+All tiers run **3 queries per prompt per model** (`RUNS_PER_PROMPT = 3` in `llm_service.py`). Tiers differ in which models they query:
+
+| Internal key | UI name  | Models queried                                                         |
+|--------------|----------|------------------------------------------------------------------------|
+| `None`       | Free     | Perplexity (`sonar`), Gemini                                           |
+| `basic`      | Starter  | ChatGPT search, Perplexity (`sonar`), Gemini                           |
+| `starter`    | Growth   | ChatGPT search, Perplexity (`sonar-pro`), Gemini                       |
+| `pro`        | Pro      | ChatGPT search, Claude + web search, Perplexity (`sonar-pro`), Gemini  |
+
+Pitch brands (`brand_type='pitch'`) always use the Free model list regardless of subscription.

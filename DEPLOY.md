@@ -46,15 +46,17 @@ SERPER_API_KEY=<your key>
 # Stripe
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_STARTER_PRICE_ID=price_...
-STRIPE_PRO_PRICE_ID=price_...
+STRIPE_BASIC_PRICE_ID=price_...    # "Starter" plan ($100/mo, internal key: basic)
+STRIPE_STARTER_PRICE_ID=price_...  # "Growth"  plan ($300/mo, internal key: starter)
+STRIPE_PRO_PRICE_ID=price_...      # "Pro"     plan ($500/mo, internal key: pro)
 
-# Email (Resend SMTP)
-SMTP_HOST=smtp.resend.com
-SMTP_PORT=465
-SMTP_USER=resend
-SMTP_PASS=<your resend api key>
-EMAIL_FROM=hello@lumidian.ai
+# Email (Resend HTTP API — no SMTP ports needed)
+RESEND_API_KEY=re_...
+EMAIL_FROM=Lumidian <noreply@lumidian.ai>
+SUPPORT_EMAIL=support@lumidian.ai
+
+# Monitoring (optional)
+SENTRY_DSN=https://...
 
 # Admin
 ADMIN_EMAILS=<your email>
@@ -135,7 +137,7 @@ Railway provides the exact values in the Custom Domain setup.
 
 **Database empty after redeploy:** Volume not attached. Check Settings → Volumes.
 
-**Emails not sending:** Verify SMTP credentials. Check backend logs for errors.
+**Emails not sending:** Verify `RESEND_API_KEY` is set and the sending domain is verified in the Resend dashboard. Check backend logs for errors.
 
 **Scheduled jobs not running:** APScheduler runs in-process. If backend restarts, jobs reschedule automatically.
 

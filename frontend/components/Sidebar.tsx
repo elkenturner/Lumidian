@@ -12,6 +12,7 @@ import {
   User,
   LineChart,
   Shield,
+  Briefcase,
   ChevronDown,
   Plus,
   Check,
@@ -317,6 +318,15 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
               expanded={expanded}
             />
           ))}
+
+          {(user?.is_agency_staff || user?.is_admin) && (
+            <NavLink
+              item={{ label: 'Agency', href: '/agency', icon: Briefcase }}
+              pathname={pathname}
+              exact={false}
+              expanded={expanded}
+            />
+          )}
 
           {user?.is_admin && (
             <NavLink

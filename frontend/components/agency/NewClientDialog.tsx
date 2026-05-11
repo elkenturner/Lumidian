@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { api, type AgencyClientOut } from '@/lib/api';
+import { agencyCreateClient, type AgencyClient } from '@/lib/api';
 
 interface Props {
-  onCreated: (client: AgencyClientOut) => void;
+  onCreated: (client: AgencyClient) => void;
 }
 
 export function NewClientDialog({ onCreated }: Props) {
@@ -35,7 +35,7 @@ export function NewClientDialog({ onCreated }: Props) {
     }
     setSubmitting(true);
     try {
-      const created = await api.createClient({
+      const created = await agencyCreateClient({
         name: name.trim(),
         primary_contact_name: contactName.trim() || undefined,
         primary_contact_email: contactEmail.trim() || undefined,
@@ -45,9 +45,8 @@ export function NewClientDialog({ onCreated }: Props) {
       onCreated(created);
       setOpen(false);
       reset();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to create client.';
-      setError(msg);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create client.');
     } finally {
       setSubmitting(false);
     }
@@ -56,81 +55,84 @@ export function NewClientDialog({ onCreated }: Props) {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
-        <button className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
+        <button className="rounded-md bg-[var(--bg-elevated)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card)]">
           New client
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/40" />
-        <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-white p-6 shadow-lg">
+        <Dialog.Overlay className="fixed inset-0 bg-black/60" />
+        <Dialog.Content className="fixed left-1/2 top-1/2 w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-lg border border-[var(--border-default)] bg-[var(--bg-raised)] p-6 shadow-lg text-[var(--text-primary)]">
           <Dialog.Title className="text-lg font-semibold">New client</Dialog.Title>
-          <Dialog.Description className="mb-4 text-sm text-muted-foreground">
+          <Dialog.Description className="mb-4 text-sm text-[var(--text-muted)]">
             Creates an agency client and a linked brand record.
           </Dialog.Description>
 
           <form onSubmit={submit} className="space-y-3">
             <div>
-              <label className="mb-1 block text-xs font-medium">Name</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Name</label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-md border border-border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 placeholder="Acme Co"
                 autoFocus
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="mb-1 block text-xs font-medium">Contact name</label>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Contact name</label>
                 <input
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
-                  className="w-full rounded-md border border-border px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium">Contact email</label>
+                <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Contact email</label>
                 <input
                   type="email"
                   value={contactEmail}
                   onChange={(e) => setContactEmail(e.target.value)}
-                  className="w-full rounded-md border border-border px-3 py-2 text-sm"
+                  className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 />
               </div>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium">Retainer (USD/mo)</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Retainer (USD/mo)</label>
               <input
                 type="number"
                 value={retainer}
                 onChange={(e) => setRetainer(e.target.value)}
-                className="w-full rounded-md border border-border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 placeholder="3000"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-medium">Peec dashboard URL</label>
+              <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Peec dashboard URL</label>
               <input
                 type="url"
                 value={peecUrl}
                 onChange={(e) => setPeecUrl(e.target.value)}
-                className="w-full rounded-md border border-border px-3 py-2 text-sm"
+                className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 placeholder="https://peec.ai/..."
               />
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && <p className="text-sm text-red-400">{error}</p>}
 
             <div className="flex justify-end gap-2 pt-2">
               <Dialog.Close asChild>
-                <button type="button" className="rounded-md border border-border px-4 py-2 text-sm">
+                <button
+                  type="button"
+                  className="rounded-md border border-[var(--border-default)] px-4 py-2 text-sm text-[var(--text-secondary)]"
+                >
                   Cancel
                 </button>
               </Dialog.Close>
               <button
                 type="submit"
                 disabled={submitting}
-                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className="rounded-md bg-[var(--bg-elevated)] px-4 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card)] disabled:opacity-50"
               >
                 {submitting ? 'Creating…' : 'Create client'}
               </button>

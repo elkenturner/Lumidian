@@ -918,6 +918,7 @@ export interface AuthUser {
   subscription_status: string | null;
   subscription_trial_end: string | null;
   is_admin: boolean;
+  is_agency_staff?: boolean;
   prompt_limit: number;
   totp_enabled: boolean;
   created_at: string;
@@ -925,6 +926,84 @@ export interface AuthUser {
   is_team_member?: boolean;
   team_owner_name?: string | null;
   team_owner_email?: string | null;
+}
+
+// ── Agency portal ────────────────────────────────────────────────────────────
+
+export interface AgencyClient {
+  id: number;
+  name: string;
+  slug: string;
+  status: 'onboarding' | 'active' | 'paused' | 'churned';
+  retainer_amount_usd: number | null;
+  retainer_started_at: string | null;
+  peec_dashboard_url: string | null;
+  primary_contact_name: string | null;
+  primary_contact_email: string | null;
+  brand_id: number | null;
+  drafts_pending: number;
+  created_at: string;
+}
+
+export interface AgencyClientCreate {
+  name: string;
+  status?: string;
+  retainer_amount_usd?: number;
+  peec_dashboard_url?: string;
+  primary_contact_name?: string;
+  primary_contact_email?: string;
+}
+
+export interface AgencyTodayDraft {
+  draft_id: number;
+  title: string | null;
+  platform: string;
+  client_id: number;
+  client_name: string;
+  assigned_to_user_id: number | null;
+  created_at: string;
+}
+
+export interface AgencyTodayResponse {
+  drafts_to_review: AgencyTodayDraft[];
+  drafts_to_review_count: number;
+  active_clients: number;
+}
+
+export async function agencyListClients(): Promise<AgencyClient[]> {
+  const res = await api.get<AgencyClient[]>('/agency/clients');
+  return res.data;
+}
+
+export async function agencyGetClient(id: number): Promise<AgencyClient> {
+  const res = await api.get<AgencyClient>(`/agency/clients/${id}`);
+  return res.data;
+}
+
+export async function agencyCreateClient(body: AgencyClientCreate): Promise<AgencyClient> {
+  const res = await api.post<AgencyClient>('/agency/clients', body);
+  return res.data;
+}
+
+export async function agencyUpdateClient(
+  id: number,
+  body: Partial<AgencyClientCreate> & { status?: string },
+): Promise<AgencyClient> {
+  const res = await api.patch<AgencyClient>(`/agency/clients/${id}`, body);
+  return res.data;
+}
+
+export async function agencyDeleteClient(id: number): Promise<void> {
+  await api.delete(`/agency/clients/${id}`);
+}
+
+export async function agencyToday(): Promise<AgencyTodayResponse> {
+  const res = await api.get<AgencyTodayResponse>('/agency/today');
+  return res.data;
+}
+
+export async function agencyAssignDraft(draftId: number, userId: number | null): Promise<void> {
+  await api.patch(`/agency/drafts/${draftId}/assign`, { assigned_to_user_id: userId });
 }
 
 export interface RegisterResult {

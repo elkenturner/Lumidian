@@ -1,24 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { api, type AgencyClientOut } from '@/lib/api';
+import { agencyUpdateClient, type AgencyClient } from '@/lib/api';
 
 interface Props {
-  client: AgencyClientOut;
-  onChange: (next: AgencyClientOut) => void;
+  client: AgencyClient;
+  onChange: (next: AgencyClient) => void;
 }
 
-const STATUSES: AgencyClientOut['status'][] = ['onboarding', 'active', 'paused', 'churned'];
+const STATUSES: AgencyClient['status'][] = ['onboarding', 'active', 'paused', 'churned'];
 
 export function ClientOverviewTab({ client, onChange }: Props) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const updateStatus = async (status: AgencyClientOut['status']) => {
+  const updateStatus = async (status: AgencyClient['status']) => {
     setSaving(true);
     setError(null);
     try {
-      const next = await api.updateClient(client.id, { status });
+      const next = await agencyUpdateClient(client.id, { status });
       onChange(next);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update.');
@@ -28,9 +28,9 @@ export function ClientOverviewTab({ client, onChange }: Props) {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-[var(--text-primary)]">
       <div>
-        <h2 className="text-sm font-medium text-muted-foreground">Status</h2>
+        <h2 className="text-sm font-medium text-[var(--text-secondary)]">Status</h2>
         <div className="mt-2 flex gap-2">
           {STATUSES.map((s) => (
             <button
@@ -39,8 +39,8 @@ export function ClientOverviewTab({ client, onChange }: Props) {
               disabled={saving || client.status === s}
               className={`rounded-md border px-3 py-1.5 text-xs ${
                 client.status === s
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-white hover:bg-muted'
+                  ? 'border-[var(--border-strong)] bg-[var(--bg-elevated)] text-[var(--text-primary)]'
+                  : 'border-[var(--border-default)] bg-[var(--bg-card)] text-[var(--text-secondary)] hover:bg-[var(--bg-raised)]'
               }`}
             >
               {s}
@@ -51,13 +51,13 @@ export function ClientOverviewTab({ client, onChange }: Props) {
 
       <div className="grid grid-cols-2 gap-6">
         <div>
-          <h2 className="mb-1 text-sm font-medium text-muted-foreground">Retainer</h2>
+          <h2 className="mb-1 text-sm font-medium text-[var(--text-secondary)]">Retainer</h2>
           <p className="text-base">
             {client.retainer_amount_usd ? `$${client.retainer_amount_usd}/mo` : '—'}
           </p>
         </div>
         <div>
-          <h2 className="mb-1 text-sm font-medium text-muted-foreground">Started</h2>
+          <h2 className="mb-1 text-sm font-medium text-[var(--text-secondary)]">Started</h2>
           <p className="text-base">
             {client.retainer_started_at
               ? new Date(client.retainer_started_at).toLocaleDateString()
@@ -65,18 +65,18 @@ export function ClientOverviewTab({ client, onChange }: Props) {
           </p>
         </div>
         <div>
-          <h2 className="mb-1 text-sm font-medium text-muted-foreground">Primary contact</h2>
+          <h2 className="mb-1 text-sm font-medium text-[var(--text-secondary)]">Primary contact</h2>
           <p className="text-base">
             {client.primary_contact_name || '—'}
             {client.primary_contact_email && (
-              <span className="block text-sm text-muted-foreground">
+              <span className="block text-sm text-[var(--text-muted)]">
                 {client.primary_contact_email}
               </span>
             )}
           </p>
         </div>
         <div>
-          <h2 className="mb-1 text-sm font-medium text-muted-foreground">Peec dashboard</h2>
+          <h2 className="mb-1 text-sm font-medium text-[var(--text-secondary)]">Peec dashboard</h2>
           {client.peec_dashboard_url ? (
             <a
               href={client.peec_dashboard_url}
@@ -87,12 +87,12 @@ export function ClientOverviewTab({ client, onChange }: Props) {
               Open
             </a>
           ) : (
-            <p className="text-sm text-muted-foreground">Not set</p>
+            <p className="text-sm text-[var(--text-muted)]">Not set</p>
           )}
         </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
     </div>
   );
 }

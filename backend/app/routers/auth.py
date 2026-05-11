@@ -243,6 +243,7 @@ def user_to_dict(user: User) -> dict:
         "subscription_status": user.subscription_status,
         "subscription_trial_end": trial_end.isoformat() if trial_end else None,
         "is_admin": user.is_admin,
+        "is_agency_staff": bool(getattr(user, "is_agency_staff", False)),
         "prompt_limit": limit,
         "totp_enabled": bool(user.totp_enabled),
         "created_at": user.created_at.isoformat() if user.created_at else None,

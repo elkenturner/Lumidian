@@ -3,34 +3,42 @@
 import { use, useEffect, useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
 import Link from 'next/link';
-import { api, type AgencyClientOut } from '@/lib/api';
-import { ClientOverviewTab } from '@/components/clients/client-overview-tab';
-import { ClientBrandTab } from '@/components/clients/client-brand-tab';
-import { ClientPipelineTab } from '@/components/clients/client-pipeline-tab';
+import { agencyGetClient, type AgencyClient } from '@/lib/api';
+import { ClientOverviewTab } from '@/components/agency/ClientOverviewTab';
+import { ClientBrandTab } from '@/components/agency/ClientBrandTab';
+import { ClientPipelineTab } from '@/components/agency/ClientPipelineTab';
 
-export default function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function AgencyClientDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = use(params);
   const clientId = parseInt(id, 10);
-  const [client, setClient] = useState<AgencyClientOut | null>(null);
+  const [client, setClient] = useState<AgencyClient | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api.getClient(clientId).then(setClient).catch((e) => setError(String(e?.message ?? e)));
+    agencyGetClient(clientId)
+      .then(setClient)
+      .catch((e) => setError(String(e?.message ?? e)));
   }, [clientId]);
 
-  if (error) return <div className="p-8 text-sm text-red-600">{error}</div>;
-  if (!client) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
+  if (error) return <div className="p-8 text-sm text-red-400">{error}</div>;
+  if (!client) {
+    return <div className="p-8 text-sm text-[var(--text-muted)]">Loading…</div>;
+  }
 
   return (
-    <div className="p-8">
-      <Link href="/clients" className="text-xs text-muted-foreground hover:underline">
+    <div className="p-8 text-[var(--text-primary)]">
+      <Link href="/agency/clients" className="text-xs text-[var(--text-muted)] hover:underline">
         ← All clients
       </Link>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight">{client.name}</h1>
-      <p className="mb-6 text-sm text-muted-foreground">/{client.slug}</p>
+      <p className="mb-6 text-sm text-[var(--text-muted)]">/{client.slug}</p>
 
       <Tabs.Root defaultValue="overview" className="w-full">
-        <Tabs.List className="mb-6 flex gap-1 border-b border-border">
+        <Tabs.List className="mb-6 flex gap-1 border-b border-[var(--border-subtle)]">
           {[
             ['overview', 'Overview'],
             ['brand', 'Brand & Prompts'],
@@ -39,7 +47,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
             <Tabs.Trigger
               key={value}
               value={value}
-              className="border-b-2 border-transparent px-4 py-2 text-sm text-muted-foreground data-[state=active]:border-primary data-[state=active]:text-foreground"
+              className="border-b-2 border-transparent px-4 py-2 text-sm text-[var(--text-muted)] data-[state=active]:border-[var(--text-primary)] data-[state=active]:text-[var(--text-primary)]"
             >
               {label}
             </Tabs.Trigger>

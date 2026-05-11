@@ -1,20 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
+import { getDrafts, type ContentDraft } from '@/lib/api';
 
 interface Props {
   brandId: number | null;
-}
-
-interface DraftRow {
-  id: number;
-  title: string | null;
-  content_text: string | null;
-  platform: string;
-  status: string;
-  assigned_to_user_id?: number | null;
-  created_at: string;
 }
 
 const COLUMNS: Array<{ key: string; label: string }> = [
@@ -24,7 +14,7 @@ const COLUMNS: Array<{ key: string; label: string }> = [
 ];
 
 export function ClientPipelineTab({ brandId }: Props) {
-  const [drafts, setDrafts] = useState<DraftRow[]>([]);
+  const [drafts, setDrafts] = useState<ContentDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -33,52 +23,59 @@ export function ClientPipelineTab({ brandId }: Props) {
       setLoading(false);
       return;
     }
-    api
-      .listDrafts(brandId)
-      .then((data) => setDrafts((data as DraftRow[]) ?? []))
+    getDrafts(brandId)
+      .then(setDrafts)
       .catch((e) => setError(String(e?.message ?? e)))
       .finally(() => setLoading(false));
   }, [brandId]);
 
   if (brandId == null) {
-    return <p className="text-sm text-muted-foreground">No brand attached to this client.</p>;
+    return (
+      <p className="text-sm text-[var(--text-muted)]">No brand attached to this client.</p>
+    );
   }
-  if (loading) return <p className="text-sm text-muted-foreground">Loading…</p>;
-  if (error) return <p className="text-sm text-red-600">{error}</p>;
+  if (loading) return <p className="text-sm text-[var(--text-muted)]">Loading…</p>;
+  if (error) return <p className="text-sm text-red-400">{error}</p>;
 
   if (drafts.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-border p-10 text-center text-sm text-muted-foreground">
-        No drafts yet. Generate some from Studio (V1) — for MVP, drafts created elsewhere on the
-        backend will appear here.
+      <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-10 text-center text-sm text-[var(--text-muted)]">
+        No drafts yet. Use the Lumidian Content section to generate some for this client&apos;s brand —
+        they&apos;ll show up here.
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 text-[var(--text-primary)] md:grid-cols-3">
       {COLUMNS.map(({ key, label }) => {
         const items = drafts.filter((d) => d.status === key);
         return (
-          <section key={key} className="rounded-lg border border-border bg-white p-4">
+          <section
+            key={key}
+            className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4"
+          >
             <h3 className="mb-3 flex items-center justify-between text-sm font-medium">
               <span>{label}</span>
-              <span className="text-xs text-muted-foreground">{items.length}</span>
+              <span className="text-xs text-[var(--text-muted)]">{items.length}</span>
             </h3>
             <ul className="space-y-2">
               {items.map((d) => (
-                <li key={d.id} className="rounded-md border border-border p-3 text-sm">
+                <li
+                  key={d.id}
+                  className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-raised)] p-3 text-sm"
+                >
                   <div className="font-medium">{d.title || `Draft #${d.id}`}</div>
-                  <div className="text-xs text-muted-foreground">{d.platform}</div>
+                  <div className="text-xs text-[var(--text-muted)]">{d.platform}</div>
                   {d.content_text && (
-                    <p className="mt-2 line-clamp-3 text-xs text-muted-foreground">
+                    <p className="mt-2 line-clamp-3 text-xs text-[var(--text-muted)]">
                       {d.content_text}
                     </p>
                   )}
                 </li>
               ))}
               {items.length === 0 && (
-                <li className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+                <li className="rounded-md border border-dashed border-[var(--border-subtle)] p-3 text-xs text-[var(--text-muted)]">
                   Empty
                 </li>
               )}

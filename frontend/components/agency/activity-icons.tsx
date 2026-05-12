@@ -12,6 +12,7 @@ import {
   ListPlus,
   UserCircle,
   CheckCircle2,
+  FileText,
 } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
@@ -31,6 +32,7 @@ const ICONS: Record<string, Icon> = {
   task_created: ListPlus,
   task_assigned: UserCircle,
   task_completed: CheckCircle2,
+  document_generated: FileText,
 };
 
 export function iconForEventType(type: string): Icon {

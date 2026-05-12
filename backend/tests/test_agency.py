@@ -94,3 +94,59 @@ async def test_today_returns_empty_when_no_drafts(client):
     assert body["drafts_to_review"] == []
     assert body["drafts_to_review_count"] == 0
     assert body["active_clients"] == 0
+    assert body["awaiting_client"] == []
+    assert body["approved"] == []
+
+
+@pytest.mark.asyncio
+async def test_get_review_link_returns_none_when_none_exists(client):
+    await _make_agency_user(client)
+    create = await client.post("/api/agency/clients", json={"name": "RL One"})
+    cid = create.json()["id"]
+    resp = await client.get(f"/api/agency/clients/{cid}/review-link")
+    assert resp.status_code == 200
+    assert resp.json() is None
+
+
+@pytest.mark.asyncio
+async def test_create_and_rotate_review_link(client):
+    await _make_agency_user(client)
+    create = await client.post("/api/agency/clients", json={"name": "RL Two"})
+    cid = create.json()["id"]
+
+    first = await client.post(f"/api/agency/clients/{cid}/review-link")
+    assert first.status_code == 201
+    first_data = first.json()
+    assert first_data["token"]
+    assert first_data["url"].endswith(f"/review/{first_data['token']}")
+
+    # Rotating produces a new token; old one is revoked
+    second = await client.post(f"/api/agency/clients/{cid}/review-link")
+    assert second.status_code == 201
+    assert second.json()["token"] != first_data["token"]
+
+    # GET returns the latest active
+    current = await client.get(f"/api/agency/clients/{cid}/review-link")
+    assert current.json()["token"] == second.json()["token"]
+
+
+@pytest.mark.asyncio
+async def test_update_draft_status_requires_valid_status(client, db_session):
+    from app.models import ContentDraft
+
+    await _make_agency_user(client)
+    create = await client.post("/api/agency/clients", json={"name": "RL Three"})
+    cid = create.json()["id"]
+    brand_id = create.json()["brand_id"]
+
+    # Create a draft directly in DB
+    draft = ContentDraft(brand_id=brand_id, platform="medium", content_text="x", status="draft")
+    db_session.add(draft)
+    await db_session.commit()
+    await db_session.refresh(draft)
+
+    bad = await client.patch(f"/api/agency/drafts/{draft.id}/status", json={"status": "invalid"})
+    assert bad.status_code == 400
+
+    good = await client.patch(f"/api/agency/drafts/{draft.id}/status", json={"status": "awaiting_client"})
+    assert good.status_code == 204

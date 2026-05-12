@@ -373,6 +373,18 @@ async def run_migrations():
         "ALTER TABLE brands ADD COLUMN agency_client_id INTEGER REFERENCES agency_clients(id) ON DELETE SET NULL",
         "CREATE INDEX IF NOT EXISTS idx_brands_agency_client ON brands(agency_client_id)",
         "ALTER TABLE content_drafts ADD COLUMN assigned_to_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL",
+        # 2026-05-11: Agency portal shell — review portal + client states
+        "ALTER TABLE content_drafts ADD COLUMN client_feedback TEXT",
+        "ALTER TABLE content_drafts ADD COLUMN client_reviewed_at DATETIME",
+        """CREATE TABLE IF NOT EXISTS client_review_links (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agency_client_id INTEGER NOT NULL REFERENCES agency_clients(id) ON DELETE CASCADE,
+            token TEXT NOT NULL UNIQUE,
+            created_at DATETIME,
+            revoked_at DATETIME
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_client_review_links_token ON client_review_links(token)",
+        "CREATE INDEX IF NOT EXISTS idx_client_review_links_client ON client_review_links(agency_client_id)",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:
@@ -383,6 +395,30 @@ async def run_migrations():
             except OperationalError:
                 # Column/table/index already exists — safe to ignore
                 pass
+
+        # ── Website AIO module ─────────────────────────────────────────────────
+        # (create_all in startup handles new tables; these are explicit indexes
+        # for query patterns the ORM doesn't infer automatically.)
+        try:
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_website_audit_brand_started "
+                "ON website_audits(brand_id, started_at DESC)"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_finding_audit_severity "
+                "ON website_audit_findings(audit_id, severity)"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_citation_brand_domain "
+                "ON citation_sources(brand_id, domain)"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_citation_brand_prompt "
+                "ON citation_sources(brand_id, prompt_id)"
+            ))
+            logger.info("migration: site_audit indexes ensured")
+        except Exception as exc:
+            logger.warning("site_audit indexes migration skipped: %s", exc)
 
     # ── Idempotent data fixes (run every startup) ────────────────────────────
     async with engine.begin() as conn:

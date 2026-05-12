@@ -968,6 +968,8 @@ export interface AgencyTodayResponse {
   drafts_to_review: AgencyTodayDraft[];
   drafts_to_review_count: number;
   active_clients: number;
+  awaiting_client: AgencyTodayDraft[];
+  approved: AgencyTodayDraft[];
 }
 
 export async function agencyListClients(): Promise<AgencyClient[]> {
@@ -1004,6 +1006,78 @@ export async function agencyToday(): Promise<AgencyTodayResponse> {
 
 export async function agencyAssignDraft(draftId: number, userId: number | null): Promise<void> {
   await api.patch(`/agency/drafts/${draftId}/assign`, { assigned_to_user_id: userId });
+}
+
+// ── Agency portal shell (2026-05-11) ─────────────────────────────────────────
+
+export interface ReviewLinkOut {
+  token: string;
+  url: string;
+  created_at: string;
+}
+
+export type DraftStaffStatus =
+  | 'draft'
+  | 'awaiting_client'
+  | 'approved'
+  | 'posted'
+  | 'dismissed';
+
+export async function agencyGetReviewLink(clientId: number): Promise<ReviewLinkOut | null> {
+  const res = await api.get<ReviewLinkOut | null>(`/agency/clients/${clientId}/review-link`);
+  return res.data;
+}
+
+export async function agencyRotateReviewLink(clientId: number): Promise<ReviewLinkOut> {
+  const res = await api.post<ReviewLinkOut>(`/agency/clients/${clientId}/review-link`);
+  return res.data;
+}
+
+export async function agencyUpdateDraftStatus(
+  draftId: number,
+  status: DraftStaffStatus,
+): Promise<void> {
+  await api.patch(`/agency/drafts/${draftId}/status`, { status });
+}
+
+// ── Public review (no auth) ──────────────────────────────────────────────────
+
+export interface ReviewDraft {
+  id: number;
+  title: string | null;
+  platform: string;
+  content_text: string;
+  created_at: string;
+}
+
+export interface ReviewClientPage {
+  client_name: string;
+  drafts: ReviewDraft[];
+}
+
+export async function publicGetReviewPage(token: string): Promise<ReviewClientPage> {
+  const res = await api.get<ReviewClientPage>(`/public/review/${token}`);
+  return res.data;
+}
+
+export async function publicApproveDraft(token: string, draftId: number): Promise<void> {
+  await api.post(`/public/review/${token}/draft/${draftId}/approve`);
+}
+
+export async function publicRequestChanges(
+  token: string,
+  draftId: number,
+  feedback: string,
+): Promise<void> {
+  await api.post(`/public/review/${token}/draft/${draftId}/request-changes`, { feedback });
+}
+
+export async function publicRejectDraft(
+  token: string,
+  draftId: number,
+  reason: string,
+): Promise<void> {
+  await api.post(`/public/review/${token}/draft/${draftId}/reject`, { reason });
 }
 
 export interface RegisterResult {
@@ -1622,4 +1696,108 @@ export async function getPromptDetail(brandId: number, promptId: number): Promis
 export async function getCoachUsage(brandId: number): Promise<{ used: number; limit: number; resets_at: string }> {
   const { data } = await api.get<{ used: number; limit: number; resets_at: string }>(`/coach/${brandId}/usage`);
   return data;
+}
+
+// ── Site Audit (Website AIO) ──────────────────────────────────────────────────
+
+export type WebsiteAuditSummary = {
+  id: number
+  brand_id: number
+  status: 'pending' | 'crawling' | 'analyzing' | 'completed' | 'failed' | 'cancelled'
+  started_at: string
+  completed_at: string | null
+  total_pages: number
+  pages_failed: number
+  overall_score: number | null
+  bot_access_score: number | null
+  content_score: number | null
+  schema_score: number | null
+  technical_score: number | null
+  render_mode: string | null
+  llms_txt_present: boolean
+  llms_txt_valid: boolean
+  robots_txt_raw: string | null
+  error_message: string | null
+}
+
+export type WebsiteAuditPageOut = {
+  id: number
+  audit_id: number
+  url: string
+  page_type: string
+  http_status: number | null
+  title: string | null
+  h1_text: string | null
+  word_count: number
+  fact_density: number
+  is_js_rendered: boolean
+  page_score: number | null
+  content_score: number | null
+  structure_score: number | null
+  schema_score: number | null
+  schema_types: string[]
+}
+
+export type WebsiteAuditFindingOut = {
+  id: number
+  audit_id: number
+  page_id: number | null
+  check_id: string
+  severity: 'critical' | 'high' | 'medium' | 'low' | 'info'
+  category: 'bot_access' | 'content' | 'schema' | 'technical' | 'authority'
+  message: string
+  evidence: Record<string, unknown> | null
+}
+
+export type WebsiteAuditRecommendationOut = {
+  id: number
+  audit_id: number
+  page_id: number | null
+  priority: 'high' | 'medium' | 'low'
+  effort: 'low' | 'medium' | 'high'
+  category: string
+  title: string
+  body: string
+  linked_prompt_ids: number[]
+  expected_impact: string | null
+  llm_generated: boolean
+}
+
+export type CitationDomainAgg = { domain: string; kind: string; count: number }
+export type CitationsOverview = {
+  by_domain: CitationDomainAgg[]
+  own_pct: number
+  competitor_pct: number
+  top_competitor_domains: CitationDomainAgg[]
+}
+
+export const siteAudit = {
+  trigger: (brandId: number) =>
+    api.post<{ audit_id: number; status: string }>(`/site-audit/${brandId}/trigger`).then(r => r.data),
+  latest: (brandId: number) =>
+    api.get<WebsiteAuditSummary>(`/site-audit/${brandId}/latest`).then(r => r.data),
+  history: (brandId: number, limit = 10) =>
+    api.get<WebsiteAuditSummary[]>(`/site-audit/${brandId}/history`, { params: { limit } }).then(r => r.data),
+  audit: (auditId: number) =>
+    api.get<WebsiteAuditSummary>(`/site-audit/audit/${auditId}`).then(r => r.data),
+  pages: (auditId: number, opts?: { page?: number; per_page?: number; sort?: string }) =>
+    api.get<WebsiteAuditPageOut[]>(`/site-audit/audit/${auditId}/pages`, { params: opts }).then(r => r.data),
+  pageDetail: (auditId: number, pageId: number) =>
+    api.get<{ page: WebsiteAuditPageOut; findings: WebsiteAuditFindingOut[]; recommendations: WebsiteAuditRecommendationOut[] }>(
+      `/site-audit/audit/${auditId}/page/${pageId}`,
+    ).then(r => r.data),
+  findings: (auditId: number, severity?: string) =>
+    api.get<WebsiteAuditFindingOut[]>(`/site-audit/audit/${auditId}/findings`, { params: { severity } }).then(r => r.data),
+  recommendations: (auditId: number, priority?: string) =>
+    api.get<WebsiteAuditRecommendationOut[]>(`/site-audit/audit/${auditId}/recommendations`, { params: { priority } }).then(r => r.data),
+  citations: (brandId: number, days = 30) =>
+    api.get<CitationsOverview>(`/site-audit/${brandId}/citations`, { params: { days } }).then(r => r.data),
+  llmsTxt: (brandId: number) =>
+    api.get<string>(`/site-audit/${brandId}/llms-txt`, { responseType: 'text' }).then(r => r.data),
+  robotsSnippet: (brandId: number, mode: 'allow_all' | 'search_only' = 'allow_all') =>
+    api.get<string>(`/site-audit/${brandId}/robots-snippet`, {
+      params: { mode }, responseType: 'text',
+    }).then(r => r.data),
+  cancel: (auditId: number) =>
+    api.post(`/site-audit/audit/${auditId}/cancel`),
 }

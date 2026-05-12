@@ -927,3 +927,128 @@ class TodayOut(BaseModel):
     drafts_to_review: list[TodayDraftOut]
     drafts_to_review_count: int
     active_clients: int
+    awaiting_client: list[TodayDraftOut] = []
+    approved: list[TodayDraftOut] = []
+
+
+# ── Agency portal shell (2026-05-11) ─────────────────────────────────────────
+
+
+class ReviewLinkOut(BaseModel):
+    token: str
+    url: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReviewDraftOut(BaseModel):
+    id: int
+    title: str | None
+    platform: str
+    content_text: str
+    created_at: datetime
+
+
+class ReviewClientPageOut(BaseModel):
+    client_name: str
+    drafts: list[ReviewDraftOut]
+
+
+class ChangesRequestIn(BaseModel):
+    feedback: str = Field(min_length=1, max_length=2000)
+
+
+class RejectIn(BaseModel):
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class DraftStatusUpdateIn(BaseModel):
+    status: str = Field(min_length=1, max_length=32)
+
+
+# ── Website AIO ──────────────────────────────────────────────────────────────
+
+class WebsiteAuditSummary(BaseModel):
+    id: int
+    brand_id: int
+    status: str
+    started_at: datetime
+    completed_at: datetime | None
+    total_pages: int
+    pages_failed: int
+    overall_score: float | None
+    bot_access_score: float | None
+    content_score: float | None
+    schema_score: float | None
+    technical_score: float | None
+    render_mode: str | None
+    llms_txt_present: bool
+    llms_txt_valid: bool
+    robots_txt_raw: str | None
+    error_message: str | None
+
+
+class WebsiteAuditPageOut(BaseModel):
+    id: int
+    audit_id: int
+    url: str
+    page_type: str
+    http_status: int | None
+    title: str | None
+    h1_text: str | None
+    word_count: int
+    fact_density: float
+    is_js_rendered: bool
+    page_score: float | None
+    content_score: float | None
+    structure_score: float | None
+    schema_score: float | None
+    schema_types: list[str] = []
+
+
+class WebsiteAuditFindingOut(BaseModel):
+    id: int
+    audit_id: int
+    page_id: int | None
+    check_id: str
+    severity: str
+    category: str
+    message: str
+    evidence: dict | None
+
+
+class WebsiteAuditRecommendationOut(BaseModel):
+    id: int
+    audit_id: int
+    page_id: int | None
+    priority: str
+    effort: str
+    category: str
+    title: str
+    body: str
+    linked_prompt_ids: list[int] = []
+    expected_impact: str | None
+    llm_generated: bool
+
+
+class CitationSourceOut(BaseModel):
+    id: int
+    brand_id: int
+    prompt_id: int | None
+    model: str
+    url: str
+    domain: str
+    kind: str
+    competitor_id: int | None
+    extracted_at: datetime
+
+
+class CitationDomainAgg(BaseModel):
+    domain: str
+    kind: str
+    count: int
+
+
+class TriggerAuditOut(BaseModel):
+    audit_id: int
+    status: str

@@ -61,3 +61,25 @@ def test_build_prompt_omits_voice_when_none():
     )
     assert "VOICE EXAMPLE" not in out
     assert "RELATED PUBLISHED CONTENT" not in out
+
+
+def test_wikipedia_prompt_uses_evidence_pack():
+    from app.services.drafting.prompts import build_wikipedia_prompt
+    pack = EvidencePack(
+        sources=[
+            EvidenceSource(ref="S1", kind="web", url="https://nature.com/a",
+                           title="Nature breath study", snippet="2024 study..."),
+            EvidenceSource(ref="S2", kind="library", url="https://acme.com/methodology",
+                           title="Methodology overview", snippet="Our process..."),
+        ],
+        query="breath cancer detection", brand_name="Acme",
+    )
+    out = build_wikipedia_prompt(
+        brand_name="Acme",
+        prompt_text="breath cancer detection",
+        profile_context="ctx",
+        response_analysis="none",
+        evidence_pack=pack,
+    )
+    assert "[S1]" in out and "[S2]" in out
+    assert "{{citation needed}}" not in out

@@ -14,7 +14,7 @@ import logging
 import re
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func as sqlfunc, select
@@ -26,6 +26,7 @@ from app.models import Competitor, Prompt, QueryResult, RunModelScore, TrackingR
 from app.services.competitive_gap import _mention_matches
 from app.schemas import (
     CitationGap,
+    CompetitiveGapResponse,
     CompetitorStat,
     ConversationItem,
     DashboardAnalytics,
@@ -511,3 +512,19 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         score_confidence=score_confidence,
         active_models=active_model_count,
     )
+
+
+@router.get("/{brand_id}/competitive-gap", response_model=CompetitiveGapResponse)
+async def get_competitive_gap(
+    brand_id: int,
+    db: DbDep,
+    user: CurrentUser,
+    window: Literal["7d", "30d", "90d"] = "7d",
+) -> CompetitiveGapResponse:
+    """Brand's competitive gap (visibility delta vs competitor avg) over the requested window.
+    Drives the dashboard's Competitive Gap card + drawer.
+    Spec: docs/superpowers/specs/2026-05-12-competitive-gap-design.md
+    """
+    await get_brand_for_user(brand_id, db, user)  # 404 on miss, matches existing dashboard endpoints
+    from app.services.competitive_gap import compute_competitive_gap
+    return await compute_competitive_gap(brand_id=brand_id, window=window, db=db)

@@ -1,22 +1,26 @@
 """Agency portal endpoints. All endpoints require is_agency_staff=True."""
 from __future__ import annotations
 
+import os
 import re
+import secrets
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi import status as http_status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import require_agency_staff
-from app.models import AgencyClient, Brand, ContentDraft, User
+from app.models import AgencyClient, Brand, ClientReviewLink, ContentDraft, User
 from app.schemas import (
     AgencyClientCreate,
     AgencyClientOut,
     AgencyClientUpdate,
     DraftAssignIn,
+    DraftStatusUpdateIn,
+    ReviewLinkOut,
     TodayDraftOut,
     TodayOut,
 )
@@ -204,4 +208,92 @@ async def assign_draft(
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft not found")
     draft.assigned_to_user_id = body.assigned_to_user_id
+    await db.commit()
+
+
+def _public_base_url(request: Request) -> str:
+    """Return base URL for public links (env override, else inferred)."""
+    env_url = os.getenv("PUBLIC_BASE_URL")
+    if env_url:
+        return env_url.rstrip("/")
+    return f"{request.url.scheme}://{request.url.netloc}"
+
+
+def _link_to_out(link: ClientReviewLink, request: Request) -> ReviewLinkOut:
+    base = _public_base_url(request)
+    return ReviewLinkOut(token=link.token, url=f"{base}/review/{link.token}", created_at=link.created_at)
+
+
+@router.get("/clients/{client_id}/review-link", response_model=ReviewLinkOut | None)
+async def get_review_link(
+    client_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    q = await db.execute(
+        select(ClientReviewLink)
+        .where(ClientReviewLink.agency_client_id == client_id, ClientReviewLink.revoked_at.is_(None))
+        .order_by(ClientReviewLink.created_at.desc())
+        .limit(1)
+    )
+    link = q.scalar_one_or_none()
+    return _link_to_out(link, request) if link else None
+
+
+@router.post("/clients/{client_id}/review-link", response_model=ReviewLinkOut, status_code=http_status.HTTP_201_CREATED)
+async def rotate_review_link(
+    client_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    # Revoke any existing active links
+    existing_q = await db.execute(
+        select(ClientReviewLink).where(
+            ClientReviewLink.agency_client_id == client_id,
+            ClientReviewLink.revoked_at.is_(None),
+        )
+    )
+    for old in existing_q.scalars().all():
+        old.revoked_at = datetime.utcnow()
+    new_link = ClientReviewLink(
+        agency_client_id=client_id,
+        token=secrets.token_urlsafe(32),
+    )
+    db.add(new_link)
+    await db.commit()
+    await db.refresh(new_link)
+    return _link_to_out(new_link, request)
+
+
+_STAFF_ALLOWED_STATUSES = {"draft", "awaiting_client", "approved", "posted", "dismissed"}
+
+
+@router.patch("/drafts/{draft_id}/status", status_code=http_status.HTTP_204_NO_CONTENT)
+async def update_draft_status(
+    draft_id: int,
+    body: DraftStatusUpdateIn,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    if body.status not in _STAFF_ALLOWED_STATUSES:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"Status must be one of {sorted(_STAFF_ALLOWED_STATUSES)}",
+        )
+    draft = await db.get(ContentDraft, draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    draft.status = body.status
+    if body.status == "approved" and draft.approved_at is None:
+        draft.approved_at = datetime.utcnow()
+    if body.status == "posted" and draft.posted_at is None:
+        draft.posted_at = datetime.utcnow()
     await db.commit()

@@ -8,6 +8,65 @@ import pytest
 
 pytestmark = pytest.mark.asyncio
 
+from app.database import AsyncSessionLocal
+from app.models import Brand, Competitor, Prompt, QueryResult, TrackingRun, User
+
+
+async def _seed_brand_with_runs(
+    *,
+    user_email: str,
+    competitors: list[tuple[str, datetime]] | None = None,  # (name, created_at)
+    runs: list[dict] | None = None,
+    # runs: [{"completed_at": dt, "queries": [{"model": str, "mentioned": bool, "response_text": str}]}, ...]
+) -> tuple[int, int]:
+    """Seed a brand + competitors + completed tracking runs with query results.
+    Returns (user_id, brand_id)."""
+    async with AsyncSessionLocal() as db:
+        user = User(email=user_email, password_hash="x", email_verified=1)
+        db.add(user)
+        await db.flush()
+
+        brand = Brand(name="Acme", slug=f"acme-{user.id}", user_id=user.id, tier="basic")
+        db.add(brand)
+        await db.flush()
+
+        prompt = Prompt(brand_id=brand.id, text="best CRM?")
+        db.add(prompt)
+        await db.flush()
+
+        for name, created_at in competitors or []:
+            db.add(Competitor(
+                brand_id=brand.id,
+                name=name,
+                website_url=f"https://{name.lower()}.com",
+                created_at=created_at,
+            ))
+
+        for run_spec in runs or []:
+            run = TrackingRun(
+                brand_id=brand.id,
+                status="completed",
+                run_type="manual",
+                completed_at=run_spec["completed_at"],
+                started_at=run_spec["completed_at"],
+            )
+            db.add(run)
+            await db.flush()
+            for q in run_spec.get("queries", []):
+                db.add(QueryResult(
+                    tracking_run_id=run.id,
+                    prompt_id=prompt.id,
+                    model=q["model"],
+                    run_number=1,
+                    mentioned=q["mentioned"],
+                    response_text=q["response_text"],
+                    error=None,
+                    created_at=run_spec["completed_at"],
+                ))
+
+        await db.commit()
+        return user.id, brand.id
+
 
 # ── _resolve_window ──────────────────────────────────────────────────────────
 
@@ -119,3 +178,144 @@ def test_per_day_buckets_groups_by_utc_date():
 def test_per_day_buckets_empty_input_returns_empty_dict():
     from app.services.competitive_gap import _per_day_buckets
     assert _per_day_buckets([]) == {}
+
+
+# ── compute_competitive_gap (happy path) ─────────────────────────────────────
+
+async def test_compute_happy_path_window_aggregate():
+    """Brand at 2/3 (66.7%), one competitor mentioned 1/3 (33.3%) → gap +33.3pp."""
+    from datetime import datetime, timedelta
+    from app.database import AsyncSessionLocal
+    from app.services.competitive_gap import compute_competitive_gap
+
+    today = datetime.utcnow().replace(microsecond=0)
+    user_id, brand_id = await _seed_brand_with_runs(
+        user_email="happy@example.com",
+        competitors=[("Notion", today - timedelta(days=30))],
+        runs=[{
+            "completed_at": today - timedelta(hours=2),
+            "queries": [
+                {"model": "chatgpt", "mentioned": True, "response_text": "Acme is great."},
+                {"model": "claude",  "mentioned": True, "response_text": "I'd suggest Acme."},
+                {"model": "gemini",  "mentioned": False, "response_text": "Try Notion instead."},
+            ],
+        }],
+    )
+
+    async with AsyncSessionLocal() as db:
+        resp = await compute_competitive_gap(brand_id=brand_id, window="7d", db=db)
+
+    assert resp.brand_id == brand_id
+    assert resp.window == "7d"
+    assert resp.has_competitors is True
+    assert resp.has_data is True
+    assert resp.brand_visibility_pct == pytest.approx(200 / 3, rel=1e-3)
+    assert resp.competitor_avg_pct == pytest.approx(100 / 3, rel=1e-3)
+    assert resp.headline_gap_pp == pytest.approx(100 / 3, rel=1e-3)  # 66.7 − 33.3
+    assert resp.sample_count == 3
+    assert resp.confidence == "low"  # <20 → low
+    assert len(resp.competitors) == 1
+    assert resp.competitors[0].name == "Notion"
+    assert resp.competitors[0].competitor_pct == pytest.approx(100 / 3, rel=1e-3)
+
+
+# ── compute_competitive_gap (edges) ──────────────────────────────────────────
+
+async def test_compute_no_competitors_returns_has_competitors_false():
+    from datetime import datetime, timedelta
+    from app.database import AsyncSessionLocal
+    from app.services.competitive_gap import compute_competitive_gap
+
+    today = datetime.utcnow().replace(microsecond=0)
+    _, brand_id = await _seed_brand_with_runs(
+        user_email="nocomp@example.com",
+        competitors=[],
+        runs=[{
+            "completed_at": today - timedelta(hours=1),
+            "queries": [{"model": "chatgpt", "mentioned": True, "response_text": "Acme!"}],
+        }],
+    )
+    async with AsyncSessionLocal() as db:
+        resp = await compute_competitive_gap(brand_id=brand_id, window="7d", db=db)
+    assert resp.has_competitors is False
+    assert resp.headline_gap_pp is None
+    assert resp.competitor_avg_pct is None
+    assert resp.competitors == []
+
+
+async def test_compute_no_runs_returns_has_data_false():
+    from datetime import datetime, timedelta
+    from app.database import AsyncSessionLocal
+    from app.services.competitive_gap import compute_competitive_gap
+
+    today = datetime.utcnow().replace(microsecond=0)
+    _, brand_id = await _seed_brand_with_runs(
+        user_email="noruns@example.com",
+        competitors=[("Notion", today - timedelta(days=30))],
+        runs=[],
+    )
+    async with AsyncSessionLocal() as db:
+        resp = await compute_competitive_gap(brand_id=brand_id, window="7d", db=db)
+    assert resp.has_competitors is True
+    assert resp.has_data is False
+    assert resp.headline_gap_pp is None
+
+
+async def test_compute_recently_added_competitor_marked_no_data():
+    """Competitor created today is excluded from prior-window aggregate;
+    appears in the response with has_data=False if also after window_end."""
+    from datetime import datetime, timedelta
+    from app.database import AsyncSessionLocal
+    from app.services.competitive_gap import compute_competitive_gap
+
+    today = datetime.utcnow().replace(microsecond=0)
+    # Competitor created in the FUTURE relative to window end → has_data False
+    _, brand_id = await _seed_brand_with_runs(
+        user_email="recentcomp@example.com",
+        competitors=[("FutureCo", today + timedelta(days=1))],
+        runs=[{
+            "completed_at": today - timedelta(hours=1),
+            "queries": [{"model": "chatgpt", "mentioned": True, "response_text": "Acme is great."}],
+        }],
+    )
+    async with AsyncSessionLocal() as db:
+        resp = await compute_competitive_gap(brand_id=brand_id, window="7d", db=db)
+    assert len(resp.competitors) == 1
+    assert resp.competitors[0].has_data is False
+    # Headline gap is None — no eligible competitors in the window
+    assert resp.headline_gap_pp is None
+
+
+async def test_compute_per_day_trend_groups_multiple_runs_same_day():
+    from datetime import datetime, timedelta
+    from app.database import AsyncSessionLocal
+    from app.services.competitive_gap import compute_competitive_gap
+
+    today_morning = datetime.utcnow().replace(hour=8, minute=0, second=0, microsecond=0)
+    today_evening = today_morning.replace(hour=20)
+    _, brand_id = await _seed_brand_with_runs(
+        user_email="multiday@example.com",
+        competitors=[("Notion", today_morning - timedelta(days=30))],
+        runs=[
+            {"completed_at": today_morning, "queries": [
+                {"model": "chatgpt", "mentioned": True, "response_text": "Acme."},
+            ]},
+            {"completed_at": today_evening, "queries": [
+                {"model": "chatgpt", "mentioned": False, "response_text": "Notion."},
+            ]},
+        ],
+    )
+    async with AsyncSessionLocal() as db:
+        resp = await compute_competitive_gap(brand_id=brand_id, window="7d", db=db)
+    # Both runs same UTC day → 1 trend point
+    assert len(resp.trend) == 1
+
+
+def test_confidence_thresholds():
+    from app.services.competitive_gap import _confidence
+    assert _confidence(0) == "low"
+    assert _confidence(19) == "low"
+    assert _confidence(20) == "medium"
+    assert _confidence(99) == "medium"
+    assert _confidence(100) == "high"
+    assert _confidence(500) == "high"

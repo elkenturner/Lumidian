@@ -1083,3 +1083,73 @@ class NoteCreate(BaseModel):
 
 class NoteUpdate(BaseModel):
     body: str = Field(min_length=1, max_length=10000)
+
+
+# ── Agency tasks (sub-project B, 2026-05-12) ─────────────────────────────────
+
+
+_TASK_STATUSES = {"open", "in_progress", "done"}
+
+
+class AgencyTaskCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=255)
+    description: str | None = None
+    due_at: datetime | None = None
+    assigned_to_user_id: int | None = None
+
+
+class AgencyTaskUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = None
+    status: str | None = None
+    due_at: datetime | None = None
+    assigned_to_user_id: int | None = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if v not in _TASK_STATUSES:
+            raise ValueError(f"status must be one of {sorted(_TASK_STATUSES)}")
+        return v
+
+
+class AgencyTaskOut(BaseModel):
+    id: int
+    agency_client_id: int
+    title: str
+    description: str | None
+    status: str
+    assigned_to_user_id: int | None
+    assigned_to_name: str | None
+    due_at: datetime | None
+    created_by_user_id: int | None
+    created_at: datetime
+    updated_at: datetime | None
+    completed_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MyQueueDraft(BaseModel):
+    draft_id: int
+    title: str | None
+    platform: str
+    status: str
+    client_id: int
+    client_name: str
+    created_at: datetime
+
+
+class MyQueueOut(BaseModel):
+    drafts: list[MyQueueDraft]
+    tasks: list[AgencyTaskOut]
+
+
+class AgencyStaffOut(BaseModel):
+    id: int
+    name: str | None
+    email: str
+
+    model_config = ConfigDict(from_attributes=True)

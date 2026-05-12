@@ -25,6 +25,9 @@ EVENT_REVIEW_LINK_ROTATED = "review_link_rotated"
 EVENT_CLIENT_APPROVED = "client_approved"
 EVENT_CLIENT_CHANGES_REQUESTED = "client_changes_requested"
 EVENT_CLIENT_REJECTED = "client_rejected"
+EVENT_TASK_CREATED = "task_created"
+EVENT_TASK_ASSIGNED = "task_assigned"
+EVENT_TASK_COMPLETED = "task_completed"
 
 
 def _encode_payload(payload: dict[str, Any] | None) -> str | None:

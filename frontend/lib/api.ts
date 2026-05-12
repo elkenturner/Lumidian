@@ -1865,3 +1865,89 @@ export async function agencyRecentActivity(limit = 10): Promise<ActivityEventWit
   });
   return res.data;
 }
+
+// ── Agency tasks (sub-project B, 2026-05-12) ─────────────────────────────────
+
+export type TaskStatus = 'open' | 'in_progress' | 'done';
+
+export interface AgencyTask {
+  id: number;
+  agency_client_id: number;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  assigned_to_user_id: number | null;
+  assigned_to_name: string | null;
+  due_at: string | null;
+  created_by_user_id: number | null;
+  created_at: string;
+  updated_at: string | null;
+  completed_at: string | null;
+}
+
+export interface AgencyTaskCreate {
+  title: string;
+  description?: string;
+  due_at?: string;
+  assigned_to_user_id?: number | null;
+}
+
+export interface AgencyTaskUpdate {
+  title?: string;
+  description?: string | null;
+  status?: TaskStatus;
+  due_at?: string | null;
+  assigned_to_user_id?: number | null;
+}
+
+export interface AgencyStaffMember {
+  id: number;
+  name: string | null;
+  email: string;
+}
+
+export interface MyQueueDraft {
+  draft_id: number;
+  title: string | null;
+  platform: string;
+  status: string;
+  client_id: number;
+  client_name: string;
+  created_at: string;
+}
+
+export interface MyQueueResponse {
+  drafts: MyQueueDraft[];
+  tasks: AgencyTask[];
+}
+
+export async function agencyListTasks(clientId: number, status?: TaskStatus): Promise<AgencyTask[]> {
+  const params: Record<string, string> = {};
+  if (status) params.status = status;
+  const res = await api.get<AgencyTask[]>(`/agency/clients/${clientId}/tasks`, { params });
+  return res.data;
+}
+
+export async function agencyCreateTask(clientId: number, body: AgencyTaskCreate): Promise<AgencyTask> {
+  const res = await api.post<AgencyTask>(`/agency/clients/${clientId}/tasks`, body);
+  return res.data;
+}
+
+export async function agencyUpdateTask(taskId: number, body: AgencyTaskUpdate): Promise<AgencyTask> {
+  const res = await api.patch<AgencyTask>(`/agency/tasks/${taskId}`, body);
+  return res.data;
+}
+
+export async function agencyDeleteTask(taskId: number): Promise<void> {
+  await api.delete(`/agency/tasks/${taskId}`);
+}
+
+export async function agencyMyQueue(): Promise<MyQueueResponse> {
+  const res = await api.get<MyQueueResponse>('/agency/my-queue');
+  return res.data;
+}
+
+export async function agencyStaff(): Promise<AgencyStaffMember[]> {
+  const res = await api.get<AgencyStaffMember[]>('/agency/staff');
+  return res.data;
+}

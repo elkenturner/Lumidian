@@ -9,6 +9,9 @@ import {
   MessageSquare,
   XCircle,
   Circle,
+  ListPlus,
+  UserCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import type { ComponentType, SVGProps } from 'react';
 
@@ -25,6 +28,9 @@ const ICONS: Record<string, Icon> = {
   client_approved: Check,
   client_changes_requested: MessageSquare,
   client_rejected: XCircle,
+  task_created: ListPlus,
+  task_assigned: UserCircle,
+  task_completed: CheckCircle2,
 };
 
 export function iconForEventType(type: string): Icon {

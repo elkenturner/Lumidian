@@ -27,6 +27,8 @@ from app.schemas import (
     BrandSourceCreate,
     BrandSourceOut,
     Publication,
+    VoiceSampleCreate,
+    VoiceSampleOut,
 )
 from app.services.drafting.evidence import BRAND_SOURCE_LIMIT
 
@@ -34,6 +36,8 @@ router = APIRouter(prefix="/brands", tags=["brand-profile"])
 logger = logging.getLogger(__name__)
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
+
+VOICE_SAMPLE_CAP = 3
 
 ALL_FIELDS = [
     "company_description",
@@ -348,4 +352,85 @@ async def delete_brand_source(
         raise HTTPException(status_code=404, detail="Source not found")
     await db.delete(src)
     await db.commit()
+    return Response(status_code=204)
+
+
+# ── Voice samples ───────────────────────────────────────────────────────────
+
+
+def _load_voice_samples(profile: BrandProfile | None) -> list[dict]:
+    if profile is None or not profile.voice_samples:
+        return []
+    try:
+        data = json.loads(profile.voice_samples)
+        return data if isinstance(data, list) else []
+    except (TypeError, json.JSONDecodeError):
+        return []
+
+
+@router.post("/{brand_id}/voice-samples", response_model=VoiceSampleOut)
+async def add_voice_sample(
+    brand_id: int,
+    payload: VoiceSampleCreate,
+    db: DbDep,
+    user: CurrentUser,
+):
+    """Add a writing sample to the brand's voice library.
+    New samples insert at index 0 (most-recent-first). Capped at VOICE_SAMPLE_CAP."""
+    await get_brand_for_user(brand_id, db, user)
+    profile = await _get_or_create_profile(db, brand_id)
+    samples = _load_voice_samples(profile)
+    if len(samples) >= VOICE_SAMPLE_CAP:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Voice sample cap reached ({VOICE_SAMPLE_CAP}). "
+                "Delete one before adding more."
+            ),
+        )
+    samples.insert(0, {"title": payload.title, "text": payload.text})
+    profile.voice_samples = json.dumps(samples)
+    await db.commit()
+    return VoiceSampleOut(index=0, title=payload.title, text=payload.text)
+
+
+@router.get("/{brand_id}/voice-samples", response_model=list[VoiceSampleOut])
+async def list_voice_samples(
+    brand_id: int,
+    db: DbDep,
+    user: CurrentUser,
+):
+    """List all writing samples for a brand (most-recently-added first)."""
+    await get_brand_for_user(brand_id, db, user)
+    result = await db.execute(
+        select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+    )
+    profile = result.scalar_one_or_none()
+    samples = _load_voice_samples(profile)
+    return [
+        VoiceSampleOut(index=i, title=s.get("title", ""), text=s.get("text", ""))
+        for i, s in enumerate(samples)
+    ]
+
+
+@router.delete("/{brand_id}/voice-samples/{index}", status_code=204)
+async def delete_voice_sample(
+    brand_id: int,
+    index: int,
+    db: DbDep,
+    user: CurrentUser,
+):
+    """Remove a voice sample by its index in the most-recent-first list."""
+    await get_brand_for_user(brand_id, db, user)
+    result = await db.execute(
+        select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+    )
+    profile = result.scalar_one_or_none()
+    samples = _load_voice_samples(profile)
+    if index < 0 or index >= len(samples):
+        raise HTTPException(status_code=404, detail="Voice sample index out of range")
+    samples.pop(index)
+    if profile is not None:
+        profile.voice_samples = json.dumps(samples)
+        await db.commit()
     return Response(status_code=204)

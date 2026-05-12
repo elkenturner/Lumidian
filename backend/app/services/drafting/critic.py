@@ -262,3 +262,17 @@ async def rewrite_flagged(
         paras[idx] = replacements[offset]
 
     return "\n\n".join(paras)
+
+
+# ── Hard-fail handling ──────────────────────────────────────────────────────
+
+def should_hard_retry(score: CriticScore) -> bool:
+    return score.hard_fail
+
+
+def pick_better(
+    a: tuple[str, CriticScore],
+    b: tuple[str, CriticScore],
+) -> tuple[str, CriticScore]:
+    """Return whichever draft has the higher overall_score."""
+    return a if a[1].overall_score >= b[1].overall_score else b

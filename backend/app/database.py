@@ -396,6 +396,30 @@ async def run_migrations():
                 # Column/table/index already exists — safe to ignore
                 pass
 
+        # ── Website AIO module ─────────────────────────────────────────────────
+        # (create_all in startup handles new tables; these are explicit indexes
+        # for query patterns the ORM doesn't infer automatically.)
+        try:
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_website_audit_brand_started "
+                "ON website_audits(brand_id, started_at DESC)"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_finding_audit_severity "
+                "ON website_audit_findings(audit_id, severity)"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_citation_brand_domain "
+                "ON citation_sources(brand_id, domain)"
+            ))
+            await conn.execute(text(
+                "CREATE INDEX IF NOT EXISTS idx_citation_brand_prompt "
+                "ON citation_sources(brand_id, prompt_id)"
+            ))
+            logger.info("migration: site_audit indexes ensured")
+        except Exception as exc:
+            logger.warning("site_audit indexes migration skipped: %s", exc)
+
     # ── Idempotent data fixes (run every startup) ────────────────────────────
     async with engine.begin() as conn:
         # Ensure brands match their owner's subscription tier.

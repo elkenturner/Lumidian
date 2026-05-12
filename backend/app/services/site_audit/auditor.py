@@ -1,0 +1,340 @@
+"""Audit orchestrator: crawl → parse → score → link → recommend → persist."""
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from urllib.parse import urljoin
+
+from sqlalchemy import select
+
+from app.database import AsyncSessionLocal
+from app.models import (
+    Brand, CitationSource, Prompt, WebsiteAudit, WebsiteAuditFinding,
+    WebsiteAuditPage, WebsiteAuditRecommendation, utcnow,
+)
+from app.services.site_audit.constants import (
+    PER_AUDIT_BUDGET_S, RENDER_SAMPLE_SIZE, normalise_url,
+)
+from app.services.site_audit.crawler import crawl_site, discover_sitemap_urls
+from app.services.site_audit.fetcher import (
+    classify_render_mode, fetch_raw, fetch_rendered,
+)
+from app.services.site_audit.page_classifier import classify_page
+from app.services.site_audit.page_prompt_link import (
+    PageLinkInput, PromptLinkInput, link_pages_to_prompts,
+)
+from app.services.site_audit.parsers import Finding
+from app.services.site_audit.parsers.llms_txt import parse_llms_txt
+from app.services.site_audit.parsers.meta import parse_meta
+from app.services.site_audit.parsers.robots import parse_robots
+from app.services.site_audit.parsers.schema import parse_schema
+from app.services.site_audit.parsers.semantic import parse_semantic
+from app.services.site_audit.recommendations import (
+    build_rule_based_recs, render_rec_for_csr_page,
+)
+from app.services.site_audit.scoring import (
+    PageScoreInputs, score_audit, score_bot_access, score_page,
+)
+
+logger = logging.getLogger(__name__)
+
+
+async def run_audit(*, brand_id: int, triggered_by: str, max_pages: int) -> int:
+    """Top-level entry. Creates a WebsiteAudit row and runs to completion.
+
+    Returns the audit_id. Never raises; on failure, audit.status='failed'
+    and error_message is set.
+    """
+    async with AsyncSessionLocal() as db:
+        brand = await db.get(Brand, brand_id)
+        if brand is None or not brand.website_url:
+            raise ValueError("brand not found or has no website_url")
+
+        audit = WebsiteAudit(
+            brand_id=brand_id, status="pending", triggered_by=triggered_by,
+            started_at=utcnow(),
+        )
+        db.add(audit)
+        await db.commit()
+        await db.refresh(audit)
+        audit_id = audit.id
+
+    try:
+        await asyncio.wait_for(_run_audit_inner(audit_id, brand_id, max_pages),
+                                timeout=PER_AUDIT_BUDGET_S + 30)
+    except asyncio.TimeoutError:
+        await _mark_failed(audit_id, "audit budget exceeded")
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("audit %d failed", audit_id)
+        await _mark_failed(audit_id, f"unexpected error: {exc}")
+    return audit_id
+
+
+async def _mark_failed(audit_id: int, msg: str) -> None:
+    async with AsyncSessionLocal() as db:
+        audit = await db.get(WebsiteAudit, audit_id)
+        if audit:
+            audit.status = "failed"
+            audit.error_message = msg
+            audit.completed_at = utcnow()
+            await db.commit()
+
+
+async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None:
+    async with AsyncSessionLocal() as db:
+        brand = await db.get(Brand, brand_id)
+        root = (brand.website_url or "").rstrip("/") + "/"
+
+    # ── crawling phase ────────────────────────────────────────────────────
+    await _set_status(audit_id, "crawling")
+
+    sitemap_urls, sitemap_src = await discover_sitemap_urls(root)
+    seed_urls = sitemap_urls[:max_pages] if sitemap_urls else None
+    pages_crawled = await crawl_site(root, max_pages=max_pages, max_depth=3, seed_urls=seed_urls)
+
+    # robots.txt + llms.txt
+    robots_res = await fetch_raw(urljoin(root, "robots.txt"))
+    robots_content = robots_res.html if robots_res.status == 200 else None
+    llms_res = await fetch_raw(urljoin(root, "llms.txt"))
+    llms_content = llms_res.html if llms_res.status == 200 else None
+
+    # Render-mode detection on a sample
+    sample_indexes = _sample_indexes(len(pages_crawled), RENDER_SAMPLE_SIZE)
+    rendered_modes: list[str] = []
+    is_js_rendered_by_url: dict[str, bool] = {}
+    for i in sample_indexes:
+        if i >= len(pages_crawled):
+            continue
+        page = pages_crawled[i]
+        if not page.html:
+            continue
+        rendered = await fetch_rendered(page.url)
+        mode = classify_render_mode(page.html, rendered.html or "")
+        rendered_modes.append(mode)
+        is_js_rendered_by_url[page.url] = (mode == "csr")
+
+    site_render_mode = _majority(rendered_modes) if rendered_modes else "unknown"
+
+    # ── analyzing phase ──────────────────────────────────────────────────
+    await _set_status(audit_id, "analyzing")
+
+    site_findings: list[Finding] = []
+    robots_out = parse_robots(robots_content, root)
+    site_findings.extend(robots_out.findings)
+    bot_status = robots_out.measurements.get("bot_status", {})
+
+    llms_out = parse_llms_txt(llms_content)
+    site_findings.extend(llms_out.findings)
+
+    # Per-page parsing
+    page_records: list[dict] = []
+
+    for crawl_page in pages_crawled:
+        page_type = classify_page(crawl_page.url, crawl_page.html)
+        sem = parse_semantic(crawl_page.html or "", crawl_page.url)
+        sch = parse_schema(crawl_page.html or "", crawl_page.url, page_type)
+        mta = parse_meta(crawl_page.html or "", crawl_page.url, page_type)
+
+        per_page_findings = sem.findings + sch.findings + mta.findings
+        is_js = is_js_rendered_by_url.get(crawl_page.url, False)
+
+        # Severity counts for scoring
+        sev_counts: dict[str, int] = {"critical": 0, "high": 0, "medium": 0, "low": 0, "info": 0}
+        for f in per_page_findings:
+            sev_counts[f.severity] = sev_counts.get(f.severity, 0) + 1
+
+        inputs = PageScoreInputs(
+            word_count=sem.measurements["word_count"],
+            h2_count=sem.measurements["h2_count"],
+            table_count=sem.measurements["table_count"],
+            list_count=sem.measurements["list_count"],
+            fact_density=sem.measurements["fact_density"],
+            outbound_links=sem.measurements["outbound_links"],
+            internal_links=sem.measurements["internal_links"],
+            image_alt_pct=mta.measurements["image_alt_pct"],
+            has_jsonld=sch.measurements["has_jsonld"],
+            schema_types_count=len(sch.measurements["schema_types"]),
+            is_js_rendered=is_js,
+            http_status=crawl_page.status,
+            fetch_ms=crawl_page.fetch_ms,
+            findings_by_severity=sev_counts,
+        )
+        scores = score_page(inputs)
+        page_records.append({
+            "url": crawl_page.url,
+            "depth": crawl_page.depth,
+            "http_status": crawl_page.status,
+            "fetch_ms": crawl_page.fetch_ms,
+            "fetch_error": crawl_page.error,
+            "page_type": page_type,
+            "measurements": {**sem.measurements, **sch.measurements, **mta.measurements,
+                             "is_js_rendered": is_js,
+                             "raw_html_size": len(crawl_page.html or ""),
+                             "rendered_html_size": None},
+            "findings": per_page_findings,
+            "scores": scores,
+        })
+
+    # ── persist ───────────────────────────────────────────────────────────
+    async with AsyncSessionLocal() as db:
+        for rec in page_records:
+            m = rec["measurements"]
+            page_row = WebsiteAuditPage(
+                audit_id=audit_id,
+                url=normalise_url(rec["url"]),
+                depth=rec["depth"],
+                http_status=rec["http_status"],
+                fetch_ms=rec["fetch_ms"],
+                page_type=rec["page_type"],
+                word_count=m.get("word_count", 0),
+                title=m.get("title"),
+                meta_description=m.get("meta_description"),
+                h1_text=m.get("h1_text"),
+                h2_count=m.get("h2_count", 0),
+                h3_count=m.get("h3_count", 0),
+                table_count=m.get("table_count", 0),
+                list_count=m.get("list_count", 0),
+                fact_density=m.get("fact_density", 0.0),
+                outbound_links=m.get("outbound_links", 0),
+                internal_links=m.get("internal_links", 0),
+                image_count=m.get("image_count", 0),
+                image_alt_pct=m.get("image_alt_pct", 0.0),
+                has_jsonld=m.get("has_jsonld", False),
+                schema_types=json.dumps(m.get("schema_types") or []),
+                is_js_rendered=m.get("is_js_rendered", False),
+                page_score=rec["scores"]["page_score"],
+                content_score=rec["scores"]["content_score"],
+                structure_score=rec["scores"]["structure_score"],
+                schema_score=rec["scores"]["schema_score"],
+                raw_html_size=m.get("raw_html_size"),
+                fetch_error=rec.get("fetch_error"),
+            )
+            db.add(page_row)
+            await db.flush()
+            rec["page_id"] = page_row.id
+            for f in rec["findings"]:
+                db.add(WebsiteAuditFinding(
+                    audit_id=audit_id, page_id=page_row.id,
+                    check_id=f.check_id, severity=f.severity, category=f.category,
+                    message=f.message, evidence=json.dumps(f.evidence),
+                ))
+
+        # Site-level findings
+        for f in site_findings:
+            db.add(WebsiteAuditFinding(
+                audit_id=audit_id, page_id=None,
+                check_id=f.check_id, severity=f.severity, category=f.category,
+                message=f.message, evidence=json.dumps(f.evidence),
+            ))
+
+        await db.commit()
+
+    # ── page↔prompt linking ──────────────────────────────────────────────
+    page_link_inputs = [
+        PageLinkInput(id=rec["page_id"], url=rec["url"],
+                       title=rec["measurements"].get("title"),
+                       page_type=rec["page_type"])
+        for rec in page_records
+    ]
+    prompt_link_inputs = await _build_prompt_link_inputs(brand_id)
+    page_link_map = link_pages_to_prompts(page_link_inputs, prompt_link_inputs)
+
+    # ── recommendations ───────────────────────────────────────────────────
+    async with AsyncSessionLocal() as db:
+        # Per-page recs from per-page findings
+        for rec in page_records:
+            recs = build_rule_based_recs(
+                findings=rec["findings"],
+                page_link_map=page_link_map,
+                page_id=rec["page_id"],
+            )
+            if rec["measurements"].get("is_js_rendered"):
+                recs.append(render_rec_for_csr_page(
+                    rec["page_id"], page_link_map.get(rec["page_id"], [])
+                ))
+            for r in recs:
+                db.add(WebsiteAuditRecommendation(
+                    audit_id=audit_id, page_id=rec["page_id"],
+                    priority=r.priority, effort=r.effort, category=r.category,
+                    title=r.title, body=r.body,
+                    linked_prompt_ids=json.dumps(r.linked_prompt_ids) if r.linked_prompt_ids else None,
+                    expected_impact=r.expected_impact,
+                    llm_generated=r.llm_generated,
+                ))
+
+        # Site-level recs from site-level findings (no page_id)
+        site_recs = build_rule_based_recs(site_findings, page_link_map={}, page_id=None)
+        for r in site_recs:
+            db.add(WebsiteAuditRecommendation(
+                audit_id=audit_id, page_id=None,
+                priority=r.priority, effort=r.effort, category=r.category,
+                title=r.title, body=r.body,
+                linked_prompt_ids=None, expected_impact=r.expected_impact,
+                llm_generated=False,
+            ))
+
+        # Scores
+        bot_score = score_bot_access(bot_status)
+        content_avg = sum(rec["scores"]["content_score"] for rec in page_records) / max(len(page_records), 1)
+        schema_avg = sum(rec["scores"]["schema_score"] for rec in page_records) / max(len(page_records), 1)
+        technical_avg = sum(rec["scores"]["page_score"] for rec in page_records) / max(len(page_records), 1)
+
+        audit = await db.get(WebsiteAudit, audit_id)
+        scores = score_audit(
+            bot_access=bot_score, content=content_avg, schema=schema_avg, technical=technical_avg,
+        )
+        audit.overall_score = scores["overall_score"]
+        audit.bot_access_score = scores["bot_access_score"]
+        audit.content_score = scores["content_score"]
+        audit.schema_score = scores["schema_score"]
+        audit.technical_score = scores["technical_score"]
+        audit.total_pages = len(page_records)
+        audit.pages_failed = sum(1 for r in page_records if r.get("fetch_error"))
+        audit.render_mode = site_render_mode
+        audit.sitemap_url = sitemap_src
+        audit.robots_txt_raw = (robots_content or "")[:8192] if robots_content else None
+        audit.llms_txt_present = llms_out.measurements["present"]
+        audit.llms_txt_valid = llms_out.measurements["valid"]
+        audit.status = "completed"
+        audit.completed_at = utcnow()
+        await db.commit()
+
+
+async def _set_status(audit_id: int, status: str) -> None:
+    async with AsyncSessionLocal() as db:
+        audit = await db.get(WebsiteAudit, audit_id)
+        if audit:
+            audit.status = status
+            await db.commit()
+
+
+async def _build_prompt_link_inputs(brand_id: int) -> list[PromptLinkInput]:
+    async with AsyncSessionLocal() as db:
+        prompts = (await db.execute(
+            select(Prompt).where(Prompt.brand_id == brand_id)
+        )).scalars().all()
+        out: list[PromptLinkInput] = []
+        for p in prompts:
+            cites = (await db.execute(
+                select(CitationSource.url).where(
+                    CitationSource.brand_id == brand_id,
+                    CitationSource.prompt_id == p.id,
+                    CitationSource.kind.in_(["competitor", "third_party"]),
+                )
+            )).all()
+            out.append(PromptLinkInput(id=p.id, text=p.text, cited_urls=[r[0] for r in cites]))
+        return out
+
+
+def _majority(values: list[str]) -> str:
+    counts: dict[str, int] = {}
+    for v in values:
+        counts[v] = counts.get(v, 0) + 1
+    return max(counts.items(), key=lambda kv: kv[1])[0]
+
+
+def _sample_indexes(total: int, k: int) -> list[int]:
+    if total <= k:
+        return list(range(total))
+    return [0, total // 4, total // 2, (3 * total) // 4, total - 1][:k]

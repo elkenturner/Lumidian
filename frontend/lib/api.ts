@@ -1006,6 +1006,78 @@ export async function agencyAssignDraft(draftId: number, userId: number | null):
   await api.patch(`/agency/drafts/${draftId}/assign`, { assigned_to_user_id: userId });
 }
 
+// ── Agency portal shell (2026-05-11) ─────────────────────────────────────────
+
+export interface ReviewLinkOut {
+  token: string;
+  url: string;
+  created_at: string;
+}
+
+export type DraftStaffStatus =
+  | 'draft'
+  | 'awaiting_client'
+  | 'approved'
+  | 'posted'
+  | 'dismissed';
+
+export async function agencyGetReviewLink(clientId: number): Promise<ReviewLinkOut | null> {
+  const res = await api.get<ReviewLinkOut | null>(`/agency/clients/${clientId}/review-link`);
+  return res.data;
+}
+
+export async function agencyRotateReviewLink(clientId: number): Promise<ReviewLinkOut> {
+  const res = await api.post<ReviewLinkOut>(`/agency/clients/${clientId}/review-link`);
+  return res.data;
+}
+
+export async function agencyUpdateDraftStatus(
+  draftId: number,
+  status: DraftStaffStatus,
+): Promise<void> {
+  await api.patch(`/agency/drafts/${draftId}/status`, { status });
+}
+
+// ── Public review (no auth) ──────────────────────────────────────────────────
+
+export interface ReviewDraft {
+  id: number;
+  title: string | null;
+  platform: string;
+  content_text: string;
+  created_at: string;
+}
+
+export interface ReviewClientPage {
+  client_name: string;
+  drafts: ReviewDraft[];
+}
+
+export async function publicGetReviewPage(token: string): Promise<ReviewClientPage> {
+  const res = await api.get<ReviewClientPage>(`/public/review/${token}`);
+  return res.data;
+}
+
+export async function publicApproveDraft(token: string, draftId: number): Promise<void> {
+  await api.post(`/public/review/${token}/draft/${draftId}/approve`);
+}
+
+export async function publicRequestChanges(
+  token: string,
+  draftId: number,
+  feedback: string,
+): Promise<void> {
+  await api.post(`/public/review/${token}/draft/${draftId}/request-changes`, { feedback });
+}
+
+export async function publicRejectDraft(
+  token: string,
+  draftId: number,
+  reason: string,
+): Promise<void> {
+  await api.post(`/public/review/${token}/draft/${draftId}/reject`, { reason });
+}
+
 export interface RegisterResult {
   email: string;
   needs_verification: boolean;

@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
 from app.models import Competitor, Prompt, QueryResult, RunModelScore, TrackingRun
+from app.services.competitive_gap import _mention_matches
 from app.schemas import (
     CitationGap,
     CompetitorStat,
@@ -306,10 +307,9 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
     brand_mentions = sum(1 for qr, _ in rows if qr.mentioned)
     comp_counts: dict[str, int] = {}
     for comp in competitors:
-        comp_lower = comp.name.lower()
         comp_counts[comp.name] = sum(
             1 for qr, _ in rows
-            if qr.response_text and comp_lower in qr.response_text.lower()
+            if _mention_matches(qr.response_text, comp.name)
         )
     total_mentions = brand_mentions + sum(comp_counts.values())
     sov_pct = (brand_mentions / total_mentions * 100.0) if total_mentions > 0 else (100.0 if not competitors else 0.0)

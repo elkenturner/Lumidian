@@ -135,3 +135,23 @@ async def test_rewrite_keeps_original_when_fewer_paragraphs_returned():
     paras = rewritten.split("\n\n")
     assert paras[1] == "Only one paragraph back."
     assert paras[2] == "Para 2."
+
+
+@pytest.mark.asyncio
+async def test_should_retry_on_hard_fail():
+    from app.services.drafting.critic import CriticScore, should_hard_retry
+    bad = CriticScore(0, 0, 0, 0, 0, 1.0, [])
+    ok = CriticScore(5, 5, 5, 5, 5, 5.0, [])
+    great = CriticScore(8, 8, 8, 8, 8, 8.0, [])
+    assert should_hard_retry(bad) is True
+    assert should_hard_retry(ok) is False
+    assert should_hard_retry(great) is False
+
+
+def test_pick_better_score_returns_higher():
+    from app.services.drafting.critic import CriticScore, pick_better
+    a = CriticScore(1, 1, 1, 1, 1, 1.0, [])
+    b = CriticScore(8, 8, 8, 8, 8, 8.0, [])
+    drafts = pick_better(("A", a), ("B", b))
+    assert drafts[0] == "B"
+    assert drafts[1].overall_score == 8.0

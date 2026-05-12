@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from app.models import Brand, WebsiteAudit, WebsiteAuditPage, User
+from app.models import Brand, WebsiteAudit, WebsiteAuditPage, User, BrandSource
 from app.services.drafting.evidence import (
     EvidenceSource,
     EvidencePack,
@@ -119,3 +119,48 @@ async def test_select_web_sources_empty_on_no_results():
     with patch("app.services.drafting.evidence._serper_search", new=AsyncMock(return_value=[])):
         sources = await select_web_sources(query="anything", limit=5)
     assert sources == []
+
+
+@pytest.mark.asyncio
+async def test_select_library_sources_returns_brand_sources(db_session):
+    from app.services.drafting.evidence import select_library_sources
+
+    user = User(email="ev3@test.com", password_hash="x", email_verified=1)
+    db_session.add(user)
+    await db_session.flush()
+    brand = Brand(name="Lib", slug="lib-evidence", user_id=user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    db_session.add_all([
+        BrandSource(brand_id=brand.id, title="Study A", url="https://a.com/a",
+                    snippet="A", source_type="paper"),
+        BrandSource(brand_id=brand.id, title="Study B", url="https://a.com/b",
+                    snippet="B", source_type="paper"),
+    ])
+    await db_session.commit()
+
+    sources = await select_library_sources(brand_id=brand.id, db=db_session)
+    assert len(sources) == 2
+    assert {s.title for s in sources} == {"Study A", "Study B"}
+    assert all(s.kind == "library" for s in sources)
+
+
+@pytest.mark.asyncio
+async def test_select_library_sources_caps_at_limit(db_session):
+    from app.services.drafting.evidence import select_library_sources, BRAND_SOURCE_LIMIT
+
+    user = User(email="ev4@test.com", password_hash="x", email_verified=1)
+    db_session.add(user)
+    await db_session.flush()
+    brand = Brand(name="Many", slug="many-evidence", user_id=user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    db_session.add_all([
+        BrandSource(brand_id=brand.id, title=f"S{i}", url=f"https://a.com/{i}",
+                    snippet=f"snip {i}", source_type="article")
+        for i in range(BRAND_SOURCE_LIMIT + 5)
+    ])
+    await db_session.commit()
+
+    sources = await select_library_sources(brand_id=brand.id, db=db_session)
+    assert len(sources) == BRAND_SOURCE_LIMIT

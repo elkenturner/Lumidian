@@ -165,35 +165,60 @@ async def get_today(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_agency_staff),
 ):
-    drafts_q = await db.execute(
+    awaiting_staff_q = await db.execute(
         select(ContentDraft, Brand, AgencyClient)
         .join(Brand, Brand.id == ContentDraft.brand_id)
         .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
-        .where(ContentDraft.status == "draft")
+        .where(ContentDraft.status.in_(("draft", "changes_requested")))
         .order_by(ContentDraft.created_at.asc())
         .limit(50)
     )
-    drafts_rows = drafts_q.all()
-    drafts = [
-        TodayDraftOut(
-            draft_id=draft.id,
-            title=getattr(draft, "title", None),
-            platform=draft.platform,
-            client_id=client.id,
-            client_name=client.name,
-            assigned_to_user_id=draft.assigned_to_user_id,
-            created_at=draft.created_at,
-        )
-        for draft, _brand, client in drafts_rows
-    ]
+    awaiting_client_q = await db.execute(
+        select(ContentDraft, Brand, AgencyClient)
+        .join(Brand, Brand.id == ContentDraft.brand_id)
+        .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
+        .where(ContentDraft.status == "awaiting_client")
+        .order_by(ContentDraft.created_at.asc())
+        .limit(50)
+    )
+    approved_q = await db.execute(
+        select(ContentDraft, Brand, AgencyClient)
+        .join(Brand, Brand.id == ContentDraft.brand_id)
+        .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
+        .where(ContentDraft.status == "approved")
+        .order_by(ContentDraft.created_at.asc())
+        .limit(50)
+    )
+
+    def _to_out(rows):
+        return [
+            TodayDraftOut(
+                draft_id=draft.id,
+                title=getattr(draft, "title", None),
+                platform=draft.platform,
+                client_id=ac.id,
+                client_name=ac.name,
+                assigned_to_user_id=draft.assigned_to_user_id,
+                created_at=draft.created_at,
+            )
+            for draft, _b, ac in rows
+        ]
+
+    awaiting_staff = _to_out(awaiting_staff_q.all())
+    awaiting_client = _to_out(awaiting_client_q.all())
+    approved = _to_out(approved_q.all())
+
     active_clients_q = await db.execute(
         select(func.count(AgencyClient.id)).where(AgencyClient.status == "active")
     )
     active_clients = active_clients_q.scalar_one() or 0
+
     return TodayOut(
-        drafts_to_review=drafts,
-        drafts_to_review_count=len(drafts),
+        drafts_to_review=awaiting_staff,
+        drafts_to_review_count=len(awaiting_staff),
         active_clients=active_clients,
+        awaiting_client=awaiting_client,
+        approved=approved,
     )
 
 

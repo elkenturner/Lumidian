@@ -94,6 +94,8 @@ async def test_today_returns_empty_when_no_drafts(client):
     assert body["drafts_to_review"] == []
     assert body["drafts_to_review_count"] == 0
     assert body["active_clients"] == 0
+    assert body["awaiting_client"] == []
+    assert body["approved"] == []
 
 
 @pytest.mark.asyncio

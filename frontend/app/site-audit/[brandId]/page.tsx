@@ -7,6 +7,9 @@ import { siteAudit, type WebsiteAuditSummary } from '@/lib/api'
 import { AuditTriggerButton } from '@/components/site-audit/AuditTriggerButton'
 import { PageList } from '@/components/site-audit/PageList'
 import { PageDetail } from '@/components/site-audit/PageDetail'
+import { BotAccessPanel } from '@/components/site-audit/BotAccessPanel'
+import { LlmsTxtPanel } from '@/components/site-audit/LlmsTxtPanel'
+import { GeneratorsCard } from '@/components/site-audit/GeneratorsCard'
 
 export default function SiteAuditPage() {
   const params = useParams<{ brandId: string }>()
@@ -84,7 +87,13 @@ export default function SiteAuditPage() {
           ? <PageList auditId={audit.id} onSelect={setSelectedPageId} />
           : <PageDetail auditId={audit.id} pageId={selectedPageId} onBack={() => setSelectedPageId(null)} />
       )}
-      {tab === 'bots' && <div className="text-muted-foreground">Bots tab — coming in Task 28</div>}
+      {tab === 'bots' && (
+        <div className="space-y-8 max-w-3xl">
+          <BotAccessPanel auditId={audit.id} robotsTxtRaw={audit.robots_txt_raw} />
+          <LlmsTxtPanel brandId={brandId} present={audit.llms_txt_present} valid={audit.llms_txt_valid} />
+          <GeneratorsCard brandId={brandId} />
+        </div>
+      )}
       {tab === 'citations' && <div className="text-muted-foreground">Citations tab — coming in Task 29</div>}
       {tab === 'recs' && <div className="text-muted-foreground">Recommendations tab — coming in Task 30</div>}
     </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { agencyToday, type AgencyTodayDraft, type AgencyTodayResponse } from '@/lib/api';
+import { RecentActivitySection } from '@/components/agency/RecentActivitySection';
 
 function DraftList({ drafts, emptyText }: { drafts: AgencyTodayDraft[]; emptyText: string }) {
   if (drafts.length === 0) {
@@ -90,6 +91,8 @@ export default function AgencyTodayPage() {
           />
         </section>
       </div>
+
+      <RecentActivitySection />
     </div>
   );
 }

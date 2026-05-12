@@ -34,6 +34,7 @@ import {
   getBrandProfile,
   getBillingStatus,
   getBillingUsage,
+  getCompetitiveGap,
   BrandDetail,
   OverviewData,
   TrendPoint,
@@ -47,6 +48,8 @@ import {
   BillingUsage,
   ModelStat,
   parseApiError,
+  CompetitiveGapResponse,
+  CompetitiveGapWindow,
 } from '@/lib/api';
 import { AppToast, ToastData } from '@/components/AppToast';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
@@ -73,6 +76,8 @@ import {
   HelpTooltip,
   MethodologyCallout,
   buildPromptGroups,
+  CompetitiveGapCard,
+  CompetitiveGapDrawer,
 } from '@/components/dashboard';
 import { AskCoachButton } from '@/components/coach/AskCoachButton';
 
@@ -110,6 +115,12 @@ export default function DashboardPage() {
   // Competitor modal
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
   const [competitorModalOpen, setCompetitorModalOpen] = useState(false);
+
+  // Competitive gap
+  const [competitiveGap, setCompetitiveGap] = useState<CompetitiveGapResponse | null>(null);
+  const [gapWindow, setGapWindow] = useState<CompetitiveGapWindow>('7d');
+  const [gapLoading, setGapLoading] = useState(false);
+  const [gapDrawerOpen, setGapDrawerOpen] = useState(false);
 
   // Billing and usage state
   const [billingStatus, setBillingStatus] = useState<BillingStatus | null>(null);
@@ -206,6 +217,16 @@ export default function DashboardPage() {
     loadData(selectedBrandId, controller.signal);
     return () => controller.abort();
   }, [selectedBrandId, loadData]);
+
+  // Re-fetch only competitive gap data when window toggle changes (or brand changes)
+  useEffect(() => {
+    if (!selectedBrandId) return;
+    setGapLoading(true);
+    getCompetitiveGap(selectedBrandId, gapWindow)
+      .then((res) => setCompetitiveGap(res))
+      .catch((err) => logError(err, 'Dashboard: refetch competitive gap'))
+      .finally(() => setGapLoading(false));
+  }, [selectedBrandId, gapWindow]);
 
   const handlePullRefresh = useCallback(async () => {
     if (selectedBrandId) await loadData(selectedBrandId);
@@ -706,7 +727,7 @@ export default function DashboardPage() {
                 />
               )}
 
-              {/* Row 1: visibility (left) + prompt/sentiment/sov (right) */}
+              {/* Row 1: Visibility Score | Competitive Gap */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                 {/* Visibility score + sparkline */}
                 <VisibilityChart
@@ -721,127 +742,137 @@ export default function DashboardPage() {
                   brandId={selectedBrandId ?? undefined}
                 />
 
-                {/* Right column: Best Prompt + Sentiment on top, SOV below */}
-                <div className="flex flex-col gap-3">
-                  {/* Top row */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <BestPromptCard responses={responses} loading={loadingAnalytics} />
+                {/* Competitive Gap card */}
+                <CompetitiveGapCard
+                  data={competitiveGap}
+                  loading={gapLoading || loadingAnalytics}
+                  window={gapWindow}
+                  onWindowChange={setGapWindow}
+                  onExpand={() => setGapDrawerOpen(true)}
+                  onAddCompetitorsClick={() => setCompetitorModalOpen(true)}
+                />
+              </div>
 
-                    {/* Sentiment */}
-                    <div className="card p-5">
-                      <div className="flex items-start justify-between mb-2">
-                        <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
-                          Sentiment
-                          <HelpTooltip text="How positively AI models describe your brand when they mention it." />
-                        </p>
-                        <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] flex items-center justify-center text-[var(--accent)] flex-shrink-0">
-                          <TrendingUp size={15} />
-                        </div>
-                      </div>
-                      {loadingAnalytics ? (
-                        <div className="h-8 w-16 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-1" />
-                      ) : sentData?.has_data && sentHeadline ? (
-                        <>
-                          <p className="text-2xl font-bold mt-1" style={{ color: sentColor }}>
-                            {sentHeadline}
-                          </p>
-                          <div className="mt-2 flex gap-0.5 h-1.5 rounded-full overflow-hidden">
-                            <div style={{ width: `${sentData.positive_pct}%`, background: 'var(--success)' }} />
-                            <div style={{ width: `${sentData.neutral_pct}%`, background: 'var(--warning)' }} />
-                            <div style={{ width: `${sentData.negative_pct}%`, background: 'var(--danger)' }} />
-                          </div>
-                          <p className="text-xs text-[var(--text-faint)] mt-1.5">
-                            {Math.round(sentData.neutral_pct)}% neutral &middot; {Math.round(sentData.negative_pct)}% negative
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">&mdash;</p>
-                          <p className="text-xs text-[var(--text-faint)] mt-1">No mentions to analyze</p>
-                        </>
-                      )}
-                    </div>
-                  </div>
+              {/* Row 2: Best Prompt + Sentiment | SOV (was the right column of old Row 1) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                {/* Best Prompt + Sentiment */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <BestPromptCard responses={responses} loading={loadingAnalytics} />
 
-                  {/* SOV */}
-                  <div className="flex-1 card p-5">
-                    <div className="flex items-center justify-between mb-3">
+                  {/* Sentiment */}
+                  <div className="card p-5">
+                    <div className="flex items-start justify-between mb-2">
                       <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
-                        Share of Voice
-                        <HelpTooltip text="Percentage of total AI brand mentions in your category per entity." />
+                        Sentiment
+                        <HelpTooltip text="How positively AI models describe your brand when they mention it." />
                       </p>
-                      <button
-                        onClick={() => setCompetitorModalOpen(true)}
-                        aria-label="Manage competitors"
-                        className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] bg-[rgba(255,255,255,0.06)] hover:bg-[var(--accent-muted)] border border-[rgba(255,255,255,0.08)] rounded-lg px-2.5 py-1.5 transition-colors"
-                      >
-                        <Users size={12} />
-                        {analytics?.sov.has_competitors ? 'Manage' : 'Add competitors'}
-                      </button>
+                      <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] flex items-center justify-center text-[var(--accent)] flex-shrink-0">
+                        <TrendingUp size={15} />
+                      </div>
                     </div>
                     {loadingAnalytics ? (
-                      <div className="flex gap-3">
-                        {[1, 2, 3].map(i => <div key={i} className="h-4 flex-1 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
-                      </div>
-                    ) : !analytics?.sov.has_competitors ? (
-                      <p className="text-xs text-[var(--text-faint)]">
-                        Add competitors to see how your brand&apos;s AI visibility compares.
-                      </p>
-                    ) : (() => {
-                      const allStats = analytics.competitor_comparison;
-                      const sorted = [...allStats].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
-                      const count = sorted.length;
-                      const mutedColors = [
-                        '#7c8aaa', // slate
-                        '#8a7ca5', // lavender
-                        '#7ca58a', // sage
-                        '#a5917c', // tan
-                        '#7c9ba5', // teal
-                        '#a57c8a', // mauve
-                        '#9a9a7c', // olive
-                        '#7c88a5', // steel
-                      ];
-                      let colorIdx = 0;
-
-                      return (
-                        <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : count <= 2 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
-                          {sorted.map((s) => {
-                            const pct = Math.round(s.mention_rate * 100);
-                            const competitorColor = s.is_primary ? null : mutedColors[colorIdx++ % mutedColors.length];
-                            const barColor = s.is_primary ? 'var(--accent)' : competitorColor!;
-                            const textColor = s.is_primary ? 'var(--accent-light)' : competitorColor!;
-                            return (
-                              <div key={s.name} className="flex flex-col gap-1.5">
-                                <div className="flex items-center justify-between">
-                                  <span className={`text-xs font-medium truncate ${s.is_primary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{s.name}</span>
-                                  <span className="text-xs font-semibold tabular-nums ml-2 flex-shrink-0" style={{ color: textColor }}>{pct}%</span>
-                                </div>
-                                <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full transition-[width] duration-500"
-                                    style={{ width: `${pct}%`, background: barColor }}
-                                  />
-                                </div>
-                                {!s.is_primary && selectedBrandId != null && (
-                                  <AskCoachButton
-                                    brandId={selectedBrandId}
-                                    question={`Why is ${s.name} outperforming us in AI visibility?`}
-                                    className="text-[10px] text-[var(--text-faint)] hover:text-[var(--accent)] underline underline-offset-2 transition-colors text-left"
-                                  >
-                                    Why are they ahead?
-                                  </AskCoachButton>
-                                )}
-                              </div>
-                            );
-                          })}
+                      <div className="h-8 w-16 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-1" />
+                    ) : sentData?.has_data && sentHeadline ? (
+                      <>
+                        <p className="text-2xl font-bold mt-1" style={{ color: sentColor }}>
+                          {sentHeadline}
+                        </p>
+                        <div className="mt-2 flex gap-0.5 h-1.5 rounded-full overflow-hidden">
+                          <div style={{ width: `${sentData.positive_pct}%`, background: 'var(--success)' }} />
+                          <div style={{ width: `${sentData.neutral_pct}%`, background: 'var(--warning)' }} />
+                          <div style={{ width: `${sentData.negative_pct}%`, background: 'var(--danger)' }} />
                         </div>
-                      );
-                    })()}
+                        <p className="text-xs text-[var(--text-faint)] mt-1.5">
+                          {Math.round(sentData.neutral_pct)}% neutral &middot; {Math.round(sentData.negative_pct)}% negative
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">&mdash;</p>
+                        <p className="text-xs text-[var(--text-faint)] mt-1">No mentions to analyze</p>
+                      </>
+                    )}
                   </div>
+                </div>
+
+                {/* SOV */}
+                <div className="card p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
+                      Share of Voice
+                      <HelpTooltip text="Percentage of total AI brand mentions in your category per entity." />
+                    </p>
+                    <button
+                      onClick={() => setCompetitorModalOpen(true)}
+                      aria-label="Manage competitors"
+                      className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] bg-[rgba(255,255,255,0.06)] hover:bg-[var(--accent-muted)] border border-[rgba(255,255,255,0.08)] rounded-lg px-2.5 py-1.5 transition-colors"
+                    >
+                      <Users size={12} />
+                      {analytics?.sov.has_competitors ? 'Manage' : 'Add competitors'}
+                    </button>
+                  </div>
+                  {loadingAnalytics ? (
+                    <div className="flex gap-3">
+                      {[1, 2, 3].map(i => <div key={i} className="h-4 flex-1 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
+                    </div>
+                  ) : !analytics?.sov.has_competitors ? (
+                    <p className="text-xs text-[var(--text-faint)]">
+                      Add competitors to see how your brand&apos;s AI visibility compares.
+                    </p>
+                  ) : (() => {
+                    const allStats = analytics.competitor_comparison;
+                    const sorted = [...allStats].sort((a, b) => (b.is_primary ? 1 : 0) - (a.is_primary ? 1 : 0));
+                    const count = sorted.length;
+                    const mutedColors = [
+                      '#7c8aaa', // slate
+                      '#8a7ca5', // lavender
+                      '#7ca58a', // sage
+                      '#a5917c', // tan
+                      '#7c9ba5', // teal
+                      '#a57c8a', // mauve
+                      '#9a9a7c', // olive
+                      '#7c88a5', // steel
+                    ];
+                    let colorIdx = 0;
+
+                    return (
+                      <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : count <= 2 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                        {sorted.map((s) => {
+                          const pct = Math.round(s.mention_rate * 100);
+                          const competitorColor = s.is_primary ? null : mutedColors[colorIdx++ % mutedColors.length];
+                          const barColor = s.is_primary ? 'var(--accent)' : competitorColor!;
+                          const textColor = s.is_primary ? 'var(--accent-light)' : competitorColor!;
+                          return (
+                            <div key={s.name} className="flex flex-col gap-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className={`text-xs font-medium truncate ${s.is_primary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{s.name}</span>
+                                <span className="text-xs font-semibold tabular-nums ml-2 flex-shrink-0" style={{ color: textColor }}>{pct}%</span>
+                              </div>
+                              <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+                                <div
+                                  className="h-full rounded-full transition-[width] duration-500"
+                                  style={{ width: `${pct}%`, background: barColor }}
+                                />
+                              </div>
+                              {!s.is_primary && selectedBrandId != null && (
+                                <AskCoachButton
+                                  brandId={selectedBrandId}
+                                  question={`Why is ${s.name} outperforming us in AI visibility?`}
+                                  className="text-[10px] text-[var(--text-faint)] hover:text-[var(--accent)] underline underline-offset-2 transition-colors text-left"
+                                >
+                                  Why are they ahead?
+                                </AskCoachButton>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
                 </div>
               </div>
 
-              {/* Row 2: Avg Position + Top Domains */}
+              {/* Row 3 (was Row 2): Avg Position + Top Domains */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 {/* Avg Position */}
                 <div className="card p-5">
@@ -901,7 +932,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Row 3: Model breakdown */}
+              {/* Row 4: Model breakdown */}
               <div className="mb-4">
                 <div className="card p-5">
                   <div className="flex items-center gap-2 mb-4">
@@ -926,7 +957,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Row 4: Sources you're missing from */}
+              {/* Row 5: Sources you're missing from */}
               {analytics && analytics.total_responses_analyzed > 0 && selectedBrand && (
                 <div className="mb-4">
                   <div className="card p-5">
@@ -977,6 +1008,16 @@ export default function DashboardPage() {
           onChanged={(updated) => setCompetitors(updated)}
         />
       )}
+
+      <CompetitiveGapDrawer
+        open={gapDrawerOpen}
+        onClose={() => setGapDrawerOpen(false)}
+        brandId={selectedBrandId}
+        brandName={selectedBrand?.name ?? ''}
+        data={competitiveGap}
+        window={gapWindow}
+        onWindowChange={setGapWindow}
+      />
 
       {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}
     </motion.div>

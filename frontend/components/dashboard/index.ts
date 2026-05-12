@@ -11,3 +11,6 @@ export { default as MethodologyCallout } from './MethodologyCallout';
 export { default as SparklineTooltip } from './SparklineTooltip';
 export { buildPromptGroups } from './BestPromptCard';
 export type { PromptGroup } from './BestPromptCard';
+export { CompetitiveGapCard } from './CompetitiveGapCard';
+export { CompetitiveGapDrawer } from './CompetitiveGapDrawer';
+export { CompetitiveGapTrendChart } from './CompetitiveGapTrendChart';

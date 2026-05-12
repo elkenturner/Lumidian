@@ -1952,3 +1952,66 @@ export async function agencyStaff(): Promise<AgencyStaffMember[]> {
   const res = await api.get<AgencyStaffMember[]>('/agency/staff');
   return res.data;
 }
+
+// ── Agency documents (sub-project C, 2026-05-12) ─────────────────────────────
+
+export interface DocumentTemplate {
+  kind: string;
+  name: string;
+  description: string;
+}
+
+export interface AgencyDocument {
+  id: number;
+  agency_client_id: number;
+  kind: string;
+  title: string;
+  body_markdown: string;
+  generated_by_user_id: number | null;
+  generated_by_name: string | null;
+  generated_at: string;
+  updated_at: string | null;
+}
+
+export interface AgencyDocumentWithClient extends AgencyDocument {
+  client_id: number;
+  client_name: string;
+}
+
+export async function agencyListDocumentTemplates(): Promise<DocumentTemplate[]> {
+  const res = await api.get<DocumentTemplate[]>('/agency/document-templates');
+  return res.data;
+}
+
+export async function agencyListDocuments(clientId: number, kind?: string): Promise<AgencyDocument[]> {
+  const params: Record<string, string> = {};
+  if (kind) params.kind = kind;
+  const res = await api.get<AgencyDocument[]>(`/agency/clients/${clientId}/documents`, { params });
+  return res.data;
+}
+
+export async function agencyGetDocument(documentId: number): Promise<AgencyDocument> {
+  const res = await api.get<AgencyDocument>(`/agency/documents/${documentId}`);
+  return res.data;
+}
+
+export async function agencyGenerateDocument(clientId: number, kind: string): Promise<AgencyDocument> {
+  const res = await api.post<AgencyDocument>(`/agency/clients/${clientId}/documents`, { kind });
+  return res.data;
+}
+
+export async function agencyUpdateDocument(documentId: number, bodyMarkdown: string): Promise<AgencyDocument> {
+  const res = await api.patch<AgencyDocument>(`/agency/documents/${documentId}`, { body_markdown: bodyMarkdown });
+  return res.data;
+}
+
+export async function agencyDeleteDocument(documentId: number): Promise<void> {
+  await api.delete(`/agency/documents/${documentId}`);
+}
+
+export async function agencyRecentDocuments(limit = 20, kind?: string): Promise<AgencyDocumentWithClient[]> {
+  const params: Record<string, string | number> = { limit };
+  if (kind) params.kind = kind;
+  const res = await api.get<AgencyDocumentWithClient[]>('/agency/documents/recent', { params });
+  return res.data;
+}

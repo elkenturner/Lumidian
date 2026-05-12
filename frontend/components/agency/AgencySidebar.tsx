@@ -2,12 +2,27 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Users, ArrowLeft, Shield } from 'lucide-react';
+import {
+  Home,
+  Users,
+  Calendar,
+  Inbox,
+  BarChart3,
+  FileText,
+  Settings as SettingsIcon,
+  ArrowLeft,
+  Shield,
+} from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 const NAV = [
   { href: '/agency', label: 'Today', icon: Home, exact: true },
   { href: '/agency/clients', label: 'Clients', icon: Users, exact: false },
+  { href: '/agency/calendar', label: 'Calendar', icon: Calendar, exact: false },
+  { href: '/agency/opportunities', label: 'Opportunities', icon: Inbox, exact: false },
+  { href: '/agency/performance', label: 'Performance', icon: BarChart3, exact: false },
+  { href: '/agency/documents', label: 'Documents', icon: FileText, exact: false },
+  { href: '/agency/settings', label: 'Settings', icon: SettingsIcon, exact: false },
 ];
 
 export function AgencySidebar() {

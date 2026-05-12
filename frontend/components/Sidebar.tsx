@@ -12,6 +12,7 @@ import {
   User,
   LineChart,
   Shield,
+  ShieldCheck,
   Briefcase,
   ChevronDown,
   Plus,
@@ -114,6 +115,9 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
   const navItems: NavItem[] = [
     { label: 'Dashboard',   href: '/dashboard', icon: LayoutDashboard },
     { label: 'Reports',     href: '/reports',   icon: LineChart },
+    ...(user?.subscription_tier
+      ? [{ label: 'Site Audit', href: '/site-audit', icon: ShieldCheck }]
+      : []),
     { label: 'Content Hub', href: '/content',   icon: PenLine },
     { label: 'Settings',    href: '/settings',  icon: Settings },
     { label: 'Account',     href: '/account',   icon: User },

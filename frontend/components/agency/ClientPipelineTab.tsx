@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getDrafts, type ContentDraft } from '@/lib/api';
+import {
+  agencyUpdateDraftStatus,
+  getDrafts,
+  type ContentDraft,
+  type DraftStaffStatus,
+} from '@/lib/api';
 
 interface Props {
   brandId: number | null;
@@ -9,12 +14,60 @@ interface Props {
 
 const COLUMNS: Array<{ key: string; label: string }> = [
   { key: 'draft', label: 'Draft' },
+  { key: 'awaiting_client', label: 'Awaiting client' },
+  { key: 'changes_requested', label: 'Changes requested' },
   { key: 'approved', label: 'Approved' },
   { key: 'posted', label: 'Posted' },
 ];
 
+// ContentDraft.status covers the core states; agency workflow adds extra states
+// at runtime that the public type doesn't enumerate.
+type AgencyDraft = Omit<ContentDraft, 'status'> & { status: string };
+
+interface DraftActionsProps {
+  draft: AgencyDraft;
+  onChange: (next: Partial<AgencyDraft>) => void;
+}
+
+function DraftActions({ draft, onChange }: DraftActionsProps) {
+  const [busy, setBusy] = useState(false);
+  const set = async (status: DraftStaffStatus) => {
+    setBusy(true);
+    try {
+      await agencyUpdateDraftStatus(draft.id, status);
+      onChange({ status });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (draft.status === 'draft' || draft.status === 'changes_requested') {
+    return (
+      <button
+        onClick={() => set('awaiting_client')}
+        disabled={busy}
+        className="mt-2 rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-raised)] disabled:opacity-50"
+      >
+        Send to client review
+      </button>
+    );
+  }
+  if (draft.status === 'approved') {
+    return (
+      <button
+        onClick={() => set('posted')}
+        disabled={busy}
+        className="mt-2 rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-raised)] disabled:opacity-50"
+      >
+        Mark as posted
+      </button>
+    );
+  }
+  return null;
+}
+
 export function ClientPipelineTab({ brandId }: Props) {
-  const [drafts, setDrafts] = useState<ContentDraft[]>([]);
+  const [drafts, setDrafts] = useState<AgencyDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -24,10 +77,14 @@ export function ClientPipelineTab({ brandId }: Props) {
       return;
     }
     getDrafts(brandId)
-      .then(setDrafts)
+      .then((data) => setDrafts(data as AgencyDraft[]))
       .catch((e) => setError(String(e?.message ?? e)))
       .finally(() => setLoading(false));
   }, [brandId]);
+
+  const updateLocal = (id: number, patch: Partial<AgencyDraft>) => {
+    setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+  };
 
   if (brandId == null) {
     return (
@@ -40,14 +97,14 @@ export function ClientPipelineTab({ brandId }: Props) {
   if (drafts.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-10 text-center text-sm text-[var(--text-muted)]">
-        No drafts yet. Use the Lumidian Content section to generate some for this client&apos;s brand —
-        they&apos;ll show up here.
+        No drafts yet. Use the Lumidian Content section to generate some for this client&apos;s
+        brand — they&apos;ll show up here.
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 text-[var(--text-primary)] md:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 text-[var(--text-primary)] md:grid-cols-5">
       {COLUMNS.map(({ key, label }) => {
         const items = drafts.filter((d) => d.status === key);
         return (
@@ -72,6 +129,18 @@ export function ClientPipelineTab({ brandId }: Props) {
                       {d.content_text}
                     </p>
                   )}
+                  {key === 'changes_requested' &&
+                    'client_feedback' in d &&
+                    typeof (d as { client_feedback?: string | null }).client_feedback ===
+                      'string' && (
+                      <p className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-xs text-amber-200">
+                        {(d as { client_feedback?: string | null }).client_feedback}
+                      </p>
+                    )}
+                  <DraftActions
+                    draft={d}
+                    onChange={(patch) => updateLocal(d.id, patch)}
+                  />
                 </li>
               ))}
               {items.length === 0 && (

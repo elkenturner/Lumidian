@@ -527,6 +527,14 @@ async def run_tracking(
             "Gap analysis failed for run %d (non-fatal): %s", run_id, exc
         )
 
+    # ── 8a. Extract citation sources from query responses ────────────────────
+    try:
+        from app.services.site_audit.citations import extract_for_run
+        await extract_for_run(run_id)
+    except Exception as exc:  # noqa: BLE001
+        _post_processing_warnings.append(f"citations: {exc}")
+        logger.warning("citation extraction failed for run %d: %s", run_id, exc)
+
     # ── 8b. Log significant prompt score changes ────────────────────────────
     try:
         from app.models import PromptRunScore as _PRS

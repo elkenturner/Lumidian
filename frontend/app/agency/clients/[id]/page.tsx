@@ -5,8 +5,16 @@ import * as Tabs from '@radix-ui/react-tabs';
 import Link from 'next/link';
 import { agencyGetClient, type AgencyClient } from '@/lib/api';
 import { ClientOverviewTab } from '@/components/agency/ClientOverviewTab';
-import { ClientBrandTab } from '@/components/agency/ClientBrandTab';
-import { ClientPipelineTab } from '@/components/agency/ClientPipelineTab';
+import { ClientStrategyTab } from '@/components/agency/ClientStrategyTab';
+import { ClientContentTab } from '@/components/agency/ClientContentTab';
+import { ClientReportsTab } from '@/components/agency/ClientReportsTab';
+
+const TABS: Array<[string, string]> = [
+  ['overview', 'Overview'],
+  ['strategy', 'Strategy'],
+  ['content', 'Content'],
+  ['reports', 'Reports'],
+];
 
 export default function AgencyClientDetailPage({
   params,
@@ -39,11 +47,7 @@ export default function AgencyClientDetailPage({
 
       <Tabs.Root defaultValue="overview" className="w-full">
         <Tabs.List className="mb-6 flex gap-1 border-b border-[var(--border-subtle)]">
-          {[
-            ['overview', 'Overview'],
-            ['brand', 'Brand & Prompts'],
-            ['pipeline', 'Pipeline'],
-          ].map(([value, label]) => (
+          {TABS.map(([value, label]) => (
             <Tabs.Trigger
               key={value}
               value={value}
@@ -57,11 +61,14 @@ export default function AgencyClientDetailPage({
         <Tabs.Content value="overview">
           <ClientOverviewTab client={client} onChange={setClient} />
         </Tabs.Content>
-        <Tabs.Content value="brand">
-          <ClientBrandTab brandId={client.brand_id} />
+        <Tabs.Content value="strategy">
+          <ClientStrategyTab brandId={client.brand_id} />
         </Tabs.Content>
-        <Tabs.Content value="pipeline">
-          <ClientPipelineTab brandId={client.brand_id} />
+        <Tabs.Content value="content">
+          <ClientContentTab brandId={client.brand_id} />
+        </Tabs.Content>
+        <Tabs.Content value="reports">
+          <ClientReportsTab brandId={client.brand_id} />
         </Tabs.Content>
       </Tabs.Root>
     </div>

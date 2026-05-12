@@ -205,3 +205,26 @@ async def select_web_sources(query: str, limit: int = WEB_RESULT_LIMIT) -> list[
             published_date=item.get("date"),
         ))
     return sources
+
+
+# ── BrandSource library ─────────────────────────────────────────────────────
+
+async def select_library_sources(brand_id: int, db: AsyncSession) -> list[EvidenceSource]:
+    result = await db.execute(
+        select(BrandSource)
+        .where(BrandSource.brand_id == brand_id)
+        .order_by(desc(BrandSource.added_at))
+        .limit(BRAND_SOURCE_LIMIT)
+    )
+    rows = list(result.scalars().all())
+    return [
+        EvidenceSource(
+            ref="",
+            kind="library",
+            url=row.url,
+            title=row.title[:200],
+            snippet=(row.snippet or "")[:600],
+            published_date=None,
+        )
+        for row in rows
+    ]

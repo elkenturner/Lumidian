@@ -28,6 +28,7 @@ EVENT_CLIENT_REJECTED = "client_rejected"
 EVENT_TASK_CREATED = "task_created"
 EVENT_TASK_ASSIGNED = "task_assigned"
 EVENT_TASK_COMPLETED = "task_completed"
+EVENT_DOCUMENT_GENERATED = "document_generated"
 
 
 def _encode_payload(payload: dict[str, Any] | None) -> str | None:

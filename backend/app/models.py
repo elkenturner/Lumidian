@@ -697,20 +697,6 @@ class AgencyStaff(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
-class ClientNote(Base):
-    __tablename__ = "client_notes"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    agency_client_id: Mapped[int] = mapped_column(
-        Integer, ForeignKey("agency_clients.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    author_user_id: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
-    )
-    body: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-
-
 class ClientReviewLink(Base):
     __tablename__ = "client_review_links"
 
@@ -833,3 +819,23 @@ class CitationSource(Base):
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     competitor_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("competitors.id", ondelete="SET NULL"), nullable=True)
     extracted_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class ClientActivityEvent(Base):
+    __tablename__ = "client_activity_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agency_client_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("agency_clients.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    actor_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+    related_draft_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("content_drafts.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

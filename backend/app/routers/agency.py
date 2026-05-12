@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import require_agency_staff
-from app.models import AgencyClient, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientReviewLink, ContentDraft, User
+from app.models import AgencyClient, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, User
 from app.schemas import (
     ActivityEventOut,
     ActivityEventWithClientOut,
@@ -25,6 +25,11 @@ from app.schemas import (
     AgencyTaskCreate,
     AgencyTaskOut,
     AgencyTaskUpdate,
+    DocumentGenerateIn,
+    DocumentOut,
+    DocumentTemplateOut,
+    DocumentUpdateIn,
+    DocumentWithClientOut,
     DraftAssignIn,
     DraftStatusUpdateIn,
     MyQueueDraft,
@@ -35,6 +40,7 @@ from app.schemas import (
     TodayDraftOut,
     TodayOut,
 )
+from app.services.document_engine import generate_document, get_template, list_templates
 from app.services.agency_activity import (
     emit_event,
     EVENT_NOTE,
@@ -732,3 +738,143 @@ async def list_staff(
     )
     users = rows.scalars().all()
     return [AgencyStaffOut(id=u.id, name=u.name, email=u.email) for u in users]
+
+
+# ── Document helpers ──────────────────────────────────────────────────────────
+
+async def _doc_to_out(db: AsyncSession, doc: ClientDocument) -> DocumentOut:
+    name: str | None = None
+    if doc.generated_by_user_id is not None:
+        u = await db.get(User, doc.generated_by_user_id)
+        name = (u.name or u.email) if u else None
+    return DocumentOut(
+        id=doc.id,
+        agency_client_id=doc.agency_client_id,
+        kind=doc.kind,
+        title=doc.title,
+        body_markdown=doc.body_markdown,
+        generated_by_user_id=doc.generated_by_user_id,
+        generated_by_name=name,
+        generated_at=doc.generated_at,
+        updated_at=doc.updated_at,
+    )
+
+
+# ── Document endpoints ────────────────────────────────────────────────────────
+
+@router.get("/document-templates", response_model=list[DocumentTemplateOut])
+async def list_document_templates(
+    _user: User = Depends(require_agency_staff),
+):
+    return [DocumentTemplateOut(kind=t.kind, name=t.name, description=t.description) for t in list_templates()]
+
+
+@router.get("/clients/{client_id}/documents", response_model=list[DocumentOut])
+async def list_client_documents(
+    client_id: int,
+    kind: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    stmt = select(ClientDocument).where(ClientDocument.agency_client_id == client_id)
+    if kind:
+        stmt = stmt.where(ClientDocument.kind == kind)
+    stmt = stmt.order_by(ClientDocument.generated_at.desc())
+    rows = (await db.execute(stmt)).scalars().all()
+    return [await _doc_to_out(db, d) for d in rows]
+
+
+@router.get("/documents/recent", response_model=list[DocumentWithClientOut])
+async def list_recent_documents(
+    limit: int = 20,
+    kind: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    limit = max(1, min(limit, 100))
+    stmt = (
+        select(ClientDocument, AgencyClient)
+        .join(AgencyClient, AgencyClient.id == ClientDocument.agency_client_id)
+        .order_by(ClientDocument.generated_at.desc())
+        .limit(limit)
+    )
+    if kind:
+        stmt = stmt.where(ClientDocument.kind == kind)
+    rows = (await db.execute(stmt)).all()
+    results: list[DocumentWithClientOut] = []
+    for doc, ac in rows:
+        base = await _doc_to_out(db, doc)
+        results.append(
+            DocumentWithClientOut(
+                **base.model_dump(),
+                client_id=ac.id,
+                client_name=ac.name,
+            )
+        )
+    return results
+
+
+@router.get("/documents/{document_id}", response_model=DocumentOut)
+async def get_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    doc = await db.get(ClientDocument, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return await _doc_to_out(db, doc)
+
+
+@router.post("/clients/{client_id}/documents", response_model=DocumentOut, status_code=http_status.HTTP_201_CREATED)
+async def create_document(
+    client_id: int,
+    body: DocumentGenerateIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+):
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    template = get_template(body.kind)
+    if template is None:
+        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=f"Unknown template kind: {body.kind}")
+    try:
+        doc = await generate_document(db, client=client, template=template, actor_user_id=user.id)
+    except ValueError as e:
+        # e.g., missing ANTHROPIC_API_KEY
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
+    return await _doc_to_out(db, doc)
+
+
+@router.patch("/documents/{document_id}", response_model=DocumentOut)
+async def update_document(
+    document_id: int,
+    body: DocumentUpdateIn,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    doc = await db.get(ClientDocument, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    doc.body_markdown = body.body_markdown
+    doc.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(doc)
+    return await _doc_to_out(db, doc)
+
+
+@router.delete("/documents/{document_id}", status_code=http_status.HTTP_204_NO_CONTENT)
+async def delete_document(
+    document_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    doc = await db.get(ClientDocument, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    await db.delete(doc)
+    await db.commit()

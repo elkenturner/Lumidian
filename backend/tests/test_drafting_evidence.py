@@ -206,3 +206,69 @@ async def test_cache_returns_none_when_expired(db_session):
 async def test_cache_miss_returns_none(db_session):
     from app.services.drafting.evidence import read_cache
     assert await read_cache(brand_id=999, prompt_id=999, db=db_session) is None
+
+
+@pytest.mark.asyncio
+async def test_build_evidence_pack_merges_three_sources(db_session):
+    from app.services.drafting.evidence import build_evidence_pack
+
+    user = User(email="ev5@test.com", password_hash="x", email_verified=1)
+    db_session.add(user)
+    await db_session.flush()
+    brand = Brand(name="Pack", slug="pack-evidence", user_id=user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    audit = WebsiteAudit(brand_id=brand.id, status="completed")
+    db_session.add(audit)
+    await db_session.flush()
+    db_session.add(WebsiteAuditPage(
+        audit_id=audit.id, url="https://b.com/x", title="breath cancer",
+        h1_text="breath", content_excerpt="data", fact_density=0.8,
+    ))
+    db_session.add(BrandSource(
+        brand_id=brand.id, title="Lib paper", url="https://a.com/p",
+        snippet="paper", source_type="paper",
+    ))
+    await db_session.commit()
+
+    fake_web = [
+        {"title": "Nature x", "link": "https://nature.com/y", "snippet": "web snip"},
+    ]
+    with patch("app.services.drafting.evidence._serper_search", new=AsyncMock(return_value=fake_web)):
+        pack = await build_evidence_pack(
+            brand_id=brand.id,
+            brand_name="Pack",
+            prompt_id=1,
+            prompt_text="breath cancer detection",
+            db=db_session,
+            use_cache=False,
+        )
+    refs = [s.ref for s in pack.sources]
+    assert refs == [f"S{i+1}" for i in range(len(pack.sources))]
+    kinds = {s.kind for s in pack.sources}
+    assert kinds == {"library", "brand_page", "web"}
+    assert len(pack.sources) <= 15
+
+
+@pytest.mark.asyncio
+async def test_build_evidence_pack_uses_cache_on_second_call(db_session):
+    from app.services.drafting.evidence import build_evidence_pack
+
+    user = User(email="ev6@test.com", password_hash="x", email_verified=1)
+    db_session.add(user)
+    await db_session.flush()
+    brand = Brand(name="Cached", slug="cached-evidence", user_id=user.id)
+    db_session.add(brand)
+    await db_session.commit()
+
+    with patch("app.services.drafting.evidence._serper_search",
+               new=AsyncMock(return_value=[{"title": "T", "link": "https://nature.com/z", "snippet": "s"}])) as m:
+        await build_evidence_pack(
+            brand_id=brand.id, brand_name="Cached", prompt_id=42,
+            prompt_text="test query", db=db_session, use_cache=True,
+        )
+        await build_evidence_pack(
+            brand_id=brand.id, brand_name="Cached", prompt_id=42,
+            prompt_text="test query", db=db_session, use_cache=True,
+        )
+    assert m.call_count == 1

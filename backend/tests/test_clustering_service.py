@@ -1,0 +1,132 @@
+"""Tests for clustering_service orchestrator."""
+from unittest.mock import AsyncMock, patch
+
+import pytest
+import pytest_asyncio
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import (
+    Brand,
+    BrandContentSettings,
+    ContentBrief,
+    ContentCluster,
+    ContentDraft,
+    Prompt,
+    User,
+)
+from app.services.clustering_service import (
+    CLUSTER_PLATFORMS,
+    get_or_create_cluster,
+    regenerate_cluster,
+    regenerate_piece,
+)
+
+
+SAMPLE_BRIEF_JSON = """{
+  "positioning": "Pos",
+  "key_claims": ["c1", "c2"],
+  "canonical_phrasings": ["Acme tracks X across Y"],
+  "stats": [{"label": "k", "value": "1", "source": "internal"}],
+  "narrative_spine": "spine",
+  "tone_notes": "neutral"
+}"""
+
+
+@pytest_asyncio.fixture
+async def registered_user(db_session: AsyncSession) -> User:
+    """Create and persist a minimal User for direct-DB model tests."""
+    user = User(email="clustering_svc_test@example.com", password_hash="x", email_verified=1)
+    db_session.add(user)
+    await db_session.flush()
+    return user
+
+
+@pytest.mark.asyncio
+async def test_cluster_platforms_excludes_wikipedia() -> None:
+    assert "wikipedia" not in CLUSTER_PLATFORMS
+    assert set(CLUSTER_PLATFORMS) == {"linkedin", "medium", "reddit", "quora", "x"}
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_cluster_idempotent(db_session: AsyncSession, registered_user: User) -> None:
+    brand = Brand(name="Acme", slug="c-acme1", user_id=registered_user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    prompt = Prompt(brand_id=brand.id, text="Q", prompt_type="standard")
+    db_session.add(prompt)
+    await db_session.commit()
+
+    c1 = await get_or_create_cluster(db_session, brand_id=brand.id, prompt_id=prompt.id)
+    c2 = await get_or_create_cluster(db_session, brand_id=brand.id, prompt_id=prompt.id)
+    assert c1.id == c2.id
+
+
+@pytest.mark.asyncio
+async def test_regenerate_cluster_produces_5_pieces(db_session: AsyncSession, registered_user: User) -> None:
+    brand = Brand(name="Acme", slug="c-acme2", user_id=registered_user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    prompt = Prompt(brand_id=brand.id, text="What is Acme?", prompt_type="standard")
+    db_session.add(prompt)
+    await db_session.commit()
+
+    cluster = await get_or_create_cluster(db_session, brand_id=brand.id, prompt_id=prompt.id)
+
+    with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body content here."))):
+        result = await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
+
+    assert result.status == "ready"
+    drafts = (await db_session.execute(select(ContentDraft).where(ContentDraft.cluster_id == cluster.id))).scalars().all()
+    assert len(drafts) == 5
+    assert {d.platform for d in drafts} == {"linkedin", "medium", "reddit", "quora", "x"}
+    assert all(d.cluster_id == cluster.id for d in drafts)
+
+
+@pytest.mark.asyncio
+async def test_regenerate_cluster_respects_disabled_platform(db_session: AsyncSession, registered_user: User) -> None:
+    brand = Brand(name="Acme", slug="c-acme3", user_id=registered_user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    prompt = Prompt(brand_id=brand.id, text="Q", prompt_type="standard")
+    db_session.add(prompt)
+    await db_session.flush()
+    db_session.add(BrandContentSettings(brand_id=brand.id, platform="x", enabled=False, auto_post=False))
+    await db_session.commit()
+
+    cluster = await get_or_create_cluster(db_session, brand_id=brand.id, prompt_id=prompt.id)
+
+    with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body."))):
+        await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
+
+    drafts = (await db_session.execute(select(ContentDraft).where(ContentDraft.cluster_id == cluster.id))).scalars().all()
+    platforms = {d.platform for d in drafts}
+    assert "x" not in platforms
+    assert len(drafts) == 4
+
+
+@pytest.mark.asyncio
+async def test_regenerate_piece_replaces_only_target(db_session: AsyncSession, registered_user: User) -> None:
+    brand = Brand(name="Acme", slug="c-acme4", user_id=registered_user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    prompt = Prompt(brand_id=brand.id, text="Q", prompt_type="standard")
+    db_session.add(prompt)
+    await db_session.commit()
+
+    cluster = await get_or_create_cluster(db_session, brand_id=brand.id, prompt_id=prompt.id)
+
+    with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("First", "First body."))):
+        await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
+
+    with patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Updated", "Updated body."))):
+        await regenerate_piece(db_session, cluster_id=cluster.id, platform="linkedin", tier="starter")
+
+    drafts = (await db_session.execute(select(ContentDraft).where(ContentDraft.cluster_id == cluster.id))).scalars().all()
+    li = next(d for d in drafts if d.platform == "linkedin")
+    others = [d for d in drafts if d.platform != "linkedin"]
+    assert li.title == "Updated"
+    assert all(d.title == "First" for d in others)

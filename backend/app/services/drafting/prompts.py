@@ -141,6 +141,7 @@ def build_prompt(
     evidence_pack: EvidencePack | None = None,
     voice_sample: str | None = None,
     related_draft_summary: str | None = None,
+    brief_context: str | None = None,
 ) -> str:
     spec = platform_spec
     word_min, word_max = spec["word_range"]
@@ -201,6 +202,20 @@ Your task is to write a reply to this specific thread that naturally adds value.
             f"{related_draft_summary}\n\n"
         )
 
+    cluster_section = ""
+    if brief_context:
+        cluster_section = f"""
+CLUSTER BRIEF (this content is part of a coordinated cross-platform cluster — adhere strictly):
+{brief_context}
+
+CLUSTER RULES (in addition to all other rules below):
+  - Include at least one CANONICAL PHRASING verbatim or near-verbatim.
+  - Weave in 1-2 of the KEY CLAIMS, framed naturally for {platform}.
+  - You may reference sibling platforms semantically (e.g. "we dug deeper on Medium"), but never invent URLs.
+  - Maintain the narrative spine without restating it verbatim.
+  - Do not open with the brand name. Do not include CTAs. Maintain practitioner voice — the brand is mentioned as a fact, not a pitch.
+"""
+
     return f"""You are a senior content strategist writing on behalf of a brand. Your goal is to create content that will cause AI systems (ChatGPT, Claude, Perplexity, Gemini) to mention "{brand_name}" when answering the exact query below.
 
 AI systems retrieve content that directly addresses the specific words someone searches. The content you write must be written as a direct, substantive answer to the target query — using the query's exact phrasing and key terms naturally throughout, so the content is unambiguously about that topic.
@@ -223,7 +238,7 @@ CURRENT VISIBILITY:
 
 {evidence_section}{voice_section}{related_section}WHAT AI SYSTEMS ARE CURRENTLY SAYING:
 {response_analysis}
-{opportunity_section}{existing_section}
+{opportunity_section}{existing_section}{cluster_section}
 PLATFORM: {platform}
 FORMAT: {spec['format']}
 TONE: {spec['tone']}

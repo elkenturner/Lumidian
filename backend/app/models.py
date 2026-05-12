@@ -358,6 +358,8 @@ class ContentDraft(Base):
     assigned_to_user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    client_feedback: Mapped[str | None] = mapped_column(Text, nullable=True)
+    client_reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
@@ -707,3 +709,15 @@ class ClientNote(Base):
     )
     body: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ClientReviewLink(Base):
+    __tablename__ = "client_review_links"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agency_client_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("agency_clients.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    token: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

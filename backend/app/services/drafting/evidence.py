@@ -228,3 +228,36 @@ async def select_library_sources(brand_id: int, db: AsyncSession) -> list[Eviden
         )
         for row in rows
     ]
+
+
+# ── Cache ───────────────────────────────────────────────────────────────────
+
+import json as _json
+
+
+async def write_cache(brand_id: int, prompt_id: int, pack: EvidencePack, db: AsyncSession) -> None:
+    payload = _json.dumps(pack.to_dict())
+    now = datetime.now(UTC).replace(tzinfo=None)
+    existing = await db.get(EvidenceCache, (brand_id, prompt_id))
+    if existing:
+        existing.pack_json = payload
+        existing.fetched_at = now
+    else:
+        db.add(EvidenceCache(
+            brand_id=brand_id, prompt_id=prompt_id,
+            pack_json=payload, fetched_at=now,
+        ))
+    await db.commit()
+
+
+async def read_cache(brand_id: int, prompt_id: int, db: AsyncSession) -> EvidencePack | None:
+    row = await db.get(EvidenceCache, (brand_id, prompt_id))
+    if row is None:
+        return None
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=CACHE_TTL_HOURS)
+    if row.fetched_at < cutoff:
+        return None
+    try:
+        return EvidencePack.from_dict(_json.loads(row.pack_json))
+    except Exception:
+        return None

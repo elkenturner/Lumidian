@@ -170,3 +170,95 @@ async def critic_score(
                     score.overall_score, computed)
         score.overall_score = round(computed, 2)
     return score
+
+
+# ── Paragraph-scoped rewriter ───────────────────────────────────────────────
+
+_PARAGRAPH_DELIMITER = "---PARAGRAPH---"
+
+
+def _split_paragraphs(text: str) -> list[str]:
+    return [p.strip() for p in text.split("\n\n") if p.strip()]
+
+
+def _build_rewrite_prompt(
+    draft_text: str,
+    flagged: list[dict[str, Any]],
+    pack: EvidencePack,
+    query: str,
+    platform: str,
+) -> str:
+    paras = _split_paragraphs(draft_text)
+    indexed = "\n\n".join(f"[Paragraph {i}]\n{p}" for i, p in enumerate(paras))
+    flagged_block = "\n".join(
+        f"- Paragraph {f['index']}: {f.get('issue', 'issue')} — {f.get('note', '')}"
+        for f in flagged
+    )
+    sources_block = "\n".join(
+        f"[{s.ref}] {s.title} — {s.url}\n     \"{s.snippet}\""
+        for s in pack.sources
+    ) or "(no evidence sources were provided)"
+
+    return f"""You are rewriting flagged paragraphs of an existing draft. The full draft is shown for context — but you must only return the REPLACEMENT paragraphs.
+
+TARGET QUERY: "{query}"
+PLATFORM: {platform}
+
+EVIDENCE SOURCES (use [SN] markers, no inventions):
+{sources_block}
+
+FULL DRAFT (read-only — for context):
+{indexed}
+
+PARAGRAPHS TO REWRITE (in this exact order):
+{flagged_block}
+
+INSTRUCTIONS:
+- Return ONLY the replacement paragraphs.
+- Separate paragraphs with the delimiter line:  {_PARAGRAPH_DELIMITER}
+- Return the same number of paragraphs as flagged, in the same order.
+- Each replacement must address its specific issue: claim_density → add concrete claims with [SN] citations; citation_coverage → add [SN] citations to existing claims; voice_authenticity → remove AI-tells and vary sentence rhythm; concrete_specificity → replace vague language with precise figures; query_mirroring → echo the target query's key noun phrases.
+- If a claim cannot be backed by one of the EVIDENCE SOURCES, remove the claim rather than hedging.
+- No analysis, no headers, no labels. Just the paragraphs and the delimiter.
+
+OUTPUT:"""
+
+
+async def rewrite_flagged(
+    draft_text: str,
+    flagged: list[dict[str, Any]],
+    pack: EvidencePack,
+    query: str,
+    platform: str,
+    tier: str | None,
+) -> str:
+    if not flagged:
+        return draft_text
+
+    model = rewriter_model_for_tier(tier)
+    client = _anthropic_client()
+    response = await client.messages.create(
+        model=model,
+        max_tokens=2000,
+        messages=[{"role": "user", "content": _build_rewrite_prompt(draft_text, flagged, pack, query, platform)}],
+    )
+    raw_text = ""
+    for block in response.content:
+        if getattr(block, "type", None) == "text":
+            raw_text = block.text
+            break
+    if not raw_text:
+        return draft_text
+
+    replacements = [p.strip() for p in raw_text.split(_PARAGRAPH_DELIMITER) if p.strip()]
+    paras = _split_paragraphs(draft_text)
+
+    for offset, flag in enumerate(flagged):
+        idx = flag.get("index")
+        if not isinstance(idx, int) or idx < 0 or idx >= len(paras):
+            continue
+        if offset >= len(replacements):
+            continue
+        paras[idx] = replacements[offset]
+
+    return "\n\n".join(paras)

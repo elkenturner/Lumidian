@@ -78,15 +78,9 @@ def parse_wikipedia_draft(raw: str) -> tuple[str, str, str, str, str]:
 # ── Hedging phrase removal ────────────────────────────────────────────────────
 
 _HEDGING_RE = _re.compile(
-    # Compound forms must come before their standalone components so the full
-    # phrase is consumed rather than leaving "More" or "Even more" dangling.
-    r"\b(even more importantly,?|most importantly,?|more importantly,?|"
-    r"even more notably,?|most notably,?|more notably,?|"
-    r"it['']s worth noting|it['']s important to (note|mention)|notably,?|importantly,?|"
-    r"it should be noted|it['']s important to note|one thing to note|it bears mentioning|"
-    r"needless to say|of course,?|additionally,|furthermore,|moreover,|"
-    r"honestly,?|straightforward(ly)?,?|genuinely,?|delve into|dive into|unpack,?|"
-    r"let['']s explore|the bottom line is|the bottom line:|at the end of the day,?)\s*",
+    r"\b(delve into|dive into|unpack(?:\s+the)?|"
+    r"it['']s worth noting|it['']s important to (?:note|mention)|"
+    r"the bottom line(?: is)?|at the end of the day,?)\s*",
     _re.IGNORECASE,
 )
 

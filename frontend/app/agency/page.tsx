@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { agencyToday, type AgencyTodayDraft, type AgencyTodayResponse } from '@/lib/api';
 import { RecentActivitySection } from '@/components/agency/RecentActivitySection';
+import { MyQueueSection } from '@/components/agency/MyQueueSection';
 
 function DraftList({ drafts, emptyText }: { drafts: AgencyTodayDraft[]; emptyText: string }) {
   if (drafts.length === 0) {
@@ -59,6 +60,8 @@ export default function AgencyTodayPage() {
           {totalAttention} draft{totalAttention === 1 ? '' : 's'} in flight
         </p>
       </div>
+
+      <MyQueueSection />
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5">

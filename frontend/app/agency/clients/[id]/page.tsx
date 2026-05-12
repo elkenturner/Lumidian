@@ -8,11 +8,13 @@ import { ClientOverviewTab } from '@/components/agency/ClientOverviewTab';
 import { ClientStrategyTab } from '@/components/agency/ClientStrategyTab';
 import { ClientContentTab } from '@/components/agency/ClientContentTab';
 import { ClientReportsTab } from '@/components/agency/ClientReportsTab';
+import { SiteAuditView } from '@/components/site-audit/SiteAuditView';
 
 const TABS: Array<[string, string]> = [
   ['overview', 'Overview'],
   ['strategy', 'Strategy'],
   ['content', 'Content'],
+  ['audit', 'Site Audit'],
   ['reports', 'Reports'],
 ];
 
@@ -62,10 +64,19 @@ export default function AgencyClientDetailPage({
           <ClientOverviewTab client={client} onChange={setClient} />
         </Tabs.Content>
         <Tabs.Content value="strategy">
-          <ClientStrategyTab brandId={client.brand_id} />
+          <ClientStrategyTab brandId={client.brand_id} clientId={client.id} />
         </Tabs.Content>
         <Tabs.Content value="content">
           <ClientContentTab brandId={client.brand_id} />
+        </Tabs.Content>
+        <Tabs.Content value="audit">
+          {client.brand_id === null ? (
+            <div className="p-6 text-sm text-[var(--text-muted)]">
+              Link a brand from the Overview tab to run a site audit.
+            </div>
+          ) : (
+            <SiteAuditView brandId={client.brand_id} />
+          )}
         </Tabs.Content>
         <Tabs.Content value="reports">
           <ClientReportsTab brandId={client.brand_id} />

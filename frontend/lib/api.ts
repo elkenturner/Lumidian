@@ -231,6 +231,7 @@ export interface ContentDraft {
   created_at: string;
   updated_at: string;
   prompt_text?: string;
+  assigned_to_user_id: number | null;
 }
 
 export interface ContentOpportunity {

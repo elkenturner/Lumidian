@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import {
+  agencyAssignDraft,
   agencyUpdateDraftStatus,
   getDrafts,
   type ContentDraft,
   type DraftStaffStatus,
 } from '@/lib/api';
+import { AssigneePicker } from './AssigneePicker';
 
 interface Props {
   brandId: number | null;
@@ -137,6 +139,16 @@ export function ClientPipelineTab({ brandId }: Props) {
                         {(d as { client_feedback?: string | null }).client_feedback}
                       </p>
                     )}
+                  <div className="mt-2">
+                    <AssigneePicker
+                      value={(d as { assigned_to_user_id?: number | null }).assigned_to_user_id ?? null}
+                      onChange={async (userId) => {
+                        await agencyAssignDraft(d.id, userId);
+                        updateLocal(d.id, { assigned_to_user_id: userId } as Partial<typeof d>);
+                      }}
+                      compact
+                    />
+                  </div>
                   <DraftActions
                     draft={d}
                     onChange={(patch) => updateLocal(d.id, patch)}

@@ -3,7 +3,7 @@
 > **This file is the shared brain across all Claude surfaces working on Lumidian.**
 > Claude Code, Cowork, and Claude in Chrome should all (a) read this file at the start of every session and (b) update it before ending the session. Stable architecture lives in `CLAUDE.md`; this file holds volatile state only.
 
-**Last updated:** 2026-05-11 by Claude Code (Website AIO build session)
+**Last updated:** 2026-05-12 by Claude Code (Website AIO smoke-test + UX polish session)
 
 ---
 
@@ -16,9 +16,9 @@
 
 One FastAPI backend, one Next.js frontend. The `/agency/*` routes are staff-only; everything else is the customer-facing SaaS. SaaS customers and agency clients share the same DB — agency clients are scoped via `AgencyClient → Brand` link.
 
-- **Most recent work:** **Website AIO module shipped on branch `feat/website-aio`** (worktree at `/tmp/lumidian-website-aio-wt`). Backend: `services/site_audit/*` package with crawler (httpx + sitemap + BFS), Playwright render-mode detection, 5 parsers (semantic / schema / robots / llms_txt / meta), scoring, citation extraction with backfill script, page↔prompt linking, rule-based + LLM-rewrite recommendations, llms.txt / robots.txt generators. 5 new tables; 13 API endpoints under `/api/site-audit/*`. Frontend: `/site-audit/[brandId]` with 5 tabs (Overview / Pages / AI Bots & Files / Citations / Recommendations) + agency portal view at `/agency/clients/[id]/audit`. Manual trigger only; Free tier excluded. 95+ tests passing. Specs: `docs/superpowers/specs/2026-05-11-website-aio-design.md`. Plan: `docs/superpowers/plans/2026-05-11-website-aio.md`.
-- **Branch:** `feat/website-aio` (built in worktree, branched off `feat/agency-portal-shell`)
-- **Next concrete step:** Merge `feat/website-aio` to `main`. Then run `python -m scripts.backfill_citations` once to populate citation data from existing TrackingRun history.
+- **Most recent work:** **Website AIO smoke-tested end-to-end on `feat/agency-activity-log`.** Citation backfill ran locally — **962 citations from 57 TrackingRuns** (most own-domain hits are MSC; mix of third-party authority + unknown competitor domains). Triggered first real audit against Rhythm (rhythmlivin.com): **50 pages crawled, overall 86.1** (Bot 100 / Content 88 / Schema 67 / Technical 90), 146 findings, 110 recommendations (22 high-priority), LLM rewrites firing on Pro tier. All 5 frontend tabs verified rendering live data via Playwright. **Two UX polish changes (uncommitted, on current branch):** (1) `/agency/clients/[id]` adds a 5th "Site Audit" tab that embeds `SiteAuditView` inline (separate `/audit` deep-link route also still works); (2) `/site-audit` index now shows a brand picker when user has multiple brands (single-brand auto-redirect preserved).
+- **Branch:** `feat/agency-activity-log` (Website AIO already merged to main via `453e7c8`; the UX polish edits sit on top of the activity-log branch as drive-by improvements)
+- **Next concrete step:** Decide on commit/PR for the two UX polish edits. Run the citation backfill against **prod** (Railway CLI) — local DB had 7,215 query_results yielding 962 citations; prod likely has much more.
 - **Blockers / waiting on:** None known.
 
 ---
@@ -27,6 +27,7 @@ One FastAPI backend, one Next.js frontend. The `/agency/*` routes are staff-only
 
 _Append-only log. Newest first. Each entry: date — decision — rationale (1 line)._
 
+- **2026-05-12** — Website AIO validated end-to-end against Rhythm (real crawl, real findings/recommendations). Citation backfill confirmed idempotent and effective. Surfaced Site Audit as a tab on the agency client detail page (was previously only reachable via direct URL) and replaced the auto-redirect on `/site-audit` index with a brand picker.
 - **2026-05-11** — Shipped **Website AIO** module on branch `feat/website-aio`. Manual-trigger site audits with: crawler (sitemap + BFS + Playwright render-mode detection), 5 parsers, page scoring, citation extraction from existing AI responses, page↔prompt linking (the wedge — no competitor connects audit findings to specific losing prompts), rule-based recommendations + LLM rewrites (Growth/Pro), llms.txt + robots.txt generators. 5 new tables, 13 endpoints, 5-tab frontend + agency portal view. Specs and plan committed; 95+ tests green.
 - **2026-05-11** — Direction committed: dual-track agency + SaaS on one codebase. Lumidian SaaS stays available to anyone who wants it; the same app doubles as the internal tool for Ken + contractors delivering agency work. Closed-loop roadmap features (auto-posting, G2 wizard, scheduler) serve BOTH self-serve users and agency operators. The "Managed tier" from the earlier Path D′ framing collapses into the agency offering — done-for-you clients become agency clients, not a SaaS tier.
 - **2026-05-05** — Agency portal MVP shipped. Differentiator is content creation (Lumidian's pipeline beats competitors); tracking is outsourced to Peec via per-client dashboard URL. Implemented as `/agency/*` routes inside the existing Next.js frontend (NOT a separate `agency-frontend/` app as initially scoped). Same FastAPI backend with `/api/agency/*` router. MVP scope: Today / Clients / Client detail (Overview / Brand & Prompts / Pipeline). Studio, Notes, Reports deferred to V1.
@@ -48,11 +49,13 @@ _Things to figure out. Move to "Recent Decisions" once resolved with the resolut
 
 ## Recently Changed (last session)
 
-- **Website AIO module (branch `feat/website-aio`, worktree `/tmp/lumidian-website-aio-wt`):**
-  - Backend: `app/services/site_audit/` (new package — constants, fetcher, crawler, page_classifier, parsers/{semantic,schema,robots,llms_txt,meta}, scoring, citations, page_prompt_link, recommendations, generators, auditor); `app/routers/site_audit.py` (new — 13 endpoints); `app/models.py` (+5 ORM models); `app/database.py` (+migration step); `app/schemas.py` (+7 Pydantic response schemas); `app/services/tracking_service.py` (+citation extraction hook in post-run pipeline); `scripts/backfill_citations.py` (new, one-shot backfill).
-  - Frontend: `app/site-audit/page.tsx` + `app/site-audit/[brandId]/page.tsx` (new); `app/agency/clients/[id]/audit/page.tsx` (new); `components/site-audit/*` (10 components: SiteAuditView, AuditTriggerButton, PageList, PageDetail, BotAccessPanel, LlmsTxtPanel, GeneratorsCard, CitationDomainList, RecommendationsList); `lib/api.ts` (+ siteAudit group + 6 type exports); `components/Sidebar.tsx` (+Site Audit nav item, tier-gated).
-  - Tests: 95+ new tests across 13 test files; full site_audit suite green.
-  - Docs: `docs/superpowers/specs/2026-05-11-website-aio-design.md` (design); `docs/superpowers/plans/2026-05-11-website-aio.md` (37-task implementation plan).
+- **Website AIO smoke-test + UX polish (current branch `feat/agency-activity-log`):**
+  - `frontend/app/site-audit/page.tsx`: replaced auto-redirect with a brand picker for multi-brand users (single-brand auto-redirect preserved).
+  - `frontend/app/agency/clients/[id]/page.tsx`: 5th "Site Audit" tab embeds `SiteAuditView` inline (committed via the agency-tasks branch alongside `TaskList`).
+  - `frontend/components/agency/ClientStrategyTab.tsx`: removed the stale "AIO website audit" mention from the placeholder copy now that audit has its own tab.
+  - Verified end-to-end via Playwright: 5-tab `/site-audit/[brandId]` renders live data; new brand picker works; new agency Site Audit tab loads `SiteAuditView`.
+- **Local DB seeded:** `python -m scripts.backfill_citations` populated **962 `citation_sources` rows** from 57 completed `tracking_runs`. First live audit (`website_audits.id=1`, Rhythm, brand_id=4) captured 50 pages, 146 findings, 110 recommendations.
+- **Side observation (not addressed):** `POST /api/agency/clients` with an existing `brand_id` returns a different `brand_id` in the response — looks like the handler auto-creates/clones a new brand instead of linking the one passed. Worth a follow-up bug if intentional.
 
 ---
 

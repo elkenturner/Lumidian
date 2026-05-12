@@ -5,12 +5,15 @@ import { useParams } from 'next/navigation'
 
 import { siteAudit, type WebsiteAuditSummary } from '@/lib/api'
 import { AuditTriggerButton } from '@/components/site-audit/AuditTriggerButton'
+import { PageList } from '@/components/site-audit/PageList'
+import { PageDetail } from '@/components/site-audit/PageDetail'
 
 export default function SiteAuditPage() {
   const params = useParams<{ brandId: string }>()
   const brandId = Number(params.brandId)
   const [audit, setAudit] = useState<WebsiteAuditSummary | null | undefined>(undefined)
   const [tab, setTab] = useState<'overview' | 'pages' | 'bots' | 'citations' | 'recs'>('overview')
+  const [selectedPageId, setSelectedPageId] = useState<number | null>(null)
 
   const loadLatest = useCallback(async () => {
     try {
@@ -66,7 +69,7 @@ export default function SiteAuditPage() {
         {(['overview', 'pages', 'bots', 'citations', 'recs'] as const).map(t => (
           <button key={t}
             className={`pb-2 ${tab === t ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'}`}
-            onClick={() => setTab(t)}>
+            onClick={() => { setTab(t); setSelectedPageId(null) }}>
             {t === 'overview' ? 'Overview' :
              t === 'pages'   ? 'Pages' :
              t === 'bots'    ? 'AI Bots & Files' :
@@ -76,7 +79,11 @@ export default function SiteAuditPage() {
       </nav>
 
       {tab === 'overview' && <OverviewTab audit={audit} />}
-      {tab === 'pages' && <div className="text-muted-foreground">Pages tab — coming in Task 27</div>}
+      {tab === 'pages' && (
+        selectedPageId === null
+          ? <PageList auditId={audit.id} onSelect={setSelectedPageId} />
+          : <PageDetail auditId={audit.id} pageId={selectedPageId} onBack={() => setSelectedPageId(null)} />
+      )}
       {tab === 'bots' && <div className="text-muted-foreground">Bots tab — coming in Task 28</div>}
       {tab === 'citations' && <div className="text-muted-foreground">Citations tab — coming in Task 29</div>}
       {tab === 'recs' && <div className="text-muted-foreground">Recommendations tab — coming in Task 30</div>}

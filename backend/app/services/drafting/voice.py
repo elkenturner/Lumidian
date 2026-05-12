@@ -56,3 +56,61 @@ async def select_voice_sample(
         return draft.content_text
 
     return None
+
+
+# ── Cross-reference ─────────────────────────────────────────────────────────
+
+import os
+
+from app.services.drafting.models import CROSS_REF_SUMMARY_MODEL
+
+
+def _anthropic_client():
+    api_key = os.getenv("ANTHROPIC_API_KEY", "")
+    if not api_key:
+        raise ValueError("ANTHROPIC_API_KEY not configured")
+    import anthropic
+    return anthropic.AsyncAnthropic(api_key=api_key)
+
+
+async def select_related_draft(
+    brand_id: int,
+    prompt_id: int,
+    exclude_platform: str,
+    db: AsyncSession,
+) -> str | None:
+    """Return a one-line summary of one sibling approved draft for cross-referencing, or None."""
+    row = await db.execute(
+        select(ContentDraft)
+        .where(
+            ContentDraft.brand_id == brand_id,
+            ContentDraft.prompt_id == prompt_id,
+            ContentDraft.platform != exclude_platform,
+            ContentDraft.status.in_(["approved", "posted"]),
+        )
+        .order_by(desc(ContentDraft.posted_at), desc(ContentDraft.approved_at))
+        .limit(1)
+    )
+    draft = row.scalar_one_or_none()
+    if draft is None or not draft.summary:
+        return None
+    title = (draft.title or "(untitled)")[:200]
+    return f"- {draft.platform}: \"{title}\" — {draft.summary}"
+
+
+async def generate_draft_summary(draft_text: str, query: str) -> str:
+    """30-word summary of a draft's central argument, cached on ContentDraft.summary."""
+    client = _anthropic_client()
+    response = await client.messages.create(
+        model=CROSS_REF_SUMMARY_MODEL,
+        max_tokens=80,
+        messages=[{"role": "user", "content": (
+            f"Summarise this draft's central argument in one sentence (≤30 words). "
+            f"It was written to answer: \"{query}\". Output ONLY the sentence, no prose around it.\n\n"
+            f"DRAFT:\n{draft_text}"
+        )}],
+    )
+    for block in response.content:
+        if getattr(block, "type", None) == "text":
+            return block.text.strip()
+    return ""

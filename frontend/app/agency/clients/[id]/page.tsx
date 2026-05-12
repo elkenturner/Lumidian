@@ -79,7 +79,7 @@ export default function AgencyClientDetailPage({
           )}
         </Tabs.Content>
         <Tabs.Content value="reports">
-          <ClientReportsTab brandId={client.brand_id} />
+          <ClientReportsTab brandId={client.brand_id} clientId={client.id} />
         </Tabs.Content>
       </Tabs.Root>
     </div>

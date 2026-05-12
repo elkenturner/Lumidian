@@ -861,3 +861,20 @@ class AgencyTask(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ClientDocument(Base):
+    __tablename__ = "client_documents"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agency_client_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("agency_clients.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body_markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    generated_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    generated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

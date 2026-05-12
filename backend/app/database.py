@@ -416,6 +416,19 @@ async def run_migrations():
         )""",
         "CREATE INDEX IF NOT EXISTS idx_agency_tasks_client_status ON agency_tasks(agency_client_id, status, due_at)",
         "CREATE INDEX IF NOT EXISTS idx_agency_tasks_assigned ON agency_tasks(assigned_to_user_id, status, due_at)",
+        # 2026-05-12: Agency documents (sub-project C)
+        """CREATE TABLE IF NOT EXISTS client_documents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agency_client_id INTEGER NOT NULL REFERENCES agency_clients(id) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body_markdown TEXT NOT NULL,
+            generated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            generated_at DATETIME,
+            updated_at DATETIME
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_client_documents_client_kind ON client_documents(agency_client_id, kind, generated_at DESC)",
+        "CREATE INDEX IF NOT EXISTS idx_client_documents_recent ON client_documents(generated_at DESC)",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ── Prompt schemas ────────────────────────────────────────────────────────────
@@ -1231,3 +1233,36 @@ class CompetitiveGapResponse(BaseModel):
     competitors: list[CompetitorGapStat]
     sample_count: int
     confidence: str              # "low" | "medium" | "high"
+
+
+# ── BrandSource ─────────────────────────────────────────────────────────────
+
+class BrandSourceCreate(BaseModel):
+    url: str = Field(..., max_length=1000)
+    title: str | None = Field(None, max_length=500)
+    snippet: str | None = Field(None, max_length=1500)
+    source_type: Literal["paper", "article", "stat", "case_study"] = "article"
+
+
+class BrandSourceOut(BaseModel):
+    id: int
+    title: str
+    url: str
+    snippet: str | None
+    source_type: str
+    added_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ── Voice samples ───────────────────────────────────────────────────────────
+
+class VoiceSampleCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    text: str = Field(..., min_length=50, max_length=4000)
+
+
+class VoiceSampleOut(BaseModel):
+    index: int
+    title: str
+    text: str

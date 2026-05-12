@@ -528,7 +528,9 @@ async def run_migrations():
 
     # --- Migration: content clusters (2026-05-12) ---
     async with engine.begin() as conn:
-        # Create content_briefs first (content_clusters.last_brief_id → content_briefs.id)
+        # Note: content_briefs created BEFORE content_clusters because of the
+        # circular FK (content_clusters.last_brief_id → content_briefs.id).
+        # SQLite defers FK validation; do not reorder.
         await conn.execute(text("""
             CREATE TABLE IF NOT EXISTS content_briefs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -546,7 +548,7 @@ async def run_migrations():
                 FOREIGN KEY (cluster_id) REFERENCES content_clusters(id) ON DELETE CASCADE
             )
         """))
-        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_content_briefs_cluster_id ON content_briefs (cluster_id)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_content_briefs_cluster_id ON content_briefs (cluster_id)"))
 
         # Create content_clusters table (references content_briefs.id via last_brief_id)
         await conn.execute(text("""
@@ -567,14 +569,14 @@ async def run_migrations():
                 UNIQUE (prompt_id)
             )
         """))
-        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_content_clusters_brand_id ON content_clusters (brand_id)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_content_clusters_brand_id ON content_clusters (brand_id)"))
 
         # Add cluster_id column to content_drafts (idempotent: PRAGMA check)
         result = await conn.execute(text("PRAGMA table_info(content_drafts)"))
         cols = {row[1] for row in result.fetchall()}
         if "cluster_id" not in cols:
             await conn.execute(text("ALTER TABLE content_drafts ADD COLUMN cluster_id INTEGER REFERENCES content_clusters(id) ON DELETE SET NULL"))
-            await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_content_drafts_cluster_id ON content_drafts (cluster_id)"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_content_drafts_cluster_id ON content_drafts (cluster_id)"))
 
         # Clean-slate: delete all unposted ContentDraft rows.
         # Drafts referenced by ContentPost or DraftAttribution are retained with cluster_id NULL.

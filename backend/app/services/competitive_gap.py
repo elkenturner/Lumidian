@@ -18,7 +18,7 @@ _WINDOW_DAYS: dict[str, int] = {"7d": 7, "30d": 30, "90d": 90}
 
 
 def _resolve_window(
-    window: str,
+    window: WindowLiteral,
     now: datetime | None = None,
 ) -> tuple[datetime, datetime, datetime, datetime]:
     """

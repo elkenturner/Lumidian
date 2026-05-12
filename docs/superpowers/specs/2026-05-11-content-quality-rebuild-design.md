@@ -53,6 +53,28 @@ build_prompt() → call_claude() → remove_hedging() → save
 
 Tier-gating logic lives in `services/drafting_service.py` alongside the existing `TIER_DRAFT_CAPS` pattern.
 
+## Model matrix
+
+| Tier | Writer (first draft) | Critic | Rewriter (paragraph-scoped) | Cross-ref summary | Short replies |
+|------|----------------------|--------|------------------------------|-------------------|----------------|
+| Free / pitch | `claude-sonnet-4-6` (existing flow) | — | — | — | `claude-haiku-4-5-20251001` |
+| Starter | `claude-sonnet-4-6` | — | — | — | `claude-haiku-4-5-20251001` |
+| Growth | `claude-sonnet-4-6` | `claude-sonnet-4-6` | **`claude-opus-4-7`** | `claude-haiku-4-5-20251001` | `claude-haiku-4-5-20251001` |
+| Pro | **`claude-opus-4-7`** | `claude-sonnet-4-6` | **`claude-opus-4-7`** | `claude-haiku-4-5-20251001` | `claude-haiku-4-5-20251001` |
+
+Reasoning:
+- **Opus on the rewriter** is the highest-leverage upgrade — only flagged paragraphs incur Opus tokens (typically 1–3 paragraphs out of a full draft), and the rewrite has a precise objective from the critic. This applies to both Growth and Pro.
+- **Opus on the writer** is Pro's main differentiator. Long-context synthesis (Evidence Pack + brand profile + voice sample + cross-ref + platform spec) is exactly where Opus pulls ahead.
+- **Sonnet on the critic** for all tiers — it's a constrained structured-output task (tool-use, `max_tokens=400`), and Opus's reasoning advantage doesn't show up under those constraints.
+- **Haiku** unchanged for cross-ref summaries and short replies — the existing pattern is correct.
+
+Model constants centralised in a new `services/drafting/models.py` (or a module-level dict in `drafting_service.py`) so swaps are one-line changes per role.
+
+Per-draft cost estimates (approximate):
+- Starter: ~$0.05
+- Growth: ~$0.10–0.12 (Sonnet draft + Sonnet critic + Opus rewrite on flagged paragraphs)
+- Pro: ~$0.25–0.30 (Opus draft + Sonnet critic + Opus rewrite on flagged paragraphs)
+
 ---
 
 ## Layer 1 — Evidence Retrieval
@@ -180,7 +202,7 @@ class ContentDraftCitation(Base):
 
 ### Critic call
 
-A second Claude call (Sonnet 4.6) runs after the first draft, using **Anthropic tool-use** for structured output. The tool schema:
+A second Claude call (`claude-sonnet-4-6` for all tiers — see Model Matrix) runs after the first draft, using **Anthropic tool-use** for structured output. The tool schema:
 
 ```python
 {
@@ -233,7 +255,7 @@ HARD_FAIL = 4.0
 
 ### Rewrite — paragraph-scoped
 
-If `overall_score < 7.0`: a third Claude call rewrites **only the flagged paragraphs**. Inputs:
+If `overall_score < 7.0`: a third Claude call (`claude-opus-4-7` for Growth + Pro — see Model Matrix) rewrites **only the flagged paragraphs**. Inputs:
 1. The original Evidence Pack
 2. The full draft (read-only context)
 3. The flagged paragraphs joined with their critic notes
@@ -322,6 +344,7 @@ The current 20+ phrase list in `prompts.py:build_prompt()` shrinks to ~5 unambig
 - `backend/app/services/drafting/critic.py` — critic call + weighted scoring + targeted rewrite
 - `backend/app/services/drafting/voice.py` — voice sample selection + cross-reference lookup
 - `backend/app/services/drafting/citations.py` — per-platform citation rendering
+- `backend/app/services/drafting/models.py` — centralised per-role / per-tier model constants (`writer_model_for_tier`, `CRITIC_MODEL`, `rewriter_model_for_tier`, `CROSS_REF_SUMMARY_MODEL`)
 
 ### Modified
 - `backend/app/services/drafting/prompts.py` — accepts EvidencePack + voice sample + related drafts; rewritten INFORMATION HIERARCHY block; shrunk banned-word list
@@ -389,3 +412,4 @@ All tests follow the existing `conftest.py` fixtures and isolated SQLite pattern
 - **Citation rendering per platform:** as specified in the table above. Wikipedia replaces the existing single-citation logic; X variants drop markers.
 - **Tier gating:** Free/pitch keep existing minimal flow. Starter gets Evidence Pack only. Growth adds critic. Pro adds voice + cross-ref.
 - **Cost / latency on Growth+:** ~2.5× tokens, ~25–35s wall time per draft. Acceptable for async draft generation.
+- **Model selection per role:** Opus 4.7 on the rewriter for Growth + Pro (highest leverage — flagged paragraphs only). Opus 4.7 on the writer for Pro (long-context synthesis differentiator). Sonnet 4.6 on the critic everywhere (structured output, no Opus advantage). Haiku 4.5 unchanged for cross-ref summaries and short replies.

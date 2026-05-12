@@ -96,3 +96,26 @@ def test_mention_matches_empty_text_returns_false():
     from app.services.competitive_gap import _mention_matches
     assert _mention_matches("", "Notion") is False
     assert _mention_matches(None, "Notion") is False
+
+
+# ── _per_day_buckets ─────────────────────────────────────────────────────────
+
+def test_per_day_buckets_groups_by_utc_date():
+    from datetime import date, datetime
+    from app.services.competitive_gap import _per_day_buckets
+
+    rows = [
+        ("rowA", datetime(2026, 5, 10, 9, 0)),
+        ("rowB", datetime(2026, 5, 10, 23, 30)),
+        ("rowC", datetime(2026, 5, 11, 8, 0)),
+    ]
+    out = _per_day_buckets(rows)
+
+    assert set(out.keys()) == {date(2026, 5, 10), date(2026, 5, 11)}
+    assert len(out[date(2026, 5, 10)]) == 2
+    assert len(out[date(2026, 5, 11)]) == 1
+
+
+def test_per_day_buckets_empty_input_returns_empty_dict():
+    from app.services.competitive_gap import _per_day_buckets
+    assert _per_day_buckets([]) == {}

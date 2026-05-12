@@ -10,8 +10,9 @@ Spec: docs/superpowers/specs/2026-05-12-competitive-gap-design.md
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime, timedelta
-from typing import Literal
+from collections import defaultdict
+from datetime import UTC, date as Date, datetime, timedelta
+from typing import Literal, TypeVar
 
 WindowLiteral = Literal["7d", "30d", "90d"]
 
@@ -69,3 +70,17 @@ def _mention_matches(text: str | None, name: str) -> bool:
         return False
     name_norm = _normalize(name)
     return bool(name_norm) and name_norm in _normalize(text)
+
+
+T = TypeVar("T")
+
+
+def _per_day_buckets(rows: list[tuple[T, datetime]]) -> dict[Date, list[T]]:
+    """
+    Group `(payload, when)` tuples by `when.date()`. Returned dict maps each
+    UTC day (date) to the list of payloads that fell on it.
+    """
+    buckets: dict[Date, list[T]] = defaultdict(list)
+    for payload, when in rows:
+        buckets[when.date()].append(payload)
+    return dict(buckets)

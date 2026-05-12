@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlparse
 
+from bs4 import BeautifulSoup
+
 from app.services.site_audit.constants import (
     HOST_REQUESTS_PER_SECOND,
     PER_AUDIT_CONCURRENCY,
@@ -19,6 +21,20 @@ logger = logging.getLogger(__name__)
 
 _LOC_RE = re.compile(r"<loc>\s*([^<]+?)\s*</loc>", re.IGNORECASE)
 _HREF_RE = re.compile(r"<a[^>]+href=[\"']?([^\"'\s>]+)", re.IGNORECASE)
+
+
+def _extract_content_excerpt(html: str, max_chars: int = 1500) -> str:
+    """
+    Return up to max_chars of cleaned visible body text — no scripts/styles, no nav.
+    Used by the drafting pipeline as evidence material.
+    """
+    if not html:
+        return ""
+    soup = BeautifulSoup(html, "lxml")
+    for tag in soup(["script", "style", "noscript", "nav", "footer", "header", "aside"]):
+        tag.decompose()
+    text = " ".join(soup.get_text(separator=" ").split())
+    return text[:max_chars]
 
 
 async def discover_sitemap_urls(root_url: str) -> tuple[list[str], str | None]:
@@ -59,6 +75,7 @@ class CrawlPage:
     html: str
     fetch_ms: int | None
     error: str | None = None
+    content_excerpt: str | None = None
 
 
 class _HostRateLimiter:
@@ -131,6 +148,7 @@ async def crawl_site(
                 pages.append(CrawlPage(
                     url=url, depth=depth, status=res.status, html=res.html,
                     fetch_ms=res.fetch_ms, error=res.error,
+                    content_excerpt=_extract_content_excerpt(res.html) if res.html else None,
                 ))
                 if depth < max_depth and res.html:
                     for link in _extract_internal_links(res.html, url, host):

@@ -1,6 +1,7 @@
 """Agency portal endpoints. All endpoints require is_agency_staff=True."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import secrets
@@ -13,17 +14,22 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import require_agency_staff
-from app.models import AgencyClient, Brand, ClientReviewLink, ContentDraft, User
+from app.models import AgencyClient, Brand, ClientActivityEvent, ClientReviewLink, ContentDraft, User
 from app.schemas import (
+    ActivityEventOut,
+    ActivityEventWithClientOut,
     AgencyClientCreate,
     AgencyClientOut,
     AgencyClientUpdate,
     DraftAssignIn,
     DraftStatusUpdateIn,
+    NoteCreate,
+    NoteUpdate,
     ReviewLinkOut,
     TodayDraftOut,
     TodayOut,
 )
+from app.services.agency_activity import emit_event, EVENT_NOTE
 
 router = APIRouter(prefix="/agency", tags=["agency"])
 
@@ -70,6 +76,31 @@ async def _client_to_out(db: AsyncSession, client: AgencyClient) -> AgencyClient
         brand_id=brand_id,
         drafts_pending=pending_count,
         created_at=client.created_at,
+    )
+
+
+async def _event_to_out(db: AsyncSession, event: ClientActivityEvent) -> ActivityEventOut:
+    actor_name: str | None = None
+    if event.actor_user_id is not None:
+        actor = await db.get(User, event.actor_user_id)
+        actor_name = (actor.name or actor.email) if actor else None
+    payload_obj: dict | None = None
+    if event.payload:
+        try:
+            payload_obj = json.loads(event.payload)
+        except json.JSONDecodeError:
+            payload_obj = None
+    return ActivityEventOut(
+        id=event.id,
+        agency_client_id=event.agency_client_id,
+        event_type=event.event_type,
+        actor_user_id=event.actor_user_id,
+        actor_name=actor_name,
+        body=event.body,
+        payload=payload_obj,
+        related_draft_id=event.related_draft_id,
+        created_at=event.created_at,
+        updated_at=event.updated_at,
     )
 
 
@@ -322,3 +353,114 @@ async def update_draft_status(
     if body.status == "posted" and draft.posted_at is None:
         draft.posted_at = datetime.utcnow()
     await db.commit()
+
+
+@router.get("/clients/{client_id}/activity", response_model=list[ActivityEventOut])
+async def list_client_activity(
+    client_id: int,
+    limit: int = 50,
+    before: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    limit = max(1, min(limit, 100))
+    stmt = (
+        select(ClientActivityEvent)
+        .where(ClientActivityEvent.agency_client_id == client_id)
+        .order_by(ClientActivityEvent.id.desc())
+        .limit(limit)
+    )
+    if before is not None:
+        stmt = stmt.where(ClientActivityEvent.id < before)
+    rows = (await db.execute(stmt)).scalars().all()
+    return [await _event_to_out(db, e) for e in rows]
+
+
+@router.post("/clients/{client_id}/activity/note", response_model=ActivityEventOut, status_code=http_status.HTTP_201_CREATED)
+async def post_note(
+    client_id: int,
+    body: NoteCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+):
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    event = await emit_event(
+        db,
+        agency_client_id=client_id,
+        event_type=EVENT_NOTE,
+        body=body.body,
+        actor_user_id=user.id,
+    )
+    await db.commit()
+    await db.refresh(event)
+    return await _event_to_out(db, event)
+
+
+@router.patch("/activity/{event_id}/note", response_model=ActivityEventOut)
+async def edit_note(
+    event_id: int,
+    body: NoteUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+):
+    event = await db.get(ClientActivityEvent, event_id)
+    if event is None or event.event_type != EVENT_NOTE:
+        raise HTTPException(status_code=404, detail="Note not found")
+    if event.actor_user_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not the author")
+    event.body = body.body
+    event.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(event)
+    return await _event_to_out(db, event)
+
+
+@router.delete("/activity/{event_id}/note", status_code=http_status.HTTP_204_NO_CONTENT)
+async def delete_note(
+    event_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+):
+    event = await db.get(ClientActivityEvent, event_id)
+    if event is None or event.event_type != EVENT_NOTE:
+        raise HTTPException(status_code=404, detail="Note not found")
+    if event.actor_user_id != user.id and not user.is_admin:
+        raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not the author")
+    await db.delete(event)
+    await db.commit()
+
+
+@router.get("/activity/recent", response_model=list[ActivityEventWithClientOut])
+async def list_recent_activity(
+    limit: int = 10,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    from datetime import timedelta
+
+    limit = max(1, min(limit, 50))
+    cutoff = datetime.utcnow() - timedelta(days=7)
+    stmt = (
+        select(ClientActivityEvent, AgencyClient)
+        .join(AgencyClient, AgencyClient.id == ClientActivityEvent.agency_client_id)
+        .where(ClientActivityEvent.created_at >= cutoff)
+        .order_by(ClientActivityEvent.id.desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).all()
+    results: list[ActivityEventWithClientOut] = []
+    for event, ac in rows:
+        base = await _event_to_out(db, event)
+        results.append(
+            ActivityEventWithClientOut(
+                **base.model_dump(),
+                client_id=ac.id,
+                client_name=ac.name,
+            )
+        )
+    return results

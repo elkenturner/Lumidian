@@ -721,3 +721,115 @@ class ClientReviewLink(Base):
     token: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ── Website AIO module ───────────────────────────────────────────────────────
+
+class WebsiteAudit(Base):
+    __tablename__ = "website_audits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    brand_id: Mapped[int] = mapped_column(Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    triggered_by: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    total_pages: Mapped[int] = mapped_column(Integer, default=0)
+    pages_failed: Mapped[int] = mapped_column(Integer, default=0)
+    overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    bot_access_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    content_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    schema_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    technical_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    render_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    sitemap_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    robots_txt_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
+    llms_txt_present: Mapped[bool] = mapped_column(Boolean, default=False)
+    llms_txt_valid: Mapped[bool] = mapped_column(Boolean, default=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class WebsiteAuditPage(Base):
+    __tablename__ = "website_audit_pages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    audit_id: Mapped[int] = mapped_column(Integer, ForeignKey("website_audits.id", ondelete="CASCADE"), nullable=False, index=True)
+    url: Mapped[str] = mapped_column(String(2048), nullable=False, index=True)
+    depth: Mapped[int] = mapped_column(Integer, default=0)
+    http_status: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fetch_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    page_type: Mapped[str] = mapped_column(String(20), default="other")
+    word_count: Mapped[int] = mapped_column(Integer, default=0)
+    title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    meta_description: Mapped[str | None] = mapped_column(String(1024), nullable=True)
+    h1_text: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    h2_count: Mapped[int] = mapped_column(Integer, default=0)
+    h3_count: Mapped[int] = mapped_column(Integer, default=0)
+    table_count: Mapped[int] = mapped_column(Integer, default=0)
+    list_count: Mapped[int] = mapped_column(Integer, default=0)
+    fact_density: Mapped[float] = mapped_column(Float, default=0.0)
+    outbound_links: Mapped[int] = mapped_column(Integer, default=0)
+    internal_links: Mapped[int] = mapped_column(Integer, default=0)
+    image_count: Mapped[int] = mapped_column(Integer, default=0)
+    image_alt_pct: Mapped[float] = mapped_column(Float, default=0.0)
+    has_jsonld: Mapped[bool] = mapped_column(Boolean, default=False)
+    schema_types: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_js_rendered: Mapped[bool] = mapped_column(Boolean, default=False)
+    page_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    content_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    structure_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    schema_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    raw_html_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rendered_html_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    fetch_error: Mapped[str | None] = mapped_column(String(255), nullable=True)
+
+
+class WebsiteAuditFinding(Base):
+    __tablename__ = "website_audit_findings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    audit_id: Mapped[int] = mapped_column(Integer, ForeignKey("website_audits.id", ondelete="CASCADE"), nullable=False, index=True)
+    page_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("website_audit_pages.id", ondelete="CASCADE"), nullable=True, index=True)
+    check_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    severity: Mapped[str] = mapped_column(String(16), nullable=False)
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class WebsiteAuditRecommendation(Base):
+    __tablename__ = "website_audit_recommendations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    audit_id: Mapped[int] = mapped_column(Integer, ForeignKey("website_audits.id", ondelete="CASCADE"), nullable=False, index=True)
+    page_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("website_audit_pages.id", ondelete="CASCADE"), nullable=True, index=True)
+    priority: Mapped[str] = mapped_column(String(8), nullable=False)
+    effort: Mapped[str] = mapped_column(String(8), nullable=False)
+    category: Mapped[str] = mapped_column(String(20), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    linked_prompt_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
+    expected_impact: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    llm_generated: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+
+
+class CitationSource(Base):
+    __tablename__ = "citation_sources"
+    __table_args__ = (
+        UniqueConstraint("query_result_id", "url", name="uq_citation_qr_url"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    brand_id: Mapped[int] = mapped_column(Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True)
+    tracking_run_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("tracking_runs.id", ondelete="CASCADE"), nullable=True, index=True)
+    prompt_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("prompts.id", ondelete="CASCADE"), nullable=True, index=True)
+    query_result_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("query_results.id", ondelete="CASCADE"), nullable=True, index=True)
+    model: Mapped[str] = mapped_column(String(20), nullable=False)
+    url: Mapped[str] = mapped_column(String(2048), nullable=False, index=True)
+    domain: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    competitor_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("competitors.id", ondelete="SET NULL"), nullable=True)
+    extracted_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)

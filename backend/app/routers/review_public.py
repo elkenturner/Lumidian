@@ -18,6 +18,7 @@ from app.models import (
     Notification,
 )
 from app.schemas import ChangesRequestIn, RejectIn, ReviewClientPageOut, ReviewDraftOut
+from app.services.agency_activity import emit_event
 
 router = APIRouter(prefix="/api/public/review", tags=["public-review"])
 
@@ -129,6 +130,14 @@ async def approve_draft(token: str, draft_id: int, db: AsyncSession = Depends(ge
     draft.approved_at = now
     draft.client_reviewed_at = now
     await _notify_staff(db, client_id, draft)
+    title_label = draft.title or f"Draft #{draft.id}"
+    await emit_event(
+        db,
+        agency_client_id=client_id,
+        event_type="client_approved",
+        body=f"Client approved '{title_label}'",
+        related_draft_id=draft.id,
+    )
     await db.commit()
 
 
@@ -145,6 +154,15 @@ async def request_changes(
     draft.client_feedback = body.feedback
     draft.client_reviewed_at = datetime.utcnow()
     await _notify_staff(db, client_id, draft)
+    title_label = draft.title or f"Draft #{draft.id}"
+    await emit_event(
+        db,
+        agency_client_id=client_id,
+        event_type="client_changes_requested",
+        body=f"Client requested changes on '{title_label}'",
+        payload={"feedback": body.feedback},
+        related_draft_id=draft.id,
+    )
     await db.commit()
 
 
@@ -161,4 +179,13 @@ async def reject_draft(
     draft.client_feedback = body.reason
     draft.client_reviewed_at = datetime.utcnow()
     await _notify_staff(db, client_id, draft)
+    title_label = draft.title or f"Draft #{draft.id}"
+    await emit_event(
+        db,
+        agency_client_id=client_id,
+        event_type="client_rejected",
+        body=f"Client rejected '{title_label}'",
+        payload={"reason": body.reason},
+        related_draft_id=draft.id,
+    )
     await db.commit()

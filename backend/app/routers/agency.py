@@ -142,6 +142,13 @@ async def create_client(
         brand_type="standard",
     )
     db.add(brand)
+    await emit_event(
+        db,
+        agency_client_id=client.id,
+        event_type="client_created",
+        body=f"Created client {client.name}",
+        actor_user_id=user.id,
+    )
     await db.commit()
     await db.refresh(client)
     return await _client_to_out(db, client)
@@ -164,15 +171,25 @@ async def update_client(
     client_id: int,
     body: AgencyClientUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
         raise HTTPException(status_code=404, detail="Client not found")
+    prev_status = client.status
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(client, field, value)
     if body.status == "active" and client.retainer_started_at is None:
         client.retainer_started_at = datetime.utcnow()
+    if body.status is not None and body.status != prev_status:
+        await emit_event(
+            db,
+            agency_client_id=client.id,
+            event_type="client_status_changed",
+            body=f"Status changed: {prev_status} → {body.status}",
+            actor_user_id=user.id,
+            payload={"prev": prev_status, "next": body.status},
+        )
     await db.commit()
     await db.refresh(client)
     return await _client_to_out(db, client)
@@ -305,7 +322,7 @@ async def rotate_review_link(
     client_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -317,13 +334,24 @@ async def rotate_review_link(
             ClientReviewLink.revoked_at.is_(None),
         )
     )
-    for old in existing_q.scalars().all():
+    existing_links = existing_q.scalars().all()
+    had_prior_link = len(existing_links) > 0
+    for old in existing_links:
         old.revoked_at = datetime.utcnow()
     new_link = ClientReviewLink(
         agency_client_id=client_id,
         token=secrets.token_urlsafe(32),
     )
     db.add(new_link)
+    event_type = "review_link_rotated" if had_prior_link else "review_link_generated"
+    body_text = "Rotated client review link" if had_prior_link else "Generated client review link"
+    await emit_event(
+        db,
+        agency_client_id=client_id,
+        event_type=event_type,
+        body=body_text,
+        actor_user_id=user.id,
+    )
     await db.commit()
     await db.refresh(new_link)
     return _link_to_out(new_link, request)
@@ -337,7 +365,7 @@ async def update_draft_status(
     draft_id: int,
     body: DraftStatusUpdateIn,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
     if body.status not in _STAFF_ALLOWED_STATUSES:
         raise HTTPException(
@@ -347,11 +375,35 @@ async def update_draft_status(
     draft = await db.get(ContentDraft, draft_id)
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft not found")
+    prev_status = draft.status
     draft.status = body.status
     if body.status == "approved" and draft.approved_at is None:
         draft.approved_at = datetime.utcnow()
     if body.status == "posted" and draft.posted_at is None:
         draft.posted_at = datetime.utcnow()
+
+    # Emit activity event if this is an interesting transition
+    brand = await db.get(Brand, draft.brand_id)
+    if brand and brand.agency_client_id is not None:
+        title_label = draft.title or f"Draft #{draft.id}"
+        if body.status == "awaiting_client" and prev_status != "awaiting_client":
+            await emit_event(
+                db,
+                agency_client_id=brand.agency_client_id,
+                event_type="draft_sent_to_client",
+                body=f"Sent '{title_label}' to client review",
+                actor_user_id=user.id,
+                related_draft_id=draft.id,
+            )
+        elif body.status == "posted" and prev_status != "posted":
+            await emit_event(
+                db,
+                agency_client_id=brand.agency_client_id,
+                event_type="draft_marked_posted",
+                body=f"Marked '{title_label}' as posted",
+                actor_user_id=user.id,
+                related_draft_id=draft.id,
+            )
     await db.commit()
 
 

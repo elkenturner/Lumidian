@@ -968,6 +968,8 @@ export interface AgencyTodayResponse {
   drafts_to_review: AgencyTodayDraft[];
   drafts_to_review_count: number;
   active_clients: number;
+  awaiting_client: AgencyTodayDraft[];
+  approved: AgencyTodayDraft[];
 }
 
 export async function agencyListClients(): Promise<AgencyClient[]> {

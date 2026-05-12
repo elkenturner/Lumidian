@@ -927,6 +927,8 @@ class TodayOut(BaseModel):
     drafts_to_review: list[TodayDraftOut]
     drafts_to_review_count: int
     active_clients: int
+    awaiting_client: list[TodayDraftOut] = []
+    approved: list[TodayDraftOut] = []
 
 
 # ── Agency portal shell (2026-05-11) ─────────────────────────────────────────

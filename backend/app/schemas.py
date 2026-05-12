@@ -1153,3 +1153,39 @@ class AgencyStaffOut(BaseModel):
     email: str
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── Agency documents (sub-project C, 2026-05-12) ─────────────────────────────
+
+
+class DocumentTemplateOut(BaseModel):
+    kind: str
+    name: str
+    description: str
+
+
+class DocumentOut(BaseModel):
+    id: int
+    agency_client_id: int
+    kind: str
+    title: str
+    body_markdown: str
+    generated_by_user_id: int | None
+    generated_by_name: str | None
+    generated_at: datetime
+    updated_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentWithClientOut(DocumentOut):
+    client_id: int
+    client_name: str
+
+
+class DocumentGenerateIn(BaseModel):
+    kind: str = Field(min_length=1, max_length=64)
+
+
+class DocumentUpdateIn(BaseModel):
+    body_markdown: str = Field(min_length=1, max_length=200000)

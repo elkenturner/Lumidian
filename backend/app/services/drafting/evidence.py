@@ -261,3 +261,54 @@ async def read_cache(brand_id: int, prompt_id: int, db: AsyncSession) -> Evidenc
         return EvidencePack.from_dict(_json.loads(row.pack_json))
     except Exception:
         return None
+
+
+# ── Top-level assembly ──────────────────────────────────────────────────────
+
+async def build_evidence_pack(
+    brand_id: int,
+    brand_name: str,
+    prompt_id: int,
+    prompt_text: str,
+    db: AsyncSession,
+    use_cache: bool = True,
+) -> EvidencePack:
+    """
+    Assemble the Evidence Pack from library + brand pages + web search.
+
+    Library sources always fold in fresh from the DB. Brand pages + web search
+    are cached together for CACHE_TTL_HOURS.
+    """
+    cached_web_and_brand: list[EvidenceSource] = []
+    used_cache = False
+    if use_cache:
+        cached = await read_cache(brand_id=brand_id, prompt_id=prompt_id, db=db)
+        if cached is not None:
+            cached_web_and_brand = [s for s in cached.sources if s.kind in ("web", "brand_page")]
+            used_cache = True
+
+    if not used_cache:
+        brand_pages = await select_brand_pages(
+            brand_id=brand_id, prompt_text=prompt_text, db=db, limit=BRAND_PAGE_LIMIT,
+        )
+        web_sources = await select_web_sources(query=prompt_text, limit=WEB_RESULT_LIMIT)
+        cached_web_and_brand = brand_pages + web_sources
+
+    library_sources = await select_library_sources(brand_id=brand_id, db=db)
+
+    # Priority order: library > brand pages > web.
+    merged = library_sources + cached_web_and_brand
+    merged = merged[:PACK_CAP]
+    for idx, src in enumerate(merged, start=1):
+        src.ref = f"S{idx}"
+
+    pack = EvidencePack(sources=merged, query=prompt_text, brand_name=brand_name)
+
+    if use_cache and not used_cache:
+        cacheable = EvidencePack(
+            sources=[s for s in cached_web_and_brand],
+            query=prompt_text, brand_name=brand_name,
+        )
+        await write_cache(brand_id=brand_id, prompt_id=prompt_id, pack=cacheable, db=db)
+
+    return pack

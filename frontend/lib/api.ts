@@ -776,6 +776,58 @@ export async function getDashboardAnalytics(brandId: number): Promise<DashboardA
   return dedupedGet<DashboardAnalytics>(`/dashboard/${brandId}/analytics`);
 }
 
+// ── Competitive Gap ───────────────────────────────────────────────────────────
+
+export type CompetitiveGapWindow = '7d' | '30d' | '90d';
+
+export interface CompetitiveGapTrendPoint {
+  date: string;
+  gap_pp: number;
+  brand_pct: number;
+  comp_avg_pct: number;
+}
+
+export interface CompetitorTrendPoint {
+  date: string;
+  gap_pp: number;
+}
+
+export interface CompetitorGapStat {
+  competitor_id: number;
+  name: string;
+  competitor_pct: number;
+  gap_pp: number;
+  delta_pp: number | null;
+  trend: CompetitorTrendPoint[];
+  has_data: boolean;
+}
+
+export interface CompetitiveGapResponse {
+  brand_id: number;
+  window: CompetitiveGapWindow;
+  has_competitors: boolean;
+  has_data: boolean;
+  headline_gap_pp: number | null;
+  headline_delta_pp: number | null;
+  brand_visibility_pct: number | null;
+  competitor_avg_pct: number | null;
+  trend: CompetitiveGapTrendPoint[];
+  competitors: CompetitorGapStat[];
+  sample_count: number;
+  confidence: 'low' | 'medium' | 'high';
+}
+
+export async function getCompetitiveGap(
+  brandId: number,
+  window: CompetitiveGapWindow = '7d',
+): Promise<CompetitiveGapResponse> {
+  const res = await api.get<CompetitiveGapResponse>(
+    `/dashboard/${brandId}/competitive-gap`,
+    { params: { window } },
+  );
+  return res.data;
+}
+
 // ── Brand with stats (for brand switcher) ────────────────────────────────────
 
 export interface BrandWithStats {

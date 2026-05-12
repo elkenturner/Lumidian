@@ -6,6 +6,7 @@ from app.services.document_engine import (
     monthly_report,  # noqa: F401
     sow,  # noqa: F401
 )
+from app.services.document_engine.generator import generate_document
 from app.services.document_engine.registry import (
     TEMPLATES,
     Template,
@@ -14,4 +15,11 @@ from app.services.document_engine.registry import (
     register,
 )
 
-__all__ = ["TEMPLATES", "Template", "get_template", "list_templates", "register"]
+__all__ = [
+    "TEMPLATES",
+    "Template",
+    "generate_document",
+    "get_template",
+    "list_templates",
+    "register",
+]

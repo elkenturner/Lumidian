@@ -1052,3 +1052,34 @@ class CitationDomainAgg(BaseModel):
 class TriggerAuditOut(BaseModel):
     audit_id: int
     status: str
+
+
+# ── Agency activity log (2026-05-12) ─────────────────────────────────────────
+
+
+class ActivityEventOut(BaseModel):
+    id: int
+    agency_client_id: int
+    event_type: str
+    actor_user_id: int | None
+    actor_name: str | None
+    body: str
+    payload: dict | None
+    related_draft_id: int | None
+    created_at: datetime
+    updated_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ActivityEventWithClientOut(ActivityEventOut):
+    client_id: int
+    client_name: str
+
+
+class NoteCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=10000)
+
+
+class NoteUpdate(BaseModel):
+    body: str = Field(min_length=1, max_length=10000)

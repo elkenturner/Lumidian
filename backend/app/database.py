@@ -385,6 +385,39 @@ async def run_migrations():
         )""",
         "CREATE INDEX IF NOT EXISTS idx_client_review_links_token ON client_review_links(token)",
         "CREATE INDEX IF NOT EXISTS idx_client_review_links_client ON client_review_links(agency_client_id)",
+        # 2026-05-12: Content quality rebuild — evidence retrieval, citations, voice samples
+        "ALTER TABLE website_audit_pages ADD COLUMN content_excerpt TEXT",
+        "ALTER TABLE brand_profiles ADD COLUMN voice_samples TEXT",
+        "ALTER TABLE content_drafts ADD COLUMN quality_score REAL",
+        "ALTER TABLE content_drafts ADD COLUMN summary TEXT",
+        """CREATE TABLE IF NOT EXISTS brand_sources (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            brand_id INTEGER NOT NULL REFERENCES brands(id) ON DELETE CASCADE,
+            title TEXT NOT NULL,
+            url TEXT NOT NULL,
+            snippet TEXT,
+            source_type TEXT NOT NULL DEFAULT 'article',
+            added_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            added_at DATETIME
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_brand_sources_brand ON brand_sources(brand_id)",
+        """CREATE TABLE IF NOT EXISTS content_draft_citations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            draft_id INTEGER NOT NULL REFERENCES content_drafts(id) ON DELETE CASCADE,
+            source_ref TEXT NOT NULL,
+            url TEXT NOT NULL,
+            title TEXT,
+            position_marker INTEGER,
+            created_at DATETIME
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_content_draft_citations_draft ON content_draft_citations(draft_id)",
+        """CREATE TABLE IF NOT EXISTS evidence_cache (
+            brand_id INTEGER NOT NULL,
+            prompt_id INTEGER NOT NULL,
+            pack_json TEXT NOT NULL,
+            fetched_at DATETIME NOT NULL,
+            PRIMARY KEY (brand_id, prompt_id)
+        )""",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

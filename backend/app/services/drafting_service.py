@@ -30,11 +30,13 @@ from app.models import (
     BrandContentSettings,
     BrandProfile,
     ContentDraft,
+    ContentDraftCitation,
     ContentGap,
     ContentOpportunity,
     Prompt,
     QueryResult,
     TrackingRun,
+    User,
 )
 from app.models import (
     utcnow as _utcnow,
@@ -55,7 +57,22 @@ from app.services.drafting import (
     parse_wikipedia_draft,
     remove_hedging,
 )
+from app.services.drafting.citations import RenderedCitation, render_citations
+from app.services.drafting.critic import (
+    REWRITE_THRESHOLD,
+    critic_score,
+    pick_better,
+    rewrite_flagged,
+    should_hard_retry,
+)
+from app.services.drafting.evidence import build_evidence_pack
+from app.services.drafting.models import writer_model_for_tier
 from app.services.drafting.platforms import resolve_platform_key
+from app.services.drafting.voice import (
+    generate_draft_summary,
+    select_related_draft,
+    select_voice_sample,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -433,6 +450,9 @@ async def _store_draft(
     opportunity_id: int | None = None,
     guidelines_override: str | None = None,
     source: str | None = None,
+    quality_score: float | None = None,
+    citations: list[RenderedCitation] | None = None,
+    query_for_summary: str | None = None,
 ) -> ContentDraft:
     spec = PLATFORM_SPECS.get(platform, {})
     guidelines_applied = guidelines_override if guidelines_override is not None else json.dumps(spec.get("rules", []))
@@ -464,14 +484,43 @@ async def _store_draft(
         platform_guidelines_applied=guidelines_applied,
         visibility_score_at_draft=round(visibility_pct, 2),
         estimated_impact=round(estimated_impact, 1),
+        quality_score=quality_score,
         source=source,
     )
     db.add(draft)
+    await db.flush()  # populate draft.id so we can attach citations
+
+    if citations:
+        for c in citations:
+            db.add(ContentDraftCitation(
+                draft_id=draft.id,
+                source_ref=c.source_ref,
+                url=c.url,
+                title=c.title,
+                position_marker=c.position_marker,
+            ))
+
+    # Cross-ref summary — only generate if we ran the new pipeline (query supplied)
+    if query_for_summary and (draft.content_text or "").strip():
+        try:
+            summary = await generate_draft_summary(
+                draft_text=draft.content_text or "",
+                query=query_for_summary,
+            )
+            if summary:
+                draft.summary = summary[:500]
+        except Exception as exc:
+            logger.warning(
+                "Draft summary generation failed for brand %d prompt %s: %s",
+                brand_id, prompt_id, exc,
+            )
+
     await db.commit()
     await db.refresh(draft)
     logger.info(
-        "Draft created: id=%d brand=%d platform=%s prompt=%s impact=%.1f%%",
+        "Draft created: id=%d brand=%d platform=%s prompt=%s impact=%.1f%% quality=%s",
         draft.id, brand_id, platform, prompt_id, estimated_impact,
+        f"{quality_score:.2f}" if quality_score is not None else "n/a",
     )
     return draft
 
@@ -502,6 +551,150 @@ async def _get_prompt_visibility(db: AsyncSession, prompt_id: int) -> float:
     result = await db.execute(stmt)
     avg = result.scalar_one_or_none()
     return float(avg) * 100.0 if avg is not None else 0.0
+
+
+# ── New pipeline orchestrator (tier-gated) ────────────────────────────────────
+
+
+async def _generate_with_new_pipeline(
+    *,
+    brand_id: int,
+    brand_name: str,
+    prompt_id: int,
+    prompt_text: str,
+    platform_key: str,
+    visibility_pct: float,
+    profile_context: str,
+    response_analysis: str,
+    platform_spec: dict,
+    tier: str | None,
+    db: AsyncSession,
+    opportunity_context: str | None = None,
+    existing_drafts_context: str | None = None,
+) -> tuple[str, float | None, list[RenderedCitation]]:
+    """
+    Run the full retrieve → draft → critique → rewrite → render pipeline.
+    Returns ``(final_text, quality_score_or_None, citations)``.
+
+    Tier gating:
+      - ``None`` / ``'pitch'`` → bypass (caller falls back to the existing single-shot flow)
+      - ``'basic'``  (Starter) → Evidence Pack only
+      - ``'starter'`` (Growth) → Evidence Pack + critic + rewrite (Layer 2)
+      - ``'pro'``    (Pro)    → Evidence Pack + critic + rewrite + voice + cross-ref (Layer 3)
+    """
+    # Layer 1: Evidence Pack — paid tiers only
+    pack = None
+    if tier in ("basic", "starter", "pro"):
+        try:
+            pack = await build_evidence_pack(
+                brand_id=brand_id,
+                brand_name=brand_name,
+                prompt_id=prompt_id,
+                prompt_text=prompt_text,
+                db=db,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Evidence pack build failed for brand %d prompt %d: %s",
+                brand_id, prompt_id, exc,
+            )
+
+    # Layer 3: Voice + cross-ref — Pro only
+    voice_sample = None
+    related_summary = None
+    if tier == "pro":
+        try:
+            voice_sample = await select_voice_sample(
+                brand_id=brand_id, platform=platform_key, db=db,
+            )
+        except Exception as exc:
+            logger.warning("Voice sample lookup failed for brand %d: %s", brand_id, exc)
+        try:
+            related_summary = await select_related_draft(
+                brand_id=brand_id,
+                prompt_id=prompt_id,
+                exclude_platform=platform_key,
+                db=db,
+            )
+        except Exception as exc:
+            logger.warning("Related draft lookup failed for brand %d: %s", brand_id, exc)
+
+    # Writer call
+    writer_model = writer_model_for_tier(tier)
+    claude_prompt = build_prompt(
+        brand_name=brand_name,
+        platform=platform_key,
+        prompt_text=prompt_text,
+        visibility_pct=visibility_pct,
+        profile_context=profile_context,
+        response_analysis=response_analysis,
+        platform_spec=platform_spec,
+        opportunity_context=opportunity_context,
+        existing_drafts_context=existing_drafts_context,
+        evidence_pack=pack,
+        voice_sample=voice_sample,
+        related_draft_summary=related_summary,
+    )
+    raw_text = await call_claude(
+        claude_prompt,
+        max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
+        model=writer_model,
+    )
+
+    # Layer 2: Critic + rewrite — Growth + Pro only
+    quality_score: float | None = None
+    if tier in ("starter", "pro") and pack is not None:
+        try:
+            score = await critic_score(
+                draft_text=raw_text, pack=pack, query=prompt_text, platform=platform_key,
+            )
+            quality_score = score.overall_score
+
+            if should_hard_retry(score):
+                retry_raw = await call_claude(
+                    claude_prompt,
+                    max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
+                    model=writer_model,
+                )
+                retry_score = await critic_score(
+                    draft_text=retry_raw, pack=pack, query=prompt_text, platform=platform_key,
+                )
+                better_text, better_score = pick_better(
+                    (raw_text, score), (retry_raw, retry_score),
+                )
+                raw_text = better_text
+                quality_score = better_score.overall_score
+                score = better_score
+
+            if score.overall_score < REWRITE_THRESHOLD and score.flagged_paragraphs:
+                raw_text = await rewrite_flagged(
+                    draft_text=raw_text,
+                    flagged=score.flagged_paragraphs,
+                    pack=pack,
+                    query=prompt_text,
+                    platform=platform_key,
+                    tier=tier,
+                )
+        except Exception as exc:
+            logger.warning(
+                "Critic/rewrite failed for brand %d prompt %d: %s",
+                brand_id, prompt_id, exc,
+            )
+
+    # Render citations per platform (only if we have a pack)
+    citations: list[RenderedCitation] = []
+    if pack is not None:
+        try:
+            raw_text, citations = render_citations(
+                text=raw_text, pack=pack, platform=platform_key,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Citation rendering failed for brand %d prompt %d: %s",
+                brand_id, prompt_id, exc,
+            )
+
+    return raw_text, quality_score, citations
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -758,25 +951,62 @@ async def generate_gap_draft(
                 + (f"\n\n{_sanitize_user_input(custom_brief)}" if custom_brief else "")
             )
 
-    claude_prompt = build_prompt(
-        brand_name=brand.name,
-        platform=platform_key,
-        prompt_text=prompt.text,
-        visibility_pct=visibility_pct,
-        profile_context=profile_context,
-        response_analysis=response_analysis,
-        platform_spec=spec,
-        opportunity_context=effective_opportunity_context,
-        existing_drafts_context=existing_drafts_context,
-    )
+    # Look up the brand owner's subscription tier to gate the new pipeline.
+    # Pitch brands always use the free single-shot flow regardless of subscription.
+    brand_user = await db.get(User, brand.user_id) if brand.user_id else None
+    user_tier: str | None = brand_user.subscription_tier if brand_user else None
+    if brand.brand_type == "pitch":
+        user_tier = None
 
-    raw_text = await call_claude(claude_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500))
+    quality_score: float | None = None
+    rendered_citations: list[RenderedCitation] = []
+
+    if user_tier in ("basic", "starter", "pro"):
+        raw_text, quality_score, rendered_citations = await _generate_with_new_pipeline(
+            brand_id=brand.id,
+            brand_name=brand.name,
+            prompt_id=prompt.id,
+            prompt_text=prompt.text,
+            platform_key=platform_key,
+            visibility_pct=visibility_pct,
+            profile_context=profile_context,
+            response_analysis=response_analysis,
+            platform_spec=spec,
+            tier=user_tier,
+            db=db,
+            opportunity_context=effective_opportunity_context,
+            existing_drafts_context=existing_drafts_context,
+        )
+        claude_prompt = None  # only used by the legacy retry branch below
+    else:
+        claude_prompt = build_prompt(
+            brand_name=brand.name,
+            platform=platform_key,
+            prompt_text=prompt.text,
+            visibility_pct=visibility_pct,
+            profile_context=profile_context,
+            response_analysis=response_analysis,
+            platform_spec=spec,
+            opportunity_context=effective_opportunity_context,
+            existing_drafts_context=existing_drafts_context,
+        )
+        raw_text = await call_claude(
+            claude_prompt,
+            max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
+        )
+
     raw_text = remove_hedging(raw_text)
     raw_text = enforce_x_char_limit(raw_text, platform_key)
 
     # Quality check: brand name must appear in the content.
     # Skip retry for restricted subreddits — the prompt intentionally omits the brand.
-    if brand.name.lower() not in raw_text.lower() and _reddit_strategy != "restricted":
+    # Skip retry for the new pipeline path (claude_prompt is None) — the critic+rewrite
+    # passes already enforce brand-relevance and we don't want to bypass those layers.
+    if (
+        claude_prompt is not None
+        and brand.name.lower() not in raw_text.lower()
+        and _reddit_strategy != "restricted"
+    ):
         _retry_prompt = (
             claude_prompt
             + f"\n\n⚠ QUALITY REQUIREMENT: Your previous output did not mention '{brand.name}'."
@@ -798,6 +1028,9 @@ async def generate_gap_draft(
 
     title, body = extract_title_and_body(raw_text, platform_key)
 
+    # Only feed the cross-ref summary generator when the new pipeline ran.
+    summary_query = prompt.text if user_tier in ("basic", "starter", "pro") else None
+
     if platform == "quora" and quora_question_url and quora_question_title:
         # Targeted draft: store URL in brief, title in guidelines_override
         return await _store_draft(
@@ -812,6 +1045,9 @@ async def generate_gap_draft(
             estimated_impact=estimated_impact,
             guidelines_override=quora_question_title,
             source=source,
+            quality_score=quality_score,
+            citations=rendered_citations,
+            query_for_summary=summary_query,
         )
     elif platform == "quora":
         brief = (
@@ -845,6 +1081,9 @@ async def generate_gap_draft(
         visibility_pct=visibility_pct,
         estimated_impact=estimated_impact,
         source=source,
+        quality_score=quality_score,
+        citations=rendered_citations,
+        query_for_summary=summary_query,
     )
 
 

@@ -51,3 +51,48 @@ def test_resolve_window_invalid_raises():
 
     with pytest.raises(ValueError):
         _resolve_window("5d")
+
+
+# ── _mention_matches ─────────────────────────────────────────────────────────
+
+def test_mention_matches_exact():
+    from app.services.competitive_gap import _mention_matches
+    assert _mention_matches("I love Notion for notes.", "Notion") is True
+
+
+def test_mention_matches_case_insensitive():
+    from app.services.competitive_gap import _mention_matches
+    assert _mention_matches("notion is great", "Notion") is True
+
+
+def test_mention_matches_word_boundary_no_substring_false_positive():
+    """Asana must NOT match inside Casana."""
+    from app.services.competitive_gap import _mention_matches
+    assert _mention_matches("Casana raised a Series A.", "Asana") is False
+
+
+def test_mention_matches_punctuation_boundary():
+    """Trailing punctuation should still count as a match."""
+    from app.services.competitive_gap import _mention_matches
+    assert _mention_matches("Try Asana. It's great.", "Asana") is True
+
+
+def test_mention_matches_regex_metachars_escaped():
+    """Names with regex metacharacters must not blow up."""
+    from app.services.competitive_gap import _mention_matches
+    assert _mention_matches("We use C++ heavily.", "C++") is True
+    assert _mention_matches("See notion.so for docs.", "Notion.so") is True
+
+
+def test_mention_matches_fuzzy_normalized():
+    """When word-boundary fails, fall back to alphanumeric-normalized substring
+    (mirrors brand detection in tracking_service)."""
+    from app.services.competitive_gap import _mention_matches
+    # "SpotItEarly" should match "Spot it Early" via the fuzzy path
+    assert _mention_matches("Check out SpotItEarly today.", "Spot it Early") is True
+
+
+def test_mention_matches_empty_text_returns_false():
+    from app.services.competitive_gap import _mention_matches
+    assert _mention_matches("", "Notion") is False
+    assert _mention_matches(None, "Notion") is False

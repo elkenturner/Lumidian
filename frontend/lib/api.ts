@@ -859,6 +859,61 @@ export async function aiFillProfile(brandId: number): Promise<AiFillProfileResul
   return res.data;
 }
 
+// ── Brand sources ─────────────────────────────────────────────────────────────
+
+export interface BrandSource {
+  id: number;
+  title: string;
+  url: string;
+  snippet: string | null;
+  source_type: 'paper' | 'article' | 'stat' | 'case_study';
+  added_at: string;
+}
+
+export async function addBrandSource(
+  brandId: number,
+  payload: { url: string; title?: string; snippet?: string; source_type?: string },
+): Promise<BrandSource> {
+  const res = await api.post<BrandSource>(`/brands/${brandId}/sources`, payload);
+  invalidateCache(`/brands/${brandId}/sources`);
+  return res.data;
+}
+
+export async function listBrandSources(brandId: number): Promise<BrandSource[]> {
+  return dedupedGet<BrandSource[]>(`/brands/${brandId}/sources`);
+}
+
+export async function deleteBrandSource(brandId: number, sourceId: number): Promise<void> {
+  await api.delete(`/brands/${brandId}/sources/${sourceId}`);
+  invalidateCache(`/brands/${brandId}/sources`);
+}
+
+// ── Voice samples ─────────────────────────────────────────────────────────────
+
+export interface VoiceSample {
+  index: number;
+  title: string;
+  text: string;
+}
+
+export async function addVoiceSample(
+  brandId: number,
+  payload: { title: string; text: string },
+): Promise<VoiceSample> {
+  const res = await api.post<VoiceSample>(`/brands/${brandId}/voice-samples`, payload);
+  invalidateCache(`/brands/${brandId}/voice-samples`);
+  return res.data;
+}
+
+export async function listVoiceSamples(brandId: number): Promise<VoiceSample[]> {
+  return dedupedGet<VoiceSample[]>(`/brands/${brandId}/voice-samples`);
+}
+
+export async function deleteVoiceSample(brandId: number, index: number): Promise<void> {
+  await api.delete(`/brands/${brandId}/voice-samples/${index}`);
+  invalidateCache(`/brands/${brandId}/voice-samples`);
+}
+
 // ── Content Gap functions ─────────────────────────────────────────────────────
 
 export interface QuoraQuestion {

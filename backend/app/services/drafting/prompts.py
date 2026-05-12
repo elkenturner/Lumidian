@@ -3,6 +3,8 @@ Prompt construction for the drafting service.
 """
 from __future__ import annotations
 
+from app.services.drafting.evidence import EvidencePack
+
 # ── Wikipedia system prompt ───────────────────────────────────────────────────
 
 WIKIPEDIA_SYSTEM_PROMPT = (
@@ -49,27 +51,42 @@ def build_wikipedia_prompt(
     response_analysis: str,
     publications: list[dict] | None = None,
     website_url: str | None = None,
+    evidence_pack: EvidencePack | None = None,
 ) -> str:
-    citation_ref = _build_citation_ref(publications or [], brand_name, website_url)
-    pub_note = ""
-    if publications:
-        p = publications[0]
-        pub_note = (
-            f"\nCITATION TO USE: The citation is already provided below — copy it exactly as-is:\n"
-            f"  {citation_ref}\n"
-            f"  (Source: {p.get('title', '')} — {p.get('publisher', '')} {p.get('date', '')})"
-        )
-    elif website_url:
-        pub_note = (
-            f"\nCITATION TO USE: No peer-reviewed publications available. "
-            f"Use this cite web citation — copy it exactly as-is:\n"
-            f"  {citation_ref}"
+    pack_section = ""
+    citation_instructions = ""
+    if evidence_pack is not None and evidence_pack.sources:
+        lines = ["EVIDENCE SOURCES — cite each fact you use with [S1], [S2], etc.:", ""]
+        for src in evidence_pack.sources:
+            lines.append(f"[{src.ref}] {src.title}")
+            lines.append(f"     URL: {src.url}")
+            lines.append(f'     "{src.snippet}"')
+            lines.append("")
+        pack_section = "\n".join(lines)
+        citation_instructions = (
+            "CITATION HANDLING: Insert [SN] markers after each citable fact. "
+            "The pipeline converts each [SN] to a proper Wikipedia <ref>{{cite web|url=...|title=...}}</ref>."
         )
     else:
-        pub_note = (
-            "\nCITATION: No source is available. "
-            "End the wikitext with {{citation needed}} exactly as shown — do NOT invent any citation data."
-        )
+        # Backwards-compatible path
+        citation_ref = _build_citation_ref(publications or [], brand_name, website_url)
+        if publications:
+            p = publications[0]
+            citation_instructions = (
+                f"CITATION TO USE: The citation is already provided below — copy it exactly as-is:\n"
+                f"  {citation_ref}\n"
+                f"  (Source: {p.get('title', '')} — {p.get('publisher', '')} {p.get('date', '')})"
+            )
+        elif website_url:
+            citation_instructions = (
+                f"CITATION TO USE: No peer-reviewed publications available. "
+                f"Use this cite web citation — copy it exactly as-is:\n  {citation_ref}"
+            )
+        else:
+            citation_instructions = (
+                "CITATION: No source is available. "
+                "End the wikitext with {{citation needed}} exactly as shown — do NOT invent any citation data."
+            )
 
     return f"""You are an experienced Wikipedia editor. Given a brand profile and a target query, you must:
 1. Identify ONE specific, real, existing Wikipedia article to edit.
@@ -84,33 +101,27 @@ TARGET QUERY:
 
 WHAT AI SYSTEMS CURRENTLY SAY:
 {response_analysis}
-{pub_note}
 
-ARTICLE SELECTION — choose the article whose topic most directly matches the key terms in the target query. The article title and section should use the same vocabulary as the query (e.g. if the query mentions "breath test", target the "Breath test" article; if it mentions "cancer detection", target "Cancer screening" or a disease article). Examples of good targets:
-  - A technology article (e.g. "Breath test", "Liquid biopsy", "Volatile organic compound")
-  - A medical procedure article (e.g. "Cancer screening", "Colonoscopy", "Mammography")
-  - A disease article (e.g. "Lung cancer", "Colorectal cancer")
-  - A science/method article (e.g. "Gas chromatography", "Mass spectrometry")
-  Never target: brand articles, disambiguation pages, or articles you are inventing.
+{pack_section}
+
+{citation_instructions}
+
+ARTICLE SELECTION — choose the article whose topic most directly matches the key terms in the target query. The article title and section should use the same vocabulary as the query. Never target: brand articles, disambiguation pages, or articles you are inventing.
 
 WIKI TEXT RULES (absolute — every rule is mandatory):
   - Neutral encyclopedic tone only — no promotional language, no superlatives, no brand advocacy of any kind
   - NEVER use first person ("we", "our", "I", "us") — third person only
-  - No marketing language whatsoever — if a sentence sounds like it belongs in a press release, rewrite it completely
-  - Every factual claim must be attributable to the citation provided — do not state facts that cannot be sourced to it
-  - Only verifiable, citable facts — nothing invented, nothing approximated
+  - Every factual claim must be attributable to one of the sources above — do not state facts that cannot be sourced
   - Use [[wikilinks]] around key terms that have Wikipedia articles
-  - The wikitext must naturally use key noun phrases from the target query (e.g. if the query is "breath test for cancer detection", the sentence must use those exact terms)
-  - Structure: 1 to 3 sentences maximum, written as a natural addition to an existing article section — not a standalone paragraph
-  - End with the citation ref provided above — copy it exactly, do not modify it
-  - The text must read as encyclopedia prose; if it sounds like an advertisement or press release at any point, it is wrong
+  - Structure: 1 to 3 sentences maximum, written as a natural addition to an existing article section
+  - Insert [SN] markers (or the single citation ref provided) after each citable fact — the pipeline converts them to Wikipedia <ref> tags
 
-⚠ OUTPUT ONLY THE FIVE FIELDS BELOW. No analysis. No explanation. No preamble. No other text.
+⚠ OUTPUT ONLY THE FIVE FIELDS BELOW. No analysis. No explanation. No preamble.
 
-ARTICLE_TITLE: [exact title of the existing Wikipedia article, e.g. Cancer screening]
+ARTICLE_TITLE: [exact title of the existing Wikipedia article]
 ARTICLE_URL: https://en.wikipedia.org/wiki/[Title_With_Underscores]
-SECTION: [exact section heading where the text belongs, e.g. Emerging technologies]
-INSERT_LOCATION: [One complete sentence telling the user exactly where to paste — include the article name, section name, and precise position. Example: "In the 'Cancer screening' article, find the 'Emerging technologies' section and add this text after the first paragraph." or "In the 'Breath test' article, add this text at the end of the 'Medical applications' section, before the References."]
+SECTION: [exact section heading where the text belongs]
+INSERT_LOCATION: [One complete sentence telling the user exactly where to paste]
 WIKI_TEXT:
 [the wikitext to insert — 1 to 2 sentences, nothing else]"""
 
@@ -127,6 +138,9 @@ def build_prompt(
     platform_spec: dict,
     opportunity_context: str | None = None,
     existing_drafts_context: str | None = None,
+    evidence_pack: EvidencePack | None = None,
+    voice_sample: str | None = None,
+    related_draft_summary: str | None = None,
 ) -> str:
     spec = platform_spec
     word_min, word_max = spec["word_range"]
@@ -155,15 +169,48 @@ Your task is to write a reply to this specific thread that naturally adds value.
 {existing_drafts_context}
 """
 
+    evidence_section = ""
+    if evidence_pack is not None and evidence_pack.sources:
+        lines = ["EVIDENCE SOURCES — cite these inline using [S1], [S2], etc.:", ""]
+        for src in evidence_pack.sources:
+            lines.append(f"[{src.ref}] {src.title}")
+            lines.append(f"     URL: {src.url}")
+            lines.append(f'     "{src.snippet}"')
+            lines.append("")
+        lines.append("CITATION RULES (mandatory):")
+        lines.append("- Every statistic, study reference, or specific factual claim must end with [SN].")
+        lines.append("- If you cannot back a claim with one of the sources above, REMOVE the claim — do not hedge, do not paraphrase.")
+        lines.append("- Never invent sources or cite sources not listed above.")
+        lines.append("")
+        evidence_section = "\n".join(lines)
+
+    voice_section = ""
+    if voice_sample:
+        voice_section = (
+            "VOICE EXAMPLE — the draft should match the rhythm, claim density, "
+            "and tone of this passage written for this brand:\n\n"
+            f'"{voice_sample}"\n\n'
+        )
+
+    related_section = ""
+    if related_draft_summary:
+        related_section = (
+            "RELATED PUBLISHED CONTENT — this brand already has approved content "
+            "on this exact query. Do not duplicate its angle. You may reference it "
+            "naturally (e.g. \"in a recent LinkedIn piece\") but take a different angle:\n\n"
+            f"{related_draft_summary}\n\n"
+        )
+
     return f"""You are a senior content strategist writing on behalf of a brand. Your goal is to create content that will cause AI systems (ChatGPT, Claude, Perplexity, Gemini) to mention "{brand_name}" when answering the exact query below.
 
 AI systems retrieve content that directly addresses the specific words someone searches. The content you write must be written as a direct, substantive answer to the target query — using the query's exact phrasing and key terms naturally throughout, so the content is unambiguously about that topic.
 
 INFORMATION HIERARCHY — follow this strictly:
-  1. Brand Profile fields below (company description, key stats, approved language, what not to say, publications) are your PRIMARY source. Use them first.
-  2. The "SUPPLEMENTARY context from company website" section (if present in the Brand Profile) is secondary — use it only to fill gaps the primary fields don't cover.
-  3. NEVER invent facts, statistics, or claims not present in either source.
-  4. NEVER approximate or paraphrase statistics — use the EXACT figures as written. If a stat says "94% accuracy in a study of 1,400 participants", write exactly that — not "nearly 95%", not "over 90%", not "about 1,400".
+  1. EVIDENCE SOURCES listed above (if present) are your PRIMARY source. Every concrete claim must be backed by a [SN] citation.
+  2. Brand Profile fields (company description, key stats, approved language, what not to say, publications) are SECONDARY — use them for brand-specific framing, tone, and details the Evidence Sources don't cover.
+  3. The "SUPPLEMENTARY context from company website" section in the Brand Profile is tertiary — fill gaps only.
+  4. NEVER invent facts, statistics, or claims not present in either source.
+  5. NEVER approximate or paraphrase statistics — use the EXACT figures as written.
 
 BRAND PROFILE:
 {profile_context}
@@ -174,7 +221,7 @@ TARGET QUERY (this is the exact question the content must answer):
 CURRENT VISIBILITY:
 {visibility_pct:.1f}% of AI responses mention {brand_name} for this query. The analysis below shows what is currently being said and what specific angle is missing.
 
-WHAT AI SYSTEMS ARE CURRENTLY SAYING:
+{evidence_section}{voice_section}{related_section}WHAT AI SYSTEMS ARE CURRENTLY SAYING:
 {response_analysis}
 {opportunity_section}{existing_section}
 PLATFORM: {platform}
@@ -187,14 +234,11 @@ PLATFORM RULES (follow all of these):
 
 UNIVERSAL STYLE RULES (absolute — no exceptions):
   - NEVER use em dashes (—) or en dashes used as separators. Replace with commas, colons, or rewrite the sentence.
-  - NEVER use these words or phrases: "honestly", "straightforward", "genuinely", "notably", "importantly", "it's worth noting", "it's important to mention", "it should be noted", "it's important to note", "one thing to note", "it bears mentioning", "needless to say", "of course", "delve", "dive into", "unpack", "let's explore", "the bottom line"
-  - NEVER use triple parallel structures ("not only X, but also Y, and even Z")
-  - NEVER start a sentence with "Additionally," or "Furthermore," or "Moreover," or "This is"
+  - NEVER use these words or phrases: "delve", "dive into", "unpack" (as a verb), "it's worth noting", "the bottom line", "at the end of the day"
   - NEVER use hedging language of any kind ("may", "might", "could potentially", "perhaps", "it seems")
   - Vary sentence length — mix short punchy sentences with longer analytical ones
   - Use contractions naturally (it's, we're, you'll, don't)
-  - Only reference facts and statistics that appear in the Brand Profile above — never invent data or statistics
-  - Only use clinical or technical language that appears in the Brand Profile
+  - Only reference facts and statistics that appear in the Brand Profile or Evidence Sources above — never invent data
   - Mention {brand_name} only if it fits naturally in the context — never force it
   - Content must read as written by a knowledgeable human expert, not by an AI
   - Do not include meta-commentary about what the content does ("This post addresses...", "This answer explains...")

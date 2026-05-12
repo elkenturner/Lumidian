@@ -68,10 +68,11 @@ class TestSubredditStrategy:
 
 class TestHedgingRemoval:
     def test_removes_hedging_phrases(self):
+        # "it's worth noting" is an unambiguous AI-tell and still removed.
+        # "additionally" was dropped from the regex (prompt + critic now catch it).
         text = "It's worth noting that the product works. Additionally, it's fast."
         result = remove_hedging(text)
         assert "worth noting" not in result.lower()
-        assert "additionally" not in result.lower()
 
     def test_preserves_content(self):
         text = "The product increases efficiency by 50%."
@@ -82,9 +83,10 @@ class TestHedgingRemoval:
         assert remove_hedging("") == ""
 
     def test_removes_furthermore(self):
+        # "furthermore" was removed from the narrowed regex; prompt + critic now
+        # catch it.  Verify the function doesn't corrupt the surrounding content.
         text = "Furthermore, the product is reliable."
         result = remove_hedging(text)
-        assert "furthermore" not in result.lower()
         assert "product is reliable" in result
 
     def test_removes_em_dash(self):

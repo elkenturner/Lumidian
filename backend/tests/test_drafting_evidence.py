@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import AsyncMock, patch
 
 from app.models import Brand, WebsiteAudit, WebsiteAuditPage, User
 from app.services.drafting.evidence import (
@@ -88,3 +89,33 @@ async def test_select_brand_pages_returns_empty_when_no_audit(db_session):
         brand_id=brand.id, prompt_text="anything", db=db_session, limit=3,
     )
     assert selected == []
+
+
+@pytest.mark.asyncio
+async def test_select_web_sources_returns_top_n_filtered():
+    from app.services.drafting.evidence import select_web_sources
+
+    fake_results = [
+        {"title": "PubMed: breath analysis", "link": "https://pubmed.ncbi.nlm.nih.gov/123", "snippet": "Study A"},
+        {"title": "Random forum thread", "link": "https://forum-spam.example/thread", "snippet": "Forum chat"},
+        {"title": "Nature study", "link": "https://nature.com/articles/x", "snippet": "Study B"},
+        {"title": "Reddit", "link": "https://reddit.com/r/medicine/x", "snippet": "Reddit post"},
+        {"title": "MIT news", "link": "https://news.mit.edu/x", "snippet": "MIT writeup"},
+        {"title": "Junk", "link": "https://content-aggregator.example/x", "snippet": "junk"},
+    ]
+    with patch("app.services.drafting.evidence._serper_search", new=AsyncMock(return_value=fake_results)):
+        sources = await select_web_sources(query="breath analysis cancer detection", limit=3)
+    assert len(sources) == 3
+    domains = [s.url for s in sources]
+    assert any("pubmed" in u for u in domains)
+    assert any("nature.com" in u for u in domains)
+    assert any("mit.edu" in u for u in domains)
+    assert not any("forum-spam" in u for u in domains)
+
+
+@pytest.mark.asyncio
+async def test_select_web_sources_empty_on_no_results():
+    from app.services.drafting.evidence import select_web_sources
+    with patch("app.services.drafting.evidence._serper_search", new=AsyncMock(return_value=[])):
+        sources = await select_web_sources(query="anything", limit=5)
+    assert sources == []

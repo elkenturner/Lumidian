@@ -116,3 +116,92 @@ async def select_brand_pages(
         )
         for p in top
     ]
+
+
+# ── Web search (Serper) ─────────────────────────────────────────────────────
+
+_AUTHORITY_HINTS = (
+    ".gov", ".edu", "pubmed", "nature.com", "sciencemag.org", "nih.gov",
+    "nejm.org", "thelancet.com", "bmj.com", "sciencedirect.com",
+    "mit.edu", "stanford.edu", "harvard.edu", "ox.ac.uk", "cam.ac.uk",
+    "reuters.com", "bloomberg.com", "wsj.com", "ft.com", "economist.com",
+    "wired.com", "arstechnica.com", "ieee.org", "acm.org",
+)
+_AGGREGATOR_BLOCKLIST = (
+    "reddit.com", "quora.com", "pinterest.", "medium.com/@", "youtube.com",
+    "content-aggregator", "forum-spam",
+)
+
+
+def _domain_authority_score(url: str) -> float:
+    u = url.lower()
+    if any(b in u for b in _AGGREGATOR_BLOCKLIST):
+        return -1.0
+    if any(a in u for a in _AUTHORITY_HINTS):
+        return 1.0
+    return 0.0
+
+
+async def _serper_search(query: str, num: int = 10) -> list[dict]:
+    """
+    General-web Serper search (not site-scoped). Returns a list of dicts each
+    containing at minimum ``link`` (or ``url``), ``title``, ``snippet`` and
+    optionally ``date``. Isolated as its own function so tests can mock it.
+
+    The existing ``serper_search_service.search_site`` is site-scoped and sync;
+    we issue our own httpx call here for an unrestricted query.
+    """
+    import asyncio
+    import os
+    import httpx
+
+    api_key = os.getenv("SERPER_API_KEY", "").strip()
+    if not api_key:
+        logger.warning("Serper search: SERPER_API_KEY not configured — returning empty")
+        return []
+
+    from app.services.serper_search_service import SERPER_SEMAPHORE
+
+    try:
+        async with SERPER_SEMAPHORE:
+            async with httpx.AsyncClient(timeout=8.0) as client:
+                resp = await client.post(
+                    "https://google.serper.dev/search",
+                    headers={
+                        "X-API-KEY": api_key,
+                        "Content-Type": "application/json",
+                    },
+                    json={"q": query, "num": num},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+    except Exception as exc:
+        logger.warning("Serper search failed for %r: %s", query, exc)
+        return []
+
+    return data.get("organic", []) or []
+
+
+async def select_web_sources(query: str, limit: int = WEB_RESULT_LIMIT) -> list[EvidenceSource]:
+    raw = await _serper_search(query, num=10)
+    scored: list[tuple[float, dict]] = []
+    for item in raw:
+        link = item.get("link") or item.get("url") or ""
+        if not link:
+            continue
+        score = _domain_authority_score(link)
+        if score < 0:
+            continue
+        scored.append((score, item))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    sources: list[EvidenceSource] = []
+    for _, item in scored[:limit]:
+        sources.append(EvidenceSource(
+            ref="",
+            kind="web",
+            url=item.get("link") or item.get("url") or "",
+            title=(item.get("title") or "")[:200],
+            snippet=(item.get("snippet") or "")[:600],
+            published_date=item.get("date"),
+        ))
+    return sources

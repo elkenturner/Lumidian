@@ -51,27 +51,42 @@ def build_wikipedia_prompt(
     response_analysis: str,
     publications: list[dict] | None = None,
     website_url: str | None = None,
+    evidence_pack: EvidencePack | None = None,
 ) -> str:
-    citation_ref = _build_citation_ref(publications or [], brand_name, website_url)
-    pub_note = ""
-    if publications:
-        p = publications[0]
-        pub_note = (
-            f"\nCITATION TO USE: The citation is already provided below — copy it exactly as-is:\n"
-            f"  {citation_ref}\n"
-            f"  (Source: {p.get('title', '')} — {p.get('publisher', '')} {p.get('date', '')})"
-        )
-    elif website_url:
-        pub_note = (
-            f"\nCITATION TO USE: No peer-reviewed publications available. "
-            f"Use this cite web citation — copy it exactly as-is:\n"
-            f"  {citation_ref}"
+    pack_section = ""
+    citation_instructions = ""
+    if evidence_pack is not None and evidence_pack.sources:
+        lines = ["EVIDENCE SOURCES — cite each fact you use with [S1], [S2], etc.:", ""]
+        for src in evidence_pack.sources:
+            lines.append(f"[{src.ref}] {src.title}")
+            lines.append(f"     URL: {src.url}")
+            lines.append(f'     "{src.snippet}"')
+            lines.append("")
+        pack_section = "\n".join(lines)
+        citation_instructions = (
+            "CITATION HANDLING: Insert [SN] markers after each citable fact. "
+            "The pipeline converts each [SN] to a proper Wikipedia <ref>{{cite web|url=...|title=...}}</ref>."
         )
     else:
-        pub_note = (
-            "\nCITATION: No source is available. "
-            "End the wikitext with {{citation needed}} exactly as shown — do NOT invent any citation data."
-        )
+        # Backwards-compatible path
+        citation_ref = _build_citation_ref(publications or [], brand_name, website_url)
+        if publications:
+            p = publications[0]
+            citation_instructions = (
+                f"CITATION TO USE: The citation is already provided below — copy it exactly as-is:\n"
+                f"  {citation_ref}\n"
+                f"  (Source: {p.get('title', '')} — {p.get('publisher', '')} {p.get('date', '')})"
+            )
+        elif website_url:
+            citation_instructions = (
+                f"CITATION TO USE: No peer-reviewed publications available. "
+                f"Use this cite web citation — copy it exactly as-is:\n  {citation_ref}"
+            )
+        else:
+            citation_instructions = (
+                "CITATION: No source is available. "
+                "End the wikitext with {{citation needed}} exactly as shown — do NOT invent any citation data."
+            )
 
     return f"""You are an experienced Wikipedia editor. Given a brand profile and a target query, you must:
 1. Identify ONE specific, real, existing Wikipedia article to edit.
@@ -86,33 +101,27 @@ TARGET QUERY:
 
 WHAT AI SYSTEMS CURRENTLY SAY:
 {response_analysis}
-{pub_note}
 
-ARTICLE SELECTION — choose the article whose topic most directly matches the key terms in the target query. The article title and section should use the same vocabulary as the query (e.g. if the query mentions "breath test", target the "Breath test" article; if it mentions "cancer detection", target "Cancer screening" or a disease article). Examples of good targets:
-  - A technology article (e.g. "Breath test", "Liquid biopsy", "Volatile organic compound")
-  - A medical procedure article (e.g. "Cancer screening", "Colonoscopy", "Mammography")
-  - A disease article (e.g. "Lung cancer", "Colorectal cancer")
-  - A science/method article (e.g. "Gas chromatography", "Mass spectrometry")
-  Never target: brand articles, disambiguation pages, or articles you are inventing.
+{pack_section}
+
+{citation_instructions}
+
+ARTICLE SELECTION — choose the article whose topic most directly matches the key terms in the target query. The article title and section should use the same vocabulary as the query. Never target: brand articles, disambiguation pages, or articles you are inventing.
 
 WIKI TEXT RULES (absolute — every rule is mandatory):
   - Neutral encyclopedic tone only — no promotional language, no superlatives, no brand advocacy of any kind
   - NEVER use first person ("we", "our", "I", "us") — third person only
-  - No marketing language whatsoever — if a sentence sounds like it belongs in a press release, rewrite it completely
-  - Every factual claim must be attributable to the citation provided — do not state facts that cannot be sourced to it
-  - Only verifiable, citable facts — nothing invented, nothing approximated
+  - Every factual claim must be attributable to one of the sources above — do not state facts that cannot be sourced
   - Use [[wikilinks]] around key terms that have Wikipedia articles
-  - The wikitext must naturally use key noun phrases from the target query (e.g. if the query is "breath test for cancer detection", the sentence must use those exact terms)
-  - Structure: 1 to 3 sentences maximum, written as a natural addition to an existing article section — not a standalone paragraph
-  - End with the citation ref provided above — copy it exactly, do not modify it
-  - The text must read as encyclopedia prose; if it sounds like an advertisement or press release at any point, it is wrong
+  - Structure: 1 to 3 sentences maximum, written as a natural addition to an existing article section
+  - Insert [SN] markers (or the single citation ref provided) after each citable fact — the pipeline converts them to Wikipedia <ref> tags
 
-⚠ OUTPUT ONLY THE FIVE FIELDS BELOW. No analysis. No explanation. No preamble. No other text.
+⚠ OUTPUT ONLY THE FIVE FIELDS BELOW. No analysis. No explanation. No preamble.
 
-ARTICLE_TITLE: [exact title of the existing Wikipedia article, e.g. Cancer screening]
+ARTICLE_TITLE: [exact title of the existing Wikipedia article]
 ARTICLE_URL: https://en.wikipedia.org/wiki/[Title_With_Underscores]
-SECTION: [exact section heading where the text belongs, e.g. Emerging technologies]
-INSERT_LOCATION: [One complete sentence telling the user exactly where to paste — include the article name, section name, and precise position. Example: "In the 'Cancer screening' article, find the 'Emerging technologies' section and add this text after the first paragraph." or "In the 'Breath test' article, add this text at the end of the 'Medical applications' section, before the References."]
+SECTION: [exact section heading where the text belongs]
+INSERT_LOCATION: [One complete sentence telling the user exactly where to paste]
 WIKI_TEXT:
 [the wikitext to insert — 1 to 2 sentences, nothing else]"""
 

@@ -117,6 +117,7 @@ tests/
 | settings.py | /api/settings | Scheduler pause, API key status |
 | errors.py | /api/errors | Frontend error logging |
 | support.py | /api/support | Support ticket handling |
+| site_audit.py | /api/site-audit | Trigger audits; surface findings/recommendations/citations; generate llms.txt + robots.txt snippets |
 | main.py | /api/health | Liveness check |
 
 ### Frontend Layout
@@ -189,6 +190,11 @@ No Alembic. Migrations are embedded in `database.py:run_migrations()` and applie
 | `SystemSetting` | key (PK), value |
 | `AccountConnection` | id, platform (unique), status, credentials, display_name |
 | `BrandContentSettings` | id, brand_id FK, platform, enabled, auto_post — UNIQUE(brand_id, platform) |
+| `WebsiteAudit` | id, brand_id FK, status, triggered_by, started_at/completed_at, total_pages, overall_score, bot_access_score, content_score, schema_score, technical_score, render_mode, sitemap_url, robots_txt_raw, llms_txt_present/valid, error_message |
+| `WebsiteAuditPage` | id, audit_id FK, url, depth, http_status, fetch_ms, page_type, word_count, title, h1_text, h2/h3_count, table/list_count, fact_density, links, image_alt_pct, has_jsonld, schema_types, is_js_rendered, per-page scores |
+| `WebsiteAuditFinding` | id, audit_id FK, page_id FK (nullable for site-level), check_id, severity, category, message, evidence (JSON) |
+| `WebsiteAuditRecommendation` | id, audit_id FK, page_id FK (nullable), priority, effort, category, title, body, linked_prompt_ids (JSON), expected_impact, llm_generated |
+| `CitationSource` | id, brand_id FK, tracking_run_id/prompt_id/query_result_id FKs, model, url, domain (indexed), kind (own/competitor/third_party/unknown), competitor_id FK — UNIQUE(query_result_id, url) |
 
 ---
 
@@ -291,6 +297,9 @@ Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Over
 
 ### Request Deduplication (frontend)
 `lib/api.ts` Axios client deduplicates concurrent GET requests by URL — a second identical in-flight GET returns the same promise rather than making a second network call.
+
+### Website AIO (`services/site_audit/`)
+Site audit module — manual trigger only, no scheduled job. Crawler uses sitemap.xml-first discovery with BFS fallback, Playwright for render-mode detection on a 5-page sample, BeautifulSoup4 + lxml for parsing. Five parser modules (`semantic`, `schema`, `robots`, `llms_txt`, `meta`) each emit `Finding` records keyed by stable `check_id`. Citation extractor runs as a non-fatal post-processing hook in `tracking_service.py`, classifying URLs from `QueryResult.response_text` as own / competitor / third-party / unknown via `tldextract`. Page↔prompt linker matches own-domain audit pages to losing prompts via slug + title token Jaccard. Recommendations engine has a static `_RECS` template registry (rule-based) plus an LLM rewrite pass (Growth/Pro tiers only, gated by `TIER_AUDIT_LIMITS`). Generators produce spec-compliant `llms.txt` and a robots.txt AI-bot snippet (two modes: `allow_all` or `search_only`). Free tier (no subscription) is excluded; per-tier audit limits live in `services/site_audit/constants.py`.
 
 ---
 

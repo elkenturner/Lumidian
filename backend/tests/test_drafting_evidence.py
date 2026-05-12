@@ -1,7 +1,10 @@
+from datetime import datetime, UTC, timedelta
+
 import pytest
+from sqlalchemy import select
 from unittest.mock import AsyncMock, patch
 
-from app.models import Brand, WebsiteAudit, WebsiteAuditPage, User, BrandSource
+from app.models import Brand, WebsiteAudit, WebsiteAuditPage, User, BrandSource, EvidenceCache
 from app.services.drafting.evidence import (
     EvidenceSource,
     EvidencePack,
@@ -164,3 +167,42 @@ async def test_select_library_sources_caps_at_limit(db_session):
 
     sources = await select_library_sources(brand_id=brand.id, db=db_session)
     assert len(sources) == BRAND_SOURCE_LIMIT
+
+
+@pytest.mark.asyncio
+async def test_cache_roundtrip(db_session):
+    from app.services.drafting.evidence import (
+        EvidencePack, EvidenceSource, write_cache, read_cache,
+    )
+    pack = EvidencePack(
+        sources=[EvidenceSource(ref="S1", kind="web", url="https://x", title="t", snippet="s")],
+        query="q", brand_name="b",
+    )
+    await write_cache(brand_id=1, prompt_id=2, pack=pack, db=db_session)
+    fetched = await read_cache(brand_id=1, prompt_id=2, db=db_session)
+    assert fetched is not None
+    assert fetched.query == "q"
+    assert len(fetched.sources) == 1
+    assert fetched.sources[0].url == "https://x"
+
+
+@pytest.mark.asyncio
+async def test_cache_returns_none_when_expired(db_session):
+    from app.services.drafting.evidence import (
+        EvidencePack, write_cache, read_cache, CACHE_TTL_HOURS,
+    )
+    pack = EvidencePack(sources=[], query="q", brand_name="b")
+    await write_cache(brand_id=3, prompt_id=4, pack=pack, db=db_session)
+    row = (await db_session.execute(
+        select(EvidenceCache).where(EvidenceCache.brand_id == 3, EvidenceCache.prompt_id == 4)
+    )).scalar_one()
+    row.fetched_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=CACHE_TTL_HOURS + 1)
+    await db_session.commit()
+    fetched = await read_cache(brand_id=3, prompt_id=4, db=db_session)
+    assert fetched is None
+
+
+@pytest.mark.asyncio
+async def test_cache_miss_returns_none(db_session):
+    from app.services.drafting.evidence import read_cache
+    assert await read_cache(brand_id=999, prompt_id=999, db=db_session) is None

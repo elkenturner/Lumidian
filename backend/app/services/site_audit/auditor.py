@@ -174,6 +174,7 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
                              "rendered_html_size": None},
             "findings": per_page_findings,
             "scores": scores,
+            "content_excerpt": crawl_page.content_excerpt,
         })
 
     # ── persist ───────────────────────────────────────────────────────────
@@ -209,6 +210,7 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
                 schema_score=rec["scores"]["schema_score"],
                 raw_html_size=m.get("raw_html_size"),
                 fetch_error=rec.get("fetch_error"),
+                content_excerpt=rec.get("content_excerpt"),
             )
             db.add(page_row)
             await db.flush()

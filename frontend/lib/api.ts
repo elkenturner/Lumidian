@@ -1801,3 +1801,67 @@ export const siteAudit = {
   cancel: (auditId: number) =>
     api.post(`/site-audit/audit/${auditId}/cancel`),
 }
+
+// ── Agency activity log (2026-05-12) ─────────────────────────────────────────
+
+export type ActivityEventType =
+  | 'note'
+  | 'client_created'
+  | 'client_status_changed'
+  | 'draft_sent_to_client'
+  | 'draft_marked_posted'
+  | 'review_link_generated'
+  | 'review_link_rotated'
+  | 'client_approved'
+  | 'client_changes_requested'
+  | 'client_rejected';
+
+export interface ActivityEvent {
+  id: number;
+  agency_client_id: number;
+  event_type: ActivityEventType | string;
+  actor_user_id: number | null;
+  actor_name: string | null;
+  body: string;
+  payload: Record<string, unknown> | null;
+  related_draft_id: number | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface ActivityEventWithClient extends ActivityEvent {
+  client_id: number;
+  client_name: string;
+}
+
+export async function agencyListActivity(
+  clientId: number,
+  opts: { limit?: number; before?: number } = {},
+): Promise<ActivityEvent[]> {
+  const params: Record<string, number> = {};
+  if (opts.limit !== undefined) params.limit = opts.limit;
+  if (opts.before !== undefined) params.before = opts.before;
+  const res = await api.get<ActivityEvent[]>(`/agency/clients/${clientId}/activity`, { params });
+  return res.data;
+}
+
+export async function agencyPostNote(clientId: number, body: string): Promise<ActivityEvent> {
+  const res = await api.post<ActivityEvent>(`/agency/clients/${clientId}/activity/note`, { body });
+  return res.data;
+}
+
+export async function agencyEditNote(eventId: number, body: string): Promise<ActivityEvent> {
+  const res = await api.patch<ActivityEvent>(`/agency/activity/${eventId}/note`, { body });
+  return res.data;
+}
+
+export async function agencyDeleteNote(eventId: number): Promise<void> {
+  await api.delete(`/agency/activity/${eventId}/note`);
+}
+
+export async function agencyRecentActivity(limit = 10): Promise<ActivityEventWithClient[]> {
+  const res = await api.get<ActivityEventWithClient[]>(`/agency/activity/recent`, {
+    params: { limit },
+  });
+  return res.data;
+}

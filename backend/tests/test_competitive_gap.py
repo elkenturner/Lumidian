@@ -319,3 +319,58 @@ def test_confidence_thresholds():
     assert _confidence(99) == "medium"
     assert _confidence(100) == "high"
     assert _confidence(500) == "high"
+
+
+# ── Endpoint: GET /api/dashboard/{brand_id}/competitive-gap ─────────────────
+
+from tests.conftest import register_and_login, create_brand
+
+
+async def test_endpoint_unauthenticated_returns_401(client: httpx.AsyncClient):
+    resp = await client.get("/api/dashboard/1/competitive-gap")
+    assert resp.status_code == 401
+
+
+async def test_endpoint_wrong_owner_returns_403(client: httpx.AsyncClient):
+    await register_and_login(client, email="owner@example.com")
+    a_brand = await create_brand(client, name="A Brand")
+    a_brand_id = a_brand["id"]
+    await register_and_login(client, email="other@example.com")
+    resp = await client.get(f"/api/dashboard/{a_brand_id}/competitive-gap")
+    assert resp.status_code == 403
+
+
+async def test_endpoint_default_window_is_7d(client: httpx.AsyncClient):
+    await register_and_login(client, email="defwin@example.com")
+    brand = await create_brand(client, name="Defwin Brand")
+    resp = await client.get(f"/api/dashboard/{brand['id']}/competitive-gap")
+    assert resp.status_code == 200
+    assert resp.json()["window"] == "7d"
+
+
+async def test_endpoint_invalid_window_returns_422(client: httpx.AsyncClient):
+    await register_and_login(client, email="badwin@example.com")
+    brand = await create_brand(client, name="Badwin Brand")
+    resp = await client.get(f"/api/dashboard/{brand['id']}/competitive-gap?window=5d")
+    assert resp.status_code == 422
+
+
+async def test_endpoint_each_window_value(client: httpx.AsyncClient):
+    await register_and_login(client, email="allwin@example.com")
+    brand = await create_brand(client, name="Allwin Brand")
+    for w in ("7d", "30d", "90d"):
+        resp = await client.get(f"/api/dashboard/{brand['id']}/competitive-gap?window={w}")
+        assert resp.status_code == 200
+        assert resp.json()["window"] == w
+
+
+async def test_endpoint_no_competitors_returns_empty_shape(client: httpx.AsyncClient):
+    await register_and_login(client, email="empty@example.com")
+    brand = await create_brand(client, name="Empty Brand")
+    resp = await client.get(f"/api/dashboard/{brand['id']}/competitive-gap")
+    body = resp.json()
+    assert resp.status_code == 200
+    assert body["has_competitors"] is False
+    assert body["has_data"] is False
+    assert body["headline_gap_pp"] is None
+    assert body["competitors"] == []

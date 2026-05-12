@@ -10,6 +10,8 @@ import { PageDetail } from '@/components/site-audit/PageDetail'
 import { BotAccessPanel } from '@/components/site-audit/BotAccessPanel'
 import { LlmsTxtPanel } from '@/components/site-audit/LlmsTxtPanel'
 import { GeneratorsCard } from '@/components/site-audit/GeneratorsCard'
+import { CitationDomainList } from '@/components/site-audit/CitationDomainList'
+import { RecommendationsList } from '@/components/site-audit/RecommendationsList'
 
 export default function SiteAuditPage() {
   const params = useParams<{ brandId: string }>()
@@ -94,8 +96,8 @@ export default function SiteAuditPage() {
           <GeneratorsCard brandId={brandId} />
         </div>
       )}
-      {tab === 'citations' && <div className="text-muted-foreground">Citations tab — coming in Task 29</div>}
-      {tab === 'recs' && <div className="text-muted-foreground">Recommendations tab — coming in Task 30</div>}
+      {tab === 'citations' && <CitationDomainList brandId={brandId} />}
+      {tab === 'recs' && <RecommendationsList auditId={audit.id} />}
     </div>
   )
 }

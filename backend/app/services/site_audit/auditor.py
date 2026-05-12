@@ -274,6 +274,20 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
                 llm_generated=False,
             ))
 
+        await db.commit()
+
+    # ── LLM rewrites (Growth/Pro tiers only) ────────────────────────────
+    try:
+        await _maybe_generate_llm_rewrites(
+            audit_id=audit_id,
+            brand_id=brand_id,
+            page_records=page_records,
+            page_link_map=page_link_map,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("LLM rewrite pass failed for audit %d: %s", audit_id, exc)
+
+    async with AsyncSessionLocal() as db:
         # Scores
         bot_score = score_bot_access(bot_status)
         content_avg = sum(rec["scores"]["content_score"] for rec in page_records) / max(len(page_records), 1)
@@ -338,3 +352,107 @@ def _sample_indexes(total: int, k: int) -> list[int]:
     if total <= k:
         return list(range(total))
     return [0, total // 4, total // 2, (3 * total) // 4, total - 1][:k]
+
+
+async def _maybe_generate_llm_rewrites(
+    *,
+    audit_id: int,
+    brand_id: int,
+    page_records: list[dict],
+    page_link_map: dict[int, list[int]],
+) -> None:
+    """For tiers that include LLM rewrites, generate one for the top-N pages."""
+    from app.models import BrandProfile, Prompt, User
+    from app.services.site_audit.constants import TIER_AUDIT_LIMITS
+    from app.services.site_audit.recommendations import generate_llm_rewrite
+
+    async with AsyncSessionLocal() as db:
+        brand = await db.get(Brand, brand_id)
+        if brand is None:
+            return
+        owner = await db.get(User, brand.user_id)
+        tier = owner.subscription_tier if owner else None
+        limits = TIER_AUDIT_LIMITS.get(tier or "")
+        n_pages = (limits or {}).get("llm_rewrites", 0)
+        if n_pages <= 0:
+            return
+        profile = (await db.execute(
+            select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+        )).scalar_one_or_none()
+        # Prompt text for linked prompts (limit to 5)
+        prompt_text_by_id: dict[int, str] = {}
+        all_prompt_ids = {pid for ids in page_link_map.values() for pid in ids}
+        if all_prompt_ids:
+            prompts = (await db.execute(
+                select(Prompt).where(Prompt.id.in_(all_prompt_ids))
+            )).scalars().all()
+            prompt_text_by_id = {p.id: p.text for p in prompts}
+
+        brand_name = brand.name
+        tone = (profile.tone_of_voice if profile else None) or "professional, factual"
+        what_not_to_say = (profile.what_not_to_say if profile else None) or ""
+
+    brand_profile_dict = {
+        "name": brand_name,
+        "tone_of_voice": tone,
+        "what_not_to_say": what_not_to_say,
+    }
+
+    # Rank pages by (linked_prompt_count DESC, page_score ASC)
+    def _rank_key(rec: dict) -> tuple[int, float]:
+        n = len(page_link_map.get(rec.get("page_id", -1), []))
+        score = rec["scores"]["page_score"] or 100.0
+        return (-n, score)
+
+    ranked = sorted(page_records, key=_rank_key)
+    selected = ranked[:n_pages]
+
+    async with AsyncSessionLocal() as db:
+        for rec in selected:
+            # Build a short excerpt from the crawl_page's HTML (first ~4KB of body text)
+            # The page record stored raw_html_size but not the html itself; we have to
+            # reconstruct from measurements OR re-fetch. Simplest: re-fetch the URL.
+            from app.services.site_audit.fetcher import fetch_raw
+            r = await fetch_raw(rec["url"])
+            html = r.html or ""
+            excerpt = _extract_first_h2_section(html)
+
+            findings = rec["findings"]
+            linked_ids = page_link_map.get(rec["page_id"], [])
+            linked_texts = [prompt_text_by_id[i] for i in linked_ids if i in prompt_text_by_id][:5]
+            rewrite = await generate_llm_rewrite(
+                page_excerpt=excerpt,
+                findings=findings,
+                brand_profile=brand_profile_dict,
+                linked_prompts=linked_texts,
+            )
+            if not rewrite:
+                continue
+            db.add(WebsiteAuditRecommendation(
+                audit_id=audit_id,
+                page_id=rec["page_id"],
+                priority="high",
+                effort="medium",
+                category="content",
+                title="Rewrite this page's first section",
+                body=rewrite,
+                linked_prompt_ids=json.dumps(linked_ids) if linked_ids else None,
+                expected_impact="AI-generated rewrite for top-priority page",
+                llm_generated=True,
+            ))
+        await db.commit()
+
+
+def _extract_first_h2_section(html: str) -> str:
+    """Cheap extractor: grab the first ~4KB of body text after the first <h2>."""
+    if not html:
+        return ""
+    import re
+    # find first <h2 ... > and take everything until next <h2 or end-of-body
+    m = re.search(r"<h2[^>]*>", html, re.IGNORECASE)
+    if not m:
+        return html[:4000]
+    start = m.start()
+    next_h2 = html.find("<h2", m.end())
+    end = next_h2 if next_h2 > 0 else len(html)
+    return html[start:end][:4000]

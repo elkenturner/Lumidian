@@ -14,22 +14,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import require_agency_staff
-from app.models import AgencyClient, Brand, ClientActivityEvent, ClientReviewLink, ContentDraft, User
+from app.models import AgencyClient, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientReviewLink, ContentDraft, User
 from app.schemas import (
     ActivityEventOut,
     ActivityEventWithClientOut,
     AgencyClientCreate,
     AgencyClientOut,
     AgencyClientUpdate,
+    AgencyStaffOut,
+    AgencyTaskCreate,
+    AgencyTaskOut,
+    AgencyTaskUpdate,
     DraftAssignIn,
     DraftStatusUpdateIn,
+    MyQueueDraft,
+    MyQueueOut,
     NoteCreate,
     NoteUpdate,
     ReviewLinkOut,
     TodayDraftOut,
     TodayOut,
 )
-from app.services.agency_activity import emit_event, EVENT_NOTE
+from app.services.agency_activity import (
+    emit_event,
+    EVENT_NOTE,
+    EVENT_TASK_ASSIGNED,
+    EVENT_TASK_COMPLETED,
+    EVENT_TASK_CREATED,
+)
 
 router = APIRouter(prefix="/agency", tags=["agency"])
 
@@ -516,3 +528,207 @@ async def list_recent_activity(
             )
         )
     return results
+
+
+# ── Task helpers ──────────────────────────────────────────────────────────────
+
+async def _task_to_out(db: AsyncSession, task: AgencyTask) -> AgencyTaskOut:
+    assignee_name: str | None = None
+    if task.assigned_to_user_id is not None:
+        u = await db.get(User, task.assigned_to_user_id)
+        assignee_name = (u.name or u.email) if u else None
+    return AgencyTaskOut(
+        id=task.id,
+        agency_client_id=task.agency_client_id,
+        title=task.title,
+        description=task.description,
+        status=task.status,
+        assigned_to_user_id=task.assigned_to_user_id,
+        assigned_to_name=assignee_name,
+        due_at=task.due_at,
+        created_by_user_id=task.created_by_user_id,
+        created_at=task.created_at,
+        updated_at=task.updated_at,
+        completed_at=task.completed_at,
+    )
+
+
+# ── Task endpoints ────────────────────────────────────────────────────────────
+
+@router.get("/clients/{client_id}/tasks", response_model=list[AgencyTaskOut])
+async def list_client_tasks(
+    client_id: int,
+    status: str | None = None,
+    assigned_to: int | None = None,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    stmt = select(AgencyTask).where(AgencyTask.agency_client_id == client_id)
+    if status:
+        stmt = stmt.where(AgencyTask.status == status)
+    if assigned_to is not None:
+        stmt = stmt.where(AgencyTask.assigned_to_user_id == assigned_to)
+    stmt = stmt.order_by(AgencyTask.due_at.asc().nulls_last(), AgencyTask.created_at.asc())
+    rows = (await db.execute(stmt)).scalars().all()
+    return [await _task_to_out(db, t) for t in rows]
+
+
+@router.post("/clients/{client_id}/tasks", response_model=AgencyTaskOut, status_code=http_status.HTTP_201_CREATED)
+async def create_task(
+    client_id: int,
+    body: AgencyTaskCreate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+):
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    task = AgencyTask(
+        agency_client_id=client_id,
+        title=body.title.strip(),
+        description=body.description,
+        status="open",
+        assigned_to_user_id=body.assigned_to_user_id,
+        due_at=body.due_at,
+        created_by_user_id=user.id,
+    )
+    db.add(task)
+    await db.flush()
+    await emit_event(
+        db,
+        agency_client_id=client_id,
+        event_type=EVENT_TASK_CREATED,
+        body=f"Created task '{task.title}'",
+        actor_user_id=user.id,
+        payload={"task_id": task.id},
+    )
+    await db.commit()
+    await db.refresh(task)
+    return await _task_to_out(db, task)
+
+
+@router.patch("/tasks/{task_id}", response_model=AgencyTaskOut)
+async def update_task(
+    task_id: int,
+    body: AgencyTaskUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+):
+    task = await db.get(AgencyTask, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    prev_assignee = task.assigned_to_user_id
+    prev_status = task.status
+    data = body.model_dump(exclude_unset=True)
+    for field, value in data.items():
+        setattr(task, field, value)
+    if "status" in data:
+        if data["status"] == "done" and task.completed_at is None:
+            task.completed_at = datetime.utcnow()
+        elif data["status"] != "done":
+            task.completed_at = None
+    task.updated_at = datetime.utcnow()
+
+    if "assigned_to_user_id" in data and data["assigned_to_user_id"] != prev_assignee:
+        new_assignee_name: str | None = None
+        if task.assigned_to_user_id is not None:
+            u = await db.get(User, task.assigned_to_user_id)
+            new_assignee_name = (u.name or u.email) if u else None
+        await emit_event(
+            db,
+            agency_client_id=task.agency_client_id,
+            event_type=EVENT_TASK_ASSIGNED,
+            body=f"Assigned task '{task.title}' to {new_assignee_name or 'unassigned'}",
+            actor_user_id=user.id,
+            payload={"task_id": task.id, "prev_assignee_id": prev_assignee, "next_assignee_id": task.assigned_to_user_id},
+        )
+    if "status" in data and data["status"] == "done" and prev_status != "done":
+        await emit_event(
+            db,
+            agency_client_id=task.agency_client_id,
+            event_type=EVENT_TASK_COMPLETED,
+            body=f"Completed task '{task.title}'",
+            actor_user_id=user.id,
+            payload={"task_id": task.id},
+        )
+
+    await db.commit()
+    await db.refresh(task)
+    return await _task_to_out(db, task)
+
+
+@router.delete("/tasks/{task_id}", status_code=http_status.HTTP_204_NO_CONTENT)
+async def delete_task(
+    task_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    task = await db.get(AgencyTask, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+    await db.delete(task)
+    await db.commit()
+
+
+_ACTIONABLE_DRAFT_STATUSES = ("draft", "changes_requested", "approved")
+
+
+@router.get("/my-queue", response_model=MyQueueOut)
+async def my_queue(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+):
+    drafts_q = await db.execute(
+        select(ContentDraft, Brand, AgencyClient)
+        .join(Brand, Brand.id == ContentDraft.brand_id)
+        .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
+        .where(
+            ContentDraft.assigned_to_user_id == user.id,
+            ContentDraft.status.in_(_ACTIONABLE_DRAFT_STATUSES),
+        )
+        .order_by(ContentDraft.created_at.asc())
+        .limit(100)
+    )
+    drafts = [
+        MyQueueDraft(
+            draft_id=d.id,
+            title=getattr(d, "title", None),
+            platform=d.platform,
+            status=d.status,
+            client_id=ac.id,
+            client_name=ac.name,
+            created_at=d.created_at,
+        )
+        for d, _b, ac in drafts_q.all()
+    ]
+
+    tasks_q = await db.execute(
+        select(AgencyTask)
+        .where(
+            AgencyTask.assigned_to_user_id == user.id,
+            AgencyTask.status != "done",
+        )
+        .order_by(AgencyTask.due_at.asc().nulls_last(), AgencyTask.created_at.asc())
+        .limit(100)
+    )
+    tasks = [await _task_to_out(db, t) for t in tasks_q.scalars().all()]
+
+    return MyQueueOut(drafts=drafts, tasks=tasks)
+
+
+@router.get("/staff", response_model=list[AgencyStaffOut])
+async def list_staff(
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    rows = await db.execute(
+        select(User)
+        .join(AgencyStaff, AgencyStaff.user_id == User.id)
+        .where(AgencyStaff.active == True)  # noqa: E712
+        .order_by(User.email.asc())
+    )
+    users = rows.scalars().all()
+    return [AgencyStaffOut(id=u.id, name=u.name, email=u.email) for u in users]

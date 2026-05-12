@@ -82,7 +82,7 @@ Failure of any single piece-generation call lands the cluster in `partial_failed
 
 ### Changed: `ContentDraft`
 
-- Add `cluster_id` int FK → content_clusters.id, **nullable** (so existing drafts can be migrated incrementally and Wikipedia drafts can remain cluster-less).
+- Add `cluster_id` int FK → content_clusters.id, **nullable** (posted drafts retained after migration have a null `cluster_id`; the field is otherwise always set for new drafts).
 
 ### Unchanged
 
@@ -95,7 +95,7 @@ New `ALTER TABLE` block at the bottom of `database.py:run_migrations()`:
 1. Create `content_clusters` table.
 2. Create `content_briefs` table.
 3. Add `cluster_id` column to `content_drafts`.
-4. Backfill (one-time, idempotent): for each brand with drafts, group drafts by `prompt_id`; create a `ContentCluster` (status=`ready`, `pillar_mode=none`); synthesize a templated `ContentBrief` (no LLM call — just BrandProfile + prompt text into the brief fields so the cluster has a brief it can show); set `cluster_id` on the existing drafts. Wikipedia drafts skipped (left with `cluster_id` null; still accessible from the new Wikipedia tab).
+4. Clean slate: delete all unposted `ContentDraft` rows. No backfill, no templated briefs, no Wikipedia preservation. Users land on an empty cluster hub and click Regenerate per brand to populate. Posted drafts (those with `ContentPost` or `DraftAttribution` rows referencing them) are preserved — those represent real activity, not queued suggestions — but their `cluster_id` is left null and they're not surfaced in the cluster hub.
 
 ## Generation Pipeline
 
@@ -190,7 +190,7 @@ Pillars are opt-in and tone-gated. Default state across all clusters is `pillar_
 
 **Opportunities tab:** unchanged from today.
 
-**Wikipedia tab:** placeholder for this build. Shows a list of Wikipedia-relevant topics for the brand (derived from BrandProfile + tracked prompts) with a "Wikipedia requires different handling — proper workflow coming soon" card. Legacy Wikipedia drafts (cluster-less after migration) are listed here so they remain accessible.
+**Wikipedia tab:** placeholder for this build. Shows a list of Wikipedia-relevant topics for the brand (derived from BrandProfile + tracked prompts) with a "Wikipedia requires different handling — proper workflow coming soon" card. No legacy Wikipedia drafts surface here — they're deleted in migration.
 
 **Gaps tab:** unchanged from today. (Future iteration: clicking a gap could spawn a cluster — not in MVP.)
 
@@ -222,18 +222,16 @@ No new env vars; no new tier columns.
 
 ## Wikipedia (out of scope, but stated for clarity)
 
-Wikipedia is removed from the cluster platform set in this build. Existing Wikipedia drafts are preserved (cluster-less) and shown under the new Wikipedia tab. No new Wikipedia generation occurs as part of cluster regeneration. The proper Wikipedia workflow (neutral encyclopedic voice, citation requirements, no first-person, suggested edits not drafts) is a separate future project.
+Wikipedia is removed from the cluster platform set in this build. Existing unposted Wikipedia drafts are deleted in the migration along with all other unposted drafts. No new Wikipedia generation occurs as part of cluster regeneration. The proper Wikipedia workflow (neutral encyclopedic voice, citation requirements, no first-person, suggested edits not drafts) is a separate future project.
 
 ## Migration
 
-One-time, idempotent backfill run after deploy:
+Clean slate. The migration is a single destructive step run once on deploy:
 
-1. Skip brands with no `ContentDraft` rows.
-2. For each brand, group drafts by `prompt_id`, excluding Wikipedia drafts.
-3. Per group: create a `ContentCluster` (status=`ready`, `pillar_mode=none`); synthesize a templated `ContentBrief` (no LLM call); set `cluster_id` on each draft in the group.
-4. Wikipedia drafts: `cluster_id` stays null; surfaced from the new Wikipedia tab.
+1. Delete all `ContentDraft` rows that are not referenced by a `ContentPost` or `DraftAttribution` row.
+2. Posted drafts (referenced by `ContentPost` / `DraftAttribution`) are retained with `cluster_id` null. They remain accessible via the existing posts surface but aren't part of any cluster.
 
-Existing drafts retain their content. Users see clusters immediately with a "Regenerate to upgrade this cluster" hint on each card so they can opt into LLM-generated briefs at their pace.
+No backfill, no templated briefs, no per-brand groupings. Users land on an empty cluster hub and click Regenerate per brand to populate. This is acceptable because existing drafts were independent and incoherent — preserving them would just be cruft, and users had to manually post anyway (per project memory, posting is manual-only).
 
 ## Backend Surface
 
@@ -265,14 +263,14 @@ New service module `app/services/clustering_service.py` owns:
 - `app/content/[brandId]/page.tsx`: refactored into a tabbed layout with Clusters as default tab.
 - `app/content/[brandId]/cluster/[clusterId]/page.tsx`: new route for cluster detail.
 - `components/content/cluster/*`: new component group — `ClusterCard`, `ClusterDetailView`, `BriefPanel`, `PieceCard`, `PillarCard`.
-- Wikipedia tab: lightweight component listing topics + legacy drafts. No editing surface.
+- Wikipedia tab: lightweight component listing topics. No editing surface, no legacy drafts.
 
 ## Risks & Open Questions
 
 - **Brief-driven coherence vs. platform authenticity tradeoff.** Heavy use of canonical phrasings can cross over into formulaic / templated reads, which AI engines and humans both detect. Piece-generation prompts must enforce variation in framing while preserving phrasing — this is the main quality risk and worth manual review on the first cohort of clusters.
 - **Pillar tone-scoring reliability.** The tone gate is LLM-based and will occasionally misclassify. Surface the reasoning to the user so they can override.
-- **Backfill brief quality.** Migrated clusters have a templated brief, not an LLM-generated one. The hint to "Regenerate to upgrade" addresses this, but some users won't act on it and will see weak briefs if they open the brief panel. Acceptable for v1.
-- **Wikipedia tab is intentionally thin.** Some users may have invested in Wikipedia drafts. We preserve them but stop generating new ones until the proper workflow lands. This is the right call (existing Wiki drafts shouldn't be posted as-is anyway).
+- **Clean-slate migration is destructive but justified.** Users with queued (unposted) drafts will see them disappear on deploy. Communicate via in-app notice; the value exchange (regenerate to get clustered, cross-affirming content) is clearly upside.
+- **Wikipedia tab is intentionally thin.** Legacy unposted Wiki drafts are deleted; the proper Wikipedia workflow is a future project.
 
 ## Out of Scope (parked for future)
 

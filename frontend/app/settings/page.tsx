@@ -29,6 +29,8 @@ import {
   Wand2,
   FileText,
   Globe,
+  Link2,
+  ExternalLink,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -58,6 +60,10 @@ import {
   BrandProfile,
   Publication,
   TeamMember,
+  BrandSource,
+  addBrandSource,
+  listBrandSources,
+  deleteBrandSource,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
@@ -354,6 +360,209 @@ function PublicationsEditor({
         Add publication
       </button>
     </div>
+  );
+}
+
+// ── Sources section ───────────────────────────────────────────────────────────
+
+const SOURCE_CAP = 10;
+
+const SOURCE_TYPE_OPTIONS: Array<{ value: BrandSource['source_type']; label: string }> = [
+  { value: 'article', label: 'Article' },
+  { value: 'paper', label: 'Paper / study' },
+  { value: 'stat', label: 'Stat' },
+  { value: 'case_study', label: 'Case study' },
+];
+
+function SourcesSection({ brandId }: { brandId: number }) {
+  const [sources, setSources] = useState<BrandSource[]>([]);
+  const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
+  const [snippet, setSnippet] = useState('');
+  const [sourceType, setSourceType] = useState<BrandSource['source_type']>('article');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    listBrandSources(brandId)
+      .then((items) => {
+        if (!cancelled) setSources(items);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          logError(err, 'SourcesSection: list');
+          setSources([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId]);
+
+  const atCap = sources.length >= SOURCE_CAP;
+
+  async function handleAdd() {
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl || busy || atCap) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await addBrandSource(brandId, {
+        url: trimmedUrl,
+        title: title.trim() || undefined,
+        snippet: snippet.trim() || undefined,
+        source_type: sourceType,
+      });
+      setSources((prev) => [created, ...prev]);
+      setUrl('');
+      setTitle('');
+      setSnippet('');
+      setSourceType('article');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      const detail = err?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Failed to add source');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    setDeletingId(id);
+    try {
+      await deleteBrandSource(brandId, id);
+      setSources((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      logError(err, 'SourcesSection: delete');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  return (
+    <SectionCard
+      icon={Link2}
+      title="Sources"
+      description="Papers, studies, and articles drafts can cite. Drafts include these as evidence and link to them inline."
+    >
+      <div className="space-y-4">
+        {/* Existing sources */}
+        {sources.length > 0 && (
+          <ul className="space-y-2">
+            {sources.map((src) => (
+              <li
+                key={src.id}
+                className="bg-[var(--accent-muted)] border border-[var(--border-subtle)] rounded-lg p-3"
+              >
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <a
+                      href={src.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-foreground)] hover:text-[var(--accent)] break-words"
+                    >
+                      <span className="break-words">{src.title}</span>
+                      <ExternalLink size={11} className="shrink-0 opacity-60" />
+                    </a>
+                    {src.snippet && (
+                      <p className="mt-1 text-xs text-[var(--text-muted)] leading-relaxed break-words whitespace-pre-wrap">
+                        {src.snippet}
+                      </p>
+                    )}
+                    <div className="mt-1.5 flex items-center gap-2 text-xs text-[var(--text-faint)]">
+                      <span className="px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] uppercase tracking-wide text-[10px]">
+                        {src.source_type.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(src.id)}
+                    disabled={deletingId === src.id}
+                    className="shrink-0 text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors p-1 disabled:opacity-40"
+                    aria-label="Remove source"
+                  >
+                    {deletingId === src.id ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={13} />
+                    )}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Add form */}
+        <div className="space-y-2 border-t border-[var(--border-subtle)] pt-4">
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://example.com/study  (required)"
+            disabled={atCap || busy}
+            className="mobile-input w-full px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50"
+          />
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Title (optional — defaults to the URL)"
+            disabled={atCap || busy}
+            maxLength={500}
+            className="mobile-input w-full px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50"
+          />
+          <textarea
+            value={snippet}
+            onChange={(e) => setSnippet(e.target.value)}
+            placeholder="Snippet (optional) — the citable claim or quote from this source"
+            disabled={atCap || busy}
+            rows={2}
+            maxLength={1500}
+            className="mobile-input w-full px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50 resize-y"
+          />
+          <div className="flex gap-2">
+            <select
+              value={sourceType}
+              onChange={(e) => setSourceType(e.target.value as BrandSource['source_type'])}
+              disabled={atCap || busy}
+              className="px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50"
+            >
+              {SOURCE_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={atCap || busy || !url.trim()}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] hover:border-[var(--accent-muted)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+              Add source
+            </button>
+          </div>
+
+          {error && (
+            <p className="text-xs text-[var(--danger)] leading-relaxed">{error}</p>
+          )}
+
+          <div className="flex items-center justify-between text-xs text-[var(--text-faint)] pt-1">
+            <span>
+              {atCap
+                ? `Cap reached — delete one to add more`
+                : `${sources.length} of ${SOURCE_CAP}`}
+            </span>
+          </div>
+        </div>
+      </div>
+    </SectionCard>
   );
 }
 
@@ -1343,6 +1552,8 @@ export default function SettingsPage() {
             >
               <PublicationsEditor items={publications} onChange={setPublications} />
             </SectionCard>
+
+            {brandId !== null && <SourcesSection brandId={brandId} />}
           </div>
 
           {profileSaveError && (

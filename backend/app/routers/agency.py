@@ -237,8 +237,13 @@ async def assign_draft(
 
 
 def _public_base_url(request: Request) -> str:
-    """Return base URL for public links (env override, else inferred)."""
-    env_url = os.getenv("PUBLIC_BASE_URL")
+    """Return base URL for public client-facing links.
+
+    Prefers PUBLIC_BASE_URL, falls back to FRONTEND_URL (already set in .env),
+    then to the request's host. The host-inference fallback would point at the
+    backend in dev (different port from frontend), so explicit env always wins.
+    """
+    env_url = os.getenv("PUBLIC_BASE_URL") or os.getenv("FRONTEND_URL")
     if env_url:
         return env_url.rstrip("/")
     return f"{request.url.scheme}://{request.url.netloc}"

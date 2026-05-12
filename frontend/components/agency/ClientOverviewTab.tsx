@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { agencyUpdateClient, type AgencyClient } from '@/lib/api';
 import { LumidianTrackingWidget } from './LumidianTrackingWidget';
 import { ReviewLinkSection } from './ReviewLinkSection';
+import { ActivityFeed } from './ActivityFeed';
 
 interface Props {
   client: AgencyClient;
@@ -85,6 +86,7 @@ export function ClientOverviewTab({ client, onChange }: Props) {
       </div>
 
       {error && <p className="text-sm text-red-400">{error}</p>}
+      <ActivityFeed clientId={client.id} />
     </div>
   );
 }

@@ -927,3 +927,38 @@ class TodayOut(BaseModel):
     drafts_to_review: list[TodayDraftOut]
     drafts_to_review_count: int
     active_clients: int
+
+
+# ── Agency portal shell (2026-05-11) ─────────────────────────────────────────
+
+
+class ReviewLinkOut(BaseModel):
+    token: str
+    url: str
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ReviewDraftOut(BaseModel):
+    id: int
+    title: str | None
+    platform: str
+    content_text: str
+    created_at: datetime
+
+
+class ReviewClientPageOut(BaseModel):
+    client_name: str
+    drafts: list[ReviewDraftOut]
+
+
+class ChangesRequestIn(BaseModel):
+    feedback: str = Field(min_length=1, max_length=2000)
+
+
+class RejectIn(BaseModel):
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class DraftStatusUpdateIn(BaseModel):
+    status: str = Field(min_length=1, max_length=32)

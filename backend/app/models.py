@@ -2,7 +2,7 @@ import enum
 from datetime import UTC, datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, JSON, String, Text, UniqueConstraint
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -365,11 +365,58 @@ class ContentDraft(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
+    # ── Content Clusters FK (nullable; set NULL on cluster delete) ───────────
+    cluster_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("content_clusters.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+
     brand: Mapped["Brand"] = relationship("Brand")
     prompt: Mapped[Optional["Prompt"]] = relationship("Prompt")
     content_posts: Mapped[list["ContentPost"]] = relationship(
         "ContentPost", back_populates="draft", cascade="all, delete-orphan"
     )
+
+
+# ── Content Clusters & Briefs ─────────────────────────────────────────────────
+
+class ContentCluster(Base):
+    """One cluster per prompt — tracks the content strategy state for that query."""
+    __tablename__ = "content_clusters"
+    __table_args__ = (UniqueConstraint("prompt_id", name="uq_content_clusters_prompt_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    brand_id: Mapped[int] = mapped_column(Integer, ForeignKey("brands.id", ondelete="CASCADE"), index=True)
+    prompt_id: Mapped[int] = mapped_column(Integer, ForeignKey("prompts.id", ondelete="CASCADE"))
+    status: Mapped[str] = mapped_column(String(32), default="pending")
+    pillar_mode: Mapped[str] = mapped_column(String(32), default="none")
+    pillar_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # Deferred FK to content_briefs — table created after; use_alter avoids DDL ordering issues
+    last_brief_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("content_briefs.id", ondelete="SET NULL", use_alter=True, name="fk_content_clusters_last_brief_id"),
+        nullable=True,
+    )
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    last_generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ContentBrief(Base):
+    """Structured brief for a content cluster — describes positioning, claims, and narrative."""
+    __tablename__ = "content_briefs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    cluster_id: Mapped[int] = mapped_column(Integer, ForeignKey("content_clusters.id", ondelete="CASCADE"), index=True)
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    positioning: Mapped[str] = mapped_column(Text, default="")
+    key_claims: Mapped[list] = mapped_column(JSON, default=list)
+    canonical_phrasings: Mapped[list] = mapped_column(JSON, default=list)
+    stats: Mapped[list] = mapped_column(JSON, default=list)
+    competitor_context: Mapped[dict] = mapped_column(JSON, default=dict)
+    narrative_spine: Mapped[str] = mapped_column(Text, default="")
+    tone_notes: Mapped[str] = mapped_column(Text, default="")
+    created_by: Mapped[str] = mapped_column(String(64), default="system")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class ContentPost(Base):

@@ -346,6 +346,8 @@ class ContentDraft(Base):
     platform_guidelines_applied: Mapped[str | None] = mapped_column(Text, nullable=True)
     visibility_score_at_draft: Mapped[float | None] = mapped_column(Float, nullable=True)
     estimated_impact: Mapped[float | None] = mapped_column(Float, nullable=True)
+    quality_score: Mapped[float | None] = mapped_column(Float)
+    summary: Mapped[str | None] = mapped_column(Text)
     # ── Lifecycle tracking ────────────────────────────────────────────────────
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
@@ -438,6 +440,7 @@ class BrandProfile(Base):
     target_audience: Mapped[str | None] = mapped_column(Text, nullable=True)
     approved_language: Mapped[str | None] = mapped_column(Text, nullable=True) # JSON array of strings
     publications: Mapped[str | None] = mapped_column(Text, nullable=True)     # JSON array of {url,title,publisher,date}
+    voice_samples: Mapped[str | None] = mapped_column(Text)  # JSON: list[{"title": str, "text": str}]
     internal_brand_context: Mapped[str | None] = mapped_column(Text, nullable=True)  # fetched from website via Jina
     website_context_last_fetched: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     market_scope: Mapped[str | None] = mapped_column(String(20), nullable=True)
@@ -768,6 +771,7 @@ class WebsiteAuditPage(Base):
     schema_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     raw_html_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rendered_html_size: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    content_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
     fetch_error: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
 
@@ -878,3 +882,39 @@ class ClientDocument(Base):
     )
     generated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+# ── Content quality rebuild — evidence retrieval, citations, voice samples ───
+
+class BrandSource(Base):
+    __tablename__ = "brand_sources"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(500))
+    url: Mapped[str] = mapped_column(String(1000))
+    snippet: Mapped[str | None] = mapped_column(Text)
+    source_type: Mapped[str] = mapped_column(String(50), default="article")
+    added_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
+
+
+class ContentDraftCitation(Base):
+    __tablename__ = "content_draft_citations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    draft_id: Mapped[int] = mapped_column(ForeignKey("content_drafts.id", ondelete="CASCADE"), index=True)
+    source_ref: Mapped[str] = mapped_column(String(10))   # "S1"
+    url: Mapped[str] = mapped_column(String(1000))
+    title: Mapped[str | None] = mapped_column(String(500))
+    position_marker: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC).replace(tzinfo=None))
+
+
+class EvidenceCache(Base):
+    __tablename__ = "evidence_cache"
+
+    brand_id: Mapped[int] = mapped_column(primary_key=True)
+    prompt_id: Mapped[int] = mapped_column(primary_key=True)
+    pack_json: Mapped[str] = mapped_column(Text)
+    fetched_at: Mapped[datetime] = mapped_column(DateTime)

@@ -18,7 +18,10 @@ interface Props {
 const PAGE_SIZE = 50;
 
 function timeAgo(iso: string): string {
-  const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+  // Backend records naive UTC datetimes; treat un-tz'd ISO strings as UTC.
+  const normalized = /[Zz]|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + 'Z';
+  const diff = (Date.now() - new Date(normalized).getTime()) / 1000;
+  if (diff < 0) return 'just now';
   if (diff < 60) return `${Math.floor(diff)}s ago`;
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;

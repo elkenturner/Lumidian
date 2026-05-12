@@ -9,6 +9,7 @@ Spec: docs/superpowers/specs/2026-05-12-competitive-gap-design.md
 """
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime, timedelta
 from typing import Literal
 
@@ -37,3 +38,34 @@ def _resolve_window(
     prior_end = start
     prior_start = start - timedelta(days=days)
     return start, end, prior_start, prior_end
+
+
+def _normalize(text: str) -> str:
+    """Lowercase + strip non-alphanumeric (mirrors tracking_service brand detection)."""
+    return re.sub(r"[^a-z0-9]", "", text.lower())
+
+
+def _mention_matches(text: str | None, name: str) -> bool:
+    """
+    True if `name` appears in `text` as a word-bounded match (case-insensitive)
+    or via alphanumeric-normalized substring (handles spacing/punctuation
+    variants like 'SpotItEarly' for 'Spot it Early').
+
+    `re.escape(name)` guards against names containing regex metacharacters
+    (e.g., 'C++', 'Notion.so').
+
+    The fuzzy fallback is only engaged when `name` itself contains non-word
+    characters (spaces, `+`, `.`, etc.) — this prevents pure-word names like
+    "Asana" from falsely matching as a substring inside "Casana".
+    """
+    if not text:
+        return False
+    pattern = re.compile(rf"\b{re.escape(name)}\b", re.IGNORECASE)
+    if pattern.search(text):
+        return True
+    # Only fall back to normalized substring when name contains non-word chars;
+    # otherwise word-boundary regex is the authoritative gate.
+    if not re.search(r"\W", name):
+        return False
+    name_norm = _normalize(name)
+    return bool(name_norm) and name_norm in _normalize(text)

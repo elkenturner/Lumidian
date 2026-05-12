@@ -12,15 +12,23 @@ import logging
 from datetime import UTC
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import CurrentUser, check_rate_limit, get_brand_for_user
-from app.models import Brand, BrandProfile
-from app.schemas import AiFillProfileResponse, BrandProfileResponse, BrandProfileUpdate, Publication
+from app.models import Brand, BrandProfile, BrandSource
+from app.schemas import (
+    AiFillProfileResponse,
+    BrandProfileResponse,
+    BrandProfileUpdate,
+    BrandSourceCreate,
+    BrandSourceOut,
+    Publication,
+)
+from app.services.drafting.evidence import BRAND_SOURCE_LIMIT
 
 router = APIRouter(prefix="/brands", tags=["brand-profile"])
 logger = logging.getLogger(__name__)
@@ -264,3 +272,80 @@ Return ONLY the JSON object, no markdown, no explanation. Never refuse or explai
         tone_of_voice=data.get("tone_of_voice") or None,
         key_stats=[s for s in (data.get("key_stats") or []) if isinstance(s, str)],
     )
+
+
+# ── BrandSource library ─────────────────────────────────────────────────────
+
+
+@router.post("/{brand_id}/sources", response_model=BrandSourceOut)
+async def create_brand_source(
+    brand_id: int,
+    payload: BrandSourceCreate,
+    db: DbDep,
+    user: CurrentUser,
+):
+    """Add a curated source (paper / article / stat / case study) to a brand's
+    evidence library. Capped at BRAND_SOURCE_LIMIT per brand."""
+    await get_brand_for_user(brand_id, db, user)
+
+    count_result = await db.execute(
+        select(func.count(BrandSource.id)).where(BrandSource.brand_id == brand_id)
+    )
+    count = count_result.scalar_one() or 0
+    if count >= BRAND_SOURCE_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Source cap reached ({BRAND_SOURCE_LIMIT}). "
+                "Delete one before adding more."
+            ),
+        )
+
+    title = payload.title or payload.url
+    snippet = payload.snippet or ""
+
+    src = BrandSource(
+        brand_id=brand_id,
+        title=title[:500],
+        url=payload.url,
+        snippet=snippet[:1500] if snippet else None,
+        source_type=payload.source_type,
+        added_by_user_id=user.id,
+    )
+    db.add(src)
+    await db.commit()
+    await db.refresh(src)
+    return src
+
+
+@router.get("/{brand_id}/sources", response_model=list[BrandSourceOut])
+async def list_brand_sources(
+    brand_id: int,
+    db: DbDep,
+    user: CurrentUser,
+):
+    """List all curated sources for a brand (most-recently-added first)."""
+    await get_brand_for_user(brand_id, db, user)
+    result = await db.execute(
+        select(BrandSource)
+        .where(BrandSource.brand_id == brand_id)
+        .order_by(BrandSource.added_at.desc())
+    )
+    return list(result.scalars().all())
+
+
+@router.delete("/{brand_id}/sources/{source_id}", status_code=204)
+async def delete_brand_source(
+    brand_id: int,
+    source_id: int,
+    db: DbDep,
+    user: CurrentUser,
+):
+    """Remove a curated source from the brand's evidence library."""
+    await get_brand_for_user(brand_id, db, user)
+    src = await db.get(BrandSource, source_id)
+    if src is None or src.brand_id != brand_id:
+        raise HTTPException(status_code=404, detail="Source not found")
+    await db.delete(src)
+    await db.commit()
+    return Response(status_code=204)

@@ -31,6 +31,7 @@ import {
   Globe,
   Link2,
   ExternalLink,
+  Quote,
 } from 'lucide-react';
 import clsx from 'clsx';
 import {
@@ -64,6 +65,10 @@ import {
   addBrandSource,
   listBrandSources,
   deleteBrandSource,
+  VoiceSample,
+  addVoiceSample,
+  listVoiceSamples,
+  deleteVoiceSample,
 } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
@@ -558,6 +563,205 @@ function SourcesSection({ brandId }: { brandId: number }) {
               {atCap
                 ? `Cap reached — delete one to add more`
                 : `${sources.length} of ${SOURCE_CAP}`}
+            </span>
+          </div>
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
+// ── Voice Samples section ─────────────────────────────────────────────────────
+
+const VOICE_SAMPLE_CAP = 3;
+const VOICE_SAMPLE_MIN_CHARS = 50;
+const VOICE_SAMPLE_MAX_CHARS = 4000;
+const VOICE_SAMPLE_TITLE_MAX = 200;
+
+function VoiceSamplesSection({ brandId }: { brandId: number }) {
+  const [samples, setSamples] = useState<VoiceSample[]>([]);
+  const [title, setTitle] = useState('');
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingIndex, setDeletingIndex] = useState<number | null>(null);
+
+  async function reload() {
+    try {
+      const items = await listVoiceSamples(brandId);
+      setSamples(items);
+    } catch (err) {
+      logError(err, 'VoiceSamplesSection: list');
+      setSamples([]);
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    listVoiceSamples(brandId)
+      .then((items) => {
+        if (!cancelled) setSamples(items);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          logError(err, 'VoiceSamplesSection: list');
+          setSamples([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [brandId]);
+
+  const atCap = samples.length >= VOICE_SAMPLE_CAP;
+  const trimmedTitle = title.trim();
+  const trimmedText = text.trim();
+  const textTooShort = trimmedText.length < VOICE_SAMPLE_MIN_CHARS;
+  const canAdd = !atCap && !busy && trimmedTitle.length > 0 && !textTooShort;
+
+  async function handleAdd() {
+    if (!canAdd) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const created = await addVoiceSample(brandId, {
+        title: trimmedTitle,
+        text: trimmedText,
+      });
+      // Backend inserts new samples at index 0; mimic that locally.
+      setSamples((prev) => [created, ...prev]);
+      setTitle('');
+      setText('');
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      const detail = err?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : 'Failed to add voice sample');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleDelete(index: number) {
+    setDeletingIndex(index);
+    try {
+      await deleteVoiceSample(brandId, index);
+      // Indexes shift after delete, so re-fetch rather than splice locally.
+      await reload();
+    } catch (err) {
+      logError(err, 'VoiceSamplesSection: delete');
+    } finally {
+      setDeletingIndex(null);
+    }
+  }
+
+  return (
+    <SectionCard
+      icon={Quote}
+      title="Voice samples"
+      description="Short writing samples that anchor your brand's voice. Pro-tier draft generation uses these to mimic tone and cadence."
+    >
+      <div className="space-y-4">
+        {/* Existing samples */}
+        {samples.length > 0 && (
+          <ul className="space-y-2">
+            {samples.map((sample) => (
+              <li
+                key={sample.index}
+                className="bg-[var(--accent-muted)] border border-[var(--border-subtle)] rounded-lg p-3"
+              >
+                <div className="flex items-start gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-[var(--accent-foreground)] break-words">
+                      {sample.title}
+                    </p>
+                    <p
+                      className="mt-1 text-xs text-[var(--text-muted)] leading-relaxed break-words whitespace-pre-wrap overflow-hidden"
+                      style={{
+                        display: '-webkit-box',
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: 'vertical',
+                      }}
+                    >
+                      {sample.text}
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-2 text-xs text-[var(--text-faint)]">
+                      <span className="px-1.5 py-0.5 rounded bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] uppercase tracking-wide text-[10px]">
+                        {sample.text.length.toLocaleString()} chars
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(sample.index)}
+                    disabled={deletingIndex === sample.index}
+                    className="shrink-0 text-[var(--text-faint)] hover:text-[var(--danger)] transition-colors p-1 disabled:opacity-40"
+                    aria-label="Remove voice sample"
+                  >
+                    {deletingIndex === sample.index ? (
+                      <Loader2 size={13} className="animate-spin" />
+                    ) : (
+                      <Trash2 size={13} />
+                    )}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {/* Add form */}
+        <div className="space-y-2 border-t border-[var(--border-subtle)] pt-4">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Title (required) — e.g. 'Launch announcement blog post'"
+            disabled={atCap || busy}
+            maxLength={VOICE_SAMPLE_TITLE_MAX}
+            className="mobile-input w-full px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50"
+          />
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={`Paste a paragraph-length writing sample (${VOICE_SAMPLE_MIN_CHARS}–${VOICE_SAMPLE_MAX_CHARS} chars)`}
+            disabled={atCap || busy}
+            rows={6}
+            maxLength={VOICE_SAMPLE_MAX_CHARS}
+            className="mobile-input w-full px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50 resize-y"
+          />
+          <div
+            className={`text-xs text-right ${
+              textTooShort && trimmedText.length > 0
+                ? 'text-[var(--danger)]'
+                : 'text-[var(--text-faint)]'
+            }`}
+          >
+            {trimmedText.length.toLocaleString()} / {VOICE_SAMPLE_MAX_CHARS.toLocaleString()}
+            {textTooShort && trimmedText.length > 0 && (
+              <span> — need at least {VOICE_SAMPLE_MIN_CHARS}</span>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={!canAdd}
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-muted)] hover:border-[var(--accent-muted)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {busy ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+              Add voice sample
+            </button>
+          </div>
+
+          {error && (
+            <p className="text-xs text-[var(--danger)] leading-relaxed">{error}</p>
+          )}
+
+          <div className="flex items-center justify-between text-xs text-[var(--text-faint)] pt-1">
+            <span>
+              {atCap
+                ? `Cap reached — delete one to add more`
+                : `${samples.length} of ${VOICE_SAMPLE_CAP}`}
             </span>
           </div>
         </div>
@@ -1554,6 +1758,8 @@ export default function SettingsPage() {
             </SectionCard>
 
             {brandId !== null && <SourcesSection brandId={brandId} />}
+
+            {brandId !== null && <VoiceSamplesSection brandId={brandId} />}
           </div>
 
           {profileSaveError && (

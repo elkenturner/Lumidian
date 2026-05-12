@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { agencyUpdateClient, type AgencyClient } from '@/lib/api';
+import { LumidianTrackingWidget } from './LumidianTrackingWidget';
+import { ReviewLinkSection } from './ReviewLinkSection';
 
 interface Props {
   client: AgencyClient;
@@ -49,6 +51,11 @@ export function ClientOverviewTab({ client, onChange }: Props) {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <LumidianTrackingWidget brandId={client.brand_id} />
+        <ReviewLinkSection clientId={client.id} />
+      </div>
+
       <div className="grid grid-cols-2 gap-6">
         <div>
           <h2 className="mb-1 text-sm font-medium text-[var(--text-secondary)]">Retainer</h2>
@@ -74,21 +81,6 @@ export function ClientOverviewTab({ client, onChange }: Props) {
               </span>
             )}
           </p>
-        </div>
-        <div>
-          <h2 className="mb-1 text-sm font-medium text-[var(--text-secondary)]">Peec dashboard</h2>
-          {client.peec_dashboard_url ? (
-            <a
-              href={client.peec_dashboard_url}
-              target="_blank"
-              rel="noreferrer"
-              className="text-sm underline"
-            >
-              Open
-            </a>
-          ) : (
-            <p className="text-sm text-[var(--text-muted)]">Not set</p>
-          )}
         </div>
       </div>
 

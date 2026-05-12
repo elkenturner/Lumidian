@@ -40,7 +40,7 @@ async def fetch_raw(url: str, timeout_s: float = PER_PAGE_TIMEOUT_S) -> FetchRes
             ms = int((perf_counter() - started) * 1000)
             text = ""
             ctype = resp.headers.get("content-type", "")
-            if "html" in ctype or not ctype:
+            if "html" in ctype or "xml" in ctype or not ctype:
                 text = resp.text
             return FetchResult(url=url, status=resp.status_code, html=text, fetch_ms=ms)
     except httpx.TimeoutException:

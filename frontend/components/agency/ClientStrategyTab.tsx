@@ -14,7 +14,7 @@ export function ClientStrategyTab({ brandId, clientId }: Props) {
       <TaskList clientId={clientId} />
       <ClientBrandTab brandId={brandId} />
       <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-6 text-sm text-[var(--text-muted)]">
-        Content gaps and AIO website audit will live here. Coming soon.
+        Content gaps will live here. Coming soon.
       </div>
     </div>
   );

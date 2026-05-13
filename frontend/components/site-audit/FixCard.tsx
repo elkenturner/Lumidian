@@ -10,10 +10,13 @@ import {
   X,
   AlertCircle,
   ChevronDown,
+  CornerDownRight,
+  ShieldCheck,
 } from 'lucide-react';
 
 import { siteAudit, type WebsiteAuditRecommendationOut } from '@/lib/api';
 import { easings } from '@/lib/motion';
+import { insertionHint } from '@/lib/insertion-hint';
 import { FixCardCodeBlock } from './FixCardCodeBlock';
 import { FixCardImplSteps } from './FixCardImplSteps';
 import { RegenPopover } from './RegenPopover';
@@ -123,17 +126,8 @@ export function FixCard({ rec, implSteps, onStatusChange, compact = false }: Pro
             >
               {pill.label}
             </span>
-            <span className="text-[11px] text-[var(--text-muted)] flex items-center gap-2">
-              <span>{CATEGORY_LABEL[rec.category] ?? rec.category}</span>
-              {rec.target_url && (
-                <span className="inline-flex items-center gap-1 text-[var(--text-faint)]">
-                  <span aria-hidden="true">·</span>
-                  <MapPin size={11} />
-                  <span className="font-mono truncate max-w-[260px]">
-                    {urlPath(rec.target_url)}
-                  </span>
-                </span>
-              )}
+            <span className="text-[11px] text-[var(--text-muted)]">
+              {CATEGORY_LABEL[rec.category] ?? rec.category}
             </span>
           </div>
 
@@ -142,11 +136,21 @@ export function FixCard({ rec, implSteps, onStatusChange, compact = false }: Pro
             {rec.title}
           </h3>
 
-          {/* ── Why-it-matters body ───────────────────────────────────────── */}
+          {/* ── Problem (why this is broken on YOUR site) ─────────────────── */}
           {!drafted && (
-            <p className="text-sm text-[var(--text-secondary)] leading-relaxed mt-2 whitespace-pre-line">
-              {rec.body}
-            </p>
+            <div className="mt-3">
+              <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5">
+                The problem
+              </p>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed whitespace-pre-line">
+                {rec.body}
+              </p>
+            </div>
+          )}
+
+          {/* ── Where (exact insertion point) ─────────────────────────────── */}
+          {!drafted && (rec.target_url || rec.artifact_type) && (
+            <WhereBlock targetUrl={rec.target_url} artifactType={rec.artifact_type} />
           )}
 
           {/* ── Lift + effort row ─────────────────────────────────────────── */}
@@ -219,6 +223,9 @@ export function FixCard({ rec, implSteps, onStatusChange, compact = false }: Pro
                 className="mt-4 relative"
               >
                 <FixCardCodeBlock artifact={artifact} artifactType={artifactType} />
+
+                {/* Insertion hint — where to paste */}
+                <InsertionHintRow artifactType={artifactType} targetUrl={rec.target_url} />
 
                 {/* Regen button */}
                 <div className="flex justify-end mt-2">
@@ -329,6 +336,85 @@ export function FixCard({ rec, implSteps, onStatusChange, compact = false }: Pro
         </motion.article>
       )}
     </AnimatePresence>
+  );
+}
+
+// ── Where block (collapsed-state insertion guidance) ───────────────────────
+
+function WhereBlock({
+  targetUrl,
+  artifactType,
+}: {
+  targetUrl: string | null;
+  artifactType: string | null;
+}) {
+  const hint = insertionHint(artifactType);
+  if (!targetUrl && !hint) return null;
+  return (
+    <div
+      className="mt-3 rounded-md p-3 text-xs"
+      style={{
+        background: 'var(--bg-base)',
+        border: '1px solid var(--border-subtle)',
+      }}
+    >
+      <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-1.5 flex items-center gap-1">
+        <MapPin size={11} />
+        Where it goes
+      </p>
+      {targetUrl && (
+        <p className="font-mono text-[var(--text-primary)] truncate">
+          {urlPath(targetUrl)}
+        </p>
+      )}
+      {hint && (
+        <p className="text-[var(--text-secondary)] mt-1 leading-relaxed flex gap-1.5">
+          <CornerDownRight
+            size={11}
+            className="mt-0.5 shrink-0 text-[var(--text-muted)]"
+          />
+          <span>{hint.where}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── Insertion-hint row (drafted state, above install steps) ────────────────
+
+function InsertionHintRow({
+  artifactType,
+  targetUrl,
+}: {
+  artifactType: string;
+  targetUrl: string | null;
+}) {
+  const hint = insertionHint(artifactType);
+  if (!hint) return null;
+  return (
+    <div className="mt-3 text-xs text-[var(--text-secondary)] leading-relaxed">
+      <p className="flex gap-1.5">
+        <CornerDownRight
+          size={12}
+          className="mt-0.5 shrink-0 text-[var(--text-muted)]"
+        />
+        <span>
+          {targetUrl && (
+            <span className="font-mono text-[var(--text-primary)]">
+              {urlPath(targetUrl)}
+            </span>
+          )}
+          {targetUrl && ' — '}
+          {hint.where}
+        </span>
+      </p>
+      {hint.validate && (
+        <p className="flex gap-1.5 mt-1.5 text-[var(--text-muted)]">
+          <ShieldCheck size={12} className="mt-0.5 shrink-0" />
+          <span>{hint.validate}</span>
+        </p>
+      )}
+    </div>
   );
 }
 

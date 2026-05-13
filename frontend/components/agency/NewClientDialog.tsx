@@ -14,7 +14,6 @@ export function NewClientDialog({ onCreated }: Props) {
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [retainer, setRetainer] = useState('');
-  const [peecUrl, setPeecUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,7 +22,6 @@ export function NewClientDialog({ onCreated }: Props) {
     setContactName('');
     setContactEmail('');
     setRetainer('');
-    setPeecUrl('');
     setError(null);
   };
 
@@ -40,7 +38,6 @@ export function NewClientDialog({ onCreated }: Props) {
         primary_contact_name: contactName.trim() || undefined,
         primary_contact_email: contactEmail.trim() || undefined,
         retainer_amount_usd: retainer ? parseInt(retainer, 10) : undefined,
-        peec_dashboard_url: peecUrl.trim() || undefined,
       });
       onCreated(created);
       setOpen(false);
@@ -105,16 +102,6 @@ export function NewClientDialog({ onCreated }: Props) {
                 onChange={(e) => setRetainer(e.target.value)}
                 className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
                 placeholder="3000"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-[var(--text-secondary)]">Peec dashboard URL</label>
-              <input
-                type="url"
-                value={peecUrl}
-                onChange={(e) => setPeecUrl(e.target.value)}
-                className="w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]"
-                placeholder="https://peec.ai/..."
               />
             </div>
 

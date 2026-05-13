@@ -9,6 +9,7 @@ import { easings } from '@/lib/motion';
 import { AuditHeader } from './AuditHeader';
 import { AuditTriggerButton } from './AuditTriggerButton';
 import { CitationsTab } from './CitationsTab';
+import { EmptyCrawlBanner } from './EmptyCrawlBanner';
 import { FixGrid } from './FixGrid';
 import { HistorySparkline } from './HistorySparkline';
 import { OverviewHero } from './OverviewHero';
@@ -151,6 +152,17 @@ export function SiteAuditView({ brandId }: Props) {
           );
         })}
       </nav>
+
+      {/* Empty-crawl banner — fires when an otherwise-completed audit captured 0 pages */}
+      {audit.status === 'completed' && (audit.total_pages ?? 0) === 0 && (
+        <EmptyCrawlBanner
+          brandId={brandId}
+          brandUrl={brand?.website_url ?? null}
+          errorMessage={audit.error_message ?? null}
+          pagesFailed={audit.pages_failed ?? 0}
+          onTriggered={loadLatest}
+        />
+      )}
 
       {/* Render-mode warning banner (always above content when applicable) */}
       {homepagePage?.is_js_rendered && (

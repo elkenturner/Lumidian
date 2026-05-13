@@ -171,6 +171,9 @@ async def _load_publications(db: AsyncSession, brand_id: int) -> list[dict]:
     return _extract_publications(profile) if profile else []
 
 
+# Public alias so agency router can import from one place
+ALL_DRAFT_PLATFORMS = ALL_PLATFORMS
+
 DRAFT_CAP = 20  # default / max cap (pro tier)
 
 TIER_DRAFT_CAPS: dict[str | None, int] = {

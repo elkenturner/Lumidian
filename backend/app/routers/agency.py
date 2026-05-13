@@ -14,13 +14,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import require_agency_staff
-from app.models import AgencyClient, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, User
+from app.models import AgencyClient, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, Prompt, User
 from app.schemas import (
     ActivityEventOut,
     ActivityEventWithClientOut,
     AgencyClientCreate,
     AgencyClientOut,
     AgencyClientUpdate,
+    AgencyDraftGenerateIn,
     AgencyStaffOut,
     AgencyTaskCreate,
     AgencyTaskOut,
@@ -43,11 +44,13 @@ from app.schemas import (
 from app.services.document_engine import generate_document, get_template, list_templates
 from app.services.agency_activity import (
     emit_event,
+    EVENT_DRAFT_GENERATED_BY_STAFF,
     EVENT_NOTE,
     EVENT_TASK_ASSIGNED,
     EVENT_TASK_COMPLETED,
     EVENT_TASK_CREATED,
 )
+from app.services.drafting_service import generate_gap_draft, ALL_DRAFT_PLATFORMS
 
 router = APIRouter(prefix="/agency", tags=["agency"])
 
@@ -878,3 +881,87 @@ async def delete_document(
         raise HTTPException(status_code=404, detail="Document not found")
     await db.delete(doc)
     await db.commit()
+
+
+@router.post(
+    "/clients/{client_id}/drafts/generate",
+    status_code=http_status.HTTP_201_CREATED,
+)
+async def agency_generate_draft(
+    client_id: int,
+    body: AgencyDraftGenerateIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+):
+    """Generate a draft inside the agency portal. Bypasses SaaS tier checks."""
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    brand_q = await db.execute(
+        select(Brand).where(Brand.agency_client_id == client_id).limit(1)
+    )
+    brand = brand_q.scalar_one_or_none()
+    if brand is None:
+        raise HTTPException(status_code=404, detail="No brand attached to client")
+    if brand.brand_type != "agency":
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail="Brand is not agency-tier",
+        )
+
+    if body.platform not in ALL_DRAFT_PLATFORMS:
+        raise HTTPException(
+            status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Unsupported platform. Must be one of {sorted(ALL_DRAFT_PLATFORMS)}",
+        )
+
+    prompt = await db.get(Prompt, body.prompt_id)
+    if prompt is None or prompt.brand_id != brand.id:
+        raise HTTPException(
+            status_code=404,
+            detail="Prompt not found for this client's brand",
+        )
+
+    try:
+        draft = await generate_gap_draft(
+            db=db,
+            brand_id=brand.id,
+            prompt_id=body.prompt_id,
+            platform=body.platform,
+            custom_brief=body.custom_brief,
+            source="agency",
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+
+    await emit_event(
+        db,
+        agency_client_id=client_id,
+        event_type=EVENT_DRAFT_GENERATED_BY_STAFF,
+        body=f"Generated draft '{draft.title or f'Draft #{draft.id}'}' for {body.platform}",
+        actor_user_id=user.id,
+        payload={"prompt_id": body.prompt_id, "platform": body.platform, "draft_id": draft.id},
+        related_draft_id=draft.id,
+    )
+    await db.commit()
+    await db.refresh(draft)
+
+    return {
+        "id": draft.id,
+        "brand_id": draft.brand_id,
+        "prompt_id": draft.prompt_id,
+        "platform": draft.platform,
+        "status": draft.status,
+        "title": draft.title,
+        "content_text": draft.content_text,
+        "content_brief": draft.content_brief,
+        "estimated_impact": draft.estimated_impact,
+        "source": draft.source,
+        "assigned_to_user_id": getattr(draft, "assigned_to_user_id", None),
+        "created_at": draft.created_at.isoformat() if draft.created_at else None,
+        "updated_at": draft.updated_at.isoformat() if draft.updated_at else None,
+    }

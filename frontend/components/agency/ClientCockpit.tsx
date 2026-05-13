@@ -14,6 +14,8 @@ import { ClientQuickActionsRail } from './ClientQuickActionsRail';
 import { DocumentList } from './DocumentList';
 import { GenerateDraftButton } from './GenerateDraftButton';
 import { LumidianTrackingWidget } from './LumidianTrackingWidget';
+import { PromptScoresPanel } from './PromptScoresPanel';
+import { RunTrackingButton } from './RunTrackingButton';
 import { TaskList } from './TaskList';
 
 interface Props {
@@ -38,6 +40,7 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [justGeneratedDoc, setJustGeneratedDoc] = useState<AgencyDocument | null>(null);
   const [pipelineRefreshKey, setPipelineRefreshKey] = useState(0);
+  const [trackingRefreshKey, setTrackingRefreshKey] = useState(0);
 
   const updateStatus = async (status: AgencyClient['status']) => {
     setSaving(true);
@@ -103,8 +106,15 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="space-y-8 min-w-0">
           <section id="tracking" className="scroll-mt-24">
-            <h2 className="mb-3 text-sm font-medium text-[var(--text-secondary)]">Tracking</h2>
-            <LumidianTrackingWidget brandId={client.brand_id} />
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-medium text-[var(--text-secondary)]">Tracking</h2>
+              <RunTrackingButton
+                clientId={client.id}
+                onTriggered={() => setTrackingRefreshKey((k) => k + 1)}
+              />
+            </div>
+            <LumidianTrackingWidget key={trackingRefreshKey} brandId={client.brand_id} />
+            <PromptScoresPanel brandId={client.brand_id} />
           </section>
 
           <section id="pipeline" className="scroll-mt-24">

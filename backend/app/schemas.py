@@ -1031,6 +1031,14 @@ class WebsiteAuditRecommendationOut(BaseModel):
     linked_prompt_ids: list[int] = []
     expected_impact: str | None
     llm_generated: bool
+    artifact: str | None = None
+    artifact_type: str | None = None
+    artifact_generated_at: datetime | None = None
+    artifact_regen_count: int = 0
+    status: str = "pending"
+    expected_lift_pp: float | None = None
+    target_url: str | None = None
+    priority_score: float | None = None
 
 
 class CitationSourceOut(BaseModel):
@@ -1266,3 +1274,18 @@ class VoiceSampleOut(BaseModel):
     index: int
     title: str
     text: str
+
+
+class DraftArtifactRequest(BaseModel):
+    regenerate_notes: str | None = None
+
+
+class DraftArtifactResponse(BaseModel):
+    artifact: str
+    artifact_type: str
+    generated_at: datetime
+    regen_count: int
+
+
+class UpdateRecStatusRequest(BaseModel):
+    status: str  # 'pending' | 'applied' | 'dismissed'

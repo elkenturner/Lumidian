@@ -77,17 +77,44 @@ from app import state as _state
 
 
 async def _bg_generate_drafts(brand_id: int, max_gaps: int, source: str) -> None:
-    """Background coroutine: run auto_draft_top_gaps with its own DB session."""
+    """Background coroutine: regenerate clusters per prompt for this brand.
+
+    Routes through the cluster pipeline so each prompt's drafts are generated
+    as a coordinated 5-piece set from a shared ContentBrief. The ``max_gaps``
+    arg now bounds the number of prompts processed (was: top gaps to draft).
+    The legacy ``auto_draft_top_gaps`` path is bypassed.
+    """
+    from sqlalchemy import select
     from app.database import AsyncSessionLocal
+    from app.models import Brand, Prompt, User
+    from app.services.clustering_service import get_or_create_cluster, regenerate_cluster
+
     try:
         async with AsyncSessionLocal() as db:
-            await auto_draft_top_gaps(
-                db=db,
-                brand_id=brand_id,
-                max_gaps=max_gaps,
-                clear_existing=True,
-                source=source,
-            )
+            brand = (await db.execute(select(Brand).where(Brand.id == brand_id))).scalar_one_or_none()
+            if brand is None:
+                logger.warning("_bg_generate_drafts: brand %d not found", brand_id)
+                return
+            owner = (await db.execute(select(User).where(User.id == brand.user_id))).scalar_one_or_none()
+            tier = owner.subscription_tier if owner else None
+            prompts = (
+                await db.execute(
+                    select(Prompt)
+                    .where(Prompt.brand_id == brand_id, Prompt.prompt_type == "standard")
+                    .order_by(Prompt.id)
+                )
+            ).scalars().all()
+            for prompt in prompts[:max_gaps]:
+                try:
+                    cluster = await get_or_create_cluster(db, brand_id=brand_id, prompt_id=prompt.id)
+                    await regenerate_cluster(db, cluster_id=cluster.id, tier=tier)
+                except Exception:
+                    logger.exception(
+                        "_bg_generate_drafts: cluster regen failed for prompt %d (brand %d)",
+                        prompt.id,
+                        brand_id,
+                    )
+                    continue
     except Exception:
         logger.exception("generate_now background task failed for brand_id=%d", brand_id)
     finally:

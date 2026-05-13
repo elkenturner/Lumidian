@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
+import { FileText, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import {
+  agencyGenerateWeeklyReport,
   agencyUpdateClient,
   type AgencyClient,
   type AgencyDocument,
@@ -41,6 +43,8 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
   const [justGeneratedDoc, setJustGeneratedDoc] = useState<AgencyDocument | null>(null);
   const [pipelineRefreshKey, setPipelineRefreshKey] = useState(0);
   const [trackingRefreshKey, setTrackingRefreshKey] = useState(0);
+  const [docsBusy, setDocsBusy] = useState(false);
+  const [docsError, setDocsError] = useState<string | null>(null);
 
   const updateStatus = async (status: AgencyClient['status']) => {
     setSaving(true);
@@ -52,6 +56,19 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
       setError(err instanceof Error ? err.message : 'Failed to update.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const onGenerateWeekly = async () => {
+    setDocsBusy(true);
+    setDocsError(null);
+    try {
+      const doc = await agencyGenerateWeeklyReport(client.id);
+      setJustGeneratedDoc(doc);
+    } catch (e) {
+      setDocsError(e instanceof Error ? e.message : 'Failed to generate report');
+    } finally {
+      setDocsBusy(false);
     }
   };
 
@@ -140,7 +157,20 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
           </section>
 
           <section id="documents" className="scroll-mt-24">
-            <h2 className="mb-3 text-sm font-medium text-[var(--text-secondary)]">Documents</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-medium text-[var(--text-secondary)]">Documents</h2>
+              <div className="flex items-center gap-3">
+                {docsError && <span className="text-xs text-red-400">{docsError}</span>}
+                <button
+                  onClick={onGenerateWeekly}
+                  disabled={docsBusy}
+                  className="flex items-center gap-2 rounded-md border border-[var(--border-default)] bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card)] disabled:opacity-50"
+                >
+                  {docsBusy ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+                  {docsBusy ? 'Generating…' : 'Generate weekly report'}
+                </button>
+              </div>
+            </div>
             <DocumentList clientId={client.id} injectDoc={justGeneratedDoc} />
           </section>
 

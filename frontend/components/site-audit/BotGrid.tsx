@@ -1,19 +1,77 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { Check, X } from 'lucide-react';
-import HelpTooltip from '@/components/dashboard/HelpTooltip';
+import { staggerContainer, staggerChild } from '@/lib/motion';
 
-const BOTS: { name: string; explanation: string; family: 'openai' | 'anthropic' | 'google' | 'perplexity' | 'other' }[] = [
-  { name: 'GPTBot', family: 'openai', explanation: 'OpenAI training crawler — content here is fair game for ChatGPT model training.' },
-  { name: 'OAI-SearchBot', family: 'openai', explanation: 'ChatGPT live-search crawler. The heaviest hit if blocked — ChatGPT cannot read your site in real time.' },
-  { name: 'ChatGPT-User', family: 'openai', explanation: 'ChatGPT user-initiated fetches (e.g. a user pasting a link).' },
-  { name: 'ClaudeBot', family: 'anthropic', explanation: "Anthropic's main crawler. Blocking it excludes you from Claude training and retrieval." },
-  { name: 'anthropic-ai', family: 'anthropic', explanation: 'Older Anthropic user-agent. Keep allowed for compatibility.' },
-  { name: 'PerplexityBot', family: 'perplexity', explanation: 'Perplexity is citation-driven. Blocking it removes you from a major AI search surface.' },
-  { name: 'Google-Extended', family: 'google', explanation: 'Gemini + Google AI Overviews. Separate from regular Googlebot — block this and you lose Google AI exposure without affecting search.' },
-  { name: 'Meta-ExternalAgent', family: 'other', explanation: "Meta's AI fetcher." },
-  { name: 'Applebot-Extended', family: 'other', explanation: 'Apple Intelligence + Siri crawler.' },
-  { name: 'Amazonbot', family: 'other', explanation: "Amazon's general crawler, increasingly used for Alexa AI." },
+interface Bot {
+  name: string;
+  family: 'openai' | 'anthropic' | 'google' | 'perplexity' | 'other';
+  consequence: string;  // one-liner shown always (not just on hover)
+  tier: 'critical' | 'standard';
+}
+
+const BOTS: Bot[] = [
+  {
+    name: 'OAI-SearchBot',
+    family: 'openai',
+    tier: 'critical',
+    consequence: 'Used by ChatGPT to fetch pages live when answering. Blocking it removes you from ChatGPT search entirely.',
+  },
+  {
+    name: 'GPTBot',
+    family: 'openai',
+    tier: 'critical',
+    consequence: 'OpenAI training crawler — content here can be learned into ChatGPT model weights.',
+  },
+  {
+    name: 'ClaudeBot',
+    family: 'anthropic',
+    tier: 'critical',
+    consequence: "Anthropic's main crawler. Blocking it excludes you from Claude training + retrieval.",
+  },
+  {
+    name: 'Google-Extended',
+    family: 'google',
+    tier: 'critical',
+    consequence: 'Gemini + Google AI Overviews. Separate from Googlebot — block this and you lose Google AI without affecting regular Search.',
+  },
+  {
+    name: 'PerplexityBot',
+    family: 'perplexity',
+    tier: 'critical',
+    consequence: 'Perplexity is citation-driven. Blocking it removes you from one of the biggest AI search surfaces.',
+  },
+  {
+    name: 'ChatGPT-User',
+    family: 'openai',
+    tier: 'standard',
+    consequence: 'User-initiated ChatGPT fetches (someone pastes your link).',
+  },
+  {
+    name: 'anthropic-ai',
+    family: 'anthropic',
+    tier: 'standard',
+    consequence: "Older Anthropic user-agent. Keep allowed for compatibility.",
+  },
+  {
+    name: 'Applebot-Extended',
+    family: 'other',
+    tier: 'standard',
+    consequence: 'Apple Intelligence + Siri crawler.',
+  },
+  {
+    name: 'Meta-ExternalAgent',
+    family: 'other',
+    tier: 'standard',
+    consequence: "Meta's AI fetcher.",
+  },
+  {
+    name: 'Amazonbot',
+    family: 'other',
+    tier: 'standard',
+    consequence: "Amazon's crawler, increasingly used for Alexa AI.",
+  },
 ];
 
 const FAMILY_COLOR: Record<string, string> = {
@@ -25,47 +83,102 @@ const FAMILY_COLOR: Record<string, string> = {
 };
 
 interface Props {
-  /** Optional robots.txt parse result keyed by user-agent. Missing key = "allowed". */
   botStatus?: Record<string, 'allowed' | 'blocked'>;
 }
 
 export function BotGrid({ botStatus }: Props) {
+  const critical = BOTS.filter((b) => b.tier === 'critical');
+  const standard = BOTS.filter((b) => b.tier === 'standard');
+
+  const blockedCritical = critical.filter((b) => (botStatus?.[b.name] ?? 'allowed') === 'blocked');
+  const verdict =
+    blockedCritical.length === 0
+      ? { ok: true, text: 'All five critical AI crawlers can read your site.' }
+      : {
+          ok: false,
+          text: `${blockedCritical.length} of 5 critical crawlers blocked: ${blockedCritical
+            .map((b) => b.name)
+            .join(', ')}.`,
+        };
+
   return (
     <div className="card">
-      <h3 className="text-base font-semibold text-[var(--text-primary)] mb-3">AI crawler access</h3>
-      <ul className="divide-y divide-[var(--border-subtle)]">
-        {BOTS.map((b) => {
-          const status = botStatus?.[b.name] ?? 'allowed';
-          const allowed = status === 'allowed';
-          return (
-            <li
-              key={b.name}
-              className="flex items-center gap-3 py-2.5"
-            >
-              <span
-                className="inline-block w-2 h-2 rounded-full shrink-0"
-                style={{ background: FAMILY_COLOR[b.family] }}
-                aria-hidden="true"
-              />
-              <span className="flex-1 text-sm font-medium font-mono text-[var(--text-primary)] flex items-center gap-1">
-                {b.name}
-                <HelpTooltip text={b.explanation} />
-              </span>
-              <span
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
-                style={{
-                  background: allowed ? 'var(--success-muted)' : 'rgba(239, 68, 68, 0.12)',
-                  color: allowed ? 'var(--success-text)' : 'var(--danger-text)',
-                  border: `1px solid ${allowed ? 'var(--success)' : 'var(--danger)'}`,
-                }}
-              >
-                {allowed ? <Check size={11} /> : <X size={11} />}
-                {allowed ? 'Allowed' : 'Blocked'}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="mb-4">
+        <h3 className="text-base font-semibold text-[var(--text-primary)]">AI crawler access</h3>
+        <p
+          className="text-sm mt-1 leading-relaxed"
+          style={{ color: verdict.ok ? 'var(--success-text)' : 'var(--danger-text)' }}
+        >
+          {verdict.ok ? '✓ ' : '⚠ '}
+          {verdict.text}
+        </p>
+      </div>
+
+      <section>
+        <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">
+          Critical · the 5 that matter for AI search
+        </p>
+        <BotList bots={critical} botStatus={botStatus} />
+      </section>
+
+      <section className="mt-5 pt-4 border-t border-[var(--border-subtle)]">
+        <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-2">
+          Standard · additional AI bots worth allowing
+        </p>
+        <BotList bots={standard} botStatus={botStatus} />
+      </section>
     </div>
+  );
+}
+
+function BotList({
+  bots,
+  botStatus,
+}: {
+  bots: Bot[];
+  botStatus?: Record<string, 'allowed' | 'blocked'>;
+}) {
+  return (
+    <motion.ul
+      variants={staggerContainer}
+      initial="hidden"
+      animate="visible"
+      className="divide-y divide-[var(--border-subtle)]"
+    >
+      {bots.map((b) => {
+        const status = botStatus?.[b.name] ?? 'allowed';
+        const allowed = status === 'allowed';
+        return (
+          <motion.li
+            key={b.name}
+            variants={staggerChild}
+            className="py-2.5 grid grid-cols-[10px_1fr_auto] gap-3 items-start"
+          >
+            <span
+              className="inline-block w-2 h-2 rounded-full mt-2"
+              style={{ background: FAMILY_COLOR[b.family] }}
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-mono font-medium text-[var(--text-primary)]">{b.name}</p>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5 leading-relaxed">
+                {b.consequence}
+              </p>
+            </div>
+            <span
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider shrink-0 mt-0.5"
+              style={{
+                background: allowed ? 'var(--success-muted)' : 'rgba(239, 68, 68, 0.12)',
+                color: allowed ? 'var(--success-text)' : 'var(--danger-text)',
+                border: `1px solid ${allowed ? 'var(--success)' : 'var(--danger)'}`,
+              }}
+            >
+              {allowed ? <Check size={11} /> : <X size={11} />}
+              {allowed ? 'Allowed' : 'Blocked'}
+            </span>
+          </motion.li>
+        );
+      })}
+    </motion.ul>
   );
 }

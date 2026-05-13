@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { BotGrid } from './BotGrid';
-import { SchemaMatrix } from './SchemaMatrix';
+import { SchemaCoverageList } from './SchemaCoverageList';
 import { FilesStatusRow } from './FilesStatusRow';
 import { siteAudit, type WebsiteAuditFindingOut } from '@/lib/api';
 
@@ -12,6 +12,8 @@ interface Props {
   llmsTxtPresent: boolean | null;
   llmsTxtValid: boolean | null;
   robotsTxtRaw: string | null;
+  /** Switch to the Fixes tab and pre-filter by category/schema type. */
+  onJumpToFixes?: (filter?: { category?: string; query?: string }) => void;
 }
 
 const BOT_NAMES = [
@@ -27,7 +29,14 @@ const BOT_NAMES = [
   'Amazonbot',
 ];
 
-export function SchemaAndBotsTab({ auditId, brandId, llmsTxtPresent, llmsTxtValid, robotsTxtRaw }: Props) {
+export function SchemaAndBotsTab({
+  auditId,
+  brandId,
+  llmsTxtPresent,
+  llmsTxtValid,
+  robotsTxtRaw,
+  onJumpToFixes,
+}: Props) {
   const [botStatus, setBotStatus] = useState<Record<string, 'allowed' | 'blocked'>>({});
 
   useEffect(() => {
@@ -35,7 +44,6 @@ export function SchemaAndBotsTab({ auditId, brandId, llmsTxtPresent, llmsTxtVali
       const blocked = new Set<string>();
       for (const f of all) {
         if (f.check_id.startsWith('blocked_')) {
-          // Map the check_id (e.g. blocked_oai_searchbot) back to a bot name.
           for (const b of BOT_NAMES) {
             const slug = b.toLowerCase().replace(/-/g, '');
             if (
@@ -57,7 +65,12 @@ export function SchemaAndBotsTab({ auditId, brandId, llmsTxtPresent, llmsTxtVali
 
   return (
     <div className="space-y-6">
-      <SchemaMatrix auditId={auditId} />
+      <SchemaCoverageList
+        auditId={auditId}
+        onJumpToFix={(schemaType) =>
+          onJumpToFixes?.({ category: 'schema', query: schemaType })
+        }
+      />
       <BotGrid botStatus={botStatus} />
       <FilesStatusRow
         brandId={brandId}

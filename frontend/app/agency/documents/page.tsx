@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { FileText } from 'lucide-react';
+import { FileText, Plus } from 'lucide-react';
 import { agencyRecentDocuments, type AgencyDocumentWithClient } from '@/lib/api';
 import { DocumentViewer } from '@/components/agency/DocumentViewer';
+import { GenerateForAnyClientModal } from '@/components/agency/GenerateForAnyClientModal';
 
 const KINDS = [
   { value: '', label: 'All kinds' },
@@ -20,6 +21,7 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeDoc, setActiveDoc] = useState<AgencyDocumentWithClient | null>(null);
+  const [genOpen, setGenOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -31,26 +33,35 @@ export default function DocumentsPage() {
 
   return (
     <div className="p-8 text-[var(--text-primary)]">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold tracking-tight">Documents</h1>
-        <select
-          value={kind}
-          onChange={(e) => setKind(e.target.value)}
-          className="rounded-md border border-[var(--border-default)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-primary)]"
-        >
-          {KINDS.map((k) => (
-            <option key={k.value} value={k.value}>
-              {k.label}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={kind}
+            onChange={(e) => setKind(e.target.value)}
+            className="rounded-md border border-[var(--border-default)] bg-[var(--bg-raised)] px-3 py-2 text-sm text-[var(--text-primary)]"
+          >
+            {KINDS.map((k) => (
+              <option key={k.value} value={k.value}>
+                {k.label}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setGenOpen(true)}
+            className="flex items-center gap-2 rounded-md bg-[var(--bg-elevated)] px-3 py-2 text-sm font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card)]"
+          >
+            <Plus className="h-4 w-4" />
+            Generate document
+          </button>
+        </div>
       </div>
 
       {loading && <p className="text-sm text-[var(--text-muted)]">Loading…</p>}
       {error && <p className="text-sm text-red-400">{error}</p>}
       {!loading && docs.length === 0 && (
         <p className="text-sm text-[var(--text-muted)]">
-          No documents yet. Generate one from a client&apos;s Reports tab.
+          No documents yet. Click &ldquo;Generate document&rdquo; to create one.
         </p>
       )}
 
@@ -89,6 +100,15 @@ export default function DocumentsPage() {
           setActiveDoc((prev) => (prev ? { ...prev, ...next } : null));
         }}
         onDelete={(id) => setDocs((prev) => prev.filter((d) => d.id !== id))}
+      />
+
+      <GenerateForAnyClientModal
+        open={genOpen}
+        onOpenChange={setGenOpen}
+        onGenerated={(doc) => {
+          agencyRecentDocuments(50, kind || undefined).then(setDocs);
+          setActiveDoc(doc as AgencyDocumentWithClient);
+        }}
       />
     </div>
   );

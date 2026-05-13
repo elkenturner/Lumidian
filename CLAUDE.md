@@ -118,6 +118,7 @@ tests/
 | errors.py | /api/errors | Frontend error logging |
 | support.py | /api/support | Support ticket handling |
 | site_audit.py | /api/site-audit | Trigger audits; surface findings/recommendations/citations; generate llms.txt + robots.txt snippets |
+| clusters.py | /api/clusters | Cluster lifecycle: list, detail, regenerate (full or per-piece), edit brief, pillar propose/accept/reject |
 | main.py | /api/health | Liveness check |
 
 ### Frontend Layout
@@ -179,7 +180,9 @@ No Alembic. Migrations are embedded in `database.py:run_migrations()` and applie
 | `BrandProfile` | id, brand_id FK (unique), company_description, key_stats, tone_of_voice, what_not_to_say, target_audience, approved_language, publications, internal_brand_context, website_context_last_fetched |
 | `ContentOpportunity` | id, brand_id FK, platform, thread_url, thread_title, subreddit, relevance_score, status (new/drafted/dismissed) |
 | `ContentGap` | id, brand_id FK, prompt_id FK, tracking_run_id FK, model, severity_score, opportunity_score, gap_score, competitor_mentions (JSON), platforms_lacking (JSON), quora_questions (JSON) |
-| `ContentDraft` | id, brand_id FK, prompt_id FK, opportunity_id FK, platform, status (draft/approved/posted/failed), title, content_text, source (onboarding/manual), approved_at, posted_at |
+| `ContentDraft` | id, brand_id FK, prompt_id FK, opportunity_id FK, cluster_id FK (nullable), platform, status (draft/approved/posted/failed), title, content_text, source (onboarding/manual/cluster), approved_at, posted_at |
+| `ContentCluster` | id, brand_id FK, prompt_id FK (unique), status (pending/briefing/generating/ready/partial_failed), pillar_mode (none/proposed/attached/rejected_tone), pillar_url, last_brief_id FK, version, last_generated_at |
+| `ContentBrief` | id, cluster_id FK, version, positioning, key_claims (JSON), canonical_phrasings (JSON), stats (JSON), competitor_context (JSON), narrative_spine, tone_notes, created_by |
 | `ContentPost` | id, draft_id FK, platform, post_url, platform_post_id, posted_at |
 | `ContentAttribution` | id, content_post_id FK, tracking_run_id FK, brand_id FK, visibility_before, visibility_after, improvement_pct |
 | `DraftAttribution` | id, draft_id FK, brand_id FK, prompt_id FK, score_at_posting, current_score, delta, runs_since_posting |
@@ -280,6 +283,9 @@ Caps defined in `routers/content.py` (`TIER_SCHEDULED_CAPS`) and `services/draft
 
 ### Content Drafting Flow
 Drafts are generated on brand creation (onboarding) and manually via "Regenerate Drafts". No recurring auto-draft job. Opportunity scanning is fully manual/on-demand (triggered by user or during onboarding) and is separate from drafting. Draft platforms: reddit, quora, medium, wikipedia, linkedin, x.
+
+### Content Clusters (`services/clustering_service.py`)
+Per-prompt coordinated content. Each tracked prompt can have one `ContentCluster` with a shared `ContentBrief` (positioning, canonical phrasings, stats, narrative spine, tone notes). Drafts inside a cluster are generated in parallel via `asyncio.gather` from the brief; cross-references are semantic (e.g. "we covered this on Medium") — no hard URLs at generation time. Cluster platforms are linkedin, medium, reddit, quora, x — Wikipedia is excluded (handled in its own UI tab as a placeholder). Optional own-site **pillar** is opt-in and LLM-tone-gated via `cluster_pillar.propose_pillar()` — never auto-attached. Model selection routes through `drafting/models.py:CROSS_REF_SUMMARY_MODEL` (brief + tone gate) and `writer_model_for_tier(tier)` (piece generation). API surface is `/api/clusters/*` (7 endpoints). Cluster regeneration is triggered by the new `/content/[brandId]` tab; the legacy `_bg_generate_drafts` flow on `/content` is unchanged.
 
 ### LLM Concurrency & Resilience
 Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Overall tracking concurrency: `MAX_CONCURRENT=10` in `tracking_service.py`. Model fallbacks on overload (503): `sonar-pro` → `sonar`. Rate limit errors get 65s retry delay. Auth errors (invalid API key) are not retried. Timeouts: Claude draft generation 30s, sentiment classification 15s, Reddit scanner relevance 10s.

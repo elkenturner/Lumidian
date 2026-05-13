@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { siteAudit, type WebsiteAuditRecommendationOut } from '@/lib/api';
 import { staggerContainer, staggerChild } from '@/lib/motion';
-import { FixCard } from './FixCard';
+import { FixGroup } from './FixGroup';
 import { FixFilters, type FixFilterState } from './FixFilters';
 
 interface Props {
@@ -18,6 +18,7 @@ export function FixGrid({ auditId }: Props) {
     priority: null,
     status: 'pending',
     query: '',
+    quickWins: false,
   });
 
   const load = useCallback(async () => {
@@ -51,6 +52,11 @@ export function FixGrid({ auditId }: Props) {
       .filter((r) => (filters.category ? r.category === filters.category : true))
       .filter((r) => (filters.priority ? r.priority === filters.priority : true))
       .filter((r) =>
+        filters.quickWins
+          ? (r.priority === 'high' || (r.expected_lift_pp ?? 0) >= 10) && r.effort === 'low'
+          : true,
+      )
+      .filter((r) =>
         q
           ? r.title.toLowerCase().includes(q) || r.body.toLowerCase().includes(q)
           : true,
@@ -80,18 +86,36 @@ export function FixGrid({ auditId }: Props) {
           No fixes match these filters.
         </p>
       ) : (
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          animate="visible"
-          className="space-y-3"
-        >
-          {filtered?.map((rec) => (
-            <motion.div key={rec.id} variants={staggerChild}>
-              <FixCard rec={rec} onStatusChange={() => load()} />
+        (() => {
+          // Group by (title + category) so 89 "Add JSON-LD schema" recs collapse into one card
+          // with a "show pages" disclosure. Site-wide recs (one per title) drop through as solo cards.
+          const groups = new Map<string, WebsiteAuditRecommendationOut[]>();
+          for (const r of filtered ?? []) {
+            const key = `${r.title}::${r.category}`;
+            const arr = groups.get(key) ?? [];
+            arr.push(r);
+            groups.set(key, arr);
+          }
+          const ordered = Array.from(groups.values()).sort(
+            (a, b) =>
+              Math.max(...b.map((x) => x.priority_score ?? 0))
+              - Math.max(...a.map((x) => x.priority_score ?? 0)),
+          );
+          return (
+            <motion.div
+              variants={staggerContainer}
+              initial="hidden"
+              animate="visible"
+              className="space-y-3"
+            >
+              {ordered.map((recs, i) => (
+                <motion.div key={i} variants={staggerChild}>
+                  <FixGroup recs={recs} onStatusChange={() => load()} />
+                </motion.div>
+              ))}
             </motion.div>
-          ))}
-        </motion.div>
+          );
+        })()
       )}
     </>
   );

@@ -9,7 +9,6 @@ import {
   Check,
   X,
   AlertCircle,
-  ChevronDown,
   CornerDownRight,
   ShieldCheck,
 } from 'lucide-react';
@@ -18,13 +17,10 @@ import { siteAudit, type WebsiteAuditRecommendationOut } from '@/lib/api';
 import { easings } from '@/lib/motion';
 import { insertionHint } from '@/lib/insertion-hint';
 import { FixCardCodeBlock } from './FixCardCodeBlock';
-import { FixCardImplSteps } from './FixCardImplSteps';
 import { RegenPopover } from './RegenPopover';
 
 interface Props {
   rec: WebsiteAuditRecommendationOut;
-  /** Static install steps from the recs registry, fetched via the parent. */
-  implSteps?: string[];
   /** Notify parent when status changes (e.g. so the hero list can re-rank). */
   onStatusChange?: (newStatus: 'pending' | 'applied' | 'dismissed') => void;
   /** Compact = used in the hero. Default false = used in the full Fixes list. */
@@ -59,7 +55,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   authority: 'Authority',
 };
 
-export function FixCard({ rec, implSteps, onStatusChange, compact = false }: Props) {
+export function FixCard({ rec, onStatusChange, compact = false }: Props) {
   const [artifact, setArtifact] = useState<string | null>(rec.artifact ?? null);
   const [artifactType, setArtifactType] = useState<string | null>(rec.artifact_type ?? null);
   const [draftStatus, setDraftStatus] = useState<DraftStatus>(
@@ -68,7 +64,6 @@ export function FixCard({ rec, implSteps, onStatusChange, compact = false }: Pro
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [regenOpen, setRegenOpen] = useState(false);
   const [exiting, setExiting] = useState(false);
-  const [stepsOpen, setStepsOpen] = useState(false);
 
   async function handleDraft(regenerateNotes?: string) {
     if (!rec.artifact_type) {
@@ -251,36 +246,6 @@ export function FixCard({ rec, implSteps, onStatusChange, compact = false }: Pro
                     }}
                   />
                 </div>
-
-                {/* Why-it-matters collapsed by default once drafted */}
-                <button
-                  type="button"
-                  onClick={() => setStepsOpen((v) => !v)}
-                  className="mt-4 inline-flex items-center gap-1 text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-                >
-                  <ChevronDown
-                    size={12}
-                    className="transition-transform"
-                    style={{ transform: stepsOpen ? 'rotate(0deg)' : 'rotate(-90deg)' }}
-                  />
-                  Why this matters · how to install
-                </button>
-                <AnimatePresence>
-                  {stepsOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      exit={{ opacity: 0, height: 0 }}
-                      transition={{ duration: 0.22, ease: easings.out }}
-                      className="overflow-hidden"
-                    >
-                      <p className="text-sm text-[var(--text-secondary)] mt-3 leading-relaxed whitespace-pre-line">
-                        {rec.body}
-                      </p>
-                      <FixCardImplSteps steps={implSteps ?? []} />
-                    </motion.div>
-                  )}
-                </AnimatePresence>
 
                 {/* Terminal actions */}
                 <div className="mt-4 flex items-center gap-2">

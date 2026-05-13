@@ -95,12 +95,7 @@ export function OverviewHero({ auditId, onSeeAll }: Props) {
       >
         {recs.map((rec) => (
           <motion.div key={rec.id} variants={staggerChild}>
-            <FixCard
-              rec={rec}
-              implSteps={[]} // populated via /pageDetail when card expands; for hero we keep tight
-              onStatusChange={() => load()}
-              compact
-            />
+            <FixCard rec={rec} onStatusChange={() => load()} compact />
           </motion.div>
         ))}
       </motion.div>

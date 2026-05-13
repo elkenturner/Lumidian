@@ -288,7 +288,7 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
                 recs.append(render_rec_for_csr_page(
                     rec["page_id"], page_link_map.get(rec["page_id"], [])
                 ))
-            page_url = rec["measurements"].get("url")
+            page_url = rec.get("url")
             for r in recs:
                 db.add(WebsiteAuditRecommendation(
                     audit_id=audit_id, page_id=rec["page_id"],

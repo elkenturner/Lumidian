@@ -162,6 +162,14 @@ def _rec_out(r: WebsiteAuditRecommendation) -> WebsiteAuditRecommendationOut:
         linked_prompt_ids=ids,
         expected_impact=r.expected_impact,
         llm_generated=r.llm_generated,
+        artifact=r.artifact,
+        artifact_type=r.artifact_type,
+        artifact_generated_at=r.artifact_generated_at,
+        artifact_regen_count=r.artifact_regen_count or 0,
+        status=r.status or "pending",
+        expected_lift_pp=r.expected_lift_pp,
+        target_url=r.target_url,
+        priority_score=r.priority_score,
     )
 
 

@@ -35,7 +35,7 @@ async def test_list_templates_returns_four(client):
     resp = await client.get("/api/agency/document-templates")
     assert resp.status_code == 200
     kinds = {t["kind"] for t in resp.json()}
-    assert kinds == {"audit_initial", "sow", "monthly_report", "kickoff_checklist"}
+    assert kinds == {"agency_weekly_report", "audit_initial", "sow", "monthly_report", "kickoff_checklist"}
 
 
 @pytest.mark.asyncio

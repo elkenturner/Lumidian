@@ -288,6 +288,15 @@ async def fetch_data(db: AsyncSession, client: AgencyClient) -> dict[str, Any]:
         return {
             "client": {"name": client.name},
             "period": _period(now, week_start),
+            "this_week_run": None,
+            "last_week_run": None,
+            "model_scores": [],
+            "per_prompt": [],
+            "competitors": [],
+            "content_shipped": [],
+            "draft_attribution": [],
+            "top_gaps": [],
+            "activity_sample": [],
             "has_data": False,
         }
 

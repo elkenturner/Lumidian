@@ -2070,3 +2070,116 @@ export async function agencyRecentDocuments(limit = 20, kind?: string): Promise<
   const res = await api.get<AgencyDocumentWithClient[]>('/agency/documents/recent', { params });
   return res.data;
 }
+
+// ----- Content Clusters -----
+
+export interface ContentBrief {
+  id: number;
+  cluster_id: number;
+  version: number;
+  positioning: string;
+  key_claims: string[];
+  canonical_phrasings: string[];
+  stats: { label: string; value: string; source: string }[];
+  competitor_context: Record<string, unknown>;
+  narrative_spine: string;
+  tone_notes: string;
+  created_by: string;
+  created_at: string;
+}
+
+export interface ClusterPieceSummary {
+  platform: string;
+  draft_id: number | null;
+  status: string;
+  title: string | null;
+  excerpt: string | null;
+}
+
+export interface ContentClusterSummary {
+  id: number;
+  brand_id: number;
+  prompt_id: number;
+  prompt_text: string;
+  status: string;
+  pillar_mode: string;
+  pillar_url: string | null;
+  visibility_pct: number;
+  pieces: ClusterPieceSummary[];
+  version: number;
+  last_generated_at: string | null;
+}
+
+export interface ContentClusterDetail {
+  id: number;
+  brand_id: number;
+  prompt_id: number;
+  prompt_text: string;
+  status: string;
+  pillar_mode: string;
+  pillar_url: string | null;
+  visibility_pct: number;
+  brief: ContentBrief | null;
+  drafts: ContentDraft[];
+  version: number;
+  last_generated_at: string | null;
+}
+
+export interface PillarCandidate {
+  page_id: number;
+  url: string;
+  title: string | null;
+  tone_score: number;
+  tone_reasoning: string;
+}
+
+export async function listClusters(brandId: number): Promise<ContentClusterSummary[]> {
+  const res = await api.get<ContentClusterSummary[]>(`/clusters/${brandId}`);
+  return res.data;
+}
+
+export async function getCluster(brandId: number, clusterId: number): Promise<ContentClusterDetail> {
+  const res = await api.get<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}`);
+  return res.data;
+}
+
+export async function regenerateClusterByPrompt(
+  brandId: number,
+  promptId: number,
+): Promise<ContentClusterDetail> {
+  const res = await api.post<ContentClusterDetail>(`/clusters/${brandId}/by-prompt/${promptId}/regenerate`);
+  return res.data;
+}
+
+export async function regenerateClusterPiece(
+  brandId: number,
+  clusterId: number,
+  platform: string,
+): Promise<ContentDraft> {
+  const res = await api.post<ContentDraft>(`/clusters/${brandId}/${clusterId}/regenerate-piece`, { platform });
+  return res.data;
+}
+
+export async function editClusterBrief(
+  brandId: number,
+  clusterId: number,
+  patch: Partial<Pick<ContentBrief, 'positioning' | 'key_claims' | 'canonical_phrasings' | 'stats' | 'narrative_spine' | 'tone_notes'>>,
+): Promise<ContentBrief> {
+  const res = await api.patch<ContentBrief>(`/clusters/${brandId}/${clusterId}/brief`, patch);
+  return res.data;
+}
+
+export async function proposeClusterPillar(brandId: number, clusterId: number): Promise<PillarCandidate | null> {
+  const res = await api.post<PillarCandidate | null>(`/clusters/${brandId}/${clusterId}/pillar/propose`);
+  return res.data;
+}
+
+export async function acceptClusterPillar(brandId: number, clusterId: number): Promise<ContentClusterDetail> {
+  const res = await api.post<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}/pillar/accept`);
+  return res.data;
+}
+
+export async function rejectClusterPillar(brandId: number, clusterId: number): Promise<ContentClusterDetail> {
+  const res = await api.post<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}/pillar/reject`);
+  return res.data;
+}

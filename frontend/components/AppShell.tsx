@@ -22,7 +22,7 @@ const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> 
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.bgColor, text: v.color }])
 );
 
-const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/methodology', '/account-paused'];
+const NO_SIDEBAR_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/terms', '/privacy', '/methodology', '/account-paused', '/agency'];
 
 /* ── Premium animated report-running banner ─────────────────────────────────── */
 function ReportRunningBanner({ modelScores, isMobile, promptCount }: { modelScores: Array<{ model: string; score: number }>; isMobile: boolean; promptCount: number }) {

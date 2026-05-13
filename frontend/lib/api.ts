@@ -2150,6 +2150,14 @@ export async function agencyGenerateDocument(clientId: number, kind: string): Pr
   return res.data;
 }
 
+export async function agencyGenerateWeeklyReport(clientId: number): Promise<AgencyDocument> {
+  const res = await api.post<AgencyDocument>(
+    `/agency/clients/${clientId}/documents`,
+    { kind: "agency_weekly_report" },
+  );
+  return res.data;
+}
+
 export async function agencyUpdateDocument(documentId: number, bodyMarkdown: string): Promise<AgencyDocument> {
   const res = await api.patch<AgencyDocument>(`/agency/documents/${documentId}`, { body_markdown: bodyMarkdown });
   return res.data;

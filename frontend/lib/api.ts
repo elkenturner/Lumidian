@@ -1799,6 +1799,27 @@ export async function getPromptDetail(brandId: number, promptId: number): Promis
   return dedupedGet<PromptDetailData>(`/results/${brandId}/prompt/${promptId}/detail`);
 }
 
+export interface PromptOverviewItem {
+  prompt_id: number;
+  prompt_text: string;
+  current_overall: number;
+  trend: string;
+  sparkline: number[];
+  model_scores: Record<string, number>;
+  drafts_posted: number;
+  last_draft_at: string | null;
+  has_recent_content_event: boolean;
+}
+
+export interface PromptsOverviewResponse {
+  prompts: PromptOverviewItem[];
+}
+
+export async function getPromptsOverview(brandId: number): Promise<PromptsOverviewResponse> {
+  const res = await api.get<PromptsOverviewResponse>(`/results/${brandId}/prompts/overview`);
+  return res.data;
+}
+
 // ── AI Visibility Coach ────────────────────────────────────────────────────────
 
 export async function getCoachUsage(brandId: number): Promise<{ used: number; limit: number; resets_at: string }> {
@@ -2275,4 +2296,8 @@ export async function agencyGenerateDraft(
     body,
   );
   return res.data;
+}
+
+export async function agencyTriggerTracking(clientId: number): Promise<void> {
+  await api.post(`/agency/clients/${clientId}/tracking/run`);
 }

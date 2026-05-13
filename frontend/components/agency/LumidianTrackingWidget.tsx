@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { getOverview, getTrends, type OverviewData, type TrendPoint } from '@/lib/api';
 
 interface Props {
@@ -68,15 +67,7 @@ export function LumidianTrackingWidget({ brandId }: Props) {
 
   return (
     <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 text-[var(--text-primary)]">
-      <div className="flex items-baseline justify-between">
-        <h3 className="text-sm font-medium text-[var(--text-secondary)]">Lumidian visibility</h3>
-        <Link
-          href={`/dashboard?brand=${brandId}`}
-          className="text-xs text-[var(--text-muted)] hover:underline"
-        >
-          Open in Lumidian →
-        </Link>
-      </div>
+      <h3 className="text-sm font-medium text-[var(--text-secondary)]">Lumidian visibility</h3>
       <div className="mt-2 text-3xl font-semibold">{overall}%</div>
 
       {modelBars.some((b) => b.value > 0) && (

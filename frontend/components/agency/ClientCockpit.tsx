@@ -12,6 +12,7 @@ import { ClientBrandTab } from './ClientBrandTab';
 import { ClientPipelineTab } from './ClientPipelineTab';
 import { ClientQuickActionsRail } from './ClientQuickActionsRail';
 import { DocumentList } from './DocumentList';
+import { GenerateDraftButton } from './GenerateDraftButton';
 import { LumidianTrackingWidget } from './LumidianTrackingWidget';
 import { TaskList } from './TaskList';
 
@@ -107,7 +108,14 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
           </section>
 
           <section id="pipeline" className="scroll-mt-24">
-            <h2 className="mb-3 text-sm font-medium text-[var(--text-secondary)]">Pipeline</h2>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-medium text-[var(--text-secondary)]">Pipeline</h2>
+              <GenerateDraftButton
+                clientId={client.id}
+                brandId={client.brand_id}
+                onGenerated={() => setPipelineRefreshKey((k) => k + 1)}
+              />
+            </div>
             <ClientPipelineTab
               key={pipelineRefreshKey}
               brandId={client.brand_id}

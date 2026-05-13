@@ -2257,3 +2257,22 @@ export async function rejectClusterPillar(brandId: number, clusterId: number): P
   const res = await api.post<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}/pillar/reject`);
   return res.data;
 }
+
+// ── Agency drafting (sub-project E, 2026-05-13) ──────────────────────────────
+
+export interface AgencyGenerateDraftIn {
+  prompt_id: number;
+  platform: string;
+  custom_brief?: string;
+}
+
+export async function agencyGenerateDraft(
+  clientId: number,
+  body: AgencyGenerateDraftIn,
+): Promise<ContentDraft> {
+  const res = await api.post<ContentDraft>(
+    `/agency/clients/${clientId}/drafts/generate`,
+    body,
+  );
+  return res.data;
+}

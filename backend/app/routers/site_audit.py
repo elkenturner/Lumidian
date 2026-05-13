@@ -547,7 +547,16 @@ async def draft_recommendation_artifact(
     body: DraftArtifactRequest = DraftArtifactRequest(),
     user: User = Depends(get_current_user),
 ):
-    """Generate (or regenerate) the paste-ready artifact for a recommendation."""
+    """Generate (or regenerate) the paste-ready artifact for a recommendation.
+
+    Rule-based artifact types are allowed on basic+; LLM-backed types require
+    starter+ and count against the monthly LLM-rewrite cap.
+    """
+    from app.services.site_audit.artifact_generator import (
+        LLM_ARTIFACT_TYPES,
+        generate_artifact,
+    )
+
     async with AsyncSessionLocal() as db:
         rec = await db.get(WebsiteAuditRecommendation, rec_id)
         if not rec:
@@ -557,7 +566,59 @@ async def draft_recommendation_artifact(
             raise HTTPException(404, "audit not found")
     brand = await _ensure_brand_access(audit.brand_id, user)
     _tier_or_403(brand, user)
-    raise HTTPException(501, "draft generator not wired yet")
+
+    if not rec.artifact_type:
+        raise HTTPException(
+            400,
+            "this recommendation has no draftable artifact_type",
+        )
+
+    # LLM-backed artifact gate: requires starter+ AND respects monthly cap.
+    if rec.artifact_type in LLM_ARTIFACT_TYPES:
+        tier = user.subscription_tier or ("basic" if user.is_agency_staff else None)
+        if tier not in ("starter", "pro"):
+            raise HTTPException(
+                402,
+                "LLM-backed artifacts require Growth (starter) or Pro tier",
+            )
+        # Monthly LLM cap.
+        month_start = utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        async with AsyncSessionLocal() as db:
+            used = (
+                await db.execute(
+                    select(func.count(WebsiteAuditRecommendation.id))
+                    .join(WebsiteAudit, WebsiteAudit.id == WebsiteAuditRecommendation.audit_id)
+                    .where(
+                        WebsiteAudit.brand_id == brand.id,
+                        WebsiteAuditRecommendation.artifact_generated_at >= month_start,
+                        WebsiteAuditRecommendation.artifact_type.in_(LLM_ARTIFACT_TYPES),
+                    )
+                )
+            ).scalar_one()
+        cap = TIER_AUDIT_LIMITS.get(tier, {}).get("llm_rewrites", 0)
+        if used >= cap:
+            raise HTTPException(
+                402,
+                f"monthly LLM-draft cap reached ({cap}) — upgrade or wait until next month",
+            )
+
+    try:
+        result = await generate_artifact(rec_id, regenerate_notes=body.regenerate_notes)
+    except ValueError as exc:
+        # e.g., no generator registered for this artifact_type
+        raise HTTPException(400, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("draft failed for rec %d", rec_id)
+        raise HTTPException(503, f"draft generation failed: {exc}")
+
+    async with AsyncSessionLocal() as db:
+        rec_fresh = await db.get(WebsiteAuditRecommendation, rec_id)
+        return DraftArtifactResponse(
+            artifact=result.artifact,
+            artifact_type=result.artifact_type,
+            generated_at=rec_fresh.artifact_generated_at,
+            regen_count=rec_fresh.artifact_regen_count,
+        )
 
 
 _VALID_REC_STATUS = {"pending", "applied", "dismissed"}

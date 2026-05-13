@@ -2,11 +2,29 @@
 from __future__ import annotations
 
 import logging
+import math
 from dataclasses import dataclass, field
 
 from app.services.site_audit.parsers import Finding
 
 logger = logging.getLogger(__name__)
+
+
+# Effort string → minutes (used in priority_score and surfaced in the UI).
+EFFORT_MINUTES: dict[str, int] = {
+    "low": 5,
+    "medium": 20,
+    "high": 60,
+}
+
+
+def compute_priority_score(
+    *, expected_lift_pp: float, pages_affected: int, effort_minutes: int
+) -> float:
+    """Rank recommendations: higher = more bang per minute of work."""
+    return (float(expected_lift_pp) * max(int(pages_affected), 1)) / math.sqrt(
+        max(int(effort_minutes), 0) + 1
+    )
 
 
 @dataclass
@@ -20,6 +38,11 @@ class Recommendation:
     linked_prompt_ids: list[int] = field(default_factory=list)
     expected_impact: str | None = None
     llm_generated: bool = False
+    artifact_type: str | None = None
+    expected_lift_pp: float | None = None
+    impl_steps: list[str] = field(default_factory=list)
+    priority_score: float | None = None
+    target_url: str | None = None
 
 
 @dataclass
@@ -257,6 +280,271 @@ _RECS: dict[str, dict] = {
     },
 }
 
+# ── Fix-factory metadata (additive sidecar to _RECS) ─────────────────────────
+#
+# For each check_id we record:
+#   - expected_lift_pp: magnitude this fix moves the relevant scoring axis
+#   - artifact_type:   which generator the "Draft this" button calls (or None)
+#   - impl_steps:      numbered install instructions shown under the artifact
+#
+# Values are conservative estimates calibrated to the existing scoring weights.
+
+_RECS_META: dict[str, dict] = {
+    # bot_access — small per-bot lifts; OAI-SearchBot is the heaviest hit
+    "blocked_oai_searchbot": {
+        "expected_lift_pp": 40.0,
+        "artifact_type": "robots_snippet",
+        "impl_steps": [
+            "Open your robots.txt at the site root.",
+            "Replace any `Disallow: /` for OAI-SearchBot with the snippet above.",
+            "Deploy and verify at https://yoursite.com/robots.txt.",
+            "Allow 24-48h for ChatGPT live-search to re-crawl.",
+        ],
+    },
+    "blocked_gptbot": {
+        "expected_lift_pp": 15.0,
+        "artifact_type": "robots_snippet",
+        "impl_steps": [
+            "Open robots.txt.",
+            "Add `User-agent: GPTBot` block with `Allow: /`.",
+            "Deploy.",
+        ],
+    },
+    "blocked_claudebot": {
+        "expected_lift_pp": 15.0,
+        "artifact_type": "robots_snippet",
+        "impl_steps": ["Add `User-agent: ClaudeBot` `Allow: /` to robots.txt.", "Deploy."],
+    },
+    "blocked_google_extended": {
+        "expected_lift_pp": 15.0,
+        "artifact_type": "robots_snippet",
+        "impl_steps": ["Add `User-agent: Google-Extended` `Allow: /` to robots.txt.", "Deploy."],
+    },
+    "blocked_perplexitybot": {
+        "expected_lift_pp": 5.0,
+        "artifact_type": "robots_snippet",
+        "impl_steps": ["Add `User-agent: PerplexityBot` `Allow: /` to robots.txt.", "Deploy."],
+    },
+    "no_robots_txt": {
+        "expected_lift_pp": 5.0,
+        "artifact_type": "robots_snippet",
+        "impl_steps": [
+            "Create /robots.txt at your site root.",
+            "Paste the snippet above.",
+            "Verify at https://yoursite.com/robots.txt.",
+        ],
+    },
+    "llms_txt_missing": {
+        "expected_lift_pp": 2.0,
+        "artifact_type": "llms_txt",
+        "impl_steps": [
+            "Create /llms.txt at your site root.",
+            "Paste the generated content.",
+            "Verify it loads at https://yoursite.com/llms.txt.",
+        ],
+    },
+
+    # content — per-page text fixes
+    "missing_h1": {
+        "expected_lift_pp": 12.0,
+        "artifact_type": "h1_text",
+        "impl_steps": [
+            "Open the page's template (e.g. the React component, Liquid file, or HTML).",
+            "Add the generated H1 inside <main>, above other headings.",
+            "Save and redeploy.",
+        ],
+    },
+    "no_h2": {
+        "expected_lift_pp": 8.0,
+        "artifact_type": "section_rewrite",
+        "impl_steps": [
+            "Identify natural break points in the page (every 200-300 words).",
+            "Insert H2 headings at each break.",
+            "Use the generated rewrite as a starting point for the first section.",
+        ],
+    },
+    "answer_first_failed": {
+        "expected_lift_pp": 15.0,
+        "artifact_type": "section_rewrite",
+        "impl_steps": [
+            "Locate the first H2 section.",
+            "Replace its opening paragraph with the generated rewrite.",
+            "Verify the first 40-75 words read as a self-contained answer.",
+        ],
+    },
+    "fact_density_low": {
+        "expected_lift_pp": 10.0,
+        "artifact_type": "section_rewrite",
+        "impl_steps": [
+            "Identify a section weak on specifics.",
+            "Paste the rewrite (includes 3-5 concrete stats).",
+            "Verify stats reference a source + year inline.",
+        ],
+    },
+    "no_outbound_citations": {
+        "expected_lift_pp": 6.0,
+        "artifact_type": None,
+        "impl_steps": [
+            "Identify 2-3 third-party sources that support the page's claims.",
+            "Add inline links with descriptive anchor text.",
+        ],
+    },
+    "pronoun_overuse": {
+        "expected_lift_pp": 4.0,
+        "artifact_type": "section_rewrite",
+        "impl_steps": [
+            "Find sentences starting with 'It' / 'They' / 'This'.",
+            "Replace pronouns with the brand or concept name.",
+        ],
+    },
+    "fake_lists": {
+        "expected_lift_pp": 3.0,
+        "artifact_type": None,
+        "impl_steps": [
+            "Find paragraphs that use • or - bullet characters.",
+            "Wrap each in real <ul><li>…</li></ul> or <ol><li>…</li></ol>.",
+        ],
+    },
+    "missing_title": {
+        "expected_lift_pp": 10.0,
+        "artifact_type": "meta_title",
+        "impl_steps": [
+            "Open the page's <head>.",
+            "Add the generated <title>…</title>.",
+            "Deploy and verify in the browser's tab title.",
+        ],
+    },
+    "missing_meta_description": {
+        "expected_lift_pp": 6.0,
+        "artifact_type": "meta_description",
+        "impl_steps": [
+            "Open the page's <head>.",
+            'Add `<meta name="description" content="…">` using the generated text.',
+            "Deploy.",
+        ],
+    },
+    "stale_content": {
+        "expected_lift_pp": 5.0,
+        "artifact_type": "section_rewrite",
+        "impl_steps": [
+            "Refresh the page's content using the rewrite as a baseline.",
+            "Update the dateModified in JSON-LD.",
+            "Update any visible 'Last updated' date on the page.",
+        ],
+    },
+    "low_alt_text_coverage": {
+        "expected_lift_pp": 3.0,
+        "artifact_type": "alt_text_batch",
+        "impl_steps": [
+            "Pull the JSON of alt-text suggestions.",
+            "For each image on the page, apply the closest matching alt.",
+            "Aim for 90%+ coverage of meaningful images (decorative can stay empty).",
+        ],
+    },
+    "title_too_long": {
+        "expected_lift_pp": 3.0,
+        "artifact_type": "meta_title",
+        "impl_steps": [
+            "Replace your <title> with the generated shorter version.",
+            "Verify under 70 characters.",
+        ],
+    },
+
+    # schema — JSON-LD adds
+    "missing_organization_schema": {
+        "expected_lift_pp": 21.0,
+        "artifact_type": "jsonld_org",
+        "impl_steps": [
+            "Paste the generated <script type='application/ld+json'> block into your homepage <head>.",
+            "If you have a global layout template, put it there so it appears on every page.",
+            "Validate at https://search.google.com/test/rich-results.",
+        ],
+    },
+    "incomplete_organization_schema": {
+        "expected_lift_pp": 10.0,
+        "artifact_type": "jsonld_org",
+        "impl_steps": [
+            "Replace the existing Organization JSON-LD with the generated one.",
+            "Validate at https://search.google.com/test/rich-results.",
+        ],
+    },
+    "article_missing_author": {
+        "expected_lift_pp": 8.0,
+        "artifact_type": "jsonld_article",
+        "impl_steps": [
+            "Replace the existing Article JSON-LD with the generated block.",
+            "Set the author's `sameAs` to their LinkedIn / personal site if available.",
+        ],
+    },
+    "article_missing_dates": {
+        "expected_lift_pp": 8.0,
+        "artifact_type": "jsonld_article",
+        "impl_steps": [
+            "Replace the existing Article JSON-LD with the generated block.",
+            "Set datePublished / dateModified to ISO-8601 dates from your CMS.",
+        ],
+    },
+    "product_missing_required": {
+        "expected_lift_pp": 12.0,
+        "artifact_type": "jsonld_product",
+        "impl_steps": [
+            "Replace the existing Product JSON-LD with the generated block.",
+            "Update placeholder price/availability with real values.",
+        ],
+    },
+    "faqpage_no_questions": {
+        "expected_lift_pp": 12.0,
+        "artifact_type": "jsonld_faq",
+        "impl_steps": [
+            "Replace the empty FAQPage JSON-LD with the generated block.",
+            "Ensure each Question's text appears as visible content on the page (anti-cloaking).",
+        ],
+    },
+    "malformed_jsonld": {
+        "expected_lift_pp": 15.0,
+        "artifact_type": None,
+        "impl_steps": [
+            "Open the existing JSON-LD script tag.",
+            "Fix the syntax error (often a trailing comma or unescaped quote).",
+            "Validate at https://validator.schema.org/.",
+        ],
+    },
+    "no_jsonld": {
+        "expected_lift_pp": 15.0,
+        "artifact_type": "jsonld_article",
+        "impl_steps": [
+            "Decide which schema type fits (Article/Product/FAQPage/etc.).",
+            "Paste the generated block into the page's <head>.",
+            "Validate at https://search.google.com/test/rich-results.",
+        ],
+    },
+
+    # authority — E-E-A-T signals
+    "missing_byline": {
+        "expected_lift_pp": 6.0,
+        "artifact_type": None,
+        "impl_steps": [
+            "Add a visible author byline near the H1 (e.g. 'By Jane Doe').",
+            "Link the author name to an author profile page if one exists.",
+        ],
+    },
+    "missing_update_date": {
+        "expected_lift_pp": 5.0,
+        "artifact_type": None,
+        "impl_steps": [
+            "Add a visible 'Last updated' date near the byline.",
+            "Match it to dateModified in JSON-LD.",
+        ],
+    },
+}
+
+
+def enrich_recommendation(check_id: str, base: dict) -> dict:
+    """Merge a _RECS entry with its _RECS_META sidecar; missing meta is fine."""
+    meta = _RECS_META.get(check_id, {})
+    return {**base, **meta}
+
+
 _RENDER_REC = {
     "title": "Render this page server-side",
     "body": (
@@ -272,6 +560,17 @@ _RENDER_REC = {
     "expected_impact": "Restores AI crawler visibility from zero",
 }
 
+# js_rendered_page metadata (separate because _RENDER_REC isn't in _RECS dict).
+_RECS_META["js_rendered_page"] = {
+    "expected_lift_pp": 40.0,
+    "artifact_type": None,  # rendering switch is infrastructure, not draftable
+    "impl_steps": [
+        "Identify the rendering framework (Next.js / Nuxt / Astro / SPA).",
+        "Switch this page to server-side rendering (SSR) or static generation (SSG).",
+        "Verify by curling the URL and grepping for the main content in the raw HTML.",
+    ],
+}
+
 
 def build_rule_based_recs(
     findings: list[Finding],
@@ -283,35 +582,67 @@ def build_rule_based_recs(
         spec = _RECS.get(f.check_id)
         if spec is None:
             continue
-        priority = spec.get("priority", "low")
+        enriched = enrich_recommendation(f.check_id, spec)
+        priority = enriched.get("priority", "low")
         # Boost priority from severity if higher
         if f.severity == "critical" and priority != "high":
             priority = "high"
         prompt_ids = page_link_map.get(page_id, []) if page_id is not None else []
+        effort = enriched.get("effort", "medium")
+        lift = enriched.get("expected_lift_pp")
+        ps = (
+            compute_priority_score(
+                expected_lift_pp=lift,
+                pages_affected=1,
+                effort_minutes=EFFORT_MINUTES.get(effort, 20),
+            )
+            if lift is not None
+            else None
+        )
         out.append(Recommendation(
             check_id=f.check_id,
-            title=spec["title"],
-            body=spec["body"],
-            category=spec["category"],
+            title=enriched["title"],
+            body=enriched["body"],
+            category=enriched["category"],
             priority=priority,
-            effort=spec.get("effort", "medium"),
+            effort=effort,
             linked_prompt_ids=prompt_ids,
-            expected_impact=spec.get("expected_impact"),
+            expected_impact=enriched.get("expected_impact"),
+            artifact_type=enriched.get("artifact_type"),
+            expected_lift_pp=lift,
+            impl_steps=list(enriched.get("impl_steps", [])),
+            priority_score=ps,
         ))
     return out
 
 
 def render_rec_for_csr_page(page_id: int, linked_prompt_ids: list[int]) -> Recommendation:
     """Build the 'render server-side' recommendation when is_js_rendered=True."""
+    enriched = enrich_recommendation("js_rendered_page", _RENDER_REC)
+    lift = enriched.get("expected_lift_pp")
+    effort = enriched.get("effort", "high")
+    ps = (
+        compute_priority_score(
+            expected_lift_pp=lift,
+            pages_affected=1,
+            effort_minutes=EFFORT_MINUTES.get(effort, 60),
+        )
+        if lift is not None
+        else None
+    )
     return Recommendation(
         check_id="js_rendered_page",
-        title=_RENDER_REC["title"],
-        body=_RENDER_REC["body"],
-        category=_RENDER_REC["category"],
-        priority=_RENDER_REC["priority"],
-        effort=_RENDER_REC["effort"],
+        title=enriched["title"],
+        body=enriched["body"],
+        category=enriched["category"],
+        priority=enriched["priority"],
+        effort=effort,
         linked_prompt_ids=linked_prompt_ids,
-        expected_impact=_RENDER_REC["expected_impact"],
+        expected_impact=enriched.get("expected_impact"),
+        artifact_type=enriched.get("artifact_type"),
+        expected_lift_pp=lift,
+        impl_steps=list(enriched.get("impl_steps", [])),
+        priority_score=ps,
     )
 
 

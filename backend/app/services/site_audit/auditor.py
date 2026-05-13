@@ -255,6 +255,7 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
                 recs.append(render_rec_for_csr_page(
                     rec["page_id"], page_link_map.get(rec["page_id"], [])
                 ))
+            page_url = rec["measurements"].get("url")
             for r in recs:
                 db.add(WebsiteAuditRecommendation(
                     audit_id=audit_id, page_id=rec["page_id"],
@@ -263,6 +264,10 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
                     linked_prompt_ids=json.dumps(r.linked_prompt_ids) if r.linked_prompt_ids else None,
                     expected_impact=r.expected_impact,
                     llm_generated=r.llm_generated,
+                    artifact_type=r.artifact_type,
+                    expected_lift_pp=r.expected_lift_pp,
+                    priority_score=r.priority_score,
+                    target_url=page_url,
                 ))
 
         # Site-level recs from site-level findings (no page_id)
@@ -274,6 +279,9 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
                 title=r.title, body=r.body,
                 linked_prompt_ids=None, expected_impact=r.expected_impact,
                 llm_generated=False,
+                artifact_type=r.artifact_type,
+                expected_lift_pp=r.expected_lift_pp,
+                priority_score=r.priority_score,
             ))
 
         await db.commit()
@@ -430,6 +438,16 @@ async def _maybe_generate_llm_rewrites(
             )
             if not rewrite:
                 continue
+            from app.services.site_audit.recommendations import (
+                EFFORT_MINUTES,
+                compute_priority_score,
+            )
+            lift = 15.0
+            ps = compute_priority_score(
+                expected_lift_pp=lift,
+                pages_affected=1,
+                effort_minutes=EFFORT_MINUTES["medium"],
+            )
             db.add(WebsiteAuditRecommendation(
                 audit_id=audit_id,
                 page_id=rec["page_id"],
@@ -441,6 +459,12 @@ async def _maybe_generate_llm_rewrites(
                 linked_prompt_ids=json.dumps(linked_ids) if linked_ids else None,
                 expected_impact="AI-generated rewrite for top-priority page",
                 llm_generated=True,
+                artifact_type="section_rewrite",
+                artifact=rewrite,
+                artifact_generated_at=utcnow(),
+                expected_lift_pp=lift,
+                priority_score=ps,
+                target_url=rec.get("url"),
             ))
         await db.commit()
 

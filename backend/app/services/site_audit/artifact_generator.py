@@ -113,6 +113,7 @@ def _ensure_generators_loaded() -> None:
     # Imported for side effects: each module's @register_rule / @register_llm
     # calls populate the registries.
     from app.services.site_audit import generators_artifact_rule  # noqa: F401
+    from app.services.site_audit import generators_artifact_llm  # noqa: F401
 
 
 async def generate_artifact(

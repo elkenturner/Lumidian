@@ -203,6 +203,7 @@ export function SiteAuditView({ brandId }: Props) {
               llmsTxtPresent={audit.llms_txt_present}
               llmsTxtValid={audit.llms_txt_valid}
               robotsTxtRaw={audit.robots_txt_raw}
+              onJumpToFixes={() => setTab('fixes')}
             />
           )}
           {tab === 'citations' && <CitationsTab brandId={brandId} />}

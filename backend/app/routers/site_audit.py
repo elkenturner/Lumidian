@@ -25,7 +25,10 @@ from app.models import (
 )
 from app.schemas import (
     CitationDomainAgg,
+    DraftArtifactRequest,
+    DraftArtifactResponse,
     TriggerAuditOut,
+    UpdateRecStatusRequest,
     WebsiteAuditFindingOut,
     WebsiteAuditPageOut,
     WebsiteAuditRecommendationOut,
@@ -534,5 +537,50 @@ async def cancel_audit(audit_id: int, user: User = Depends(get_current_user)):
             return Response(status_code=204)
         audit.status = "cancelled"
         audit.completed_at = utcnow()
+        await db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/recommendation/{rec_id}/draft", response_model=DraftArtifactResponse)
+async def draft_recommendation_artifact(
+    rec_id: int,
+    body: DraftArtifactRequest = DraftArtifactRequest(),
+    user: User = Depends(get_current_user),
+):
+    """Generate (or regenerate) the paste-ready artifact for a recommendation."""
+    async with AsyncSessionLocal() as db:
+        rec = await db.get(WebsiteAuditRecommendation, rec_id)
+        if not rec:
+            raise HTTPException(404, "recommendation not found")
+        audit = await db.get(WebsiteAudit, rec.audit_id)
+        if not audit:
+            raise HTTPException(404, "audit not found")
+    brand = await _ensure_brand_access(audit.brand_id, user)
+    _tier_or_403(brand, user)
+    raise HTTPException(501, "draft generator not wired yet")
+
+
+_VALID_REC_STATUS = {"pending", "applied", "dismissed"}
+
+
+@router.patch("/recommendation/{rec_id}/status", status_code=204)
+async def update_recommendation_status(
+    rec_id: int,
+    body: UpdateRecStatusRequest,
+    user: User = Depends(get_current_user),
+):
+    if body.status not in _VALID_REC_STATUS:
+        raise HTTPException(400, f"status must be one of {sorted(_VALID_REC_STATUS)}")
+    async with AsyncSessionLocal() as db:
+        rec = await db.get(WebsiteAuditRecommendation, rec_id)
+        if not rec:
+            raise HTTPException(404, "recommendation not found")
+        audit = await db.get(WebsiteAudit, rec.audit_id)
+        if not audit:
+            raise HTTPException(404, "audit not found")
+    await _ensure_brand_access(audit.brand_id, user)
+    async with AsyncSessionLocal() as db:
+        rec = await db.get(WebsiteAuditRecommendation, rec_id)
+        rec.status = body.status
         await db.commit()
     return Response(status_code=204)

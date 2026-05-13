@@ -125,7 +125,7 @@ async def list_brands_with_stats(db: DbDep, user: CurrentUser):
     brands_result = await db.execute(
         select(Brand, func.count(Prompt.id).label("prompt_count"))
         .outerjoin(Prompt, Prompt.brand_id == Brand.id)
-        .where(Brand.user_id == owner_id)
+        .where(Brand.user_id == owner_id, Brand.brand_type != "agency")
         .group_by(Brand.id)
         .order_by(Brand.created_at.desc())
     )
@@ -199,7 +199,7 @@ async def list_brands(db: DbDep, user: CurrentUser):
     result = await db.execute(
         select(Brand, func.count(Prompt.id).label("prompt_count"))
         .outerjoin(Prompt, Prompt.brand_id == Brand.id)
-        .where(Brand.user_id == owner_id)
+        .where(Brand.user_id == owner_id, Brand.brand_type != "agency")
         .group_by(Brand.id)
         .order_by(Brand.created_at.desc())
     )

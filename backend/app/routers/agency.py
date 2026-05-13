@@ -157,7 +157,7 @@ async def create_client(
         slug=f"agency-{slug}",
         user_id=user.id,
         agency_client_id=client.id,
-        brand_type="standard",
+        brand_type="agency",
     )
     db.add(brand)
     await emit_event(

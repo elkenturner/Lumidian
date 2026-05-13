@@ -1,38 +1,58 @@
-'use client'
+'use client';
 
-import { useState } from 'react'
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Play, Loader2 } from 'lucide-react';
+import { siteAudit } from '@/lib/api';
 
-import { siteAudit } from '@/lib/api'
+interface Props {
+  brandId: number;
+  disabled?: boolean;
+  onTriggered: () => void;
+}
 
-export function AuditTriggerButton({
-  brandId, onTriggered, disabled = false,
-}: { brandId: number; onTriggered: () => void; disabled?: boolean }) {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+export function AuditTriggerButton({ brandId, disabled = false, onTriggered }: Props) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  async function run() {
-    setLoading(true)
-    setError(null)
+  async function handleClick() {
+    setBusy(true);
+    setErr(null);
     try {
-      await siteAudit.trigger(brandId)
-      onTriggered()
+      await siteAudit.trigger(brandId);
+      onTriggered();
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { detail?: string } } }
-      setError(err?.response?.data?.detail || 'Failed to trigger audit')
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setErr(detail ?? 'Failed to start audit.');
     } finally {
-      setLoading(false)
+      setBusy(false);
     }
   }
 
   return (
-    <div className="inline-flex flex-col items-end">
-      <button
-        onClick={run}
-        disabled={loading || disabled}
-        className="px-4 py-2 rounded-md bg-primary text-primary-foreground disabled:opacity-50">
-        {loading ? 'Starting…' : 'Run audit'}
-      </button>
-      {error && <span className="text-xs text-red-500 mt-1">{error}</span>}
+    <div className="flex flex-col items-start gap-2">
+      <motion.button
+        type="button"
+        onClick={handleClick}
+        disabled={disabled || busy}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+        className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed"
+        style={{ background: 'var(--accent)' }}
+      >
+        {busy ? (
+          <>
+            <Loader2 size={14} className="animate-spin" />
+            Starting…
+          </>
+        ) : (
+          <>
+            <Play size={14} />
+            Run audit
+          </>
+        )}
+      </motion.button>
+      {err && <p className="text-xs" style={{ color: 'var(--danger-text)' }}>{err}</p>}
     </div>
-  )
+  );
 }

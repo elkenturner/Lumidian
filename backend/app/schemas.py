@@ -1243,48 +1243,6 @@ class DocumentUpdateIn(BaseModel):
     body_markdown: str = Field(min_length=1, max_length=200000)
 
 
-# ── Competitive Gap ──────────────────────────────────────────────────────────
-
-
-class CompetitiveGapTrendPoint(BaseModel):
-    """Per-day point on the brand-level (aggregate) trend chart."""
-    date: str  # ISO YYYY-MM-DD (UTC day)
-    gap_pp: float
-    brand_pct: float
-    comp_avg_pct: float
-
-
-class CompetitorTrendPoint(BaseModel):
-    """Per-day point on a single competitor's trend (drives the table sparkline)."""
-    date: str
-    gap_pp: float  # brand_pct − competitor_pct that day
-
-
-class CompetitorGapStat(BaseModel):
-    competitor_id: int
-    name: str
-    competitor_pct: float        # window-aggregate
-    gap_pp: float                # window-aggregate brand_pct − competitor_pct
-    delta_pp: float | None       # gap now vs prior window of same length
-    trend: list[CompetitorTrendPoint]
-    has_data: bool               # false if competitor.created_at > window_end
-
-
-class CompetitiveGapResponse(BaseModel):
-    brand_id: int
-    window: str                  # "7d" | "30d" | "90d"
-    has_competitors: bool
-    has_data: bool               # at least one completed run in current window
-    headline_gap_pp: float | None
-    headline_delta_pp: float | None
-    brand_visibility_pct: float | None
-    competitor_avg_pct: float | None
-    trend: list[CompetitiveGapTrendPoint]
-    competitors: list[CompetitorGapStat]
-    sample_count: int
-    confidence: str              # "low" | "medium" | "high"
-
-
 # ── BrandSource ─────────────────────────────────────────────────────────────
 
 class BrandSourceCreate(BaseModel):

@@ -63,6 +63,7 @@ from app.routers import agency as agency_router
 from app.routers import analytics as analytics_router
 from app.routers import auth as auth_router
 from app.routers import billing as billing_router
+from app.routers import clusters as clusters_router
 from app.routers import errors as errors_router
 from app.routers import notifications as notifications_router
 from app.routers import reports as reports_router
@@ -215,6 +216,7 @@ app.include_router(brand_profile.router, prefix="/api")
 app.include_router(tracking.router, prefix="/api")
 app.include_router(results.router, prefix="/api")
 app.include_router(content.router, prefix="/api")
+app.include_router(clusters_router.router, prefix="/api")
 app.include_router(accounts.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(gaps.router, prefix="/api")

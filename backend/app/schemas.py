@@ -1372,3 +1372,12 @@ class EditBriefRequest(BaseModel):
     stats: list[dict] | None = None
     narrative_spine: str | None = None
     tone_notes: str | None = None
+
+
+# ── Agency drafting (sub-project E, 2026-05-13) ──────────────────────────────
+
+
+class AgencyDraftGenerateIn(BaseModel):
+    prompt_id: int
+    platform: str = Field(min_length=1, max_length=64)
+    custom_brief: str | None = Field(default=None, max_length=2000)

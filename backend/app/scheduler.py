@@ -115,6 +115,9 @@ async def _run_all_brands(schedule_slot: str) -> None:
     paused_user_ids = await _get_paused_user_ids()
 
     for brand in brands:
+        if brand.brand_type == "agency":
+            continue  # agency brands have their own weekly sweep
+
         # Skip paused brands
         if _is_brand_paused(brand, paused_user_ids):
             logger.info(
@@ -157,6 +160,42 @@ async def _safe_run(brand_id: int, schedule_slot: str) -> None:
                 brand_id,
                 schedule_slot,
             )
+
+
+async def _run_all_agency_brands() -> None:
+    """Fetch agency-tier brands and trigger a tracking run for each. Runs weekly."""
+    if await _is_scheduler_paused():
+        logger.info("Scheduler paused — skipping weekly agency sweep")
+        return
+
+    from sqlalchemy import select
+    from app.database import AsyncSessionLocal, cleanup_stale_runs
+    from app.models import AgencyClient, Brand
+
+    logger.info("Scheduler: starting weekly agency sweep")
+    await cleanup_stale_runs()
+
+    async with AsyncSessionLocal() as db:
+        rows = await db.execute(
+            select(Brand).join(
+                AgencyClient, AgencyClient.id == Brand.agency_client_id
+            ).where(
+                Brand.brand_type == "agency",
+                AgencyClient.status.in_(("onboarding", "active")),
+            )
+        )
+        brands = rows.scalars().all()
+
+    if not brands:
+        logger.info("Scheduler: no agency brands, skipping weekly sweep")
+        return
+
+    for brand in brands:
+        logger.info("Scheduler: queuing weekly tracking for agency brand %d (%s)", brand.id, brand.name)
+        asyncio.create_task(
+            _safe_run(brand.id, "weekly"),
+            name=f"tracking-agency-{brand.id}",
+        )
 
 
 async def _sqlite_backup_sweep() -> None:
@@ -533,6 +572,15 @@ def start_scheduler() -> None:
         name="Visibility drop alerts (21:00 UTC)",
         replace_existing=True,
         misfire_grace_time=600,
+    )
+
+    scheduler.add_job(
+        _run_all_agency_brands,
+        trigger=CronTrigger(day_of_week="sun", hour=2, minute=0, timezone="UTC"),
+        id="weekly_agency_sweep",
+        name="Weekly agency tracking sweep (Sunday 02:00 UTC)",
+        replace_existing=True,
+        misfire_grace_time=3600,
     )
 
     scheduler.start()

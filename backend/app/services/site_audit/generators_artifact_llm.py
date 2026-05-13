@@ -138,6 +138,11 @@ OUTPUT RULES (these are non-negotiable)
 - The artifact must validate / be syntactically correct as the requested format (JSON-LD must be valid JSON, HTML must close every tag, etc.).
 - Match the brand's voice: TONE = {tone}. WHAT NOT TO SAY: {what_not_to_say}.
 
+ANTI-HALLUCINATION RULES
+- Do NOT invent specific statistics (percentages, dollar amounts, dates, customer counts, study citations) that are not present in BRAND CONTEXT / KEY STATS / PAGE CONTENT. Generic words like "many" or "most" are fine; specific numbers are not unless quoted from the inputs.
+- Do NOT preserve platform-specific CSS classes from PAGE CONTENT (Wix `font_8`, `wixui-*`, `comp-*`; Webflow `w-*`; Shopify `shopify-*`; etc.). Output clean semantic HTML with no class attributes unless the page's design system clearly relies on them.
+- Do NOT cite studies or papers by name unless the citation is verbatim in BRAND CONTEXT or PAGE CONTENT.
+
 BRAND CONTEXT
 - Name: {brand_name}
 - Website: {brand_url}

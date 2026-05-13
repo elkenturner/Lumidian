@@ -1,12 +1,13 @@
 'use client';
 
-import { Search } from 'lucide-react';
+import { Search, Zap } from 'lucide-react';
 
 export interface FixFilterState {
   category: string | null; // null = all
   priority: string | null;
   status: 'pending' | 'applied' | 'dismissed' | 'all';
   query: string;
+  quickWins: boolean; // preset: high impact + low effort
 }
 
 interface Props {
@@ -37,10 +38,23 @@ const PRIORITIES: { value: string; label: string; color: string }[] = [
 export function FixFilters({ state, onChange, counts }: Props) {
   return (
     <div className="card mb-4 space-y-3">
-      {/* Status row */}
+      {/* Preset + Status row */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mr-1">
-          Status
+        <button
+          type="button"
+          onClick={() => onChange({ ...state, quickWins: !state.quickWins })}
+          className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors"
+          style={{
+            background: state.quickWins ? 'var(--accent-muted)' : 'transparent',
+            border: `1px solid ${state.quickWins ? 'var(--accent-light)' : 'var(--border-subtle)'}`,
+            color: state.quickWins ? 'var(--accent-light)' : 'var(--text-muted)',
+          }}
+        >
+          <Zap size={11} />
+          Quick wins
+        </button>
+        <span className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mx-1">
+          ·  Status
         </span>
         {(['pending', 'applied', 'dismissed', 'all'] as const).map((s) => {
           const active = state.status === s;

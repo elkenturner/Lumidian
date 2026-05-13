@@ -278,6 +278,95 @@ _RECS: dict[str, dict] = {
         "priority": "low",
         "effort": "low",
     },
+    # ── E-E-A-T ──────────────────────────────────────────────────────────────
+    "missing_author_byline": {
+        "title": "Add a visible author byline",
+        "body": "Article pages without identified authors read as anonymous marketing copy. Add an author byline near the H1 (visible) and an `author` field in JSON-LD (structured).",
+        "category": "authority",
+        "priority": "medium",
+        "effort": "low",
+    },
+    "missing_published_date": {
+        "title": "Add visible and structured publication dates",
+        "body": "AI search weighs recency: 50% of citations come from content <13 weeks old. Add a visible date and `datePublished`/`dateModified` in JSON-LD.",
+        "category": "authority",
+        "priority": "high",
+        "effort": "low",
+    },
+    "missing_outbound_citations": {
+        "title": "Cite at least 2-3 outbound sources",
+        "body": "Long-form content with zero outbound links reads as unsourced marketing copy. Aim for 2-3 citations to authoritative third-party domains in any 500+ word article.",
+        "category": "authority",
+        "priority": "medium",
+        "effort": "low",
+    },
+    # ── Q&A ──────────────────────────────────────────────────────────────────
+    "no_qa_format": {
+        "title": "Add a Q&A section",
+        "body": "Long-form pages without question/answer structure are harder for AI search to extract for direct-answer responses. Add a 5-8 pair FAQ block.",
+        "category": "content",
+        "priority": "low",
+        "effort": "medium",
+    },
+    "qa_without_schema": {
+        "title": "Add FAQPage JSON-LD to your Q&A content",
+        "body": "Your page has visible Q&A but no FAQPage schema — AI search relies on structured data to reliably parse Q&A blocks. Add the JSON-LD.",
+        "category": "schema",
+        "priority": "medium",
+        "effort": "low",
+    },
+    "qa_thin": {
+        "title": "Expand your FAQ to 5+ questions",
+        "body": "Your FAQPage schema has fewer than 3 questions — too thin to surface as a meaningful answer source. Aim for 5-8 Q&A pairs.",
+        "category": "content",
+        "priority": "low",
+        "effort": "low",
+    },
+    # ── Internal linking ─────────────────────────────────────────────────────
+    "orphan_page": {
+        "title": "Add internal links pointing to this page",
+        "body": "This page has zero internal inbound links. AI crawlers may never reach it, and your site's topical graph is incomplete. Link to it from at least 2-3 related pages.",
+        "category": "technical",
+        "priority": "medium",
+        "effort": "low",
+    },
+    "deep_page": {
+        "title": "Shorten the path from homepage to this page",
+        "body": "This page is more than 3 clicks deep. AI crawlers tend to deprioritize deep pages. Add it to a hub, sitemap, or navigation closer to the homepage.",
+        "category": "technical",
+        "priority": "low",
+        "effort": "low",
+    },
+    "weak_hub": {
+        "title": "Strengthen this hub page's outbound links",
+        "body": "This is a hub page but it only links to a handful of child pages. Effective hubs link to 5+ supporting pages to signal topical authority.",
+        "category": "technical",
+        "priority": "medium",
+        "effort": "low",
+    },
+    # ── Stats density + structure ────────────────────────────────────────────
+    "no_tables_or_lists": {
+        "title": "Convert prose into tables or lists",
+        "body": "Long-form content without <table>/<ul>/<ol> is harder for AI to extract into structured answers. Convert at least one section to a table or list.",
+        "category": "content",
+        "priority": "low",
+        "effort": "low",
+    },
+    "low_stats_density": {
+        "title": "Add specific stats and numbers",
+        "body": "Article-type pages with fewer than 2 numbers per 500 words read as opinion, not authority. Add 3-5 concrete stats with year + source.",
+        "category": "content",
+        "priority": "low",
+        "effort": "medium",
+    },
+    # ── agents.md (companion to llms.txt) ────────────────────────────────────
+    "agents_md_missing": {
+        "title": "Add an /agents.md",
+        "body": "Companion to /llms.txt, aimed at AI agent crawlers. Cost is zero, signals intent.",
+        "category": "bot_access",
+        "priority": "low",
+        "effort": "low",
+    },
 }
 
 # ── Fix-factory metadata (additive sidecar to _RECS) ─────────────────────────
@@ -534,6 +623,93 @@ _RECS_META: dict[str, dict] = {
         "impl_steps": [
             "Add a visible 'Last updated' date near the byline.",
             "Match it to dateModified in JSON-LD.",
+        ],
+    },
+    # ── Phase 3 new check_ids ────────────────────────────────────────────────
+    "missing_author_byline": {
+        "expected_lift_pp": 6.0, "artifact_type": None,
+        "impl_steps": [
+            "Add a visible author name near the H1, e.g. 'By Jane Doe'.",
+            "Wrap it in <span class='byline'> or use rel='author' on the link.",
+            "Mirror this in your JSON-LD's author field.",
+        ],
+    },
+    "missing_published_date": {
+        "expected_lift_pp": 8.0, "artifact_type": "jsonld_article",
+        "impl_steps": [
+            "Add a visible publication date on the page.",
+            "Paste the generated Article JSON-LD with datePublished + dateModified.",
+        ],
+    },
+    "missing_outbound_citations": {
+        "expected_lift_pp": 6.0, "artifact_type": None,
+        "impl_steps": [
+            "Identify 2-3 authoritative third-party sources for claims on this page.",
+            "Add inline links with descriptive anchor text (not 'click here').",
+        ],
+    },
+    "no_qa_format": {
+        "expected_lift_pp": 8.0, "artifact_type": "faq_section",
+        "impl_steps": [
+            "Paste the generated FAQ section block at the bottom of the page.",
+            "Verify the JSON-LD's questions match the visible HTML exactly.",
+        ],
+    },
+    "qa_without_schema": {
+        "expected_lift_pp": 12.0, "artifact_type": "jsonld_faq",
+        "impl_steps": [
+            "Paste the generated FAQPage JSON-LD into the page's <head>.",
+            "Validate at https://search.google.com/test/rich-results.",
+        ],
+    },
+    "qa_thin": {
+        "expected_lift_pp": 4.0, "artifact_type": "jsonld_faq",
+        "impl_steps": [
+            "Replace the existing FAQPage schema with the expanded version.",
+            "Ensure every question's answer is also visible on the page.",
+        ],
+    },
+    "orphan_page": {
+        "expected_lift_pp": 6.0, "artifact_type": "internal_link_suggestions",
+        "impl_steps": [
+            "Review the suggested links — each names a source page and an anchor.",
+            "Add each link to the source page in a contextually-natural spot.",
+        ],
+    },
+    "deep_page": {
+        "expected_lift_pp": 3.0, "artifact_type": "internal_link_suggestions",
+        "impl_steps": [
+            "Add at least one shallow page (homepage / category hub) that links here.",
+            "Use the suggested anchor text from the generator.",
+        ],
+    },
+    "weak_hub": {
+        "expected_lift_pp": 6.0, "artifact_type": "internal_link_suggestions",
+        "impl_steps": [
+            "Add the suggested outbound links to this hub.",
+            "Group by topic if the hub has multiple sub-topics.",
+        ],
+    },
+    "no_tables_or_lists": {
+        "expected_lift_pp": 4.0, "artifact_type": "section_rewrite",
+        "impl_steps": [
+            "Pick one section that's comparing items or steps.",
+            "Use the generated rewrite which structures it as a table or list.",
+        ],
+    },
+    "low_stats_density": {
+        "expected_lift_pp": 5.0, "artifact_type": "section_rewrite",
+        "impl_steps": [
+            "Find a section weak on specifics.",
+            "Paste the rewrite — it adds 3-5 concrete stats with year + source.",
+        ],
+    },
+    "agents_md_missing": {
+        "expected_lift_pp": 1.0, "artifact_type": "agents_md",
+        "impl_steps": [
+            "Create /agents.md at the site root.",
+            "Paste the generated content.",
+            "Verify it loads at https://yoursite.com/agents.md.",
         ],
     },
 }

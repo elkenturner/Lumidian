@@ -93,11 +93,13 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
     seed_urls = sitemap_urls[:max_pages] if sitemap_urls else None
     pages_crawled = await crawl_site(root, max_pages=max_pages, max_depth=3, seed_urls=seed_urls)
 
-    # robots.txt + llms.txt
+    # robots.txt + llms.txt + agents.md
     robots_res = await fetch_raw(urljoin(root, "robots.txt"))
     robots_content = robots_res.html if robots_res.status == 200 else None
     llms_res = await fetch_raw(urljoin(root, "llms.txt"))
     llms_content = llms_res.html if llms_res.status == 200 else None
+    agents_res = await fetch_raw(urljoin(root, "agents.md"))
+    agents_content = agents_res.html if agents_res.status == 200 else None
 
     # Render-mode detection on a sample
     sample_indexes = _sample_indexes(len(pages_crawled), RENDER_SAMPLE_SIZE)
@@ -127,8 +129,15 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
     llms_out = parse_llms_txt(llms_content)
     site_findings.extend(llms_out.findings)
 
+    from app.services.site_audit.parsers.agents_md import parse_agents_md
+    site_findings.extend(parse_agents_md(agents_content))
+
     # Per-page parsing
     page_records: list[dict] = []
+
+    from app.services.site_audit.parsers.eeat import parse_eeat
+    from app.services.site_audit.parsers.qa import parse_qa
+    from bs4 import BeautifulSoup as _BS
 
     for crawl_page in pages_crawled:
         page_type = classify_page(crawl_page.url, crawl_page.html)
@@ -136,7 +145,12 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
         sch = parse_schema(crawl_page.html or "", crawl_page.url, page_type)
         mta = parse_meta(crawl_page.html or "", crawl_page.url, page_type)
 
-        per_page_findings = sem.findings + sch.findings + mta.findings
+        # New: E-E-A-T + Q&A. Both share a BS4 parse — do it once.
+        soup_cached = _BS(crawl_page.html or "", "lxml")
+        eeat_findings = parse_eeat(soup_cached, crawl_page.url, page_type)
+        qa_findings = parse_qa(soup_cached, crawl_page.url, page_type)
+
+        per_page_findings = sem.findings + sch.findings + mta.findings + eeat_findings + qa_findings
         is_js = is_js_rendered_by_url.get(crawl_page.url, False)
 
         # Severity counts for scoring
@@ -176,6 +190,25 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
             "scores": scores,
             "content_excerpt": crawl_page.content_excerpt,
         })
+
+    # ── site-level: internal linking analysis ─────────────────────────────
+    from app.services.site_audit.parsers.linking import parse_linking
+
+    pages_by_url = {
+        normalise_url(rec["url"]): {
+            "links": rec["measurements"].get("links", []),
+            "http_status": rec["http_status"],
+            "page_type": rec["page_type"],
+        }
+        for rec in page_records
+    }
+    linking_findings = parse_linking(pages_by_url, root)
+    # Merge into per-page findings by URL match
+    for rec in page_records:
+        url = normalise_url(rec["url"])
+        extra = linking_findings.get(url, [])
+        if extra:
+            rec["findings"].extend(extra)
 
     # ── persist ───────────────────────────────────────────────────────────
     async with AsyncSessionLocal() as db:

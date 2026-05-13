@@ -118,6 +118,22 @@ def parse_semantic(html: str, url: str) -> ParseOutput:
                                 "More than half of <h2> sections don't start with a self-contained answer.",
                                 {"failed": failed_h2, "total": len(h2s)}))
 
+    # No tables or lists on long-form
+    if word_count >= 500 and table_count == 0 and list_count == 0:
+        findings.append(Finding("no_tables_or_lists", "low", "content",
+                                "Long-form content (≥500 words) has no <table>, <ul>, or <ol> — structured content is more extractable.",
+                                {"word_count": word_count}))
+
+    # Low stats density on article-type pages (uses fact_density signal)
+    page_type_hint = "article" if any(t in url.lower() for t in ("/blog/", "/post/", "/article/", "/news/")) else None
+    if page_type_hint == "article" and word_count >= 300 and fact_density < 4.0:
+        # numeric facts per 500 words: numbers + dates only (no proper nouns)
+        numeric_density = ((numbers + dates) / max(word_count, 1)) * 500
+        if numeric_density < 2.0:
+            findings.append(Finding("low_stats_density", "low", "content",
+                                    f"Article-type page has only {numeric_density:.1f} numeric facts per 500 words; aim for 2+ stats/numbers.",
+                                    {"numeric_facts_per_500w": round(numeric_density, 2), "word_count": word_count}))
+
     measurements = {
         "word_count": word_count,
         "h1_text": h1s[0].get_text(strip=True) if h1s else None,

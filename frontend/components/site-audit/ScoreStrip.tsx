@@ -10,8 +10,6 @@ interface Props {
 }
 
 const EXPLAIN: Record<string, string> = {
-  overall:
-    'A weighted blend of Bot Access, Content, Schema, and Technical scores. This is the headline measure of how visible your site is to AI search.',
   bot_access:
     'Can AI crawlers (GPTBot, ClaudeBot, PerplexityBot, Google-Extended) reach your pages? Blocked bots are why your content never enters AI retrieval.',
   content:
@@ -28,16 +26,8 @@ export function ScoreStrip({ audit }: Props) {
       variants={staggerContainer}
       initial="hidden"
       animate="visible"
-      className="grid grid-cols-1 sm:grid-cols-5 gap-3"
+      className="grid grid-cols-2 sm:grid-cols-4 gap-3"
     >
-      <motion.div variants={staggerChild} className="sm:col-span-1">
-        <ScoreCard
-          label="Overall"
-          score={audit.overall_score}
-          explanation={EXPLAIN.overall}
-          emphasis
-        />
-      </motion.div>
       <motion.div variants={staggerChild}>
         <ScoreCard label="Bot access" score={audit.bot_access_score} explanation={EXPLAIN.bot_access} />
       </motion.div>

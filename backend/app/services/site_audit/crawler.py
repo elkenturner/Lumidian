@@ -23,6 +23,20 @@ _LOC_RE = re.compile(r"<loc>\s*([^<]+?)\s*</loc>", re.IGNORECASE)
 _HREF_RE = re.compile(r"<a[^>]+href=[\"']?([^\"'\s>]+)", re.IGNORECASE)
 
 
+def _canonical_host(host: str) -> str:
+    """Strip leading 'www.' so apex and www are treated as the same host.
+
+    The vast majority of sites canonicalize one way or the other but link/redirect
+    across both; treating them as one host avoids the 'zero pages crawled' trap.
+    """
+    h = host.lower()
+    return h[4:] if h.startswith("www.") else h
+
+
+def _same_host(a: str, b: str) -> bool:
+    return _canonical_host(a) == _canonical_host(b)
+
+
 def _extract_content_excerpt(html: str, max_chars: int = 1500) -> str:
     """
     Return up to max_chars of cleaned visible body text — no scripts/styles, no nav.
@@ -123,7 +137,7 @@ async def crawl_site(
             n = normalise_url(u)
         except ValueError:
             continue
-        if urlparse(n).netloc != host:
+        if not _same_host(urlparse(n).netloc, host):
             continue
         if n not in seen:
             seen.add(n)
@@ -173,7 +187,7 @@ def _extract_internal_links(html: str, base_url: str, host: str) -> list[str]:
             n = normalise_url(absolute)
         except ValueError:
             continue
-        if urlparse(n).netloc != host:
+        if not _same_host(urlparse(n).netloc, host):
             continue
         out.append(n)
     return out

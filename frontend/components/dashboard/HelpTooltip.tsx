@@ -65,7 +65,7 @@ export default function HelpTooltip({ text, href, linkText = 'Learn more' }: Hel
           absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-72
           bg-[var(--bg-base)] border border-[var(--accent-border)]
           rounded-lg p-3 text-xs text-[var(--text-secondary)] leading-relaxed
-          shadow-lg z-50 whitespace-normal
+          shadow-lg z-50 whitespace-normal normal-case tracking-normal font-normal
           transition-all duration-150 ease-out origin-bottom
           ${visible
             ? 'opacity-100 scale-100 pointer-events-auto'

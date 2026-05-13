@@ -3,7 +3,7 @@
 > **This file is the shared brain across all Claude surfaces working on Lumidian.**
 > Claude Code, Cowork, and Claude in Chrome should all (a) read this file at the start of every session and (b) update it before ending the session. Stable architecture lives in `CLAUDE.md`; this file holds volatile state only.
 
-**Last updated:** 2026-05-12 by Claude Code (Website AIO smoke-test + UX polish session)
+**Last updated:** 2026-05-12 by Claude Code (Content Clusters build session)
 
 ---
 
@@ -16,9 +16,9 @@
 
 One FastAPI backend, one Next.js frontend. The `/agency/*` routes are staff-only; everything else is the customer-facing SaaS. SaaS customers and agency clients share the same DB — agency clients are scoped via `AgencyClient → Brand` link.
 
-- **Most recent work:** **Website AIO smoke-tested end-to-end on `feat/agency-activity-log`.** Citation backfill ran locally — **962 citations from 57 TrackingRuns** (most own-domain hits are MSC; mix of third-party authority + unknown competitor domains). Triggered first real audit against Rhythm (rhythmlivin.com): **50 pages crawled, overall 86.1** (Bot 100 / Content 88 / Schema 67 / Technical 90), 146 findings, 110 recommendations (22 high-priority), LLM rewrites firing on Pro tier. All 5 frontend tabs verified rendering live data via Playwright. **Two UX polish changes (uncommitted, on current branch):** (1) `/agency/clients/[id]` adds a 5th "Site Audit" tab that embeds `SiteAuditView` inline (separate `/audit` deep-link route also still works); (2) `/site-audit` index now shows a brand picker when user has multiple brands (single-brand auto-redirect preserved).
-- **Branch:** `feat/agency-activity-log` (Website AIO already merged to main via `453e7c8`; the UX polish edits sit on top of the activity-log branch as drive-by improvements)
-- **Next concrete step:** Decide on commit/PR for the two UX polish edits. Run the citation backfill against **prod** (Railway CLI) — local DB had 7,215 query_results yielding 962 citations; prod likely has much more.
+- **Most recent work:** **Content Clusters shipped on `feat/content-quality-rebuild`.** Replaces per-prompt one-off drafts with coordinated 5-piece cross-affirming clusters (linkedin, medium, reddit, quora, x) generated from a shared `ContentBrief`. Wikipedia carved into its own placeholder tab. Optional own-site **pillar** with LLM tone gate (default off — promotional pillars hurt AIO). Clean-slate migration deletes unposted drafts; posted drafts retained with `cluster_id` null. 2 new tables + 1 column on `ContentDraft`; 8 new endpoints under `/api/clusters/*`; new tabbed `/content/[brandId]` UX + dedicated cluster detail page at `/content/[brandId]/cluster/[clusterId]`. **24/24 cluster tests pass.** Specs: `docs/superpowers/specs/2026-05-11-content-clusters-design.md`. Plan: `docs/superpowers/plans/2026-05-12-content-clusters.md`. **Task 15 (hook generate_now into cluster pipeline) deferred** — the existing `auto_draft_top_gaps` flow is too entangled (response analysis + gap scoring + Serper lookups) to safely replace inline; clusters work standalone via the dedicated endpoints and the new `/content/[brandId]` UI.
+- **Branch:** `feat/content-quality-rebuild`
+- **Next concrete step:** Merge to main when ready; communicate the clean-slate draft wipe to existing users; monitor first wave of cluster regenerations for brief quality. Optionally tackle deferred Task 15 (route `_bg_generate_drafts` through cluster pipeline) as a follow-up.
 - **Blockers / waiting on:** None known.
 
 ---
@@ -27,6 +27,7 @@ One FastAPI backend, one Next.js frontend. The `/agency/*` routes are staff-only
 
 _Append-only log. Newest first. Each entry: date — decision — rationale (1 line)._
 
+- **2026-05-12** — Shipped **Content Clusters** on `feat/content-quality-rebuild`. Each prompt → one cluster of 5 cross-affirming platform pieces from a persisted `ContentBrief`. Wikipedia carved out into its own tab (no more marketing-coded Wiki drafts). Optional own-site pillar gated by LLM tone check (default off — promotional pillars hurt AIO). Clean-slate migration: unposted drafts deleted, posted retained. Backend half drove TDD; frontend was inline-verified (no fe test suite). Task 15 deferred: replacing `_bg_generate_drafts` would entangle clusters with response analysis + Serper lookups for negligible gain — clusters live behind their own endpoints + UI.
 - **2026-05-12** — Website AIO validated end-to-end against Rhythm (real crawl, real findings/recommendations). Citation backfill confirmed idempotent and effective. Surfaced Site Audit as a tab on the agency client detail page (was previously only reachable via direct URL) and replaced the auto-redirect on `/site-audit` index with a brand picker.
 - **2026-05-11** — Shipped **Website AIO** module on branch `feat/website-aio`. Manual-trigger site audits with: crawler (sitemap + BFS + Playwright render-mode detection), 5 parsers, page scoring, citation extraction from existing AI responses, page↔prompt linking (the wedge — no competitor connects audit findings to specific losing prompts), rule-based recommendations + LLM rewrites (Growth/Pro), llms.txt + robots.txt generators. 5 new tables, 13 endpoints, 5-tab frontend + agency portal view. Specs and plan committed; 95+ tests green.
 - **2026-05-11** — Direction committed: dual-track agency + SaaS on one codebase. Lumidian SaaS stays available to anyone who wants it; the same app doubles as the internal tool for Ken + contractors delivering agency work. Closed-loop roadmap features (auto-posting, G2 wizard, scheduler) serve BOTH self-serve users and agency operators. The "Managed tier" from the earlier Path D′ framing collapses into the agency offering — done-for-you clients become agency clients, not a SaaS tier.

@@ -535,6 +535,68 @@ async def run_migrations():
         """))
         logger.info("Data fix: synced brand types/limits with user tiers")
 
+    # --- Migration: content clusters (2026-05-12) ---
+    async with engine.begin() as conn:
+        # Note: content_briefs created BEFORE content_clusters because of the
+        # circular FK (content_clusters.last_brief_id → content_briefs.id).
+        # SQLite defers FK validation; do not reorder.
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS content_briefs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cluster_id INTEGER NOT NULL,
+                version INTEGER NOT NULL DEFAULT 1,
+                positioning TEXT NOT NULL DEFAULT '',
+                key_claims JSON NOT NULL DEFAULT '[]',
+                canonical_phrasings JSON NOT NULL DEFAULT '[]',
+                stats JSON NOT NULL DEFAULT '[]',
+                competitor_context JSON NOT NULL DEFAULT '{}',
+                narrative_spine TEXT NOT NULL DEFAULT '',
+                tone_notes TEXT NOT NULL DEFAULT '',
+                created_by TEXT NOT NULL DEFAULT 'system',
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY (cluster_id) REFERENCES content_clusters(id) ON DELETE CASCADE
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_content_briefs_cluster_id ON content_briefs (cluster_id)"))
+
+        # Create content_clusters table (references content_briefs.id via last_brief_id)
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS content_clusters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                brand_id INTEGER NOT NULL,
+                prompt_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                pillar_mode TEXT NOT NULL DEFAULT 'none',
+                pillar_url TEXT,
+                last_brief_id INTEGER,
+                version INTEGER NOT NULL DEFAULT 1,
+                last_generated_at DATETIME,
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+                FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE CASCADE,
+                FOREIGN KEY (last_brief_id) REFERENCES content_briefs(id) ON DELETE SET NULL,
+                UNIQUE (prompt_id)
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_content_clusters_brand_id ON content_clusters (brand_id)"))
+
+        # Add cluster_id column to content_drafts (idempotent: PRAGMA check)
+        result = await conn.execute(text("PRAGMA table_info(content_drafts)"))
+        cols = {row[1] for row in result.fetchall()}
+        if "cluster_id" not in cols:
+            await conn.execute(text("ALTER TABLE content_drafts ADD COLUMN cluster_id INTEGER REFERENCES content_clusters(id) ON DELETE SET NULL"))
+            await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_content_drafts_cluster_id ON content_drafts (cluster_id)"))
+
+        # Clean-slate: delete all unposted ContentDraft rows.
+        # Drafts referenced by ContentPost or DraftAttribution are retained with cluster_id NULL.
+        await conn.execute(text("""
+            DELETE FROM content_drafts
+            WHERE id NOT IN (SELECT draft_id FROM content_posts)
+              AND id NOT IN (SELECT draft_id FROM draft_attributions)
+        """))
+        logger.info("Migration applied: content clusters tables, cluster_id column, clean-slate draft delete")
+
+
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):
     """Mark tracking runs stuck in pending/running for > max_age_minutes as failed.

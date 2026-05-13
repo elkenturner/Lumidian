@@ -109,7 +109,7 @@ async def clean_tables():
         for table in [
             "prompt_run_scores", "content_events",
             "analytics_events", "draft_attributions", "content_attribution", "content_posts",
-            "content_drafts", "content_gaps", "content_opportunities",
+            "content_drafts", "content_clusters", "content_briefs", "content_gaps", "content_opportunities",
             "competitor_mentions", "run_model_scores", "query_results", "tracking_runs",
             "citation_sources",
             "website_audit_recommendations",

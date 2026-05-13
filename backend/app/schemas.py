@@ -1289,3 +1289,86 @@ class DraftArtifactResponse(BaseModel):
 
 class UpdateRecStatusRequest(BaseModel):
     status: str  # 'pending' | 'applied' | 'dismissed'
+
+
+# ── Content Clusters ────────────────────────────────────────────────────────
+
+class ContentBriefSchema(BaseModel):
+    id: int
+    cluster_id: int
+    version: int
+    positioning: str
+    key_claims: list[str]
+    canonical_phrasings: list[str]
+    stats: list[dict]
+    competitor_context: dict
+    narrative_spine: str
+    tone_notes: str
+    created_by: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ClusterPieceSummary(BaseModel):
+    platform: str
+    draft_id: int | None
+    status: str  # draft / approved / posted / failed / missing
+    title: str | None
+    excerpt: str | None  # first 140 chars of content_text
+
+
+class ContentClusterSummary(BaseModel):
+    """Compact representation for the cluster list view."""
+    id: int
+    brand_id: int
+    prompt_id: int
+    prompt_text: str
+    status: str
+    pillar_mode: str
+    pillar_url: str | None
+    visibility_pct: float
+    pieces: list[ClusterPieceSummary]
+    version: int
+    last_generated_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ContentClusterDetail(BaseModel):
+    """Full cluster — brief + drafts (existing ContentDraftSchema)."""
+    id: int
+    brand_id: int
+    prompt_id: int
+    prompt_text: str
+    status: str
+    pillar_mode: str
+    pillar_url: str | None
+    visibility_pct: float
+    brief: ContentBriefSchema | None
+    drafts: list["ContentDraftSchema"]
+    version: int
+    last_generated_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class PillarCandidateSchema(BaseModel):
+    page_id: int
+    url: str
+    title: str | None
+    tone_score: float  # 0..1, higher = less promotional
+    tone_reasoning: str
+
+
+class RegeneratePieceRequest(BaseModel):
+    platform: str  # must be one of: linkedin, medium, reddit, quora, x
+
+
+class EditBriefRequest(BaseModel):
+    positioning: str | None = None
+    key_claims: list[str] | None = None
+    canonical_phrasings: list[str] | None = None
+    stats: list[dict] | None = None
+    narrative_spine: str | None = None
+    tone_notes: str | None = None

@@ -291,8 +291,11 @@ async def test_compute_per_day_trend_groups_multiple_runs_same_day():
     from app.database import AsyncSessionLocal
     from app.services.competitive_gap import compute_competitive_gap
 
-    today_morning = datetime.utcnow().replace(hour=8, minute=0, second=0, microsecond=0)
-    today_evening = today_morning.replace(hour=20)
+    # Pick a day strictly in the past so both runs are within the 7d window
+    # regardless of the wall-clock hour at test runtime.
+    base = (datetime.utcnow() - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_morning = base + timedelta(hours=8)
+    today_evening = base + timedelta(hours=20)
     _, brand_id = await _seed_brand_with_runs(
         user_email="multiday@example.com",
         competitors=[("Notion", today_morning - timedelta(days=30))],

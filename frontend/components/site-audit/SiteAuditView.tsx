@@ -1,124 +1,201 @@
-'use client'
+'use client';
 
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
-import { siteAudit, type WebsiteAuditSummary } from '@/lib/api'
-import { AuditTriggerButton } from '@/components/site-audit/AuditTriggerButton'
-import { PageList } from '@/components/site-audit/PageList'
-import { PageDetail } from '@/components/site-audit/PageDetail'
-import { BotAccessPanel } from '@/components/site-audit/BotAccessPanel'
-import { LlmsTxtPanel } from '@/components/site-audit/LlmsTxtPanel'
-import { GeneratorsCard } from '@/components/site-audit/GeneratorsCard'
-import { CitationDomainList } from '@/components/site-audit/CitationDomainList'
-import { RecommendationsList } from '@/components/site-audit/RecommendationsList'
+import { getBrand, siteAudit, type BrandDetail, type WebsiteAuditPageOut, type WebsiteAuditSummary } from '@/lib/api';
+import { easings } from '@/lib/motion';
 
-interface SiteAuditViewProps {
-  brandId: number
+import { AuditHeader } from './AuditHeader';
+import { AuditTriggerButton } from './AuditTriggerButton';
+import { CitationsTab } from './CitationsTab';
+import { FixGrid } from './FixGrid';
+import { HistorySparkline } from './HistorySparkline';
+import { OverviewHero } from './OverviewHero';
+import { PageDetail } from './PageDetail';
+import { PageTable } from './PageTable';
+import { RenderModeBanner } from './RenderModeBanner';
+import { SchemaAndBotsTab } from './SchemaAndBotsTab';
+import { ScoreStrip } from './ScoreStrip';
+
+interface Props {
+  brandId: number;
 }
 
-export function SiteAuditView({ brandId }: SiteAuditViewProps) {
-  const [audit, setAudit] = useState<WebsiteAuditSummary | null | undefined>(undefined)
-  const [tab, setTab] = useState<'overview' | 'pages' | 'bots' | 'citations' | 'recs'>('overview')
-  const [selectedPageId, setSelectedPageId] = useState<number | null>(null)
+type TabId = 'overview' | 'fixes' | 'pages' | 'schema_bots' | 'citations';
+
+const TABS: { id: TabId; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'fixes', label: 'Fixes' },
+  { id: 'pages', label: 'Pages' },
+  { id: 'schema_bots', label: 'Schema & Bots' },
+  { id: 'citations', label: 'Citations' },
+];
+
+export function SiteAuditView({ brandId }: Props) {
+  const [audit, setAudit] = useState<WebsiteAuditSummary | null | undefined>(undefined);
+  const [brand, setBrand] = useState<BrandDetail | null>(null);
+  const [tab, setTab] = useState<TabId>('overview');
+  const [selectedPageId, setSelectedPageId] = useState<number | null>(null);
+  const [homepagePage, setHomepagePage] = useState<WebsiteAuditPageOut | null>(null);
 
   const loadLatest = useCallback(async () => {
     try {
-      const a = await siteAudit.latest(brandId)
-      setAudit(a)
+      const a = await siteAudit.latest(brandId);
+      setAudit(a);
     } catch (e: unknown) {
-      const err = e as { response?: { status?: number } }
-      if (err?.response?.status === 404) setAudit(null)
-      else throw e
+      const err = e as { response?: { status?: number } };
+      if (err?.response?.status === 404) setAudit(null);
+      else throw e;
     }
-  }, [brandId])
+  }, [brandId]);
 
-  useEffect(() => { loadLatest() }, [loadLatest])
-
-  // Poll while audit is in flight
   useEffect(() => {
-    if (!audit || ['completed', 'failed', 'cancelled'].includes(audit.status)) return
-    const t = setInterval(loadLatest, 4000)
-    return () => clearInterval(t)
-  }, [audit, loadLatest])
+    loadLatest();
+    getBrand(brandId).then(setBrand).catch(() => setBrand(null));
+  }, [brandId, loadLatest]);
 
-  if (audit === undefined) return <div className="p-8">Loading…</div>
+  // Load homepage page for render-mode banner once the audit completes.
+  useEffect(() => {
+    if (!audit || audit.status !== 'completed') return;
+    siteAudit
+      .pages(audit.id, { per_page: 1, sort: 'url' })
+      .then((rows) => setHomepagePage(rows[0] ?? null))
+      .catch(() => setHomepagePage(null));
+  }, [audit]);
 
+  // Poll while in-flight
+  useEffect(() => {
+    if (!audit || ['completed', 'failed', 'cancelled'].includes(audit.status)) return;
+    const t = setInterval(loadLatest, 4000);
+    return () => clearInterval(t);
+  }, [audit, loadLatest]);
+
+  // Loading state
+  if (audit === undefined) {
+    return (
+      <div className="p-8 max-w-6xl">
+        <div className="card h-24 animate-pulse" style={{ background: 'rgba(255,255,255,0.02)' }} />
+      </div>
+    );
+  }
+
+  // First-run empty state
   if (audit === null) {
     return (
       <div className="p-8 max-w-3xl">
-        <h1 className="text-2xl font-semibold mb-2">Site Audit</h1>
-        <p className="text-muted-foreground mb-6">
-          Audit your site for AI-search visibility — semantic structure, schema, AI-bot accessibility,
-          and which competitor pages are winning the prompts you lose on.
-        </p>
-        <AuditTriggerButton brandId={brandId} onTriggered={loadLatest} />
-      </div>
-    )
-  }
-
-  const inFlight = !['completed', 'failed', 'cancelled'].includes(audit.status)
-
-  return (
-    <div className="p-8">
-      <header className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold">Site Audit</h1>
-          <p className="text-sm text-muted-foreground">
-            Latest audit: {new Date(audit.started_at).toLocaleString()} · status: {audit.status}
-            {audit.overall_score !== null && ` · overall score ${audit.overall_score.toFixed(0)}`}
+        <div className="card-elevated">
+          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Site Audit</h1>
+          <p className="text-sm text-[var(--text-secondary)] mt-2 leading-relaxed">
+            Audit your site for AI-search visibility — semantic structure, schema markup,
+            AI-bot accessibility, and which competitor pages are winning the prompts you lose
+            on. Each finding turns into a draftable, paste-ready artifact you can apply in
+            minutes.
           </p>
-        </div>
-        <AuditTriggerButton brandId={brandId} onTriggered={loadLatest} disabled={inFlight} />
-      </header>
-
-      <nav className="flex gap-4 border-b mb-6">
-        {(['overview', 'pages', 'bots', 'citations', 'recs'] as const).map(t => (
-          <button key={t}
-            className={`pb-2 ${tab === t ? 'border-b-2 border-primary font-medium' : 'text-muted-foreground'}`}
-            onClick={() => { setTab(t); setSelectedPageId(null) }}>
-            {t === 'overview' ? 'Overview' :
-             t === 'pages'   ? 'Pages' :
-             t === 'bots'    ? 'AI Bots & Files' :
-             t === 'citations' ? 'Citations' : 'Recommendations'}
-          </button>
-        ))}
-      </nav>
-
-      {tab === 'overview' && <OverviewTab audit={audit} />}
-      {tab === 'pages' && (
-        selectedPageId === null
-          ? <PageList auditId={audit.id} onSelect={setSelectedPageId} />
-          : <PageDetail auditId={audit.id} pageId={selectedPageId} onBack={() => setSelectedPageId(null)} />
-      )}
-      {tab === 'bots' && (
-        <div className="space-y-8 max-w-3xl">
-          <BotAccessPanel auditId={audit.id} robotsTxtRaw={audit.robots_txt_raw} />
-          <LlmsTxtPanel brandId={brandId} present={audit.llms_txt_present} valid={audit.llms_txt_valid} />
-          <GeneratorsCard brandId={brandId} />
-        </div>
-      )}
-      {tab === 'citations' && <CitationDomainList brandId={brandId} />}
-      {tab === 'recs' && <RecommendationsList auditId={audit.id} />}
-    </div>
-  )
-}
-
-function OverviewTab({ audit }: { audit: WebsiteAuditSummary }) {
-  return (
-    <div className="grid grid-cols-4 gap-4 max-w-4xl">
-      {[
-        { label: 'Bot access', v: audit.bot_access_score },
-        { label: 'Content',    v: audit.content_score },
-        { label: 'Schema',     v: audit.schema_score },
-        { label: 'Technical',  v: audit.technical_score },
-      ].map(({ label, v }) => (
-        <div key={label} className="border rounded-lg p-4">
-          <div className="text-xs text-muted-foreground uppercase">{label}</div>
-          <div className="text-3xl font-semibold mt-2">
-            {v !== null ? v.toFixed(0) : '—'}
+          <div className="mt-6">
+            <AuditTriggerButton brandId={brandId} onTriggered={loadLatest} />
           </div>
         </div>
-      ))}
+      </div>
+    );
+  }
+
+  const inFlight = !['completed', 'failed', 'cancelled'].includes(audit.status);
+
+  return (
+    <div className="p-6 sm:p-8 max-w-6xl">
+      <AuditHeader
+        audit={audit}
+        brandUrl={brand?.website_url ?? null}
+        inFlight={inFlight}
+        onRunNewAudit={async () => {
+          try {
+            await siteAudit.trigger(brandId);
+            loadLatest();
+          } catch {
+            // surface via the empty-state path if needed; the header button is non-fatal
+          }
+        }}
+      />
+
+      {/* Tabs */}
+      <nav
+        role="tablist"
+        className="flex gap-1 border-b border-[var(--border-subtle)] mb-6 overflow-x-auto"
+      >
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => {
+                setTab(t.id);
+                setSelectedPageId(null);
+              }}
+              className={`relative px-4 py-2 text-sm font-medium transition-colors ${
+                active ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+              }`}
+            >
+              {t.label}
+              {active && (
+                <motion.div
+                  layoutId="audit-tab-indicator"
+                  className="absolute left-0 right-0 -bottom-px h-0.5"
+                  style={{ background: 'var(--accent-light)' }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                />
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Render-mode warning banner (always above content when applicable) */}
+      {homepagePage?.is_js_rendered && (
+        <RenderModeBanner isJsRendered brandUrl={brand?.website_url ?? null} />
+      )}
+
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={tab}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -2 }}
+          transition={{ duration: 0.18, ease: easings.out }}
+        >
+          {tab === 'overview' && (
+            <div className="space-y-6">
+              <OverviewHero auditId={audit.id} onSeeAll={() => setTab('fixes')} />
+              <ScoreStrip audit={audit} />
+              <HistorySparkline brandId={brandId} />
+            </div>
+          )}
+          {tab === 'fixes' && <FixGrid auditId={audit.id} />}
+          {tab === 'pages' && (
+            selectedPageId === null ? (
+              <PageTable auditId={audit.id} onSelect={setSelectedPageId} />
+            ) : (
+              <PageDetail
+                auditId={audit.id}
+                pageId={selectedPageId}
+                onBack={() => setSelectedPageId(null)}
+              />
+            )
+          )}
+          {tab === 'schema_bots' && (
+            <SchemaAndBotsTab
+              auditId={audit.id}
+              brandId={brandId}
+              llmsTxtPresent={audit.llms_txt_present}
+              llmsTxtValid={audit.llms_txt_valid}
+              robotsTxtRaw={audit.robots_txt_raw}
+            />
+          )}
+          {tab === 'citations' && <CitationsTab brandId={brandId} />}
+        </motion.div>
+      </AnimatePresence>
     </div>
-  )
+  );
 }

@@ -1869,6 +1869,21 @@ export type WebsiteAuditRecommendationOut = {
   linked_prompt_ids: number[]
   expected_impact: string | null
   llm_generated: boolean
+  artifact: string | null
+  artifact_type: string | null
+  artifact_generated_at: string | null
+  artifact_regen_count: number
+  status: 'pending' | 'applied' | 'dismissed'
+  expected_lift_pp: number | null
+  target_url: string | null
+  priority_score: number | null
+}
+
+export type DraftArtifactResponse = {
+  artifact: string
+  artifact_type: string
+  generated_at: string
+  regen_count: number
 }
 
 export type CitationDomainAgg = { domain: string; kind: string; count: number }
@@ -1906,6 +1921,13 @@ export const siteAudit = {
     api.get<string>(`/site-audit/${brandId}/robots-snippet`, {
       params: { mode }, responseType: 'text',
     }).then(r => r.data),
+  draftRec: (recId: number, body?: { regenerate_notes?: string }) =>
+    api.post<DraftArtifactResponse>(
+      `/site-audit/recommendation/${recId}/draft`,
+      body ?? {},
+    ).then(r => r.data),
+  setRecStatus: (recId: number, status: 'pending' | 'applied' | 'dismissed') =>
+    api.patch(`/site-audit/recommendation/${recId}/status`, { status }),
   cancel: (auditId: number) =>
     api.post(`/site-audit/audit/${auditId}/cancel`),
 }

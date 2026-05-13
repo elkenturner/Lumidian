@@ -965,3 +965,32 @@ async def agency_generate_draft(
         "created_at": draft.created_at.isoformat() if draft.created_at else None,
         "updated_at": draft.updated_at.isoformat() if draft.updated_at else None,
     }
+
+
+@router.post(
+    "/clients/{client_id}/tracking/run",
+    status_code=http_status.HTTP_202_ACCEPTED,
+)
+async def agency_trigger_tracking(
+    client_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+):
+    """Kick off a tracking run for an agency client's brand. Bypasses SaaS tier checks."""
+    import asyncio as _asyncio
+
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    brand_q = await db.execute(select(Brand).where(Brand.agency_client_id == client_id).limit(1))
+    brand = brand_q.scalar_one_or_none()
+    if brand is None or brand.brand_type != "agency":
+        raise HTTPException(status_code=400, detail="Brand is not agency-tier")
+
+    from app.services.tracking_service import run_tracking
+
+    _asyncio.create_task(
+        run_tracking(brand_id=brand.id, run_type="manual", schedule_slot=None),
+        name=f"agency-manual-{brand.id}",
+    )
+    return {"detail": "Tracking run started", "brand_id": brand.id}

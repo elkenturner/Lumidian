@@ -162,6 +162,26 @@ async def _safe_run(brand_id: int, schedule_slot: str) -> None:
             )
 
 
+async def _run_agency_brand_and_report(brand_id: int, client_id: int) -> None:
+    """Run weekly tracking for an agency brand, then auto-generate the weekly report. Non-fatal."""
+    await _safe_run(brand_id, "weekly")
+    try:
+        from app.database import AsyncSessionLocal
+        from app.models import AgencyClient
+        from app.services.document_engine import generate_document, get_template
+
+        template = get_template("agency_weekly_report")
+        if template is None:
+            return
+        async with AsyncSessionLocal() as db:
+            client = await db.get(AgencyClient, client_id)
+            if client is None:
+                return
+            await generate_document(db, client=client, template=template, actor_user_id=None)
+    except Exception as e:
+        logger.error("Weekly agency report generation failed for brand %d: %s", brand_id, e)
+
+
 async def _run_all_agency_brands() -> None:
     """Fetch agency-tier brands and trigger a tracking run for each. Runs weekly."""
     if await _is_scheduler_paused():
@@ -191,9 +211,9 @@ async def _run_all_agency_brands() -> None:
         return
 
     for brand in brands:
-        logger.info("Scheduler: queuing weekly tracking for agency brand %d (%s)", brand.id, brand.name)
+        logger.info("Scheduler: queuing weekly tracking+report for agency brand %d (%s)", brand.id, brand.name)
         asyncio.create_task(
-            _safe_run(brand.id, "weekly"),
+            _run_agency_brand_and_report(brand.id, brand.agency_client_id),
             name=f"tracking-agency-{brand.id}",
         )
 

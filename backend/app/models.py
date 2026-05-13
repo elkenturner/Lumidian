@@ -803,6 +803,14 @@ class WebsiteAuditRecommendation(Base):
     linked_prompt_ids: Mapped[str | None] = mapped_column(Text, nullable=True)
     expected_impact: Mapped[str | None] = mapped_column(String(255), nullable=True)
     llm_generated: Mapped[bool] = mapped_column(Boolean, default=False)
+    artifact: Mapped[str | None] = mapped_column(Text, nullable=True)
+    artifact_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    artifact_generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    artifact_regen_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    status: Mapped[str] = mapped_column(String(16), default="pending", nullable=False)
+    expected_lift_pp: Mapped[float | None] = mapped_column(Float, nullable=True)
+    target_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    priority_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 
 

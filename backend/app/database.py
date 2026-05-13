@@ -462,6 +462,15 @@ async def run_migrations():
             fetched_at DATETIME NOT NULL,
             PRIMARY KEY (brand_id, prompt_id)
         )""",
+        # Site Audit Fix Factory — artifact columns on recommendations
+        "ALTER TABLE website_audit_recommendations ADD COLUMN artifact TEXT",
+        "ALTER TABLE website_audit_recommendations ADD COLUMN artifact_type TEXT",
+        "ALTER TABLE website_audit_recommendations ADD COLUMN artifact_generated_at DATETIME",
+        "ALTER TABLE website_audit_recommendations ADD COLUMN artifact_regen_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE website_audit_recommendations ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'",
+        "ALTER TABLE website_audit_recommendations ADD COLUMN expected_lift_pp REAL",
+        "ALTER TABLE website_audit_recommendations ADD COLUMN target_url TEXT",
+        "ALTER TABLE website_audit_recommendations ADD COLUMN priority_score REAL",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

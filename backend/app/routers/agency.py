@@ -835,6 +835,34 @@ async def get_document(
     return await _doc_to_out(db, doc)
 
 
+@router.get("/documents/{document_id}/pdf")
+async def get_document_pdf(
+    document_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_agency_staff),
+):
+    """Render an agency_weekly_report document as PDF."""
+    from fastapi import Response
+    import re as _re
+    from app.services.document_engine.pdf_renderer import render_pdf
+
+    doc = await db.get(ClientDocument, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if doc.kind != "agency_weekly_report":
+        raise HTTPException(status_code=400, detail="PDF export is only available for weekly reports")
+    try:
+        pdf_bytes = await render_pdf(db, doc)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to render PDF: {e}") from e
+    safe_title = _re.sub(r"[^a-zA-Z0-9_-]+", "-", (doc.title or f"weekly-report-{doc.id}"))[:120].strip("-")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
+    )
+
+
 @router.post("/clients/{client_id}/documents", response_model=DocumentOut, status_code=http_status.HTTP_201_CREATED)
 async def create_document(
     client_id: int,

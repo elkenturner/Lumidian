@@ -1952,6 +1952,8 @@ export const siteAudit = {
     api.patch(`/site-audit/recommendation/${recId}/status`, { status }),
   cancel: (auditId: number) =>
     api.post(`/site-audit/audit/${auditId}/cancel`),
+  downloadPdf: (auditId: number) =>
+    api.get(`/site-audit/audit/${auditId}/pdf`, { responseType: 'blob' }).then(r => r.data as Blob),
 }
 
 // ── Agency activity log (2026-05-12) ─────────────────────────────────────────

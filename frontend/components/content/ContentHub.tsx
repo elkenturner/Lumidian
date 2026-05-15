@@ -59,7 +59,11 @@ import {
   DraftQueueStatus,
   DraftAttribution,
   QuoraQuestion,
+  listClusters,
+  regenerateClusterByPrompt,
+  ContentClusterSummary,
 } from '@/lib/api';
+import { ClusterCard } from '@/components/content/cluster/ClusterCard';
 import PlatformBadge from '@/components/PlatformBadge';
 import PlatformIcon from '@/components/PlatformIcon';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -91,7 +95,7 @@ import { renderPreviewHtml, getBasePlatform } from '@/components/content/helpers
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted';
-type PrimaryTab = 'opportunities' | 'content_drafts' | 'posted';
+type PrimaryTab = 'clusters' | 'opportunities' | 'content_drafts' | 'posted';
 type ContentDraftsSubTab = 'queue' | 'scheduled';
 
 // ── Draft card (Drafts tab) ───────────────────────────────────────────────────
@@ -1497,6 +1501,8 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
   const [brandProfile, setBrandProfile] = useState<BrandProfile | null>(null);
   const [brandPrompts, setBrandPrompts] = useState<Prompt[]>([]);
   const [contentSettings, setContentSettings] = useState<BrandContentSettings[]>([]);
+  const [clusterList, setClusterList] = useState<ContentClusterSummary[]>([]);
+  const [regeneratingClusterId, setRegeneratingClusterId] = useState<number | null>(null);
 
   // Report-running guard (set by dashboard via localStorage)
   const [reportRunning, setReportRunning] = useState(false);
@@ -1571,6 +1577,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
   };
 
   const primaryTabCounts = {
+    clusters: clusterList.length,
     opportunities: opportunities.length,
     content_drafts: draftItems.length + scheduledItems.length,
     posted: postedItems.length,
@@ -1594,6 +1601,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
         settingsData,
         statusData,
         attributionsData,
+        clustersData,
       ] = await Promise.all([
         getDrafts(brandId, undefined, 'draft'),
         getDrafts(brandId, undefined, 'approved'),
@@ -1604,7 +1612,12 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
         getContentSettings(brandId).catch((err) => { logError(err, 'Content: fetch content settings'); return [] as BrandContentSettings[]; }),
         getDraftStatus(brandId).catch((err) => { logError(err, 'Content: fetch draft status'); return null; }),
         getDraftAttributions(brandId).catch((err) => { logError(err, 'Content: fetch draft attributions'); return [] as DraftAttribution[]; }),
-      ]);
+        listClusters(brandId).catch((err) => { logError(err, 'Content: fetch clusters'); return [] as ContentClusterSummary[]; }),
+      ]) as [
+        ContentDraft[], ContentDraft[], ContentDraft[], ContentOpportunity[],
+        BrandProfile | null, BrandDetail | null, BrandContentSettings[],
+        DraftQueueStatus | null, DraftAttribution[], ContentClusterSummary[],
+      ];
 
       // Ignore results if the user switched to a different brand while fetching
       if (signal?.aborted) return;
@@ -1618,6 +1631,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
       setBrandPrompts(brandDetail?.prompts ?? []);
       setContentSettings(settingsData);
       setDraftStatus(statusData);
+      setClusterList(clustersData);
     } catch {
       if (signal?.aborted) return;
       setError('Failed to load content data. Check that the backend is running.');
@@ -2087,6 +2101,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
   );
 
   const PRIMARY_TABS: { key: PrimaryTab; label: string }[] = [
+    { key: 'clusters', label: 'Clusters' },
     { key: 'opportunities', label: 'Visibility Opportunities' },
     { key: 'content_drafts', label: 'Content Drafts' },
     { key: 'posted', label: 'Posted' },
@@ -2556,7 +2571,46 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
 
             {activePrimaryTab !== 'content_drafts' && <div className="mb-2" />}
 
+            {/* Clusters tab content */}
+            {activePrimaryTab === 'clusters' && (
+              <div>
+                {clusterList.length === 0 ? (
+                  <div className="rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] p-8 text-center">
+                    <p className="text-[var(--text-secondary)]">No clusters yet for this brand.</p>
+                    <p className="mt-1 text-sm text-[var(--text-faint)]">
+                      Each tracked prompt becomes a cluster. Hit Regenerate to populate.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {clusterList.map((c) => (
+                      <ClusterCard
+                        key={c.id}
+                        cluster={c}
+                        brandId={selectedBrandId ?? c.brand_id}
+                        regenerating={regeneratingClusterId === c.id}
+                        onRegenerate={async (clusterId) => {
+                          if (!selectedBrandId) return;
+                          const cluster = clusterList.find((x) => x.id === clusterId);
+                          if (!cluster) return;
+                          setRegeneratingClusterId(clusterId);
+                          try {
+                            await regenerateClusterByPrompt(selectedBrandId, cluster.prompt_id);
+                            const refreshed = await listClusters(selectedBrandId);
+                            setClusterList(refreshed);
+                          } finally {
+                            setRegeneratingClusterId(null);
+                          }
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Tab content */}
+            {activePrimaryTab !== 'clusters' && (
             <ContentTabPanels
               activeTab={activeTab}
               brands={brands}
@@ -2598,6 +2652,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
               onOpenAttach={(draftId) => setAttachPopoverDraftId(draftId)}
               onOpenExplainer={() => setExplainerOpen(true)}
             />
+            )}
           </div>
 
           {/* ── Right panel (30%) — Settings ─────────────────────────────────── */}

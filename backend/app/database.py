@@ -471,6 +471,8 @@ async def run_migrations():
         "ALTER TABLE website_audit_recommendations ADD COLUMN expected_lift_pp REAL",
         "ALTER TABLE website_audit_recommendations ADD COLUMN target_url TEXT",
         "ALTER TABLE website_audit_recommendations ADD COLUMN priority_score REAL",
+        # Platform detection for site audits — informs install instructions
+        "ALTER TABLE website_audits ADD COLUMN cms_platform TEXT",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

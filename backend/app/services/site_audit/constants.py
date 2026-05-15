@@ -72,6 +72,41 @@ def _strip_default_port(netloc: str, scheme: str) -> str:
     return netloc
 
 
+import re as _re
+
+# Matches repeated slashes inside a path (not the //  in scheme).
+_REPEATED_SLASHES = _re.compile(r"/+")
+
+
+def _clean_path(path: str, host: str) -> str:
+    """Collapse repeated slashes; strip embedded host duplications.
+
+    Wix and a few other CMSes generate canonical URLs that accidentally embed
+    the host as a path segment (e.g. ``/post/www.example.com/cookie-policy``).
+    Normalise these to ``/post/cookie-policy``.
+    """
+    if not path:
+        return "/"
+    # Collapse runs of slashes to a single /
+    cleaned = _REPEATED_SLASHES.sub("/", path)
+    # Strip embedded host segments that match the page's own host.
+    # We try both bare host and www-stripped variants.
+    host_variants = {host.lower()}
+    if host.lower().startswith("www."):
+        host_variants.add(host[4:].lower())
+    else:
+        host_variants.add(f"www.{host.lower()}")
+
+    segments = [s for s in cleaned.split("/") if s]
+    out: list[str] = []
+    for seg in segments:
+        if seg.lower() in host_variants:
+            # Skip — host shouldn't appear as a path segment.
+            continue
+        out.append(seg)
+    return "/" + "/".join(out) if out else "/"
+
+
 def normalise_url(url: str) -> str:
     """Canonical URL form for crawler-dedup, citation-matching, and storage.
 
@@ -82,6 +117,8 @@ def normalise_url(url: str) -> str:
       - Strip default port
       - Sort query params alphabetically
       - Trim trailing slash on non-root paths
+      - Collapse repeated slashes in the path
+      - Strip embedded host segments (Wix-style canonical artifacts)
       - Never decode percent-encoding
     """
     if not url or not isinstance(url, str):
@@ -105,7 +142,7 @@ def normalise_url(url: str) -> str:
     scheme = p.scheme.lower()
     netloc = _strip_default_port(p.netloc.lower(), scheme)
 
-    path = p.path or "/"
+    path = _clean_path(p.path or "/", netloc)
     if len(path) > 1 and path.endswith("/"):
         path = path.rstrip("/")
 

@@ -118,6 +118,11 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
 
     site_render_mode = _majority(rendered_modes) if rendered_modes else "unknown"
 
+    # Platform detection — sniff homepage HTML for Wix/Shopify/Webflow/etc.
+    from app.services.site_audit.platform_detector import detect_platform
+    homepage_html = pages_crawled[0].html if pages_crawled else None
+    cms_platform = detect_platform(homepage_html)
+
     # ── analyzing phase ──────────────────────────────────────────────────
     await _set_status(audit_id, "analyzing")
 
@@ -275,7 +280,17 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
     prompt_link_inputs = await _build_prompt_link_inputs(brand_id)
     page_link_map = link_pages_to_prompts(page_link_inputs, prompt_link_inputs)
 
+    # check_ids that represent SITE-WIDE fixes — should fire once per audit even
+    # if the underlying finding triggered on multiple pages (e.g. Organization
+    # schema can be added once to the global layout, not per page).
+    _SITE_WIDE_CHECK_IDS = {
+        "missing_organization_schema",
+        "incomplete_organization_schema",
+        "no_jsonld",  # generic — handle once per site
+    }
+
     # ── recommendations ───────────────────────────────────────────────────
+    seen_site_wide: set[str] = set()
     async with AsyncSessionLocal() as db:
         # Per-page recs from per-page findings
         for rec in page_records:
@@ -290,6 +305,25 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
                 ))
             page_url = rec.get("url")
             for r in recs:
+                # Site-wide dedup: skip if we've already emitted this check_id.
+                if r.check_id in _SITE_WIDE_CHECK_IDS:
+                    if r.check_id in seen_site_wide:
+                        continue
+                    seen_site_wide.add(r.check_id)
+                    # Site-wide recs: detach from page_id so they read as global.
+                    db.add(WebsiteAuditRecommendation(
+                        audit_id=audit_id, page_id=None,
+                        priority=r.priority, effort=r.effort, category=r.category,
+                        title=r.title, body=r.body,
+                        linked_prompt_ids=None,
+                        expected_impact=r.expected_impact,
+                        llm_generated=r.llm_generated,
+                        artifact_type=r.artifact_type,
+                        expected_lift_pp=r.expected_lift_pp,
+                        priority_score=r.priority_score,
+                        target_url=None,
+                    ))
+                    continue
                 db.add(WebsiteAuditRecommendation(
                     audit_id=audit_id, page_id=rec["page_id"],
                     priority=r.priority, effort=r.effort, category=r.category,
@@ -353,6 +387,7 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
         audit.robots_txt_raw = (robots_content or "")[:8192] if robots_content else None
         audit.llms_txt_present = llms_out.measurements["present"]
         audit.llms_txt_valid = llms_out.measurements["valid"]
+        audit.cms_platform = cms_platform
         audit.status = "completed"
         audit.completed_at = utcnow()
         await db.commit()

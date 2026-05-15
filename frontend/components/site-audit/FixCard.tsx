@@ -11,13 +11,15 @@ import {
   AlertCircle,
   CornerDownRight,
   ShieldCheck,
+  Target,
 } from 'lucide-react';
 
 import { siteAudit, type WebsiteAuditRecommendationOut } from '@/lib/api';
 import { easings } from '@/lib/motion';
-import { insertionHint } from '@/lib/insertion-hint';
+import { insertionHint, platformTip, platformDisplayName } from '@/lib/insertion-hint';
 import { FixCardCodeBlock } from './FixCardCodeBlock';
 import { RegenPopover } from './RegenPopover';
+import { useAuditMeta } from './AuditMetaContext';
 
 interface Props {
   rec: WebsiteAuditRecommendationOut;
@@ -56,6 +58,7 @@ const CATEGORY_LABEL: Record<string, string> = {
 };
 
 export function FixCard({ rec, onStatusChange, compact = false }: Props) {
+  const { promptsById } = useAuditMeta();
   const [artifact, setArtifact] = useState<string | null>(rec.artifact ?? null);
   const [artifactType, setArtifactType] = useState<string | null>(rec.artifact_type ?? null);
   const [draftStatus, setDraftStatus] = useState<DraftStatus>(
@@ -64,6 +67,10 @@ export function FixCard({ rec, onStatusChange, compact = false }: Props) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [regenOpen, setRegenOpen] = useState(false);
   const [exiting, setExiting] = useState(false);
+
+  const linkedPromptTexts = (rec.linked_prompt_ids ?? [])
+    .map((id) => promptsById[id])
+    .filter((t): t is string => Boolean(t));
 
   async function handleDraft(regenerateNotes?: string) {
     if (!rec.artifact_type) {
@@ -141,6 +148,11 @@ export function FixCard({ rec, onStatusChange, compact = false }: Props) {
                 {rec.body}
               </p>
             </div>
+          )}
+
+          {/* ── Linked prompts (the wedge — what this fix helps win) ──────── */}
+          {!drafted && linkedPromptTexts.length > 0 && (
+            <LinkedPromptsBlock prompts={linkedPromptTexts} />
           )}
 
           {/* ── Where (exact insertion point) ─────────────────────────────── */}
@@ -306,6 +318,45 @@ export function FixCard({ rec, onStatusChange, compact = false }: Props) {
 
 // ── Where block (collapsed-state insertion guidance) ───────────────────────
 
+// ── Linked-prompts block (THE wedge — ties audit fix to lost AI prompts) ─────
+
+function LinkedPromptsBlock({ prompts }: { prompts: string[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? prompts : prompts.slice(0, 2);
+  const hidden = prompts.length - visible.length;
+  return (
+    <div
+      className="mt-3 rounded-md p-3 text-xs"
+      style={{
+        background: 'rgba(96, 165, 250, 0.06)',
+        border: '1px solid var(--accent-light)',
+      }}
+    >
+      <p className="text-[10px] uppercase tracking-wider mb-1.5 flex items-center gap-1" style={{ color: 'var(--accent-light)' }}>
+        <Target size={11} />
+        Helps you win {prompts.length} tracked {prompts.length === 1 ? 'prompt' : 'prompts'}
+      </p>
+      <ul className="space-y-1">
+        {visible.map((p, i) => (
+          <li key={i} className="text-[var(--text-secondary)] leading-relaxed flex gap-1.5">
+            <span className="text-[var(--text-faint)] tabular-nums shrink-0">→</span>
+            <span className="italic">&ldquo;{p}&rdquo;</span>
+          </li>
+        ))}
+      </ul>
+      {hidden > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="mt-1.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+        >
+          + {hidden} more
+        </button>
+      )}
+    </div>
+  );
+}
+
 function WhereBlock({
   targetUrl,
   artifactType,
@@ -354,7 +405,10 @@ function InsertionHintRow({
   artifactType: string;
   targetUrl: string | null;
 }) {
+  const { cmsPlatform } = useAuditMeta();
   const hint = insertionHint(artifactType);
+  const tip = platformTip(cmsPlatform, artifactType);
+  const platName = platformDisplayName(cmsPlatform);
   if (!hint) return null;
   return (
     <div className="mt-3 text-xs text-[var(--text-secondary)] leading-relaxed">
@@ -373,6 +427,21 @@ function InsertionHintRow({
           {hint.where}
         </span>
       </p>
+      {tip && platName && (
+        <p
+          className="flex gap-1.5 mt-1.5 px-2 py-1.5 rounded"
+          style={{
+            background: 'rgba(96, 165, 250, 0.06)',
+            border: '1px solid var(--accent-light)',
+            color: 'var(--text-primary)',
+          }}
+        >
+          <span className="shrink-0 font-semibold" style={{ color: 'var(--accent-light)' }}>
+            {platName}:
+          </span>
+          <span>{tip}</span>
+        </p>
+      )}
       {hint.validate && (
         <p className="flex gap-1.5 mt-1.5 text-[var(--text-muted)]">
           <ShieldCheck size={12} className="mt-0.5 shrink-0" />

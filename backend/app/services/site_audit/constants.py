@@ -84,11 +84,16 @@ def _clean_path(path: str, host: str) -> str:
     Wix and a few other CMSes generate canonical URLs that accidentally embed
     the host as a path segment (e.g. ``/post/www.example.com/cookie-policy``).
     Normalise these to ``/post/cookie-policy``.
+
+    Also unescapes JSON-style ``\\/`` sequences that leak through from
+    sitemaps or inline JSON-LD before applying the slash-collapse rule.
     """
     if not path:
         return "/"
+    # Unescape JSON-style backslash-slash sequences first (\/ → /)
+    pre = path.replace("\\/", "/").replace("\\\\", "")
     # Collapse runs of slashes to a single /
-    cleaned = _REPEATED_SLASHES.sub("/", path)
+    cleaned = _REPEATED_SLASHES.sub("/", pre)
     # Strip embedded host segments that match the page's own host.
     # We try both bare host and www-stripped variants.
     host_variants = {host.lower()}

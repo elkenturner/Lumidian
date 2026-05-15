@@ -2175,6 +2175,13 @@ export async function agencyRecentDocuments(limit = 20, kind?: string): Promise<
   return res.data;
 }
 
+export async function agencyDownloadDocumentPdf(documentId: number): Promise<Blob> {
+  const res = await api.get(`/agency/documents/${documentId}/pdf`, {
+    responseType: 'blob',
+  });
+  return res.data as Blob;
+}
+
 // ----- Content Clusters -----
 
 export interface ContentBrief {

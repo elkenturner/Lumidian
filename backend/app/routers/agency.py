@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import require_agency_staff
-from app.models import AgencyClient, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, Prompt, User
+from app.models import AgencyClient, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, ContentPost, Prompt, User
 from app.schemas import (
     ActivityEventOut,
     ActivityEventWithClientOut,
@@ -32,7 +32,9 @@ from app.schemas import (
     DocumentUpdateIn,
     DocumentWithClientOut,
     DraftAssignIn,
+    DraftOut,
     DraftStatusUpdateIn,
+    MarkPostedIn,
     MyQueueDraft,
     MyQueueOut,
     NoteCreate,
@@ -45,6 +47,7 @@ from app.services.document_engine import generate_document, get_template, list_t
 from app.services.agency_activity import (
     emit_event,
     EVENT_DRAFT_GENERATED_BY_STAFF,
+    EVENT_DRAFT_MARKED_POSTED,
     EVENT_NOTE,
     EVENT_TASK_ASSIGNED,
     EVENT_TASK_COMPLETED,
@@ -994,3 +997,68 @@ async def agency_trigger_tracking(
         name=f"agency-manual-{brand.id}",
     )
     return {"detail": "Tracking run started", "brand_id": brand.id}
+
+
+def _draft_to_out(draft: ContentDraft) -> DraftOut:
+    return DraftOut(
+        id=draft.id,
+        brand_id=draft.brand_id,
+        prompt_id=draft.prompt_id,
+        platform=draft.platform,
+        status=draft.status,
+        title=draft.title,
+        content_text=draft.content_text,
+        content_brief=getattr(draft, "content_brief", None),
+        estimated_impact=getattr(draft, "estimated_impact", None),
+        source=draft.source,
+        assigned_to_user_id=getattr(draft, "assigned_to_user_id", None),
+        posted_at=getattr(draft, "posted_at", None),
+        created_at=getattr(draft, "created_at", None),
+        updated_at=getattr(draft, "updated_at", None),
+    )
+
+
+@router.post("/drafts/{draft_id}/mark-posted", response_model=DraftOut)
+async def mark_draft_posted(
+    draft_id: int,
+    body: MarkPostedIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+):
+    """Flip a draft to 'posted', set posted_at, create a ContentPost row. Agency-only."""
+    draft = await db.get(ContentDraft, draft_id)
+    if draft is None:
+        raise HTTPException(status_code=404, detail="Draft not found")
+    brand = await db.get(Brand, draft.brand_id)
+    if brand is None or brand.agency_client_id is None:
+        raise HTTPException(status_code=400, detail="Draft is not on an agency brand")
+    if draft.status == "posted":
+        return _draft_to_out(draft)
+    if draft.status != "approved":
+        raise HTTPException(
+            status_code=http_status.HTTP_409_CONFLICT,
+            detail=f"Draft must be 'approved' to mark as posted (current: {draft.status})",
+        )
+    now = datetime.utcnow()
+    draft.status = "posted"
+    draft.posted_at = now
+    db.add(
+        ContentPost(
+            draft_id=draft.id,
+            platform=draft.platform,
+            post_url=body.post_url,
+            posted_at=now,
+        )
+    )
+    await emit_event(
+        db,
+        agency_client_id=brand.agency_client_id,
+        event_type=EVENT_DRAFT_MARKED_POSTED,
+        body=draft.title or f"Draft #{draft.id}",
+        actor_user_id=user.id,
+        related_draft_id=draft.id,
+        payload={"post_url": body.post_url, "platform": draft.platform},
+    )
+    await db.commit()
+    await db.refresh(draft)
+    return _draft_to_out(draft)

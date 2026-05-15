@@ -1381,3 +1381,26 @@ class AgencyDraftGenerateIn(BaseModel):
     prompt_id: int
     platform: str = Field(min_length=1, max_length=64)
     custom_brief: str | None = Field(default=None, max_length=2000)
+
+
+class MarkPostedIn(BaseModel):
+    post_url: str | None = Field(default=None, max_length=1000)
+
+
+class DraftOut(BaseModel):
+    id: int
+    brand_id: int
+    prompt_id: int | None
+    platform: str
+    status: str
+    title: str | None
+    content_text: str | None
+    content_brief: str | None
+    estimated_impact: str | None
+    source: str | None
+    assigned_to_user_id: int | None
+    posted_at: datetime | None
+    created_at: datetime | None
+    updated_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)

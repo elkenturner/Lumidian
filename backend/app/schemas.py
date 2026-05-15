@@ -1030,6 +1030,7 @@ class WebsiteAuditSummary(BaseModel):
     llms_txt_valid: bool
     robots_txt_raw: str | None
     error_message: str | None
+    cms_platform: str | None = None
 
 
 class WebsiteAuditPageOut(BaseModel):

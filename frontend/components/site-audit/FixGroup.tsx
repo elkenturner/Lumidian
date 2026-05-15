@@ -95,12 +95,18 @@ export function FixGroup({ recs, onStatusChange }: Props) {
       >
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-0.5">
-            Affects {recs.length} pages
+            Affects {recs.length} {recs.length === 1 ? 'page' : 'pages'}
           </p>
-          <p className="text-[var(--text-secondary)] truncate">
-            e.g. <span className="font-mono text-[var(--text-primary)]">{urlPath(lead.target_url)}</span>
-            {recs.length > 1 && <span> + {recs.length - 1} more</span>}
-          </p>
+          {lead.target_url ? (
+            <p className="text-[var(--text-secondary)] truncate">
+              e.g. <span className="font-mono text-[var(--text-primary)]">{urlPath(lead.target_url)}</span>
+              {recs.length > 1 && <span> + {recs.length - 1} more</span>}
+            </p>
+          ) : (
+            <p className="text-[var(--text-faint)] italic">
+              Per-page URLs unavailable on this audit — re-run to refresh.
+            </p>
+          )}
         </div>
         <button
           type="button"

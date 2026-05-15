@@ -93,6 +93,7 @@ export function ClientQuickActionsRail({ client, onDocumentGenerated, onDraftsSe
         clientName={client.name}
         brandId={client.brand_id}
         primaryContactName={client.primary_contact_name}
+        primaryContactEmail={client.primary_contact_email ?? null}
         onSent={onDraftsSent}
       />
     </aside>

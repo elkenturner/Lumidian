@@ -117,7 +117,12 @@ def normalise_url(url: str) -> str:
 
     Rules:
       - Lowercase scheme + host
+      - Force scheme to https:// (modern sites canonicalize this way; treating
+        http and https as the same URL eliminates duplicate page rows)
       - Default 'https://' if scheme missing
+      - Strip leading 'www.' from host (apex and www serve the same content
+        on the overwhelming majority of sites; treating them separately
+        gives 3× duplicate homepages)
       - Strip fragment
       - Strip default port
       - Sort query params alphabetically
@@ -144,8 +149,20 @@ def normalise_url(url: str) -> str:
     if p.scheme not in ("http", "https"):
         raise ValueError(f"unsupported scheme: {p.scheme!r}")
 
-    scheme = p.scheme.lower()
-    netloc = _strip_default_port(p.netloc.lower(), scheme)
+    # Strip the default port using the ORIGINAL scheme so :80 with http and
+    # :443 with https both collapse before we canonicalise the scheme.
+    original_scheme = p.scheme.lower()
+    netloc = _strip_default_port(p.netloc.lower(), original_scheme)
+
+    # Force https for public hosts to collapse http/https variants of the
+    # same URL. Skip for loopback hosts so local-server tests still work.
+    bare_host = netloc.split(":", 1)[0]
+    is_loopback = bare_host in ("localhost", "127.0.0.1", "::1")
+    scheme = original_scheme if is_loopback else "https"
+
+    # Strip leading 'www.' so apex and www point to the same canonical URL.
+    if netloc.startswith("www."):
+        netloc = netloc[4:]
 
     path = _clean_path(p.path or "/", netloc)
     if len(path) > 1 and path.endswith("/"):

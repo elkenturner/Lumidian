@@ -34,9 +34,17 @@ def test_tier_limits_excludes_free():
     ("https://example.com/foo/", "https://example.com/foo"),
     ("https://example.com/foo#section", "https://example.com/foo"),
     ("https://example.com:443/foo", "https://example.com/foo"),
-    ("http://example.com:80/", "http://example.com/"),
+    # http is canonicalised to https on public hosts (collapses scheme variants)
+    ("http://example.com:80/", "https://example.com/"),
+    ("http://example.com/", "https://example.com/"),
+    # www is stripped on public hosts (collapses host variants)
+    ("https://www.example.com/", "https://example.com/"),
+    ("http://www.example.com/foo", "https://example.com/foo"),
     ("https://example.com/foo?b=2&a=1", "https://example.com/foo?a=1&b=2"),
     ("example.com/foo", "https://example.com/foo"),
+    # Loopback hosts preserve original scheme (so local test servers still work)
+    ("http://127.0.0.1:8080/", "http://127.0.0.1:8080/"),
+    ("http://localhost/foo", "http://localhost/foo"),
 ])
 def test_normalise_url_canonical(input_url, expected):
     assert normalise_url(input_url) == expected

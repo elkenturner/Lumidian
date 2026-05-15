@@ -37,6 +37,18 @@ function urlPath(u: string | null | undefined): string {
   }
 }
 
+// Artifact types that apply globally (one paste covers the entire site).
+const SITE_WIDE_ARTIFACTS = new Set([
+  'jsonld_org',
+  'llms_txt',
+  'robots_snippet',
+  'agents_md',
+]);
+
+function isSiteWide(artifactType: string | null | undefined): boolean {
+  return !!artifactType && SITE_WIDE_ARTIFACTS.has(artifactType);
+}
+
 /**
  * Renders ONE card when a rec group has just one member (drop-through to FixCard).
  * Renders a "this fix applies to N pages" container with a disclosure listing each
@@ -95,12 +107,16 @@ export function FixGroup({ recs, onStatusChange }: Props) {
       >
         <div className="min-w-0">
           <p className="text-[10px] uppercase tracking-wider text-[var(--text-muted)] mb-0.5">
-            Affects {recs.length} {recs.length === 1 ? 'page' : 'pages'}
+            {isSiteWide(lead.artifact_type) ? 'Site-wide' : `Affects ${recs.length} ${recs.length === 1 ? 'page' : 'pages'}`}
           </p>
           {lead.target_url ? (
             <p className="text-[var(--text-secondary)] truncate">
               e.g. <span className="font-mono text-[var(--text-primary)]">{urlPath(lead.target_url)}</span>
               {recs.length > 1 && <span> + {recs.length - 1} more</span>}
+            </p>
+          ) : isSiteWide(lead.artifact_type) ? (
+            <p className="text-[var(--text-secondary)]">
+              Applies globally — add once to your site-wide template.
             </p>
           ) : (
             <p className="text-[var(--text-faint)] italic">

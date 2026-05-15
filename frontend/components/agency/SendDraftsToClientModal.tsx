@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Copy, Send, X } from 'lucide-react';
+import { Copy, Mail, Send, X } from 'lucide-react';
 import {
   agencyGetReviewLink,
   agencyRotateReviewLink,
@@ -19,6 +19,7 @@ interface Props {
   clientName: string;
   brandId: number | null;
   primaryContactName: string | null;
+  primaryContactEmail: string | null;
   onSent: () => void; // caller may want to refresh pipeline
 }
 
@@ -31,6 +32,7 @@ export function SendDraftsToClientModal({
   clientName,
   brandId,
   primaryContactName,
+  primaryContactEmail,
   onSent,
 }: Props) {
   const [drafts, setDrafts] = useState<SendableDraft[]>([]);
@@ -190,6 +192,17 @@ export function SendDraftsToClientModal({
             )}
             {stage === 'message' && (
               <>
+                {primaryContactEmail && (
+                  <a
+                    href={`mailto:${encodeURIComponent(primaryContactEmail)}?subject=${encodeURIComponent(
+                      `Drafts ready for review — ${clientName}`,
+                    )}&body=${encodeURIComponent(messageText)}`}
+                    className="flex items-center gap-1 rounded-md bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card)]"
+                  >
+                    <Mail className="h-3 w-3" />
+                    Compose email
+                  </a>
+                )}
                 <a
                   href={reviewUrl ?? '#'}
                   target="_blank"

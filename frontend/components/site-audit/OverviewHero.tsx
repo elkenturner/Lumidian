@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Sparkles } from 'lucide-react';
 import { siteAudit, type WebsiteAuditRecommendationOut } from '@/lib/api';
 import { staggerContainer, staggerChild } from '@/lib/motion';
-import { FixCard } from './FixCard';
+import { FixGroup } from './FixGroup';
 
 interface Props {
   auditId: number;
@@ -14,27 +14,38 @@ interface Props {
 
 /**
  * Top-5 ranked pending fixes for this audit, presented as the hero of the page.
- * Re-ranks when a card is marked applied / dismissed.
+ * Groups by (title + category) so 3× "Add Organization JSON-LD" appears as ONE
+ * card with "Affects 3 pages", not three duplicate cards.
  */
 export function OverviewHero({ auditId, onSeeAll }: Props) {
-  const [recs, setRecs] = useState<WebsiteAuditRecommendationOut[] | null>(null);
+  const [groups, setGroups] = useState<WebsiteAuditRecommendationOut[][] | null>(null);
   const [allCount, setAllCount] = useState<number>(0);
 
   const load = useCallback(async () => {
     const all = await siteAudit.recommendations(auditId);
     setAllCount(all.length);
-    const pending = all
-      .filter((r) => (r.status ?? 'pending') === 'pending')
-      .sort((a, b) => (b.priority_score ?? 0) - (a.priority_score ?? 0))
-      .slice(0, 5);
-    setRecs(pending);
+    const pending = all.filter((r) => (r.status ?? 'pending') === 'pending');
+    // Group by (title + category), then take top 5 groups by max priority_score.
+    const byKey = new Map<string, WebsiteAuditRecommendationOut[]>();
+    for (const r of pending) {
+      const key = `${r.title}::${r.category}`;
+      const arr = byKey.get(key) ?? [];
+      arr.push(r);
+      byKey.set(key, arr);
+    }
+    const ordered = Array.from(byKey.values()).sort(
+      (a, b) =>
+        Math.max(...b.map((x) => x.priority_score ?? 0))
+        - Math.max(...a.map((x) => x.priority_score ?? 0)),
+    );
+    setGroups(ordered.slice(0, 5));
   }, [auditId]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  if (recs === null) {
+  if (groups === null) {
     return (
       <div className="space-y-3">
         {[0, 1, 2, 3, 4].map((i) => (
@@ -48,7 +59,7 @@ export function OverviewHero({ auditId, onSeeAll }: Props) {
     );
   }
 
-  if (recs.length === 0) {
+  if (groups.length === 0) {
     return (
       <div
         className="card-elevated text-center py-10"
@@ -73,9 +84,9 @@ export function OverviewHero({ auditId, onSeeAll }: Props) {
     <section>
       <div className="flex items-baseline justify-between mb-4">
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-          Next {recs.length} fix{recs.length === 1 ? '' : 'es'}
+          Next {groups.length} fix{groups.length === 1 ? '' : 'es'}
         </h2>
-        {allCount > recs.length && (
+        {allCount > groups.reduce((s, g) => s + g.length, 0) && (
           <button
             type="button"
             onClick={onSeeAll}
@@ -93,9 +104,9 @@ export function OverviewHero({ auditId, onSeeAll }: Props) {
         animate="visible"
         className="space-y-3"
       >
-        {recs.map((rec) => (
-          <motion.div key={rec.id} variants={staggerChild}>
-            <FixCard rec={rec} onStatusChange={() => load()} compact />
+        {groups.map((groupRecs, i) => (
+          <motion.div key={i} variants={staggerChild}>
+            <FixGroup recs={groupRecs} onStatusChange={() => load()} />
           </motion.div>
         ))}
       </motion.div>

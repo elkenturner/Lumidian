@@ -782,6 +782,7 @@ class WebsiteAudit(Base):
     robots_txt_raw: Mapped[str | None] = mapped_column(Text, nullable=True)
     llms_txt_present: Mapped[bool] = mapped_column(Boolean, default=False)
     llms_txt_valid: Mapped[bool] = mapped_column(Boolean, default=False)
+    cms_platform: Mapped[str | None] = mapped_column(String(32), nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
 

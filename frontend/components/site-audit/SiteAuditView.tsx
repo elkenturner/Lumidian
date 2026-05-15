@@ -18,6 +18,8 @@ import { PageTable } from './PageTable';
 import { RenderModeBanner } from './RenderModeBanner';
 import { SchemaAndBotsTab } from './SchemaAndBotsTab';
 import { ScoreStrip } from './ScoreStrip';
+import { StaleAuditBanner } from './StaleAuditBanner';
+import { AuditMetaProvider } from './AuditMetaContext';
 
 interface Props {
   brandId: number;
@@ -103,7 +105,13 @@ export function SiteAuditView({ brandId }: Props) {
 
   const inFlight = !['completed', 'failed', 'cancelled'].includes(audit.status);
 
+  const promptsById: Record<number, string> = {};
+  for (const p of brand?.prompts ?? []) {
+    promptsById[p.id] = p.text;
+  }
+
   return (
+    <AuditMetaProvider promptsById={promptsById} cmsPlatform={audit.cms_platform ?? null}>
     <div className="p-6 sm:p-8 max-w-6xl">
       <AuditHeader
         audit={audit}
@@ -169,6 +177,16 @@ export function SiteAuditView({ brandId }: Props) {
         <RenderModeBanner isJsRendered brandUrl={brand?.website_url ?? null} />
       )}
 
+      {/* Stale audit banner — most recs missing target_url OR >14 days old */}
+      {audit.status === 'completed' && (audit.total_pages ?? 0) > 0 && (
+        <StaleAuditBanner
+          auditId={audit.id}
+          brandId={brandId}
+          startedAt={audit.started_at}
+          onTriggered={loadLatest}
+        />
+      )}
+
       <AnimatePresence mode="wait">
         <motion.div
           key={tab}
@@ -210,5 +228,6 @@ export function SiteAuditView({ brandId }: Props) {
         </motion.div>
       </AnimatePresence>
     </div>
+    </AuditMetaProvider>
   );
 }

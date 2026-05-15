@@ -35,6 +35,7 @@ async def generate_document(
         kind=template.kind,
         title=template.title_factory(client),
         body_markdown=body_markdown,
+        data_snapshot=data_json,
         generated_by_user_id=actor_user_id,
     )
     db.add(doc)

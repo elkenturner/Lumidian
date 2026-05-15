@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>{{ document.title }}</title>
+<style>
+  @page { size: Letter; margin: 0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, sans-serif; color: #0f172a; background: #fafafa; }
+  .page { width: 8.5in; height: 11in; padding: 0.75in; page-break-after: always; position: relative; background: #fafafa; }
+  .page:last-child { page-break-after: auto; }
+  h1, h2, h3 { margin: 0; font-weight: 600; }
+  h1 { font-size: 36pt; line-height: 1.15; }
+  h2 { font-size: 16pt; margin-bottom: 12pt; color: #0f172a; border-bottom: 1px solid #ececec; padding-bottom: 6pt; }
+  h3 { font-size: 11pt; margin-bottom: 6pt; color: #475569; }
+  p { margin: 0 0 10pt; line-height: 1.55; font-size: 11pt; color: #334155; }
+  ul { margin: 0 0 10pt; padding-left: 18pt; }
+  li { font-size: 11pt; line-height: 1.6; color: #334155; }
+  .tracker { font-size: 9pt; letter-spacing: 2pt; text-transform: uppercase; color: #64748b; }
+  .card { background: #ffffff; border: 1px solid #ececec; border-radius: 8px; padding: 18pt; margin-bottom: 14pt; }
+  .footer { position: absolute; left: 0.75in; right: 0.75in; bottom: 0.45in; display: flex; justify-content: space-between; font-size: 9pt; color: #94a3b8; }
+  .footer .wordmark { font-weight: 600; color: #64748b; }
+  .center { text-align: center; }
+  .right { text-align: right; }
+  .muted { color: #94a3b8; }
+
+  /* Cover */
+  .cover { display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
+  .cover .logo { width: 120px; height: auto; }
+  .cover .hero { text-align: center; margin-top: -40pt; }
+  .cover .hero .label { font-size: 11pt; letter-spacing: 3pt; text-transform: uppercase; color: #64748b; margin-bottom: 24pt; }
+  .cover .hero .name { font-family: Georgia, "Times New Roman", serif; font-size: 56pt; color: #0f172a; margin: 0 0 18pt; }
+  .cover .hero .week { font-size: 16pt; color: #475569; }
+  .cover .meta { display: flex; justify-content: space-between; font-size: 10pt; color: #64748b; }
+
+  /* Executive headline */
+  .headline { display: flex; flex-direction: column; align-items: center; margin-top: 80pt; }
+  .headline .score { font-family: Georgia, "Times New Roman", serif; font-size: 96pt; line-height: 1; color: #0f172a; }
+  .headline .delta { font-size: 22pt; font-weight: 600; margin-top: 8pt; }
+  .headline .delta.up { color: #059669; }
+  .headline .delta.down { color: #e11d48; }
+  .headline .delta.flat { color: #94a3b8; }
+  .headline .delta .arrow { display: inline-block; margin-right: 8pt; }
+  .headline .summary { margin-top: 36pt; max-width: 5in; text-align: center; font-size: 12pt; line-height: 1.6; color: #334155; }
+
+  /* Bars */
+  .bar-row { display: flex; align-items: center; padding: 8pt 0; border-bottom: 1px solid #f1f5f9; }
+  .bar-row:last-child { border-bottom: 0; }
+  .bar-row .model { width: 110px; font-size: 10pt; color: #475569; }
+  .bar-row .bar-wrap { flex: 1; height: 16px; background: #f1f5f9; border-radius: 8px; overflow: hidden; margin-right: 16pt; }
+  .bar-row .bar { height: 100%; background: #22d3ee; }
+  .bar-row .num { width: 90pt; text-align: right; font-variant-numeric: tabular-nums; font-size: 10pt; color: #0f172a; }
+  .bar-row .num .delta { display: inline-block; margin-left: 8pt; font-size: 9pt; }
+  .delta.up { color: #059669; }
+  .delta.down { color: #e11d48; }
+  .delta.flat { color: #94a3b8; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  th { text-align: left; font-weight: 600; color: #64748b; padding: 6pt 8pt; border-bottom: 1px solid #ececec; font-size: 9pt; text-transform: uppercase; letter-spacing: 1pt; }
+  td { padding: 8pt; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  td.delta-cell.up { color: #059669; font-weight: 600; }
+  td.delta-cell.down { color: #e11d48; font-weight: 600; }
+  td.delta-cell.flat { color: #94a3b8; }
+  td.prompt { font-weight: 500; color: #0f172a; max-width: 320pt; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1 — Cover -->
+<div class="page cover">
+  <div>
+    {% if logo_data_uri %}<img src="{{ logo_data_uri }}" class="logo" alt="Lumidian" />{% else %}<div class="wordmark">Lumidian</div>{% endif %}
+  </div>
+  <div class="hero">
+    <div class="label">Weekly visibility report</div>
+    <div class="name">{{ data.client.name }}</div>
+    <div class="week">{{ data.period.label }}</div>
+  </div>
+  <div class="meta">
+    <div>Prepared by Lumidian</div>
+    <div>{{ generated_label }}</div>
+  </div>
+</div>
+
+<!-- PAGE 2 — Executive headline -->
+<div class="page">
+  <div class="tracker">Executive summary</div>
+  <div class="headline">
+    {% if data.this_week_run %}
+      <div class="score">{{ data.this_week_run.overall_score|round|int }}<span style="font-size:36pt;color:#94a3b8;">%</span></div>
+      {% set delta = (data.this_week_run.overall_score - data.last_week_run.overall_score) if data.last_week_run else None %}
+      {% if delta is not none %}
+        <div class="delta {% if delta > 0 %}up{% elif delta < 0 %}down{% else %}flat{% endif %}">
+          <span class="arrow">{% if delta > 0 %}▲{% elif delta < 0 %}▼{% else %}—{% endif %}</span>{{ (delta|round(1)) }} pts vs last week
+        </div>
+      {% else %}
+        <div class="delta flat">Baseline week — no prior data to compare</div>
+      {% endif %}
+    {% else %}
+      <div class="score muted">—</div>
+      <div class="delta flat">Tracking has not run yet this week</div>
+    {% endif %}
+    <div class="summary">{{ sections.executive_summary | safe }}</div>
+  </div>
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ data.client.name }}</div>
+    <div class="right">2</div>
+  </div>
+</div>
+
+<!-- PAGE 3 — Visibility breakdown -->
+<div class="page">
+  <h2>Visibility by model</h2>
+  <div class="card">
+    {% for m in data.model_scores %}
+      <div class="bar-row">
+        <div class="model">{{ m.model }}</div>
+        <div class="bar-wrap"><div class="bar" style="width: {{ (m.score|float)|round|int }}%;"></div></div>
+        <div class="num">{{ (m.score|float)|round(1) }}%</div>
+      </div>
+    {% else %}
+      <div class="muted">No model scores available for this week.</div>
+    {% endfor %}
+  </div>
+  <div>{{ sections.visibility | safe }}</div>
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ data.client.name }}</div>
+    <div class="right">3</div>
+  </div>
+</div>
+
+<!-- PAGE 4 — Prompt scorecard -->
+<div class="page">
+  <h2>Prompt-by-prompt</h2>
+  <table>
+    <thead>
+      <tr><th>Prompt</th><th class="num">This week</th><th class="num">Last week</th><th class="num">Δ</th></tr>
+    </thead>
+    <tbody>
+      {% for p in data.per_prompt %}
+        <tr>
+          <td class="prompt">{{ p.prompt_text }}</td>
+          <td class="num">{% if p.this_week_score is not none %}{{ p.this_week_score|round(1) }}%{% else %}—{% endif %}</td>
+          <td class="num">{% if p.last_week_score is not none %}{{ p.last_week_score|round(1) }}%{% else %}—{% endif %}</td>
+          <td class="num delta-cell {% if p.delta is not none and p.delta > 0 %}up{% elif p.delta is not none and p.delta < 0 %}down{% else %}flat{% endif %}">
+            {% if p.delta is not none %}{{ ('+' if p.delta > 0 else '') }}{{ p.delta|round(1) }}{% else %}—{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="muted">No prompts tracked yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ data.client.name }}</div>
+    <div class="right">4</div>
+  </div>
+</div>
+
+<!-- PAGE 5 — Competitors + Content shipped -->
+<div class="page">
+  <h2>Competitor landscape</h2>
+  <table style="margin-bottom: 24pt;">
+    <thead>
+      <tr><th>Competitor</th><th class="num">This week</th><th class="num">Last week</th><th class="num">Δ</th></tr>
+    </thead>
+    <tbody>
+      {% for c in data.competitors %}
+        <tr>
+          <td class="prompt">{{ c.name }}</td>
+          <td class="num">{{ c.this_week_mentions }}</td>
+          <td class="num">{{ c.last_week_mentions }}</td>
+          <td class="num delta-cell {% if c.delta > 0 %}up{% elif c.delta < 0 %}down{% else %}flat{% endif %}">
+            {% if c.delta > 0 %}+{% endif %}{{ c.delta }}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="muted">No competitors tracked yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Content shipped this week</h2>
+  <div class="card">
+    {% if data.content_shipped %}
+      <ul style="margin: 0; padding-left: 16pt;">
+        {% for c in data.content_shipped %}
+          <li><strong>{{ c.platform }}</strong> — {{ c.count }} post{{ '' if c.count == 1 else 's' }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <span class="muted">No content posted this week.</span>
+    {% endif %}
+  </div>
+
+  {% if data.draft_attribution %}
+    <h3 style="margin-top: 14pt;">Impact of posted content</h3>
+    <ul style="padding-left: 16pt;">
+      {% for a in data.draft_attribution[:3] %}
+        <li><strong>{{ a.platform }}</strong> — {{ a.prompt_text }} (+{{ a.delta|round(1) }} pts)</li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ data.client.name }}</div>
+    <div class="right">5</div>
+  </div>
+</div>
+
+<!-- PAGE 6 — Gaps + Next week -->
+<div class="page">
+  <h2>Where we're losing</h2>
+  <div class="card">
+    {% if data.top_gaps %}
+      <ul style="margin: 0; padding-left: 16pt;">
+        {% for g in data.top_gaps %}
+          <li><strong>{{ g.prompt_text }}</strong> — platforms lacking: {{ g.platforms_lacking|join(', ') if g.platforms_lacking else 'n/a' }}</li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <span class="muted">No active gaps detected.</span>
+    {% endif %}
+  </div>
+
+  <h2>Plan for next week</h2>
+  <div>{{ sections.next_week | safe }}</div>
+
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ data.client.name }}</div>
+    <div class="right">6</div>
+  </div>
+</div>
+
+</body>
+</html>

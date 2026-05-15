@@ -473,6 +473,8 @@ async def run_migrations():
         "ALTER TABLE website_audit_recommendations ADD COLUMN priority_score REAL",
         # Platform detection for site audits — informs install instructions
         "ALTER TABLE website_audits ADD COLUMN cms_platform TEXT",
+        # 2026-05-15: Agency PDF report — persist fetch_data snapshot on ClientDocument
+        "ALTER TABLE client_documents ADD COLUMN data_snapshot TEXT",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

@@ -933,6 +933,7 @@ class ClientDocument(Base):
     kind: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     body_markdown: Mapped[str] = mapped_column(Text, nullable=False)
+    data_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
     generated_by_user_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )

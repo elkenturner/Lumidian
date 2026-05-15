@@ -1,14 +1,52 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { FileText } from 'lucide-react';
-import { agencyListDocuments, type AgencyDocument } from '@/lib/api';
+import { Download, FileText, Loader2 } from 'lucide-react';
+import { agencyDownloadDocumentPdf, agencyListDocuments, type AgencyDocument } from '@/lib/api';
 import { DocumentViewer } from './DocumentViewer';
 
 interface Props {
   clientId: number;
   // optional: render docs supplied externally (e.g., after a fresh generation)
   injectDoc?: AgencyDocument | null;
+}
+
+function DownloadPdfButton({ documentId, title }: { documentId: number; title: string }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const onClick = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const blob = await agencyDownloadDocumentPdf(documentId);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${title.replace(/[^a-zA-Z0-9_-]+/g, '-')}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to download PDF');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <>
+      <button
+        onClick={onClick}
+        disabled={busy}
+        className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-raised)] disabled:opacity-50"
+        title="Download as PDF"
+      >
+        {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+        PDF
+      </button>
+      {error && <span className="ml-2 text-xs text-red-400">{error}</span>}
+    </>
+  );
 }
 
 export function DocumentList({ clientId, injectDoc }: Props) {
@@ -60,6 +98,11 @@ export function DocumentList({ clientId, injectDoc }: Props) {
                   {d.generated_by_name && <> · {d.generated_by_name}</>}
                 </div>
               </div>
+              {d.kind === 'agency_weekly_report' && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <DownloadPdfButton documentId={d.id} title={d.title} />
+                </div>
+              )}
             </li>
           ))}
         </ul>

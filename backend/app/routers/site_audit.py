@@ -632,6 +632,35 @@ async def draft_recommendation_artifact(
 _VALID_REC_STATUS = {"pending", "applied", "dismissed"}
 
 
+@router.get("/audit/{audit_id}/pdf")
+async def audit_pdf(
+    audit_id: int,
+    user: User = Depends(get_current_user),
+):
+    """Render the site audit as a branded PDF for client delivery."""
+    import re as _re
+
+    from app.services.site_audit.pdf_renderer import render_audit_pdf
+
+    async with AsyncSessionLocal() as db:
+        audit = await db.get(WebsiteAudit, audit_id)
+        if audit is None:
+            raise HTTPException(status_code=404, detail="Audit not found")
+        await _ensure_brand_access(audit.brand_id, user)
+        try:
+            pdf_bytes = await render_audit_pdf(db, audit_id)
+        except Exception as exc:
+            logger.exception("Failed to render audit PDF for audit_id=%s", audit_id)
+            raise HTTPException(status_code=500, detail=f"Failed to render PDF: {exc}") from exc
+
+    safe_label = _re.sub(r"[^a-zA-Z0-9_-]+", "-", f"site-audit-{audit_id}")[:120].strip("-")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_label}.pdf"'},
+    )
+
+
 @router.patch("/recommendation/{rec_id}/status", status_code=204)
 async def update_recommendation_status(
     rec_id: int,

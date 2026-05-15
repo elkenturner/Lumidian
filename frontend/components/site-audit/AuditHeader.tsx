@@ -48,18 +48,42 @@ export function AuditHeader({ audit, brandUrl, inFlight, onRunNewAudit }: Props)
           Site Audit
         </p>
         <h1 className="text-xl font-semibold text-[var(--text-primary)] mt-1 truncate">
-          {brandUrl ? new URL(brandUrl).host : 'Site audit'}
+          {brandUrl ? (
+            new URL(brandUrl).host
+          ) : (
+            <span className="inline-block h-5 w-48 rounded animate-pulse" style={{ background: 'rgba(255,255,255,0.06)' }} />
+          )}
         </h1>
-        <p className="text-xs text-[var(--text-faint)] mt-2 tabular-nums">
-          Last audit{' '}
-          {audit.started_at
-            ? formatDistanceToNow(new Date(audit.started_at), { addSuffix: true })
-            : '—'}
+        <p className="text-xs text-[var(--text-faint)] mt-2 tabular-nums flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span>
+            Last audit{' '}
+            {audit.started_at
+              ? formatDistanceToNow(new Date(audit.started_at), { addSuffix: true })
+              : '—'}
+          </span>
           {audit.total_pages != null && (
-            <span className="text-[var(--text-faint)]"> · {audit.total_pages} pages</span>
+            <>
+              <span className="text-[var(--text-faint)]">·</span>
+              <span>{audit.total_pages} {audit.total_pages === 1 ? 'page' : 'pages'}</span>
+            </>
+          )}
+          {audit.cms_platform && (
+            <>
+              <span className="text-[var(--text-faint)]">·</span>
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider"
+                style={{
+                  background: 'var(--accent-muted)',
+                  color: 'var(--accent-light)',
+                  border: '1px solid var(--accent-light)',
+                }}
+              >
+                {audit.cms_platform === 'next' ? 'Next.js' : audit.cms_platform.charAt(0).toUpperCase() + audit.cms_platform.slice(1)}
+              </span>
+            </>
           )}
           {audit.overall_score != null && (
-            <span className="ml-2 inline-flex items-center gap-1.5">
+            <span className="inline-flex items-center gap-1.5">
               <span className="text-[var(--text-faint)]">·</span>
               <span
                 className="px-1.5 py-0.5 rounded font-semibold text-[10px]"

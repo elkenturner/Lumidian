@@ -1847,6 +1847,7 @@ export type WebsiteAuditSummary = {
   llms_txt_valid: boolean
   robots_txt_raw: string | null
   error_message: string | null
+  cms_platform?: string | null
 }
 
 export type WebsiteAuditPageOut = {
@@ -2308,4 +2309,14 @@ export async function agencyGenerateDraft(
 
 export async function agencyTriggerTracking(clientId: number): Promise<void> {
   await api.post(`/agency/clients/${clientId}/tracking/run`);
+}
+
+export async function agencyMarkDraftPosted(
+  draftId: number,
+  postUrl?: string,
+): Promise<ContentDraft> {
+  const res = await api.post<ContentDraft>(`/agency/drafts/${draftId}/mark-posted`, {
+    post_url: postUrl ?? null,
+  });
+  return res.data;
 }

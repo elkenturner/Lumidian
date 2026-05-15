@@ -11,6 +11,7 @@ import { AssigneePicker } from './AssigneePicker';
 import { NudgePill } from './NudgePill';
 import { agencyAssignDraft } from '@/lib/api';
 import { isDraftStale, nudgeMessageText } from './agency-helpers';
+import { MarkPostedModal } from './MarkPostedModal';
 
 interface Props {
   brandId: number | null;
@@ -32,6 +33,8 @@ interface DraftActionsProps {
 
 function DraftActions({ draft, onChange }: DraftActionsProps) {
   const [busy, setBusy] = useState(false);
+  const [postModalOpen, setPostModalOpen] = useState(false);
+
   const set = async (status: DraftStaffStatus) => {
     setBusy(true);
     try {
@@ -55,13 +58,20 @@ function DraftActions({ draft, onChange }: DraftActionsProps) {
   }
   if (draft.status === 'approved') {
     return (
-      <button
-        onClick={() => set('posted')}
-        disabled={busy}
-        className="mt-2 rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-raised)] disabled:opacity-50"
-      >
-        Mark as posted
-      </button>
+      <>
+        <button
+          onClick={() => setPostModalOpen(true)}
+          className="mt-2 rounded-md border border-[var(--border-default)] px-2 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-raised)]"
+        >
+          Mark as posted
+        </button>
+        <MarkPostedModal
+          open={postModalOpen}
+          onOpenChange={setPostModalOpen}
+          draft={draft as unknown as ContentDraft}
+          onPosted={(updated) => onChange({ status: updated.status, posted_at: updated.posted_at })}
+        />
+      </>
     );
   }
   return null;

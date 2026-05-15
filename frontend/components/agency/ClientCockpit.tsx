@@ -18,6 +18,7 @@ import { GenerateDraftButton } from './GenerateDraftButton';
 import { LumidianTrackingWidget } from './LumidianTrackingWidget';
 import { PromptScoresPanel } from './PromptScoresPanel';
 import { RunTrackingButton } from './RunTrackingButton';
+import { AuditSummaryCard } from './AuditSummaryCard';
 import { TaskList } from './TaskList';
 
 interface Props {
@@ -33,6 +34,7 @@ const SECTIONS = [
   { id: 'pipeline', label: 'Pipeline' },
   { id: 'brand', label: 'Brand' },
   { id: 'documents', label: 'Documents' },
+  { id: 'audit', label: 'Audit' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'activity', label: 'Activity' },
 ];
@@ -172,6 +174,11 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
               </div>
             </div>
             <DocumentList clientId={client.id} injectDoc={justGeneratedDoc} />
+          </section>
+
+          <section id="audit" className="scroll-mt-24">
+            <h2 className="mb-3 text-sm font-medium text-[var(--text-secondary)]">Site audit</h2>
+            <AuditSummaryCard clientId={client.id} brandId={client.brand_id} />
           </section>
 
           <section id="tasks" className="scroll-mt-24">

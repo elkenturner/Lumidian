@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Site Audit — {{ site_label }}</title>
+<style>
+  @page { size: Letter; margin: 0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, sans-serif; color: #0f172a; background: #fafafa; }
+  .page { width: 8.5in; min-height: 11in; padding: 0.75in 0.75in 1in; page-break-after: always; position: relative; background: #fafafa; }
+  .page:last-child { page-break-after: auto; }
+  h1, h2, h3, h4 { margin: 0; font-weight: 600; }
+  h1 { font-size: 36pt; line-height: 1.15; }
+  h2 { font-size: 16pt; margin-bottom: 12pt; color: #0f172a; border-bottom: 1px solid #ececec; padding-bottom: 6pt; }
+  h3 { font-size: 12pt; margin-bottom: 4pt; color: #0f172a; }
+  h4 { font-size: 10pt; margin: 12pt 0 4pt; color: #475569; text-transform: uppercase; letter-spacing: 1pt; }
+  p { margin: 0 0 10pt; line-height: 1.55; font-size: 11pt; color: #334155; }
+  ul { margin: 0 0 10pt; padding-left: 18pt; }
+  li { font-size: 11pt; line-height: 1.6; color: #334155; }
+  .tracker { font-size: 9pt; letter-spacing: 2pt; text-transform: uppercase; color: #64748b; }
+  .muted { color: #94a3b8; }
+  .footer { position: absolute; left: 0.75in; right: 0.75in; bottom: 0.45in; display: flex; justify-content: space-between; font-size: 9pt; color: #94a3b8; }
+  .footer .wordmark { font-weight: 600; color: #64748b; }
+
+  /* Cover */
+  .cover { position: relative; height: 9.5in; }
+  .cover .logo { width: 160px; height: auto; }
+  .cover .hero { text-align: center; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); }
+  .cover .hero .label { font-size: 11pt; letter-spacing: 3pt; text-transform: uppercase; color: #64748b; margin-bottom: 24pt; }
+  .cover .hero .name { font-family: Georgia, "Times New Roman", serif; font-size: 48pt; color: #0f172a; margin: 0 0 18pt; line-height: 1.1; word-break: break-word; }
+  .cover .hero .week { font-size: 16pt; color: #475569; }
+  .cover .grade-big { font-family: Georgia, "Times New Roman", serif; font-size: 72pt; line-height: 1; margin-top: 24pt; }
+  .cover .grade-big.good { color: #059669; }
+  .cover .grade-big.ok { color: #d97706; }
+  .cover .grade-big.bad { color: #e11d48; }
+  .cover .meta { display: flex; justify-content: space-between; font-size: 10pt; color: #64748b; padding-top: 12pt; border-top: 1px solid #ececec; position: absolute; left: 0; right: 0; bottom: 0; }
+
+  /* Score cards row */
+  .score-row { display: flex; gap: 12pt; margin: 16pt 0 24pt; }
+  .score-card { flex: 1; background: #fff; border: 1px solid #ececec; border-radius: 8px; padding: 14pt; text-align: center; }
+  .score-card .label { font-size: 9pt; text-transform: uppercase; letter-spacing: 1pt; color: #64748b; }
+  .score-card .grade { font-family: Georgia, "Times New Roman", serif; font-size: 36pt; line-height: 1.1; margin: 6pt 0 2pt; color: #0f172a; }
+  .score-card .num { font-size: 10pt; color: #475569; }
+  .grade.good { color: #059669; }
+  .grade.ok { color: #d97706; }
+  .grade.bad { color: #e11d48; }
+
+  /* Badges */
+  .badges { display: flex; gap: 6pt; flex-wrap: wrap; margin-bottom: 8pt; }
+  .badge { display: inline-block; padding: 2pt 8pt; border-radius: 10px; font-size: 9pt; font-weight: 500; letter-spacing: 0.3pt; }
+  .badge.cat { background: #f1f5f9; color: #475569; }
+  .badge.high { background: #fee2e2; color: #b91c1c; }
+  .badge.medium { background: #fef3c7; color: #b45309; }
+  .badge.low { background: #dbeafe; color: #1e40af; }
+  .badge.effort-low { background: #ecfccb; color: #4d7c0f; }
+  .badge.effort-medium { background: #f1f5f9; color: #475569; }
+  .badge.effort-high { background: #fef3c7; color: #b45309; }
+
+  /* Rec card */
+  .rec { background: #fff; border: 1px solid #ececec; border-radius: 8px; padding: 14pt; margin-bottom: 12pt; page-break-inside: avoid; }
+  .rec h3 { margin-bottom: 6pt; }
+  .rec .body { font-size: 10.5pt; color: #334155; line-height: 1.55; }
+  .rec .impact { margin-top: 6pt; font-size: 9.5pt; color: #475569; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  th { text-align: left; font-weight: 600; color: #64748b; padding: 6pt 8pt; border-bottom: 1px solid #ececec; font-size: 9pt; text-transform: uppercase; letter-spacing: 1pt; }
+  td { padding: 8pt; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; }
+
+  /* Code blocks */
+  pre.artifact { background: #0f172a; color: #e2e8f0; padding: 10pt; border-radius: 6px; font-size: 8.5pt; line-height: 1.45; overflow-wrap: break-word; white-space: pre-wrap; word-break: break-all; font-family: "SF Mono", Monaco, "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace; margin: 6pt 0 12pt; }
+
+  /* Helpers */
+  .pill { display: inline-flex; align-items: center; gap: 6pt; padding: 4pt 10pt; border-radius: 12px; background: #f1f5f9; color: #475569; font-size: 10pt; }
+  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; display: inline-block; }
+  .pill.good .dot { background: #059669; }
+  .pill.bad .dot { background: #e11d48; }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1 — Cover -->
+<div class="page cover">
+  <div>
+    {% if logo_data_uri %}<img src="{{ logo_data_uri }}" class="logo" alt="Lumidian" />{% else %}<div class="wordmark" style="font-size:18pt;font-weight:700;color:#0f172a;">Lumidian</div>{% endif %}
+  </div>
+  <div class="hero">
+    <div class="label">Site Audit Report</div>
+    <div class="name">{{ site_label }}</div>
+    <div class="week">{{ audit_date }}</div>
+    {% if overall_grade %}
+      <div class="grade-big {{ overall_grade_class }}">{{ overall_grade }}</div>
+      <div class="muted" style="font-size:12pt;margin-top:8pt;">Overall score &middot; {{ audit.overall_score | round | int }}/100</div>
+    {% endif %}
+  </div>
+  <div class="meta">
+    <div>Prepared by Lumidian</div>
+    <div>{{ generated_label }}</div>
+  </div>
+</div>
+
+<!-- PAGE 2 — Scorecard + audit context -->
+<div class="page">
+  <div class="tracker">Audit summary</div>
+  <h2 style="margin-top:16pt;">How AI sees this site</h2>
+  <div class="score-row">
+    {% for s in scorecards %}
+      <div class="score-card">
+        <div class="label">{{ s.label }}</div>
+        <div class="grade {{ s.grade_class }}">{{ s.grade }}</div>
+        <div class="num">{{ s.num }}/100</div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <h4>Audit context</h4>
+  <table>
+    <tbody>
+      <tr><td style="width: 200pt; color:#64748b;">Pages crawled</td><td>{{ audit.total_pages }}{% if audit.pages_failed %} ({{ audit.pages_failed }} failed){% endif %}</td></tr>
+      <tr><td style="color:#64748b;">Render mode</td><td>{{ audit.render_mode or '&mdash;' }}{% if cms_platform %} &middot; {{ cms_platform }}{% endif %}</td></tr>
+      <tr><td style="color:#64748b;">llms.txt</td><td>{% if audit.llms_txt_present %}{% if audit.llms_txt_valid %}present and valid{% else %}present but invalid{% endif %}{% else %}missing{% endif %}</td></tr>
+      <tr><td style="color:#64748b;">robots.txt</td><td>{% if audit.robots_txt_raw %}present{% else %}missing{% endif %}</td></tr>
+      <tr><td style="color:#64748b;">Audit completed</td><td>{{ completed_label }}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ site_label }}</div>
+    <div>2</div>
+  </div>
+</div>
+
+<!-- PAGE 3 — Top priority fixes -->
+<div class="page">
+  <h2>What we need to do &mdash; top priorities</h2>
+  {% if top_recs %}
+    {% for r in top_recs %}
+      <div class="rec">
+        <div class="badges">
+          <span class="badge {{ r.priority or 'medium' }}">{{ (r.priority or 'medium') | upper }}</span>
+          <span class="badge cat">{{ r.category }}</span>
+          {% if r.effort %}<span class="badge effort-{{ r.effort }}">Effort: {{ r.effort }}</span>{% endif %}
+        </div>
+        <h3>{{ r.title }}</h3>
+        <div class="body">{{ r.body_html | safe }}</div>
+        {% if r.expected_impact %}<div class="impact">Expected impact: {{ r.expected_impact }}</div>{% endif %}
+        {% if r.expected_lift_pp is not none %}<div class="impact">Estimated visibility lift: +{{ r.expected_lift_pp }}pp</div>{% endif %}
+        {% if r.target_url %}<div class="impact">Page: <span style="color:#475569;">{{ r.target_url }}</span></div>{% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="muted">No recommendations were generated for this audit. The site may already be in excellent shape, or the audit did not surface actionable findings.</p>
+  {% endif %}
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ site_label }}</div>
+    <div>3</div>
+  </div>
+</div>
+
+{% if grouped_remaining %}
+<!-- PAGE 4+ — Detailed fix list by category -->
+<div class="page">
+  <h2>Detailed fix list</h2>
+  {% for group in grouped_remaining %}
+    <h4>{{ group.category }}</h4>
+    {% for r in group.recs %}
+      <div class="rec">
+        <div class="badges">
+          <span class="badge {{ r.priority or 'medium' }}">{{ (r.priority or 'medium') | upper }}</span>
+          {% if r.effort %}<span class="badge effort-{{ r.effort }}">{{ r.effort }} effort</span>{% endif %}
+        </div>
+        <h3>{{ r.title }}</h3>
+        <div class="body">{{ r.body_html | safe }}</div>
+        {% if r.target_url %}<div class="impact">Page: {{ r.target_url }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  {% endfor %}
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ site_label }}</div>
+    <div>4</div>
+  </div>
+</div>
+{% endif %}
+
+{% if artifacts %}
+<!-- Paste-ready artifacts -->
+<div class="page">
+  <h2>Paste-ready code</h2>
+  <p>Copy these directly into the site. They are generated to match the site&rsquo;s brand and structure.</p>
+  {% for a in artifacts %}
+    <h3 style="margin-top: 14pt;">{{ a.title }}</h3>
+    {% if a.target_url %}<div class="muted" style="font-size:9.5pt; margin-bottom:6pt;">{{ a.target_url }}</div>{% endif %}
+    <pre class="artifact">{{ a.artifact }}</pre>
+  {% endfor %}
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ site_label }}</div>
+    <div>{{ artifacts_page_no }}</div>
+  </div>
+</div>
+{% endif %}
+
+{% if worst_pages %}
+<!-- Worst pages -->
+<div class="page">
+  <h2>Pages needing the most work</h2>
+  <table>
+    <thead>
+      <tr><th>URL</th><th>Type</th><th class="num">Score</th></tr>
+    </thead>
+    <tbody>
+      {% for p in worst_pages %}
+        <tr>
+          <td style="max-width: 320pt; word-break: break-all;">{{ p.url }}</td>
+          <td>{{ p.page_type }}</td>
+          <td class="num">{% if p.page_score is not none %}{{ p.page_score | round | int }}{% else %}&mdash;{% endif %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ site_label }}</div>
+    <div>{{ pages_page_no }}</div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Appendix -->
+<div class="page">
+  <h2>Appendix &mdash; Audit scope</h2>
+  <table>
+    <tbody>
+      <tr><td style="width: 200pt; color:#64748b;">Site</td><td style="word-break:break-all;">{{ site_label }}</td></tr>
+      <tr><td style="color:#64748b;">Pages crawled</td><td>{{ audit.total_pages }}</td></tr>
+      {% if audit.pages_failed %}<tr><td style="color:#64748b;">Pages failed</td><td>{{ audit.pages_failed }}</td></tr>{% endif %}
+      <tr><td style="color:#64748b;">Started</td><td>{{ started_label }}</td></tr>
+      <tr><td style="color:#64748b;">Completed</td><td>{{ completed_label }}</td></tr>
+      <tr><td style="color:#64748b;">Render mode</td><td>{{ audit.render_mode or '&mdash;' }}</td></tr>
+      {% if cms_platform %}<tr><td style="color:#64748b;">CMS platform</td><td>{{ cms_platform }}</td></tr>{% endif %}
+      {% if audit.sitemap_url %}<tr><td style="color:#64748b;">Sitemap</td><td style="word-break:break-all;">{{ audit.sitemap_url }}</td></tr>{% endif %}
+    </tbody>
+  </table>
+  <div class="footer">
+    <div class="wordmark">Lumidian</div>
+    <div>{{ site_label }}</div>
+    <div>{{ appendix_page_no }}</div>
+  </div>
+</div>
+
+</body>
+</html>

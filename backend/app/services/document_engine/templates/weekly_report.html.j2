@@ -25,13 +25,13 @@
   .muted { color: #94a3b8; }
 
   /* Cover */
-  .cover { display: flex; flex-direction: column; justify-content: space-between; height: 100%; }
-  .cover .logo { width: 120px; height: auto; }
-  .cover .hero { text-align: center; margin-top: -40pt; }
+  .cover { position: relative; height: 9.5in; }
+  .cover .logo { width: 160px; height: auto; }
+  .cover .hero { text-align: center; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); }
   .cover .hero .label { font-size: 11pt; letter-spacing: 3pt; text-transform: uppercase; color: #64748b; margin-bottom: 24pt; }
-  .cover .hero .name { font-family: Georgia, "Times New Roman", serif; font-size: 56pt; color: #0f172a; margin: 0 0 18pt; }
-  .cover .hero .week { font-size: 16pt; color: #475569; }
-  .cover .meta { display: flex; justify-content: space-between; font-size: 10pt; color: #64748b; }
+  .cover .hero .name { font-family: Georgia, "Times New Roman", serif; font-size: 64pt; color: #0f172a; margin: 0 0 18pt; line-height: 1.1; }
+  .cover .hero .week { font-size: 18pt; color: #475569; }
+  .cover .meta { display: flex; justify-content: space-between; font-size: 10pt; color: #64748b; padding-top: 12pt; border-top: 1px solid #ececec; position: absolute; left: 0; right: 0; bottom: 0; }
 
   /* Executive headline */
   .headline { display: flex; flex-direction: column; align-items: center; margin-top: 80pt; }

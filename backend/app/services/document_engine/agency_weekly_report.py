@@ -24,6 +24,18 @@ from app.models import (
 from app.services.document_engine.registry import Template, register
 
 
+SECTION_MAP: dict[str, str] = {
+    "executive summary": "executive_summary",
+    "visibility this week": "visibility",
+    "per-prompt scorecard": "prompts",
+    "competitor delta": "competitors",
+    "content shipped": "content",
+    "impact of posted content": "impact",
+    "top gaps to close": "gaps",
+    "next week": "next_week",
+}
+
+
 def _period(now: datetime, week_start: datetime) -> dict[str, Any]:
     return {
         "start": week_start.isoformat(),

@@ -11,6 +11,17 @@ from app.models import AgencyClient, Brand, BrandProfile
 from app.services.document_engine.registry import Template, register
 
 
+SECTION_MAP: dict[str, str] = {
+    "1. engagement summary": "engagement_summary",
+    "2. scope of services": "scope",
+    "3. deliverables": "deliverables",
+    "4. term": "term",
+    "5. payment terms": "payment",
+    "6. termination": "termination",
+    "7. signatures": "signatures",
+}
+
+
 async def fetch_data(db: AsyncSession, client: AgencyClient) -> dict[str, Any]:
     brand_q = await db.execute(select(Brand).where(Brand.agency_client_id == client.id).limit(1))
     brand = brand_q.scalar_one_or_none()

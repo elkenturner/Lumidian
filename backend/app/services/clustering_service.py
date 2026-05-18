@@ -1,4 +1,11 @@
-"""Cluster orchestrator: brief generation + parallel piece generation + pillar."""
+"""Cluster orchestrator: brief generation + parallel piece generation + pillar.
+
+Piece generation delegates to ``drafting_service._generate_with_new_pipeline`` so
+every cluster piece flows through Layer 1 (Evidence Pack) + Layer 2 (critic +
+Opus rewrite) + Layer 3 (voice anchor + cross-references) per the tier matrix,
+with citations resolved and persisted. The cluster's shared ``ContentBrief`` is
+forwarded as ``brief_context`` into the writer prompt.
+"""
 from __future__ import annotations
 
 import asyncio
@@ -14,14 +21,15 @@ from app.models import (
     ContentBrief,
     ContentCluster,
     ContentDraft,
+    ContentDraftCitation,
     Prompt,
 )
 from app.services.cluster_brief import build_brief
 from app.services.cluster_pillar import propose_pillar
-from app.services.drafting.client import call_claude
-from app.services.drafting.models import writer_model_for_tier
+from app.services.drafting.citations import RenderedCitation
+from app.services.drafting.pipeline import extract_title_and_body, remove_hedging
 from app.services.drafting.platforms import PLATFORM_SPECS, resolve_platform_key
-from app.services.drafting.prompts import build_prompt
+from app.services.drafting.voice import generate_draft_summary
 
 logger = logging.getLogger(__name__)
 
@@ -81,8 +89,11 @@ def _build_brief_context(brief: ContentBrief, sibling_platforms: list[str]) -> s
 
 
 async def _generate_piece_text(
+    db: AsyncSession,
     *,
+    brand_id: int,
     brand_name: str,
+    prompt_id: int,
     platform: str,
     prompt_text: str,
     visibility_pct: float,
@@ -90,23 +101,72 @@ async def _generate_piece_text(
     response_analysis: str,
     brief_context: str,
     tier: str | None,
-) -> tuple[str, str]:
-    """Call the LLM via build_prompt + call_claude. Returns (title, body)."""
-    from app.services.drafting.pipeline import extract_title_and_body
-    spec = PLATFORM_SPECS[resolve_platform_key(platform)]
-    prompt = build_prompt(
+) -> tuple[str, str, float | None, list[RenderedCitation]]:
+    """Generate one cluster piece via the full content-quality pipeline.
+
+    Delegates to ``drafting_service._generate_with_new_pipeline`` so every
+    piece picks up Evidence Pack + critic + rewrite + voice + cross-ref
+    according to tier, then renders citations and extracts a title/body.
+
+    Returns ``(title, body, quality_score_or_None, citations)``.
+    """
+    # Lazy import to avoid the drafting_service ↔ clustering_service cycle
+    # introduced by ``dc3c377`` (which routes generate_now through clusters).
+    from app.services.drafting_service import _generate_with_new_pipeline
+
+    platform_key = resolve_platform_key(platform)
+    spec = PLATFORM_SPECS[platform_key]
+
+    raw_text, quality_score, citations = await _generate_with_new_pipeline(
+        brand_id=brand_id,
         brand_name=brand_name,
-        platform=platform,
+        prompt_id=prompt_id,
         prompt_text=prompt_text,
+        platform_key=platform_key,
         visibility_pct=visibility_pct,
         profile_context=profile_context,
         response_analysis=response_analysis,
         platform_spec=spec,
+        tier=tier,
+        db=db,
         brief_context=brief_context,
     )
-    raw = await call_claude(prompt=prompt, max_tokens=1500, model=writer_model_for_tier(tier))
-    title, body = extract_title_and_body(raw, platform)
-    return (title or "(untitled)"), body
+    # Final polish (same step the gap-draft path applies after the pipeline).
+    raw_text = remove_hedging(raw_text)
+    title, body = extract_title_and_body(raw_text, platform_key)
+    return (title or "(untitled)"), body, quality_score, citations
+
+
+async def _persist_citations_and_summary(
+    db: AsyncSession,
+    *,
+    draft: ContentDraft,
+    citations: list[RenderedCitation],
+    query: str,
+) -> None:
+    """Attach ContentDraftCitation rows + cache a Haiku summary on the draft.
+
+    Both writes are best-effort: a Haiku failure or a citation insert failure
+    must not block the cluster from saving the draft itself.
+    """
+    for c in citations:
+        db.add(ContentDraftCitation(
+            draft_id=draft.id,
+            source_ref=c.source_ref,
+            url=c.url,
+            title=c.title,
+            position_marker=c.position_marker,
+        ))
+    try:
+        summary = await generate_draft_summary(
+            draft_text=draft.content_text or "", query=query,
+        )
+        draft.summary = (summary or "")[:500] or None
+    except Exception as exc:
+        logger.warning(
+            "Draft summary generation failed for cluster draft %s: %s",
+            draft.id, exc,
+        )
 
 
 async def regenerate_cluster(
@@ -142,11 +202,14 @@ async def regenerate_cluster(
     await db.execute(delete(ContentDraft).where(ContentDraft.cluster_id == cluster.id))
     await db.flush()
 
-    async def _gen(platform: str) -> tuple[str, str, str]:
+    async def _gen(platform: str) -> tuple[str, str, str, float | None, list[RenderedCitation]]:
         sibs = [p for p in enabled if p != platform]
         ctx = _build_brief_context(brief, sibs)
-        title, body = await _generate_piece_text(
+        title, body, quality_score, citations = await _generate_piece_text(
+            db,
+            brand_id=cluster.brand_id,
             brand_name=brand_row.name,
+            prompt_id=cluster.prompt_id,
             platform=platform,
             prompt_text=prompt_row.text,
             visibility_pct=visibility_pct,
@@ -155,18 +218,19 @@ async def regenerate_cluster(
             brief_context=ctx,
             tier=tier,
         )
-        return platform, title, body
+        return platform, title, body, quality_score, citations
 
     results = await asyncio.gather(*[_gen(p) for p in enabled], return_exceptions=True)
 
     any_failed = False
+    drafts_with_citations: list[tuple[ContentDraft, list[RenderedCitation]]] = []
     for r in results:
         if isinstance(r, Exception):
             logger.exception("Piece generation failed: %s", r)
             any_failed = True
             continue
-        platform, title, body = r
-        db.add(ContentDraft(
+        platform, title, body, quality_score, citations = r
+        draft = ContentDraft(
             brand_id=cluster.brand_id,
             prompt_id=cluster.prompt_id,
             cluster_id=cluster.id,
@@ -175,7 +239,17 @@ async def regenerate_cluster(
             title=title,
             content_text=body,
             source="cluster",
-        ))
+            quality_score=quality_score,
+        )
+        db.add(draft)
+        drafts_with_citations.append((draft, citations))
+
+    # Flush so each draft gets an id, then attach citations + per-draft summary.
+    await db.flush()
+    for draft, citations in drafts_with_citations:
+        await _persist_citations_and_summary(
+            db, draft=draft, citations=citations, query=prompt_row.text,
+        )
 
     cluster.status = "partial_failed" if any_failed else "ready"
     cluster.last_generated_at = datetime.now(UTC)
@@ -225,8 +299,11 @@ async def regenerate_piece(
     sibs = [p for p in enabled if p != platform]
     ctx = _build_brief_context(brief_row, sibs)
 
-    title, body = await _generate_piece_text(
+    title, body, quality_score, citations = await _generate_piece_text(
+        db,
+        brand_id=cluster.brand_id,
         brand_name=brand_row.name,
+        prompt_id=cluster.prompt_id,
         platform=platform,
         prompt_text=prompt_row.text,
         visibility_pct=visibility_pct,
@@ -247,6 +324,11 @@ async def regenerate_piece(
         existing.title = title
         existing.content_text = body
         existing.status = "draft"
+        existing.quality_score = quality_score
+        # Replace prior citations so the row reflects the regenerated body.
+        await db.execute(
+            delete(ContentDraftCitation).where(ContentDraftCitation.draft_id == existing.id)
+        )
         draft = existing
     else:
         draft = ContentDraft(
@@ -258,8 +340,14 @@ async def regenerate_piece(
             title=title,
             content_text=body,
             source="cluster",
+            quality_score=quality_score,
         )
         db.add(draft)
+
+    await db.flush()
+    await _persist_citations_and_summary(
+        db, draft=draft, citations=citations, query=prompt_row.text,
+    )
 
     await db.commit()
     await db.refresh(draft)

@@ -574,6 +574,7 @@ async def _generate_with_new_pipeline(
     db: AsyncSession,
     opportunity_context: str | None = None,
     existing_drafts_context: str | None = None,
+    brief_context: str | None = None,
 ) -> tuple[str, float | None, list[RenderedCitation]]:
     """
     Run the full retrieve → draft → critique → rewrite → render pipeline.
@@ -584,6 +585,9 @@ async def _generate_with_new_pipeline(
       - ``'basic'``  (Starter) → Evidence Pack only
       - ``'starter'`` (Growth) → Evidence Pack + critic + rewrite (Layer 2)
       - ``'pro'``    (Pro)    → Evidence Pack + critic + rewrite + voice + cross-ref (Layer 3)
+
+    ``brief_context`` is forwarded to ``build_prompt`` for cluster-pipeline callers
+    that need to inject a shared ContentBrief (positioning, canonical phrasings, etc.).
     """
     # Layer 1: Evidence Pack — paid tiers only
     pack = None
@@ -634,6 +638,7 @@ async def _generate_with_new_pipeline(
         platform_spec=platform_spec,
         opportunity_context=opportunity_context,
         existing_drafts_context=existing_drafts_context,
+        brief_context=brief_context,
         evidence_pack=pack,
         voice_sample=voice_sample,
         related_draft_summary=related_summary,

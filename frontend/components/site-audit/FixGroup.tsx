@@ -63,7 +63,11 @@ export function FixGroup({ recs, onStatusChange }: Props) {
 
   const lead = recs[0];
   const pill = PRIORITY_PILL[lead.priority] ?? PRIORITY_PILL.low;
-  const totalLift = recs.reduce((s, r) => s + (r.expected_lift_pp ?? 0), 0);
+  // Diminishing-returns lift: fixing the same category problem on 50 pages
+  // is not 50× the single-page lift. Use ln(n+1) to flatten the curve so the
+  // total ranks groups sensibly without inflating to absurd numbers.
+  const perPageLift = recs[0]?.expected_lift_pp ?? 0;
+  const totalLift = perPageLift * Math.log(recs.length + 1);
   const draftedCount = recs.filter((r) => r.artifact).length;
   const appliedCount = recs.filter((r) => r.status === 'applied').length;
 

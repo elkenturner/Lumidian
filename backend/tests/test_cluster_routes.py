@@ -41,7 +41,7 @@ async def test_regenerate_cluster_endpoint_creates_pieces(client: httpx.AsyncCli
     await db_session.commit()
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
-         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("T", "Body."))):
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("T", "Body.", None, []))):
         r = await client.post(
             f"/api/clusters/{brand.id}/by-prompt/{prompt.id}/regenerate",
         )
@@ -66,7 +66,7 @@ async def test_regenerate_piece_endpoint(client: httpx.AsyncClient, db_session: 
     await db_session.commit()
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
-         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("T2", "B2"))):
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("T2", "B2", None, []))):
         r = await client.post(
             f"/api/clusters/{brand.id}/{cluster.id}/regenerate-piece",
             json={"platform": "linkedin"},

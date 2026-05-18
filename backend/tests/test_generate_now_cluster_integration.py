@@ -53,7 +53,7 @@ async def test_bg_generate_drafts_creates_cluster_per_prompt(
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=BRIEF_JSON)), patch(
         "app.services.clustering_service._generate_piece_text",
-        new=AsyncMock(return_value=("Title", "Body content.")),
+        new=AsyncMock(return_value=("Title", "Body content.", None, [])),
     ):
         await _bg_generate_drafts(brand_id=brand.id, max_gaps=10, source="manual")
 
@@ -83,7 +83,7 @@ async def test_bg_generate_drafts_max_gaps_bounds_prompts(
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=BRIEF_JSON)), patch(
         "app.services.clustering_service._generate_piece_text",
-        new=AsyncMock(return_value=("T", "B")),
+        new=AsyncMock(return_value=("T", "B", None, [])),
     ):
         await _bg_generate_drafts(brand_id=brand.id, max_gaps=1, source="manual")
 

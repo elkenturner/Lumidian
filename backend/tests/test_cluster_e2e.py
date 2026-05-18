@@ -54,7 +54,7 @@ async def test_full_cluster_lifecycle(
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=BRIEF_JSON)), patch(
         "app.services.clustering_service._generate_piece_text",
-        new=AsyncMock(return_value=("Title", "Body.")),
+        new=AsyncMock(return_value=("Title", "Body.", None, [])),
     ):
         # 1. Trigger cluster regeneration
         r1 = await client.post(f"/api/clusters/{brand.id}/by-prompt/{prompt.id}/regenerate")
@@ -88,7 +88,7 @@ async def test_full_cluster_lifecycle(
         # 5. Regenerate one piece
         with patch(
             "app.services.clustering_service._generate_piece_text",
-            new=AsyncMock(return_value=("Updated", "Updated body.")),
+            new=AsyncMock(return_value=("Updated", "Updated body.", None, [])),
         ):
             r5 = await client.post(
                 f"/api/clusters/{brand.id}/{cluster_id}/regenerate-piece",

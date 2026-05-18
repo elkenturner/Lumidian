@@ -73,6 +73,19 @@ async def _call_claude(prompt: str, *, max_tokens: int = _MAX_TOKENS) -> str:
             max_tokens=max_tokens,
             messages=[{"role": "user", "content": prompt}],
         )
+    except anthropic.APIStatusError as exc:
+        # one retry on 5xx (server-side errors are usually transient)
+        if exc.status_code is not None and 500 <= exc.status_code < 600:
+            logger.warning(
+                "Claude %d, retrying once: %s", exc.status_code, exc,
+            )
+            resp = await client.messages.create(
+                model=_MODEL,
+                max_tokens=max_tokens,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        else:
+            raise
     return _strip_code_fences(resp.content[0].text)
 
 

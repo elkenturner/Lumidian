@@ -112,6 +112,8 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
         if not page.html:
             continue
         rendered = await fetch_rendered(page.url)
+        if rendered.error:
+            logger.info("fetch_rendered failed for %s: %s", page.url, rendered.error)
         mode = classify_render_mode(page.html, rendered.html or "")
         rendered_modes.append(mode)
         is_js_rendered_by_url[page.url] = (mode == "csr")
@@ -353,6 +355,12 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
 
         await db.commit()
 
+    # Carry over applied/dismissed status from the most recent prior audit so
+    # users don't have to re-acknowledge fixes they already handled. Matching
+    # by (title, target_url) — title is stable for a given check_id, target_url
+    # disambiguates per-page recs.
+    await _carry_over_rec_status(brand_id=brand_id, new_audit_id=audit_id)
+
     # ── LLM rewrites (Growth/Pro tiers only) ────────────────────────────
     try:
         await _maybe_generate_llm_rewrites(
@@ -399,6 +407,75 @@ async def _set_status(audit_id: int, status: str) -> None:
         if audit:
             audit.status = status
             await db.commit()
+
+
+async def _carry_over_rec_status(*, brand_id: int, new_audit_id: int) -> None:
+    """Propagate applied/dismissed status from the prior audit's recs to the
+    new audit. Match by (title, target_url) — title is stable per check_id,
+    target_url disambiguates per-page recs (NULL == NULL for site-wide recs).
+    """
+    async with AsyncSessionLocal() as db:
+        # Find the most recent COMPLETED audit for this brand that's older than the new one.
+        prior_audit = (
+            await db.execute(
+                select(WebsiteAudit)
+                .where(
+                    WebsiteAudit.brand_id == brand_id,
+                    WebsiteAudit.id != new_audit_id,
+                    WebsiteAudit.status == "completed",
+                )
+                .order_by(WebsiteAudit.started_at.desc())
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if not prior_audit:
+            return
+
+        prior_recs = (
+            await db.execute(
+                select(WebsiteAuditRecommendation).where(
+                    WebsiteAuditRecommendation.audit_id == prior_audit.id,
+                    WebsiteAuditRecommendation.status.in_(("applied", "dismissed")),
+                )
+            )
+        ).scalars().all()
+        if not prior_recs:
+            return
+
+        # Build a lookup from (title, target_url) → status, choosing 'applied'
+        # over 'dismissed' if both exist for the same key.
+        prior_status: dict[tuple[str, str | None], str] = {}
+        for r in prior_recs:
+            key = (r.title, r.target_url)
+            existing = prior_status.get(key)
+            if existing == "applied":
+                continue
+            prior_status[key] = r.status
+
+        if not prior_status:
+            return
+
+        new_recs = (
+            await db.execute(
+                select(WebsiteAuditRecommendation).where(
+                    WebsiteAuditRecommendation.audit_id == new_audit_id,
+                )
+            )
+        ).scalars().all()
+
+        carried = 0
+        for r in new_recs:
+            key = (r.title, r.target_url)
+            inherited = prior_status.get(key)
+            if inherited and r.status == "pending":
+                r.status = inherited
+                carried += 1
+        if carried:
+            await db.commit()
+            logger.info(
+                "Carried over %d rec status flags from audit %d → %d",
+                carried, prior_audit.id, new_audit_id,
+            )
 
 
 async def _build_prompt_link_inputs(brand_id: int) -> list[PromptLinkInput]:

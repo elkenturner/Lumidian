@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { formatDistanceToNow } from 'date-fns';
-import { Play, Loader2, Download } from 'lucide-react';
+import { Play, Loader2, Download, X } from 'lucide-react';
 import { scoreToGrade, gradeColor } from '@/lib/grade';
 import { siteAudit, type WebsiteAuditSummary } from '@/lib/api';
 
@@ -12,12 +12,25 @@ interface Props {
   brandUrl: string | null;
   inFlight: boolean;
   onRunNewAudit: () => void;
+  onCancel?: () => void;
 }
 
-export function AuditHeader({ audit, brandUrl, inFlight, onRunNewAudit }: Props) {
+export function AuditHeader({ audit, brandUrl, inFlight, onRunNewAudit, onCancel }: Props) {
   const grade = scoreToGrade(audit.overall_score);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [cancelBusy, setCancelBusy] = useState(false);
+
+  const handleCancel = async () => {
+    if (!onCancel) return;
+    setCancelBusy(true);
+    try {
+      await siteAudit.cancel(audit.id);
+      onCancel();
+    } finally {
+      setCancelBusy(false);
+    }
+  };
 
   const handleDownloadPdf = async () => {
     setPdfBusy(true);
@@ -98,7 +111,7 @@ export function AuditHeader({ audit, brandUrl, inFlight, onRunNewAudit }: Props)
           <p className="text-xs text-red-400 mt-1">{pdfError}</p>
         )}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
         {audit.status === 'completed' && (
           <button
             type="button"
@@ -113,6 +126,22 @@ export function AuditHeader({ audit, brandUrl, inFlight, onRunNewAudit }: Props)
               <Download size={14} />
             )}
             Download PDF
+          </button>
+        )}
+        {inFlight && onCancel && (
+          <button
+            type="button"
+            onClick={handleCancel}
+            disabled={cancelBusy}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:border-[var(--danger-text)] disabled:opacity-50"
+            title="Cancel the in-progress audit"
+          >
+            {cancelBusy ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <X size={14} />
+            )}
+            Cancel
           </button>
         )}
         <motion.button

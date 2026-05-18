@@ -8,7 +8,7 @@ import { easings } from '@/lib/motion';
 
 import { AuditHeader } from './AuditHeader';
 import { AuditTriggerButton } from './AuditTriggerButton';
-import { CitationsTab } from './CitationsTab';
+import { AuditHistoryList } from './AuditHistoryList';
 import { EmptyCrawlBanner } from './EmptyCrawlBanner';
 import { FixGrid } from './FixGrid';
 import { HistorySparkline } from './HistorySparkline';
@@ -25,14 +25,13 @@ interface Props {
   brandId: number;
 }
 
-type TabId = 'overview' | 'fixes' | 'pages' | 'schema_bots' | 'citations';
+type TabId = 'overview' | 'fixes' | 'pages' | 'schema_bots';
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'fixes', label: 'Fixes' },
   { id: 'pages', label: 'Pages' },
   { id: 'schema_bots', label: 'Schema & Bots' },
-  { id: 'citations', label: 'Citations' },
 ];
 
 export function SiteAuditView({ brandId }: Props) {
@@ -125,12 +124,28 @@ export function SiteAuditView({ brandId }: Props) {
             // surface via the empty-state path if needed; the header button is non-fatal
           }
         }}
+        onCancel={loadLatest}
       />
 
-      {/* Tabs */}
+      {/* Tabs — keyboard nav: ← / → / Home / End */}
       <nav
         role="tablist"
+        aria-label="Site audit sections"
         className="flex gap-1 border-b border-[var(--border-subtle)] mb-6 overflow-x-auto"
+        onKeyDown={(e) => {
+          if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+          e.preventDefault();
+          const idx = TABS.findIndex((t) => t.id === tab);
+          let next = idx;
+          if (e.key === 'ArrowLeft') next = (idx - 1 + TABS.length) % TABS.length;
+          else if (e.key === 'ArrowRight') next = (idx + 1) % TABS.length;
+          else if (e.key === 'Home') next = 0;
+          else if (e.key === 'End') next = TABS.length - 1;
+          setTab(TABS[next].id);
+          setSelectedPageId(null);
+          const btn = e.currentTarget.querySelectorAll<HTMLButtonElement>('button[role="tab"]')[next];
+          btn?.focus();
+        }}
       >
         {TABS.map((t) => {
           const active = tab === t.id;
@@ -139,11 +154,12 @@ export function SiteAuditView({ brandId }: Props) {
               key={t.id}
               role="tab"
               aria-selected={active}
+              tabIndex={active ? 0 : -1}
               onClick={() => {
                 setTab(t.id);
                 setSelectedPageId(null);
               }}
-              className={`relative px-4 py-2 text-sm font-medium transition-colors ${
+              className={`relative px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-light)] rounded-t ${
                 active ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
               }`}
             >
@@ -200,6 +216,7 @@ export function SiteAuditView({ brandId }: Props) {
               <OverviewHero auditId={audit.id} onSeeAll={() => setTab('fixes')} />
               <ScoreStrip audit={audit} />
               <HistorySparkline brandId={brandId} />
+              <AuditHistoryList brandId={brandId} />
             </div>
           )}
           {tab === 'fixes' && <FixGrid auditId={audit.id} />}
@@ -224,7 +241,6 @@ export function SiteAuditView({ brandId }: Props) {
               onJumpToFixes={() => setTab('fixes')}
             />
           )}
-          {tab === 'citations' && <CitationsTab brandId={brandId} />}
         </motion.div>
       </AnimatePresence>
     </div>

@@ -92,13 +92,36 @@ def _visible_text_length(html: str) -> int:
     return len(collapsed)
 
 
+# Common SPA-framework markers that imply CSR even without a Playwright render.
+# Detecting these in raw HTML lets us classify render-mode when Playwright fails.
+_SPA_HINT_RES = [
+    re.compile(r'<div\s+id\s*=\s*["\']root["\']\s*>\s*</div>', re.IGNORECASE),  # React root
+    re.compile(r'<div\s+id\s*=\s*["\']app["\']\s*>\s*</div>', re.IGNORECASE),  # Vue / generic
+    re.compile(r'<div\s+id\s*=\s*["\']__next["\']', re.IGNORECASE),  # Next.js CSR shell
+    re.compile(r'<router-outlet\b', re.IGNORECASE),  # Angular
+    re.compile(r'data-reactroot=', re.IGNORECASE),
+    re.compile(r'window\.__NUXT__', re.IGNORECASE),
+]
+
+
+def _looks_like_spa_shell(raw_html: str) -> bool:
+    """Empty SPA shells: HTML with framework markers but no meaningful body text."""
+    if not raw_html:
+        return False
+    visible_chars = _visible_text_length(raw_html)
+    if visible_chars > 1500:
+        return False
+    return any(rx.search(raw_html) for rx in _SPA_HINT_RES)
+
+
 def classify_render_mode(raw_html: str, rendered_html: str) -> str:
     """Return 'ssr', 'csr', 'ssg', or 'unknown' for one page.
 
     Heuristics:
+      - <noscript ...JavaScript...> marker → 'csr'
       - rendered > 1.5x raw AND raw < 500 chars → 'csr'
       - rendered ≈ raw (within 15%) → 'ssr' (treated as SSR; SSG indistinguishable without HTTP headers)
-      - <noscript ...JavaScript...> marker → 'csr'
+      - else falls back to raw-HTML SPA shell detection (works when Playwright is unavailable)
       - else 'unknown'
     """
     if _NOSCRIPT_JS_HINT_RE.search(raw_html or ""):
@@ -108,7 +131,8 @@ def classify_render_mode(raw_html: str, rendered_html: str) -> str:
     rendered_len = _visible_text_length(rendered_html)
 
     if rendered_len == 0 and raw_len == 0:
-        return "unknown"
+        # Both empty — try SPA shell detection on raw HTML directly
+        return "csr" if _looks_like_spa_shell(raw_html) else "unknown"
     if raw_len < 500 and rendered_len > raw_len * 1.5:
         return "csr"
     if raw_len == 0:
@@ -116,4 +140,10 @@ def classify_render_mode(raw_html: str, rendered_html: str) -> str:
     ratio = rendered_len / max(raw_len, 1)
     if 0.85 <= ratio <= 1.15:
         return "ssr"
+
+    # Rendered HTML didn't materially differ AND we didn't get a clear SSR ratio.
+    # Try SPA shell signature on the raw HTML to catch CSR sites where rendered
+    # fetch was missing/empty.
+    if _looks_like_spa_shell(raw_html):
+        return "csr"
     return "unknown"

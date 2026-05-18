@@ -17,10 +17,15 @@ FONT_FILES = [
     # Instrument Serif (v5, latin)
     ("Instrument Serif", "https://fonts.gstatic.com/s/instrumentserif/v5/jizBRFtNs2ka5fXjeivQ4LroWlx-6zUTjg.woff2", 400, "normal"),
     ("Instrument Serif", "https://fonts.gstatic.com/s/instrumentserif/v5/jizHRFtNs2ka5fXjeivQ4LroWlx-6zAjjH7M.woff2", 400, "italic"),
-    # Inter (v20, latin) — one woff2 per weight
-    ("Inter", "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2", 400, "normal"),
-    ("Inter", "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2", 500, "normal"),
-    ("Inter", "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7.woff2", 600, "normal"),
+    # Inter (v20, latin) — distinct static per-weight slices.
+    # NOTE: Hitting the CSS2 API with `wght@400;500;600` returns the *variable*
+    # font URL (single file, same path for every weight) which silently renders
+    # all weights as 400 in WeasyPrint. Requesting each weight individually
+    # (`wght@400`, `wght@500`, `wght@600`) forces Google to serve distinct
+    # static slices — those are what we embed here.
+    ("Inter", "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuLyfAZ9hiA.woff2", 400, "normal"),
+    ("Inter", "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuI6fAZ9hiA.woff2", 500, "normal"),
+    ("Inter", "https://fonts.gstatic.com/s/inter/v20/UcCO3FwrK3iLTeHuS_nVMrMxCp50SjIw2boKoduKmMEVuGKYAZ9hiA.woff2", 600, "normal"),
     # IBM Plex Mono (v20, latin)
     ("IBM Plex Mono", "https://fonts.gstatic.com/s/ibmplexmono/v20/-F63fjptAgt5VM-kVkqdyU8n1i8q1w.woff2", 400, "normal"),
     ("IBM Plex Mono", "https://fonts.gstatic.com/s/ibmplexmono/v20/-F6qfjptAgt5VM-kVkqdyU8n3twJwlBFgg.woff2", 500, "normal"),

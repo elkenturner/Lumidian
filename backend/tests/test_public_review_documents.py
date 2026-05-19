@@ -84,3 +84,20 @@ async def test_get_document_html_rejects_doc_from_other_client(client):
     _, _, doc_b = await _setup("BBB")
     resp = await client.get(f"/api/public/review/{token_a}/document/{doc_b}")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_document_pdf_returns_pdf_bytes(client):
+    token, _, doc_id = await _setup("PdfClient")
+    resp = await client.get(f"/api/public/review/{token}/document/{doc_id}/pdf")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content[:5] == b"%PDF-"
+
+
+@pytest.mark.asyncio
+async def test_get_document_pdf_rejects_doc_from_other_client(client):
+    token_a, _, _ = await _setup("PdfA")
+    _, _, doc_b = await _setup("PdfB")
+    resp = await client.get(f"/api/public/review/{token_a}/document/{doc_b}/pdf")
+    assert resp.status_code == 404

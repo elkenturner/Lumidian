@@ -759,6 +759,43 @@ class ClientReviewLink(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+class VideoMetadataJob(Base):
+    __tablename__ = "video_metadata_jobs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agency_client_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("agency_clients.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    brand_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("brands.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    created_by: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="uploaded", index=True)
+    filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    transcript_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    transcript_segments: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    ai_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    ai_description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ai_chapters: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    ai_tags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    ai_jsonld: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    srt_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vtt_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    metadata_failed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 # ── Website AIO module ───────────────────────────────────────────────────────
 
 class WebsiteAudit(Base):

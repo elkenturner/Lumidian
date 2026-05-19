@@ -119,6 +119,7 @@ tests/
 | support.py | /api/support | Support ticket handling |
 | site_audit.py | /api/site-audit | Trigger audits; surface findings/recommendations/citations; generate llms.txt + robots.txt snippets |
 | clusters.py | /api/clusters | Cluster lifecycle: list, detail, regenerate (full or per-piece), edit brief, pillar propose/accept/reject |
+| wikipedia.py | /api/wikipedia | Wikipedia surface: candidate list, scan trigger, on-demand draft, status update |
 | main.py | /api/health | Liveness check |
 
 ### Frontend Layout
@@ -183,6 +184,8 @@ No Alembic. Migrations are embedded in `database.py:run_migrations()` and applie
 | `ContentDraft` | id, brand_id FK, prompt_id FK, opportunity_id FK, cluster_id FK (nullable), platform, status (draft/approved/posted/failed), title, content_text, source (onboarding/manual/cluster), approved_at, posted_at |
 | `ContentCluster` | id, brand_id FK, prompt_id FK (unique), status (pending/briefing/generating/ready/partial_failed), pillar_mode (none/proposed/attached/rejected_tone), pillar_url, last_brief_id FK, version, last_generated_at |
 | `ContentBrief` | id, cluster_id FK, version, positioning, key_claims (JSON), canonical_phrasings (JSON), stats (JSON), competitor_context (JSON), narrative_spine, tone_notes, created_by |
+| `WikipediaScan` | id, brand_id FK, status (running/completed/failed), triggered_by FK, prompts_searched, total_candidates_found, candidates_persisted, error_message, started_at, completed_at |
+| `WikipediaCandidate` | id, brand_id FK, prompt_id FK (nullable), scan_id FK, article_title, article_url, pageid, article_summary, legitimacy_score, legitimacy_reasoning, status (new/drafted/submitted/accepted/reverted/dismissed), suggested_wikitext, suggested_section, suggested_insert_location, evidence_pack_used (JSON), last_drafted_at, last_status_change_at — UNIQUE(brand_id, article_title) |
 | `ContentPost` | id, draft_id FK, platform, post_url, platform_post_id, posted_at |
 | `ContentAttribution` | id, content_post_id FK, tracking_run_id FK, brand_id FK, visibility_before, visibility_after, improvement_pct |
 | `DraftAttribution` | id, draft_id FK, brand_id FK, prompt_id FK, score_at_posting, current_score, delta, runs_since_posting |
@@ -306,6 +309,9 @@ Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Over
 
 ### Website AIO (`services/site_audit/`)
 Site audit module — manual trigger only, no scheduled job. Crawler uses sitemap.xml-first discovery with BFS fallback, Playwright for render-mode detection on a 5-page sample, BeautifulSoup4 + lxml for parsing. Five parser modules (`semantic`, `schema`, `robots`, `llms_txt`, `meta`) each emit `Finding` records keyed by stable `check_id`. Citation extractor runs as a non-fatal post-processing hook in `tracking_service.py`, classifying URLs from `QueryResult.response_text` as own / competitor / third-party / unknown via `tldextract`. Page↔prompt linker matches own-domain audit pages to losing prompts via slug + title token Jaccard. Recommendations engine has a static `_RECS` template registry (rule-based) plus an LLM rewrite pass (Growth/Pro tiers only, gated by `TIER_AUDIT_LIMITS`). Generators produce spec-compliant `llms.txt` and a robots.txt AI-bot snippet (two modes: `allow_all` or `search_only`). Free tier (no subscription) is excluded; per-tier audit limits live in `services/site_audit/constants.py`.
+
+### Wikipedia Surface (`services/wikipedia/`)
+Dedicated `/wiki/[brandId]` surface for discovering existing Wikipedia articles where a brand could legitimately contribute. Manual scan via `POST /api/wikipedia/{brand_id}/scan` queries the Wikipedia REST API for each tracked prompt, pre-filters obvious non-starters (disambiguation, list pages, brand-self, competitors, thin summaries), then runs `services/wikipedia/legitimacy_gate.py:score_candidate()` (one haiku call per candidate) and persists survivors above the 0.55 threshold as `WikipediaCandidate` rows. On-demand drafting via `POST /api/wikipedia/{brand_id}/candidates/{id}/draft` reuses `build_wikipedia_prompt()` with new `locked_article_title` / `article_section_list` / `citation_needed_hints` kwargs to constrain the LLM to a verified article. Status lifecycle is user-recorded (`new` → `drafted` → `submitted` → `accepted` / `reverted`); we never edit Wikipedia ourselves. Growth + Pro tier only, with rolling-30-day caps (Growth: 4 scans + 30 drafts; Pro: unlimited). Caps live in `services/wikipedia/caps.py`.
 
 ---
 

@@ -2329,3 +2329,81 @@ export async function agencyMarkDraftPosted(
   });
   return res.data;
 }
+
+// ----- Wikipedia Surface -----
+
+export interface WikipediaScan {
+  id: number;
+  brand_id: number;
+  status: 'running' | 'completed' | 'failed';
+  triggered_by: number | null;
+  prompts_searched: number;
+  total_candidates_found: number;
+  candidates_persisted: number;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface WikipediaCandidate {
+  id: number;
+  brand_id: number;
+  prompt_id: number | null;
+  scan_id: number;
+  article_title: string;
+  article_url: string;
+  pageid: number;
+  article_summary: string;
+  legitimacy_score: number;
+  legitimacy_reasoning: string;
+  status: 'new' | 'drafted' | 'submitted' | 'accepted' | 'reverted' | 'dismissed';
+  suggested_wikitext: string | null;
+  suggested_section: string | null;
+  suggested_insert_location: string | null;
+  evidence_pack_used: Record<string, unknown> | null;
+  last_drafted_at: string | null;
+  last_status_change_at: string | null;
+  created_at: string;
+}
+
+export type WikipediaCandidateStatusUpdate = 'submitted' | 'accepted' | 'reverted' | 'dismissed';
+
+export async function listWikipediaCandidates(
+  brandId: number,
+  opts?: { status?: WikipediaCandidate['status']; minScore?: number },
+): Promise<WikipediaCandidate[]> {
+  const params: Record<string, string | number> = {};
+  if (opts?.status) params.status = opts.status;
+  if (opts?.minScore != null) params.min_score = opts.minScore;
+  const res = await api.get<WikipediaCandidate[]>(`/wikipedia/${brandId}/candidates`, { params });
+  return res.data;
+}
+
+export async function getWikipediaCandidate(brandId: number, candidateId: number): Promise<WikipediaCandidate> {
+  const res = await api.get<WikipediaCandidate>(`/wikipedia/${brandId}/candidates/${candidateId}`);
+  return res.data;
+}
+
+export async function scanWikipedia(brandId: number): Promise<WikipediaScan> {
+  const res = await api.post<WikipediaScan>(`/wikipedia/${brandId}/scan`);
+  return res.data;
+}
+
+export async function getLatestWikipediaScan(brandId: number): Promise<WikipediaScan | null> {
+  const res = await api.get<WikipediaScan | null>(`/wikipedia/${brandId}/scans/latest`);
+  return res.data;
+}
+
+export async function draftWikipediaCandidate(brandId: number, candidateId: number): Promise<WikipediaCandidate> {
+  const res = await api.post<WikipediaCandidate>(`/wikipedia/${brandId}/candidates/${candidateId}/draft`);
+  return res.data;
+}
+
+export async function updateWikipediaCandidateStatus(
+  brandId: number,
+  candidateId: number,
+  status: WikipediaCandidateStatusUpdate,
+): Promise<WikipediaCandidate> {
+  const res = await api.patch<WikipediaCandidate>(`/wikipedia/${brandId}/candidates/${candidateId}/status`, { status });
+  return res.data;
+}

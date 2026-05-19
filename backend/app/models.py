@@ -975,3 +975,44 @@ class EvidenceCache(Base):
     prompt_id: Mapped[int] = mapped_column(primary_key=True)
     pack_json: Mapped[str] = mapped_column(Text)
     fetched_at: Mapped[datetime] = mapped_column(DateTime)
+
+
+class WikipediaScan(Base):
+    __tablename__ = "wikipedia_scans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), index=True)
+    status: Mapped[str] = mapped_column(String(32), default="running")
+    triggered_by: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    prompts_searched: Mapped[int] = mapped_column(default=0)
+    total_candidates_found: Mapped[int] = mapped_column(default=0)
+    candidates_persisted: Mapped[int] = mapped_column(default=0)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
+    completed_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+
+class WikipediaCandidate(Base):
+    __tablename__ = "wikipedia_candidates"
+    __table_args__ = (
+        UniqueConstraint("brand_id", "article_title", name="uq_wikipedia_candidates_brand_article"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id", ondelete="CASCADE"), index=True)
+    prompt_id: Mapped[int | None] = mapped_column(ForeignKey("prompts.id", ondelete="SET NULL"), nullable=True)
+    scan_id: Mapped[int] = mapped_column(ForeignKey("wikipedia_scans.id", ondelete="CASCADE"))
+    article_title: Mapped[str] = mapped_column(String(512))
+    article_url: Mapped[str] = mapped_column(String(2048))
+    pageid: Mapped[int] = mapped_column()
+    article_summary: Mapped[str] = mapped_column(Text, default="")
+    legitimacy_score: Mapped[float] = mapped_column(default=0.0)
+    legitimacy_reasoning: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String(32), default="new")
+    suggested_wikitext: Mapped[str | None] = mapped_column(Text, nullable=True)
+    suggested_section: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    suggested_insert_location: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    evidence_pack_used: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    last_drafted_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    last_status_change_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))

@@ -26,5 +26,5 @@ def parse_sections(body: str | None, section_map: dict[str, str]) -> dict[str, s
         key = section_map.get(heading)
         if key is None:
             continue
-        out[key] = _md.markdown(body_md, extensions=["extra"])
+        out[key] = _md.markdown(body_md, extensions=["extra", "pymdownx.tasklist"])
     return out

@@ -109,3 +109,30 @@ async def test_render_html_sow_contains_letterhead_and_signatures():
     assert "sig-row" in html  # signature block rendered
     assert "Engagement Summary" in html
     assert "<!DOCTYPE html>" in html
+
+
+@pytest.mark.asyncio
+async def test_render_html_kickoff_uses_checklist_items():
+    body = (
+        "# Kickoff\n\n"
+        "## What we have\n\n- [x] Primary contact name\n- [x] Primary contact email\n\n"
+        "## What the client still owes\n\n- [ ] Brand profile: tone of voice\n- [ ] At least 10 tracked prompts\n\n"
+        "## Suggested first call\n\n- Walk through visibility goals\n- Confirm review cadence\n"
+    )
+    snapshot = {
+        "client": {"name": "KickoffCo", "primary_contact_name": True, "primary_contact_email": True},
+        "brand": {"name": "KickoffCo", "website_url": True},
+        "brand_profile": {"company_description": True, "tone_of_voice": False, "what_not_to_say": False, "approved_language": False, "publications": False},
+        "prompt_count": 3,
+    }
+    doc_id = await _make_client_with_doc("KickoffCo", "kickoff_checklist", body, snapshot)
+    async with AsyncSessionLocal() as db:
+        doc = await db.get(ClientDocument, doc_id)
+        from app.services.document_engine.pdf_renderer import render_html
+        html = render_html(doc, snapshot)
+    assert "KickoffCo" in html
+    assert "Kickoff Checklist" in html or "KICKOFF CHECKLIST" in html
+    assert "What we have" in html
+    assert "What we still need" in html or "What the client still owes" in html
+    # Markdown `- [x]` / `- [ ]` should produce task-list-item class OR checked input
+    assert "task-list-item" in html or "checked" in html

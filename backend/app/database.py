@@ -600,6 +600,60 @@ async def run_migrations():
         """))
         logger.info("Migration applied: content clusters tables, cluster_id column, clean-slate draft delete")
 
+    # --- Migration: wikipedia surface (2026-05-19) ---
+    async with engine.begin() as conn:
+        # Create wikipedia_scans table (must come before wikipedia_candidates)
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS wikipedia_scans (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                brand_id INTEGER NOT NULL,
+                status TEXT NOT NULL DEFAULT 'running',
+                triggered_by INTEGER,
+                prompts_searched INTEGER NOT NULL DEFAULT 0,
+                total_candidates_found INTEGER NOT NULL DEFAULT 0,
+                candidates_persisted INTEGER NOT NULL DEFAULT 0,
+                error_message TEXT,
+                started_at DATETIME NOT NULL,
+                completed_at DATETIME,
+                FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+                FOREIGN KEY (triggered_by) REFERENCES users(id) ON DELETE SET NULL
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_wikipedia_scans_brand ON wikipedia_scans(brand_id)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_wikipedia_scans_brand_started ON wikipedia_scans(brand_id, started_at)"))
+
+        # Create wikipedia_candidates table (depends on wikipedia_scans via FK)
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS wikipedia_candidates (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                brand_id INTEGER NOT NULL,
+                prompt_id INTEGER,
+                scan_id INTEGER NOT NULL,
+                article_title TEXT NOT NULL,
+                article_url TEXT NOT NULL,
+                pageid INTEGER NOT NULL,
+                article_summary TEXT NOT NULL DEFAULT '',
+                legitimacy_score REAL NOT NULL DEFAULT 0.0,
+                legitimacy_reasoning TEXT NOT NULL DEFAULT '',
+                status TEXT NOT NULL DEFAULT 'new',
+                suggested_wikitext TEXT,
+                suggested_section TEXT,
+                suggested_insert_location TEXT,
+                evidence_pack_used TEXT,
+                last_drafted_at DATETIME,
+                last_status_change_at DATETIME,
+                created_at DATETIME NOT NULL,
+                FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE,
+                FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE SET NULL,
+                FOREIGN KEY (scan_id) REFERENCES wikipedia_scans(id) ON DELETE CASCADE,
+                UNIQUE (brand_id, article_title)
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_wikipedia_candidates_brand ON wikipedia_candidates(brand_id)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_wikipedia_candidates_last_drafted ON wikipedia_candidates(brand_id, last_drafted_at)"))
+
+        logger.info("Migration applied: wikipedia_scans + wikipedia_candidates tables")
+
 
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):

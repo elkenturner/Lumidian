@@ -1188,6 +1188,33 @@ export async function publicRejectDraft(
   await api.post(`/public/review/${token}/draft/${draftId}/reject`, { reason });
 }
 
+export interface PublicDocumentSummary {
+  id: number;
+  kind: string;
+  title: string;
+  generated_at: string;
+  pdf_available: boolean;
+}
+
+export async function publicListDocuments(token: string): Promise<PublicDocumentSummary[]> {
+  const res = await api.get<PublicDocumentSummary[]>(`/public/review/${token}/documents`);
+  return res.data;
+}
+
+export async function publicGetDocumentHtml(token: string, docId: number): Promise<string> {
+  const res = await api.get<string>(`/public/review/${token}/document/${docId}`, {
+    responseType: 'text',
+    transformResponse: (data) => data,
+  });
+  return res.data;
+}
+
+export function publicDocumentPdfUrl(token: string, docId: number): string {
+  // Returns an absolute URL the browser can hit directly to trigger a download.
+  const base = (api.defaults.baseURL || '').replace(/\/+$/, '');
+  return `${base}/public/review/${token}/document/${docId}/pdf`;
+}
+
 export interface RegisterResult {
   email: string;
   needs_verification: boolean;

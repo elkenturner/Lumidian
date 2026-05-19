@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 // Paths that don't require auth
-const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/team/accept', '/terms', '/privacy', '/methodology', '/account-paused'];
+const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-password', '/reset-password', '/verify-email', '/team/accept', '/terms', '/privacy', '/methodology', '/account-paused', '/review'];
 // Paths that redirect to /dashboard if already authenticated
 const AUTH_REDIRECT_PATHS = ['/login', '/register'];
 

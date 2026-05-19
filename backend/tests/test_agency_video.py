@@ -99,3 +99,59 @@ def test_should_chunk_returns_true_for_large_file(tmp_path):
     big = tmp_path / "big.m4a"
     big.write_bytes(b"x" * (25 * 1024 * 1024))  # 25 MB > 24 MB threshold
     assert audio_extractor.should_chunk(big) is True
+
+
+import asyncio
+from unittest.mock import AsyncMock, patch
+
+from app.services.video_pipeline import transcriber
+
+
+def test_offset_segments_shifts_timestamps():
+    segs = [
+        {"start": 0.0, "end": 2.0, "text": "a"},
+        {"start": 2.0, "end": 4.0, "text": "b"},
+    ]
+    out = transcriber.offset_segments(segs, offset=10.0)
+    assert out == [
+        {"start": 10.0, "end": 12.0, "text": "a"},
+        {"start": 12.0, "end": 14.0, "text": "b"},
+    ]
+
+
+def test_concatenate_text():
+    assert transcriber.concatenate_text(["Hello.", " World."]) == "Hello. World."
+    assert transcriber.concatenate_text(["  Hi  ", "there"]) == "Hi there"
+
+
+def test_transcribe_chunks_reassembles(tmp_path):
+    chunk_a = tmp_path / "a.m4a"; chunk_a.write_bytes(b"a")
+    chunk_b = tmp_path / "b.m4a"; chunk_b.write_bytes(b"b")
+
+    async def fake_call_whisper(path):
+        if path.name == "a.m4a":
+            return {"text": "Hello.", "segments": [{"start": 0.0, "end": 2.0, "text": "Hello."}]}
+        return {"text": "World.", "segments": [{"start": 0.0, "end": 1.5, "text": "World."}]}
+
+    with patch.object(transcriber, "_call_whisper", side_effect=fake_call_whisper):
+        result = asyncio.run(transcriber.transcribe_chunks([(chunk_a, 0.0), (chunk_b, 2.0)]))
+    assert result["text"] == "Hello. World."
+    assert result["segments"] == [
+        {"start": 0.0, "end": 2.0, "text": "Hello."},
+        {"start": 2.0, "end": 3.5, "text": "World."},
+    ]
+
+
+def test_transcribe_chunks_raises_on_provider_error(tmp_path):
+    chunk = tmp_path / "a.m4a"; chunk.write_bytes(b"a")
+
+    async def fake_call_whisper(path):
+        raise transcriber.TranscriptionError("rate limited")
+
+    with patch.object(transcriber, "_call_whisper", side_effect=fake_call_whisper):
+        try:
+            asyncio.run(transcriber.transcribe_chunks([(chunk, 0.0)]))
+        except transcriber.TranscriptionError as e:
+            assert "rate limited" in str(e)
+        else:
+            raise AssertionError("expected TranscriptionError")

@@ -200,3 +200,28 @@ async def test_render_html_monthly_report_has_cover_and_summary():
     assert "Monthly Report" in html or "MONTHLY REPORT" in html
     assert "50" in html  # hero score
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind,body,snapshot", [
+    ("sow",
+     "# SOW\n## 1. Engagement Summary\n\nx\n## 2. Scope of Services\n\nx\n## 3. Deliverables\n\nx\n## 4. Term\n\nx\n## 5. Payment Terms\n\nx\n## 6. Termination\n\nx\n## 7. Signatures\n\nx\n",
+     {"client": {"name": "C", "primary_contact_name": "N", "primary_contact_email": "e@e.com", "retainer_amount_usd": 1000, "retainer_started_at": None}, "brand": {"name": "C", "website_url": "x"}, "brand_profile": None, "today": "May 18, 2026"}),
+    ("kickoff_checklist",
+     "# K\n## What we have\n\n- [x] a\n## What the client still owes\n\n- [ ] b\n## Suggested first call\n\n- c\n",
+     {"client": {"name": "C", "primary_contact_name": True, "primary_contact_email": True}, "brand": {"name": "C", "website_url": True}, "brand_profile": None, "prompt_count": 3}),
+    ("audit_initial",
+     "# A\n## Current State\n\nx\n## What's Working\n\n- y\n## Gaps\n\n- z\n## Recommendations (next 30 days)\n\n- q\n## Open Questions for the Client\n\n- r?\n",
+     {"client": {"name": "C", "slug": "c", "status": "active"}, "brand": {"name": "C", "website_url": "x"}, "brand_profile": None, "prompts": [], "competitors": [], "latest_run": None, "generated_at": "2026-05-18T12:00:00", "has_data": False}),
+    ("monthly_report",
+     "# M\n## Summary\n\nx\n## Visibility Change\n\ny\n## Content Shipped\n\nz\n## Notable Activity\n\nq\n## Next Month\n\nr\n",
+     {"client": {"name": "C"}, "period": {"label": "May 2026"}, "this_month_run": None, "last_month_run": None, "drafts_posted_this_month": 0, "drafts_by_platform": {}, "activity_events_count": 0, "activity_sample": [], "has_data": False}),
+])
+async def test_render_pdf_produces_nonempty_bytes_for_each_kind(kind, body, snapshot):
+    doc_id = await _make_client_with_doc(f"Pdf{kind}", kind, body, snapshot)
+    async with AsyncSessionLocal() as db:
+        doc = await db.get(ClientDocument, doc_id)
+        from app.services.document_engine.pdf_renderer import render_pdf
+        pdf = await render_pdf(db, doc)
+    assert isinstance(pdf, bytes)
+    assert len(pdf) > 1000  # any real PDF is well over a KB
+    assert pdf.startswith(b"%PDF-")

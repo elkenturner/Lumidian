@@ -228,3 +228,157 @@ def test_generate_metadata_calls_claude(monkeypatch):
             brand_name="X", brand_profile={}, transcript="hello"
         ))
     assert result.title == "T"
+
+
+# ── Pipeline orchestrator tests ──────────────────────────────────────────────
+
+from unittest.mock import AsyncMock, patch
+
+import pytest
+from sqlalchemy import select, update
+
+from app.database import AsyncSessionLocal
+from app.models import AgencyClient, AgencyStaff, Brand, User, VideoMetadataJob
+from tests.conftest import register_and_login
+
+
+async def _make_agency_user(client, email: str = "video-staff@example.com") -> int:
+    """Register, log in, and elevate to is_agency_staff. Returns the user's id."""
+    await register_and_login(client, email=email)
+    async with AsyncSessionLocal() as db:
+        await db.execute(update(User).where(User.email == email).values(is_agency_staff=True))
+        user = (await db.execute(select(User).where(User.email == email))).scalar_one()
+        if not (
+            await db.execute(select(AgencyStaff).where(AgencyStaff.user_id == user.id))
+        ).scalar_one_or_none():
+            db.add(AgencyStaff(user_id=user.id, role="owner", active=True))
+        await db.commit()
+    return user.id
+
+
+async def _create_agency_client(client, name: str = "VidCo") -> tuple[int, int]:
+    """POST /api/agency/clients and return (client_id, brand_id)."""
+    resp = await client.post("/api/agency/clients", json={"name": name})
+    assert resp.status_code == 201, resp.text
+    body = resp.json()
+    return body["id"], body["brand_id"]
+
+
+async def _insert_job(*, agency_client_id: int, brand_id: int, created_by: int | None,
+                     status: str = "uploaded", **fields) -> VideoMetadataJob:
+    async with AsyncSessionLocal() as db:
+        job = VideoMetadataJob(
+            agency_client_id=agency_client_id, brand_id=brand_id,
+            created_by=created_by, status=status,
+            filename=fields.pop("filename", "test.mp4"),
+            file_size_bytes=fields.pop("file_size_bytes", 1024),
+            **fields,
+        )
+        db.add(job); await db.commit(); await db.refresh(job)
+    return job
+
+
+@pytest.mark.asyncio
+async def test_pipeline_happy_path(client, tmp_path):
+    user_id = await _make_agency_user(client)
+    cid, brand_id = await _create_agency_client(client)
+    job = await _insert_job(agency_client_id=cid, brand_id=brand_id, created_by=user_id)
+
+    fake_video = tmp_path / "v.mp4"; fake_video.write_bytes(b"fake")
+    fake_audio = tmp_path / "v.m4a"
+
+    fake_transcript = {
+        "text": "Hello world.",
+        "segments": [{"start": 0.0, "end": 1.5, "text": "Hello world."}],
+    }
+    from app.services.video_pipeline.metadata_generator import MetadataOut, ChapterOut
+    fake_meta = MetadataOut(
+        title="How does X work?",
+        description="X is...",
+        chapters=[ChapterOut(ts_seconds=0, label="Intro")],
+        tags=["a", "b"],
+        jsonld={"@type": "VideoObject"},
+    )
+
+    def fake_extract(_src, dst):
+        dst.write_bytes(b"audio")
+        return dst
+
+    with patch("app.services.video_pipeline.pipeline.audio_extractor.probe_duration", return_value=12.5), \
+         patch("app.services.video_pipeline.pipeline.audio_extractor.extract_audio", side_effect=fake_extract), \
+         patch("app.services.video_pipeline.pipeline.audio_extractor.should_chunk", return_value=False), \
+         patch("app.services.video_pipeline.pipeline.transcriber.transcribe_chunks", new=AsyncMock(return_value=fake_transcript)), \
+         patch("app.services.video_pipeline.pipeline.metadata_generator.generate_metadata", new=AsyncMock(return_value=fake_meta)):
+        from app.services.video_pipeline import pipeline
+        await pipeline.process_job(job.id, fake_video)
+
+    async with AsyncSessionLocal() as db:
+        result = await db.get(VideoMetadataJob, job.id)
+    assert result.status == "completed"
+    assert result.transcript_text == "Hello world."
+    assert result.ai_title == "How does X work?"
+    assert result.srt_content.startswith("1\n")
+    assert not fake_video.exists()
+    assert not fake_audio.exists()
+
+
+@pytest.mark.asyncio
+async def test_pipeline_transcription_failure_marks_failed(client, tmp_path):
+    user_id = await _make_agency_user(client)
+    cid, brand_id = await _create_agency_client(client)
+    job = await _insert_job(agency_client_id=cid, brand_id=brand_id, created_by=user_id)
+
+    fake_video = tmp_path / "v.mp4"; fake_video.write_bytes(b"fake")
+
+    def fake_extract(_src, dst):
+        dst.write_bytes(b"audio")
+        return dst
+
+    from app.services.video_pipeline.transcriber import TranscriptionError
+    with patch("app.services.video_pipeline.pipeline.audio_extractor.probe_duration", return_value=10.0), \
+         patch("app.services.video_pipeline.pipeline.audio_extractor.extract_audio", side_effect=fake_extract), \
+         patch("app.services.video_pipeline.pipeline.audio_extractor.should_chunk", return_value=False), \
+         patch("app.services.video_pipeline.pipeline.transcriber.transcribe_chunks",
+               new=AsyncMock(side_effect=TranscriptionError("rate limited"))):
+        from app.services.video_pipeline import pipeline
+        await pipeline.process_job(job.id, fake_video)
+
+    async with AsyncSessionLocal() as db:
+        result = await db.get(VideoMetadataJob, job.id)
+    assert result.status == "failed"
+    assert "rate limited" in (result.error_message or "")
+    assert not fake_video.exists()
+
+
+@pytest.mark.asyncio
+async def test_pipeline_metadata_failure_keeps_transcript(client, tmp_path):
+    user_id = await _make_agency_user(client)
+    cid, brand_id = await _create_agency_client(client)
+    job = await _insert_job(agency_client_id=cid, brand_id=brand_id, created_by=user_id)
+
+    fake_video = tmp_path / "v.mp4"; fake_video.write_bytes(b"fake")
+    fake_transcript = {
+        "text": "Hello.", "segments": [{"start": 0.0, "end": 1.0, "text": "Hello."}],
+    }
+
+    def fake_extract(_src, dst):
+        dst.write_bytes(b"audio")
+        return dst
+
+    from app.services.video_pipeline.metadata_generator import MetadataGenerationError
+    with patch("app.services.video_pipeline.pipeline.audio_extractor.probe_duration", return_value=5.0), \
+         patch("app.services.video_pipeline.pipeline.audio_extractor.extract_audio", side_effect=fake_extract), \
+         patch("app.services.video_pipeline.pipeline.audio_extractor.should_chunk", return_value=False), \
+         patch("app.services.video_pipeline.pipeline.transcriber.transcribe_chunks", new=AsyncMock(return_value=fake_transcript)), \
+         patch("app.services.video_pipeline.pipeline.metadata_generator.generate_metadata",
+               new=AsyncMock(side_effect=MetadataGenerationError("validation"))):
+        from app.services.video_pipeline import pipeline
+        await pipeline.process_job(job.id, fake_video)
+
+    async with AsyncSessionLocal() as db:
+        result = await db.get(VideoMetadataJob, job.id)
+    assert result.status == "completed"
+    assert result.metadata_failed is True
+    assert result.transcript_text == "Hello."
+    assert result.srt_content.startswith("1\n")
+    assert result.ai_title is None

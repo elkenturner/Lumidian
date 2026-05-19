@@ -14,6 +14,7 @@ import {
   Shield,
   ShieldCheck,
   Briefcase,
+  BookOpen,
   ChevronDown,
   Plus,
   Check,
@@ -119,6 +120,9 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
       ? [{ label: 'Site Audit', href: '/site-audit', icon: ShieldCheck }]
       : []),
     { label: 'Content Hub', href: '/content',   icon: PenLine },
+    ...(user?.subscription_tier === 'starter' || user?.subscription_tier === 'pro'
+      ? [{ label: 'Wikipedia', href: '/wiki', icon: BookOpen }]
+      : []),
     { label: 'Settings',    href: '/settings',  icon: Settings },
     { label: 'Account',     href: '/account',   icon: User },
   ];

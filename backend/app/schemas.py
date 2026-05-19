@@ -1405,3 +1405,54 @@ class DraftOut(BaseModel):
     updated_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ── Wikipedia Surface ────────────────────────────────────────────────────────
+
+class WikipediaScanSchema(BaseModel):
+    id: int
+    brand_id: int
+    status: str
+    triggered_by: int | None
+    prompts_searched: int
+    total_candidates_found: int
+    candidates_persisted: int
+    error_message: str | None
+    started_at: datetime
+    completed_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class WikipediaCandidateSchema(BaseModel):
+    id: int
+    brand_id: int
+    prompt_id: int | None
+    scan_id: int
+    article_title: str
+    article_url: str
+    pageid: int
+    article_summary: str
+    legitimacy_score: float
+    legitimacy_reasoning: str
+    status: str
+    suggested_wikitext: str | None
+    suggested_section: str | None
+    suggested_insert_location: str | None
+    evidence_pack_used: dict | None
+    last_drafted_at: datetime | None
+    last_status_change_at: datetime | None
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class UpdateCandidateStatusRequest(BaseModel):
+    status: str  # 'submitted' | 'accepted' | 'reverted' | 'dismissed'
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, v: str) -> str:
+        if v not in ("submitted", "accepted", "reverted", "dismissed"):
+            raise ValueError("status must be one of submitted/accepted/reverted/dismissed")
+        return v

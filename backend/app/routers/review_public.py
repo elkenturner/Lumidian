@@ -5,6 +5,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import status as http_status
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -224,3 +225,20 @@ async def list_documents(token: str, db: AsyncSession = Depends(get_db)):
         )
         for d in docs
     ]
+
+
+async def _resolve_client_doc(db: AsyncSession, token: str, doc_id: int) -> ClientDocument:
+    client_id = await _resolve_client_id(db, token)
+    doc = await db.get(ClientDocument, doc_id)
+    if doc is None or doc.agency_client_id != client_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return doc
+
+
+@router.get("/{token}/document/{doc_id}", response_class=Response)
+async def get_document_html(token: str, doc_id: int, db: AsyncSession = Depends(get_db)):
+    from app.services.document_engine.pdf_renderer import render_html, _resolve_data
+    doc = await _resolve_client_doc(db, token, doc_id)
+    data = await _resolve_data(db, doc)
+    html = render_html(doc, data)
+    return Response(content=html, media_type="text/html; charset=utf-8")

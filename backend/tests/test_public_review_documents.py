@@ -65,3 +65,22 @@ async def test_list_documents_empty_when_no_docs(client):
     resp = await client.get("/api/public/review/tok-empty/documents")
     assert resp.status_code == 200
     assert resp.json() == []
+
+
+@pytest.mark.asyncio
+async def test_get_document_html_returns_rendered_html(client):
+    token, _, doc_id = await _setup("HtmlClient")
+    resp = await client.get(f"/api/public/review/{token}/document/{doc_id}")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    body = resp.text
+    assert "<!DOCTYPE html>" in body
+    assert "HtmlClient" in body
+
+
+@pytest.mark.asyncio
+async def test_get_document_html_rejects_doc_from_other_client(client):
+    token_a, _, _ = await _setup("AAA")
+    _, _, doc_b = await _setup("BBB")
+    resp = await client.get(f"/api/public/review/{token_a}/document/{doc_b}")
+    assert resp.status_code == 404

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { agencyListClients, type AgencyClient } from '@/lib/api';
 import { NewClientDialog } from '@/components/agency/NewClientDialog';
 
@@ -17,6 +18,17 @@ export default function AgencyClientsPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const openNewOnMount = searchParams.get('new') === '1';
+
+  useEffect(() => {
+    if (openNewOnMount) {
+      router.replace(pathname);
+    }
+  }, [openNewOnMount, pathname, router]);
+
   useEffect(() => {
     agencyListClients()
       .then(setClients)
@@ -31,7 +43,7 @@ export default function AgencyClientsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Clients</h1>
           <p className="text-sm text-[var(--text-muted)]">{clients.length} total</p>
         </div>
-        <NewClientDialog onCreated={(c) => setClients((prev) => [c, ...prev])} />
+        <NewClientDialog initialOpen={openNewOnMount} onCreated={(c) => setClients((prev) => [c, ...prev])} />
       </div>
 
       {loading && <p className="text-sm text-[var(--text-muted)]">Loading…</p>}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronRight, Plus, Loader2, CheckCircle, ArrowLeft, BarChart2, Zap, FileText, Lock } from 'lucide-react';
+import { ChevronRight, Plus, Loader2, CheckCircle, ArrowLeft, BarChart2, Zap, FileText, Lock, Building2 } from 'lucide-react';
 import LumidianLogo from '@/components/LumidianLogo';
 import {
   getBillingUsage,
@@ -352,6 +352,33 @@ export default function NewBrandPage() {
                   </button>
                 );
               })()}
+
+              {/* Agency brand — admin-only; redirects to /agency/clients to create AgencyClient + Brand */}
+              {isAdmin && (
+                <button
+                  onClick={() => router.push('/agency/clients?new=1')}
+                  className="w-full text-left rounded-xl p-4 border border-[var(--color-claude)]/24 bg-[var(--color-claude)]/5 hover:border-[var(--color-claude)] hover:bg-[var(--color-claude)]/10 transition-[border-color,background-color] cursor-pointer"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-[var(--color-claude)]/12 border border-[var(--color-claude)]/28 flex items-center justify-center flex-shrink-0">
+                      <Building2 size={15} className="text-[var(--accent-foreground)]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-0.5">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">Agency brand</p>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-[var(--color-claude)]/18 text-[var(--accent-foreground)] border border-[var(--color-claude)]/30">
+                            ADMIN
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                        Set up a new agency client with a linked brand. Continues in the <span className="text-[var(--text-secondary)] font-medium">Agency portal</span>.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              )}
 
               {/* Pitch brand — only shown for free users (paid users get full brands) */}
               {!isOnPaidPlan && (() => {

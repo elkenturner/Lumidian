@@ -519,3 +519,29 @@ async def test_regenerate_metadata_reruns_claude(client):
         refreshed = await db.get(VideoMetadataJob, job.id)
     assert refreshed.ai_title == "NEW"
     assert refreshed.transcript_text == "hello world"  # unchanged
+
+
+# ── Orphan sweep tests ────────────────────────────────────────────────────────
+
+import os
+import time
+
+from app.services.video_pipeline.orphan_sweep import sweep_orphan_files
+
+
+def test_sweep_deletes_files_older_than_max_age(tmp_path):
+    old = tmp_path / "old.mp4"
+    new = tmp_path / "new.mp4"
+    old.write_bytes(b"x")
+    new.write_bytes(b"x")
+    # Set mtime of old to 2 hours ago.
+    two_hours_ago = time.time() - 7200
+    os.utime(old, (two_hours_ago, two_hours_ago))
+
+    sweep_orphan_files(tmp_path, max_age_seconds=3600)
+    assert not old.exists()
+    assert new.exists()
+
+
+def test_sweep_handles_missing_dir(tmp_path):
+    sweep_orphan_files(tmp_path / "does-not-exist", max_age_seconds=3600)  # no exception

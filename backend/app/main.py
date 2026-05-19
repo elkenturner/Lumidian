@@ -118,6 +118,14 @@ async def lifespan(app: FastAPI):
     logger.info("Starting background scheduler...")
     start_scheduler()
 
+    # Sweep orphan video tmp files from crashes/hot-reloads
+    from app.services.video_pipeline.orphan_sweep import sweep_orphan_files
+    from app.routers.agency_video import TMP_DIR as VIDEO_TMP_DIR
+    try:
+        sweep_orphan_files(VIDEO_TMP_DIR)
+    except Exception as e:
+        logger.warning("Video orphan sweep failed: %s", e)
+
     yield  # Application runs here
 
     # ── Shutdown ──────────────────────────────────────────────────────────────

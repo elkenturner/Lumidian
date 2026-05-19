@@ -52,6 +52,9 @@ def build_wikipedia_prompt(
     publications: list[dict] | None = None,
     website_url: str | None = None,
     evidence_pack: EvidencePack | None = None,
+    locked_article_title: str | None = None,
+    article_section_list: list[str] | None = None,
+    citation_needed_hints: list[str] | None = None,
 ) -> str:
     pack_section = ""
     citation_instructions = ""
@@ -88,6 +91,24 @@ def build_wikipedia_prompt(
                 "End the wikitext with {{citation needed}} exactly as shown — do NOT invent any citation data."
             )
 
+    fixed_article_section = ""
+    if locked_article_title:
+        sections_block = ""
+        if article_section_list:
+            sections_block = "\nEXISTING SECTIONS in this article (pick the best fit):\n" + "\n".join(
+                f"  - {s}" for s in article_section_list
+            )
+        cn_block = ""
+        if citation_needed_hints:
+            cn_block = "\n\nCITATION NEEDED hints (existing {{citation needed}} locations the brand could help fill):\n" + "\n".join(
+                f"  - {h}" for h in citation_needed_hints
+            )
+        fixed_article_section = (
+            f"\nFIXED ARTICLE — non-negotiable. Insert into the Wikipedia article titled "
+            f'"{locked_article_title}". Do not choose a different article. Do not invent a title.'
+            f"{sections_block}{cn_block}\n"
+        )
+
     return f"""You are an experienced Wikipedia editor. Given a brand profile and a target query, you must:
 1. Identify ONE specific, real, existing Wikipedia article to edit.
 2. Write the exact wikitext sentence(s) to insert into it.
@@ -106,7 +127,7 @@ WHAT AI SYSTEMS CURRENTLY SAY:
 
 {citation_instructions}
 
-ARTICLE SELECTION — choose the article whose topic most directly matches the key terms in the target query. The article title and section should use the same vocabulary as the query. Never target: brand articles, disambiguation pages, or articles you are inventing.
+{fixed_article_section if locked_article_title else "ARTICLE SELECTION — choose the article whose topic most directly matches the key terms in the target query. The article title and section should use the same vocabulary as the query. Never target: brand articles, disambiguation pages, or articles you are inventing."}
 
 WIKI TEXT RULES (absolute — every rule is mandatory):
   - Neutral encyclopedic tone only — no promotional language, no superlatives, no brand advocacy of any kind

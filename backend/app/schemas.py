@@ -1456,3 +1456,40 @@ class UpdateCandidateStatusRequest(BaseModel):
         if v not in ("submitted", "accepted", "reverted", "dismissed"):
             raise ValueError("status must be one of submitted/accepted/reverted/dismissed")
         return v
+
+
+# ── Agency video pipeline ──────────────────────────────────────────────
+
+class VideoChapterOut(BaseModel):
+    ts_seconds: int
+    label: str
+
+
+class VideoMetadataJobOut(BaseModel):
+    id: int
+    agency_client_id: int
+    brand_id: int
+    status: str
+    filename: str
+    file_size_bytes: int
+    duration_seconds: float | None
+    transcript_text: str | None
+    transcript_segments: list[dict] | None
+    ai_title: str | None
+    ai_description: str | None
+    ai_chapters: list[VideoChapterOut] | None
+    ai_tags: list[str] | None
+    ai_jsonld: dict | None
+    srt_content: str | None
+    vtt_content: str | None
+    metadata_failed: bool
+    error_message: str | None
+    created_at: datetime
+    completed_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class VideoUploadResponse(BaseModel):
+    job_id: int
+    status: str

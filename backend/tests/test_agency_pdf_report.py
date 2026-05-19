@@ -9,8 +9,14 @@ from sqlalchemy import select, update
 
 from app.database import AsyncSessionLocal
 from app.models import AgencyClient, AgencyStaff, ClientDocument, User
-from app.services.document_engine.pdf_renderer import _parse_markdown_sections
+from app.services.document_engine.markdown_sections import parse_sections
+from app.services.document_engine.agency_weekly_report import SECTION_MAP as WEEKLY_SECTION_MAP
 from tests.conftest import register_and_login
+
+
+def _parse_markdown_sections(body):
+    """Compatibility shim so the existing weekly-specific tests keep passing."""
+    return parse_sections(body, WEEKLY_SECTION_MAP)
 
 
 async def _make_agency_user(client, email: str = "pdf@example.com") -> None:

@@ -759,6 +759,14 @@ class ClientReviewLink(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+class VideoMetadataJobStatusEnum(str, enum.Enum):
+    uploaded = "uploaded"
+    transcribing = "transcribing"
+    generating = "generating"
+    completed = "completed"
+    failed = "failed"
+
+
 class VideoMetadataJob(Base):
     __tablename__ = "video_metadata_jobs"
 

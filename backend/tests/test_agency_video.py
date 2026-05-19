@@ -155,3 +155,76 @@ def test_transcribe_chunks_raises_on_provider_error(tmp_path):
             assert "rate limited" in str(e)
         else:
             raise AssertionError("expected TranscriptionError")
+
+
+import json
+from app.services.video_pipeline import metadata_generator
+
+
+def test_build_prompt_includes_brand_profile_fields():
+    profile = {
+        "company_description": "Acme makes widgets.",
+        "tone_of_voice": "direct, technical",
+        "target_audience": "engineering managers",
+        "approved_language": "ship, retention",
+        "what_not_to_say": "synergy, leverage",
+        "key_stats": "60% retention",
+    }
+    out = metadata_generator.build_prompt(brand_name="Acme", brand_profile=profile, transcript="Hello world.")
+    assert "Acme" in out
+    assert "direct, technical" in out
+    assert "Hello world." in out
+    assert "synergy" in out  # what_not_to_say included
+
+
+def test_parse_response_success():
+    raw = json.dumps({
+        "title": "How does X work?",
+        "description": "X is...",
+        "chapters": [{"ts_seconds": 0, "label": "Intro"}],
+        "tags": ["a", "b"],
+        "jsonld": {"@type": "VideoObject"},
+    })
+    out = metadata_generator.parse_response(raw)
+    assert out.title == "How does X work?"
+    assert out.chapters[0].label == "Intro"
+    assert out.jsonld == {"@type": "VideoObject"}
+
+
+def test_parse_response_invalid_json_raises():
+    try:
+        metadata_generator.parse_response("not json")
+    except metadata_generator.MetadataGenerationError:
+        pass
+    else:
+        raise AssertionError("expected MetadataGenerationError")
+
+
+def test_parse_response_missing_field_raises():
+    raw = json.dumps({"title": "x"})  # missing description, chapters, tags, jsonld
+    try:
+        metadata_generator.parse_response(raw)
+    except metadata_generator.MetadataGenerationError:
+        pass
+    else:
+        raise AssertionError("expected MetadataGenerationError")
+
+
+def test_generate_metadata_calls_claude(monkeypatch):
+    fake_response = AsyncMock()
+    fake_response.content = [type("Block", (), {"text": json.dumps({
+        "title": "T", "description": "D",
+        "chapters": [{"ts_seconds": 0, "label": "L"}],
+        "tags": ["t"], "jsonld": {"@type": "VideoObject"},
+    })})]
+
+    async def fake_create(**_kwargs):
+        return fake_response
+
+    fake_client = type("C", (), {"messages": type("M", (), {"create": staticmethod(fake_create)})()})()
+
+    with patch.object(metadata_generator, "_get_client", return_value=fake_client):
+        result = asyncio.run(metadata_generator.generate_metadata(
+            brand_name="X", brand_profile={}, transcript="hello"
+        ))
+    assert result.title == "T"

@@ -13,11 +13,18 @@ from app.models import (
     AgencyClient,
     AgencyStaff,
     Brand,
+    ClientDocument,
     ClientReviewLink,
     ContentDraft,
     Notification,
 )
-from app.schemas import ChangesRequestIn, RejectIn, ReviewClientPageOut, ReviewDraftOut
+from app.schemas import (
+    ChangesRequestIn,
+    PublicDocumentSummaryOut,
+    RejectIn,
+    ReviewClientPageOut,
+    ReviewDraftOut,
+)
 from app.services.agency_activity import emit_event
 
 router = APIRouter(prefix="/api/public/review", tags=["public-review"])
@@ -189,3 +196,31 @@ async def reject_draft(
         related_draft_id=draft.id,
     )
     await db.commit()
+
+
+# ── Document library endpoints ────────────────────────────────────────────────
+
+# Kinds that have a registered PDF template — must stay in sync with
+# pdf_renderer._KIND_TO_TEMPLATE.
+_PDF_AVAILABLE_KINDS = {"agency_weekly_report", "monthly_report", "sow", "audit_initial", "kickoff_checklist"}
+
+
+@router.get("/{token}/documents", response_model=list[PublicDocumentSummaryOut])
+async def list_documents(token: str, db: AsyncSession = Depends(get_db)):
+    client_id = await _resolve_client_id(db, token)
+    q = await db.execute(
+        select(ClientDocument)
+        .where(ClientDocument.agency_client_id == client_id)
+        .order_by(ClientDocument.generated_at.desc())
+    )
+    docs = list(q.scalars().all())
+    return [
+        PublicDocumentSummaryOut(
+            id=d.id,
+            kind=d.kind,
+            title=d.title,
+            generated_at=d.generated_at,
+            pdf_available=d.kind in _PDF_AVAILABLE_KINDS,
+        )
+        for d in docs
+    ]

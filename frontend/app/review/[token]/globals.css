@@ -1,0 +1,16 @@
+:root {
+  /* paper & ink — mirrors backend _styles.css.j2 */
+  --paper: #FAF7F2;
+  --paper-elev: #FFFFFF;
+  --ink: #0B1220;
+  --ink-soft: #334155;
+  --ink-mute: #6B7280;
+  --ink-faint: #9AA4B2;
+  --rule: #E6E1D8;
+
+  --lumidian: #2447EE;
+  --lumidian-tint: rgba(36, 71, 238, 0.08);
+
+  --up: #047857;
+  --down: #B91C1C;
+}

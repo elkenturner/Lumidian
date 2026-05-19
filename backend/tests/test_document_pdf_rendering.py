@@ -167,3 +167,36 @@ async def test_render_html_audit_initial_shows_score_inset_when_present():
     assert "AuditCo" in html
     assert "42" in html  # score in the inset card
     assert "Recommendations" in html or "recommendations" in html
+
+
+@pytest.mark.asyncio
+async def test_render_html_monthly_report_has_cover_and_summary():
+    body = (
+        "# Monthly\n\n"
+        "## Summary\n\nVisibility up 8 points; 12 posts shipped.\n\n"
+        "## Visibility Change\n\nFrom 42% to 50%.\n\n"
+        "## Content Shipped\n\n- linkedin: 6\n- medium: 4\n- reddit: 2\n\n"
+        "## Notable Activity\n\n- 8 drafts approved\n- Client kicked off pillar page\n\n"
+        "## Next Month\n\n- Ramp Reddit\n- Wikipedia stub\n"
+    )
+    snapshot = {
+        "client": {"name": "MonthlyCo"},
+        "period": {"start": "2026-05-01T00:00:00", "end": "2026-05-18T12:00:00", "label": "May 2026"},
+        "this_month_run": {"overall_score": 50.0, "total_queries": 36},
+        "last_month_run": {"overall_score": 42.0, "total_queries": 36},
+        "drafts_posted_this_month": 12,
+        "drafts_by_platform": {"linkedin": 6, "medium": 4, "reddit": 2},
+        "activity_events_count": 18,
+        "activity_sample": [],
+        "has_data": True,
+    }
+    doc_id = await _make_client_with_doc("MonthlyCo", "monthly_report", body, snapshot)
+    async with AsyncSessionLocal() as db:
+        doc = await db.get(ClientDocument, doc_id)
+        from app.services.document_engine.pdf_renderer import render_html
+        html = render_html(doc, snapshot)
+    assert "MonthlyCo" in html
+    assert "May 2026" in html
+    assert "Monthly Report" in html or "MONTHLY REPORT" in html
+    assert "50" in html  # hero score
+

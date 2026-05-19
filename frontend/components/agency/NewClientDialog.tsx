@@ -6,10 +6,11 @@ import { agencyCreateClient, type AgencyClient } from '@/lib/api';
 
 interface Props {
   onCreated: (client: AgencyClient) => void;
+  initialOpen?: boolean;
 }
 
-export function NewClientDialog({ onCreated }: Props) {
-  const [open, setOpen] = useState(false);
+export function NewClientDialog({ onCreated, initialOpen = false }: Props) {
+  const [open, setOpen] = useState(initialOpen);
   const [name, setName] = useState('');
   const [contactName, setContactName] = useState('');
   const [contactEmail, setContactEmail] = useState('');

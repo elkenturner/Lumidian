@@ -136,3 +136,34 @@ async def test_render_html_kickoff_uses_checklist_items():
     assert "What we still need" in html or "What the client still owes" in html
     # Markdown `- [x]` / `- [ ]` should produce task-list-item class OR checked input
     assert "task-list-item" in html or "checked" in html
+
+
+@pytest.mark.asyncio
+async def test_render_html_audit_initial_shows_score_inset_when_present():
+    body = (
+        "# Audit\n\n"
+        "## Current State\n\nVisibility is 42%. Below industry median.\n\n"
+        "## What's Working\n\n- LinkedIn presence is strong\n\n"
+        "## Gaps\n\n- No Reddit coverage\n- Wikipedia missing\n\n"
+        "## Recommendations (next 30 days)\n\n- Add 4 Reddit drafts\n- Build Wikipedia stub\n\n"
+        "## Open Questions for the Client\n\n- What is your North-Star use case?\n"
+    )
+    snapshot = {
+        "client": {"name": "AuditCo", "slug": "auditco", "status": "active"},
+        "brand": {"name": "AuditCo", "website_url": "https://x.com"},
+        "brand_profile": None,
+        "prompts": [],
+        "competitors": [],
+        "latest_run": {"overall_score": 42.0, "total_queries": 24, "total_mentions": 10, "completed_at": "2026-05-17T10:00:00"},
+        "generated_at": "2026-05-18T12:00:00",
+        "has_data": True,
+    }
+    doc_id = await _make_client_with_doc("AuditCo", "audit_initial", body, snapshot)
+    async with AsyncSessionLocal() as db:
+        doc = await db.get(ClientDocument, doc_id)
+        from app.services.document_engine.pdf_renderer import render_html
+        html = render_html(doc, snapshot)
+    assert "Initial Audit" in html or "INITIAL AUDIT" in html
+    assert "AuditCo" in html
+    assert "42" in html  # score in the inset card
+    assert "Recommendations" in html or "recommendations" in html

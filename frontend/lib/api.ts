@@ -1148,6 +1148,85 @@ export async function agencyUpdateDraftStatus(
   await api.patch(`/agency/drafts/${draftId}/status`, { status });
 }
 
+// ── Agency video pipeline ──────────────────────────────────────────────────
+
+export interface VideoChapter {
+  ts_seconds: number;
+  label: string;
+}
+
+export interface VideoMetadataJobOut {
+  id: number;
+  agency_client_id: number;
+  brand_id: number;
+  status: 'uploaded' | 'transcribing' | 'generating' | 'completed' | 'failed';
+  filename: string;
+  file_size_bytes: number;
+  duration_seconds: number | null;
+  transcript_text: string | null;
+  transcript_segments: { start: number; end: number; text: string }[] | null;
+  ai_title: string | null;
+  ai_description: string | null;
+  ai_chapters: VideoChapter[] | null;
+  ai_tags: string[] | null;
+  ai_jsonld: Record<string, unknown> | null;
+  srt_content: string | null;
+  vtt_content: string | null;
+  metadata_failed: boolean;
+  error_message: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export async function agencyUploadVideo(
+  clientId: number,
+  file: File,
+  onProgress?: (pct: number) => void,
+): Promise<{ job_id: number; status: string }> {
+  const form = new FormData();
+  form.append('file', file);
+  const resp = await api.post<{ job_id: number; status: string }>(
+    `/api/agency/clients/${clientId}/video/upload`,
+    form,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (e) => {
+        if (onProgress && e.total) onProgress(Math.round((e.loaded / e.total) * 100));
+      },
+    },
+  );
+  return resp.data;
+}
+
+export async function agencyGetVideoJobs(clientId: number): Promise<VideoMetadataJobOut[]> {
+  const res = await api.get<VideoMetadataJobOut[]>(`/api/agency/clients/${clientId}/video/jobs`);
+  return res.data;
+}
+
+export async function agencyGetVideoJob(
+  clientId: number,
+  jobId: number,
+): Promise<VideoMetadataJobOut> {
+  const res = await api.get<VideoMetadataJobOut>(
+    `/api/agency/clients/${clientId}/video/jobs/${jobId}`,
+  );
+  return res.data;
+}
+
+export async function agencyRegenerateVideoMetadata(
+  clientId: number,
+  jobId: number,
+): Promise<VideoMetadataJobOut> {
+  const res = await api.post<VideoMetadataJobOut>(
+    `/api/agency/clients/${clientId}/video/jobs/${jobId}/regenerate-metadata`,
+  );
+  return res.data;
+}
+
+export async function agencyDeleteVideoJob(clientId: number, jobId: number): Promise<void> {
+  await api.delete(`/api/agency/clients/${clientId}/video/jobs/${jobId}`);
+}
+
 // ── Public review (no auth) ──────────────────────────────────────────────────
 
 export interface ReviewDraft {

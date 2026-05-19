@@ -242,3 +242,21 @@ async def get_document_html(token: str, doc_id: int, db: AsyncSession = Depends(
     data = await _resolve_data(db, doc)
     html = render_html(doc, data)
     return Response(content=html, media_type="text/html; charset=utf-8")
+
+
+@router.get("/{token}/document/{doc_id}/pdf", response_class=Response)
+async def get_document_pdf(token: str, doc_id: int, db: AsyncSession = Depends(get_db)):
+    from app.services.document_engine.pdf_renderer import render_pdf
+    doc = await _resolve_client_doc(db, token, doc_id)
+    try:
+        pdf_bytes = await render_pdf(db, doc)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to render PDF: {e}") from e
+    safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in doc.title)[:120].strip() or f"document-{doc.id}"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
+    )

@@ -382,3 +382,140 @@ async def test_pipeline_metadata_failure_keeps_transcript(client, tmp_path):
     assert result.transcript_text == "Hello."
     assert result.srt_content.startswith("1\n")
     assert result.ai_title is None
+
+
+# ── Endpoint tests ────────────────────────────────────────────────────────────
+
+import io
+
+
+@pytest.mark.asyncio
+async def test_upload_creates_job(client):
+    await _make_agency_user(client)
+    cid, _brand = await _create_agency_client(client)
+    files = {"file": ("test.mp4", io.BytesIO(b"x" * 2048), "video/mp4")}
+    resp = await client.post(f"/api/agency/clients/{cid}/video/upload", files=files)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "job_id" in body
+    assert body["status"] == "uploaded"
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_non_video_mime(client):
+    await _make_agency_user(client)
+    cid, _brand = await _create_agency_client(client)
+    files = {"file": ("a.txt", io.BytesIO(b"hi"), "text/plain")}
+    resp = await client.post(f"/api/agency/clients/{cid}/video/upload", files=files)
+    assert resp.status_code == 415
+
+
+@pytest.mark.asyncio
+async def test_upload_rejects_over_size_limit(client, monkeypatch):
+    await _make_agency_user(client)
+    cid, _brand = await _create_agency_client(client)
+    from app.routers import agency_video
+    monkeypatch.setattr(agency_video, "MAX_UPLOAD_BYTES", 1024)
+    files = {"file": ("big.mp4", io.BytesIO(b"x" * 2048), "video/mp4")}
+    resp = await client.post(f"/api/agency/clients/{cid}/video/upload", files=files)
+    assert resp.status_code == 413
+
+
+@pytest.mark.asyncio
+async def test_upload_requires_staff(client):
+    """Logged-in but non-staff user should get 403 from require_agency_staff."""
+    await register_and_login(client, email="not-staff@example.com")
+    # No is_agency_staff elevation. Create a client row directly so the endpoint
+    # doesn't 404 before the staff check.
+    async with AsyncSessionLocal() as db:
+        ac = AgencyClient(name="X", slug="x-client", status="active")
+        db.add(ac); await db.commit(); await db.refresh(ac)
+        brand = Brand(
+            name="X Brand", slug="x-brand", user_id=1,
+            agency_client_id=ac.id, brand_type="agency",
+        )
+        db.add(brand); await db.commit()
+        cid = ac.id
+
+    files = {"file": ("t.mp4", io.BytesIO(b"x"), "video/mp4")}
+    resp = await client.post(f"/api/agency/clients/{cid}/video/upload", files=files)
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_upload_unknown_client_returns_404(client):
+    await _make_agency_user(client)
+    files = {"file": ("t.mp4", io.BytesIO(b"x"), "video/mp4")}
+    resp = await client.post("/api/agency/clients/999999/video/upload", files=files)
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_jobs_scoped_to_client(client):
+    user_id = await _make_agency_user(client)
+    cid_a, brand_a = await _create_agency_client(client, name="ClientA")
+    cid_b, brand_b = await _create_agency_client(client, name="ClientB")
+    await _insert_job(agency_client_id=cid_a, brand_id=brand_a, created_by=user_id,
+                      status="completed", filename="a1.mp4")
+    await _insert_job(agency_client_id=cid_a, brand_id=brand_a, created_by=user_id,
+                      status="completed", filename="a2.mp4")
+    await _insert_job(agency_client_id=cid_b, brand_id=brand_b, created_by=user_id,
+                      status="completed", filename="b1.mp4")
+
+    resp = await client.get(f"/api/agency/clients/{cid_a}/video/jobs")
+    assert resp.status_code == 200
+    fnames = {j["filename"] for j in resp.json()}
+    assert fnames == {"a1.mp4", "a2.mp4"}
+
+
+@pytest.mark.asyncio
+async def test_get_job_returns_artifacts(client):
+    user_id = await _make_agency_user(client)
+    cid, brand_id = await _create_agency_client(client)
+    job = await _insert_job(
+        agency_client_id=cid, brand_id=brand_id, created_by=user_id,
+        status="completed", ai_title="Hello?", transcript_text="hi",
+    )
+    resp = await client.get(f"/api/agency/clients/{cid}/video/jobs/{job.id}")
+    assert resp.status_code == 200
+    assert resp.json()["ai_title"] == "Hello?"
+
+
+@pytest.mark.asyncio
+async def test_delete_job(client):
+    user_id = await _make_agency_user(client)
+    cid, brand_id = await _create_agency_client(client)
+    job = await _insert_job(
+        agency_client_id=cid, brand_id=brand_id, created_by=user_id, status="completed",
+    )
+    resp = await client.delete(f"/api/agency/clients/{cid}/video/jobs/{job.id}")
+    assert resp.status_code == 204
+    async with AsyncSessionLocal() as db:
+        rows = await db.execute(select(VideoMetadataJob).where(VideoMetadataJob.id == job.id))
+        assert rows.scalar_one_or_none() is None
+
+
+@pytest.mark.asyncio
+async def test_regenerate_metadata_reruns_claude(client):
+    user_id = await _make_agency_user(client)
+    cid, brand_id = await _create_agency_client(client)
+    job = await _insert_job(
+        agency_client_id=cid, brand_id=brand_id, created_by=user_id,
+        status="completed", transcript_text="hello world", ai_title="OLD",
+    )
+
+    from app.services.video_pipeline.metadata_generator import MetadataOut, ChapterOut
+    fake_meta = MetadataOut(
+        title="NEW", description="d", chapters=[ChapterOut(ts_seconds=0, label="L")],
+        tags=["t"], jsonld={"@type": "VideoObject"},
+    )
+    with patch("app.services.video_pipeline.pipeline.metadata_generator.generate_metadata",
+               new=AsyncMock(return_value=fake_meta)):
+        resp = await client.post(
+            f"/api/agency/clients/{cid}/video/jobs/{job.id}/regenerate-metadata"
+        )
+    assert resp.status_code == 200, resp.text
+    async with AsyncSessionLocal() as db:
+        refreshed = await db.get(VideoMetadataJob, job.id)
+    assert refreshed.ai_title == "NEW"
+    assert refreshed.transcript_text == "hello world"  # unchanged

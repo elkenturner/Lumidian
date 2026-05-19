@@ -60,6 +60,7 @@ from app.routers import (
 )
 from app.routers import admin as admin_router
 from app.routers import agency as agency_router
+from app.routers import agency_video as agency_video_router
 from app.routers import analytics as analytics_router
 from app.routers import auth as auth_router
 from app.routers import billing as billing_router
@@ -233,6 +234,7 @@ app.include_router(errors_router.router, prefix="/api")
 app.include_router(notifications_router.router, prefix="/api")
 app.include_router(support_router.router, prefix="/api")
 app.include_router(agency_router.router, prefix="/api")
+app.include_router(agency_video_router.router)
 app.include_router(review_public_router.router)
 app.include_router(coach.router)
 app.include_router(site_audit_router.router)

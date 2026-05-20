@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { ArrowUpRight, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
+import PlatformBadge from "@/components/PlatformBadge";
 import type { ContentClusterSummary } from "@/lib/api";
 
 interface Props {
@@ -11,12 +12,21 @@ interface Props {
   regenerating: boolean;
 }
 
-const PIECE_BADGE_STYLES: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-700",
-  approved: "bg-emerald-100 text-emerald-800",
-  posted: "bg-sky-100 text-sky-800",
-  failed: "bg-rose-100 text-rose-800",
-  missing: "bg-slate-50 text-slate-400 border border-dashed border-slate-300",
+const PIECE_TONE: Record<string, string> = {
+  draft: "bg-[rgba(148,163,184,0.10)] text-[var(--text-secondary)] border-[rgba(148,163,184,0.18)]",
+  approved: "bg-[rgba(34,197,94,0.10)] text-[#4ade80] border-[rgba(34,197,94,0.22)]",
+  posted: "bg-[rgba(56,189,248,0.10)] text-[#7dd3fc] border-[rgba(56,189,248,0.22)]",
+  failed: "bg-[rgba(244,63,94,0.10)] text-[#fb7185] border-[rgba(244,63,94,0.22)]",
+  missing:
+    "bg-transparent text-[var(--text-faint)] border-dashed border-[var(--border-subtle)]",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  pending: "Pending",
+  briefing: "Briefing",
+  generating: "Generating",
+  ready: "Ready",
+  partial_failed: "Partial failure",
 };
 
 export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Props) {
@@ -24,66 +34,84 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
   const completed = cluster.pieces.filter((p) => p.status !== "missing").length;
   const visibility = Math.round(cluster.visibility_pct);
   const visibilityTone =
-    visibility >= 60 ? "text-emerald-700" : visibility >= 30 ? "text-amber-700" : "text-rose-700";
+    visibility >= 60
+      ? "text-[#4ade80]"
+      : visibility >= 30
+      ? "text-[#fbbf24]"
+      : "text-[#fb7185]";
+  const statusLabel = STATUS_LABEL[cluster.status] ?? cluster.status.replace("_", " ");
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm hover:shadow transition-shadow">
+    <div className="card card-hover flex flex-col gap-4">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
-          <h3 className="text-base font-semibold text-slate-900 line-clamp-2">{cluster.prompt_text}</h3>
-          <div className="mt-1 flex items-center gap-3 text-sm text-slate-500">
+          <h3 className="text-base font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
+            {cluster.prompt_text}
+          </h3>
+          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-faint)]">
             <span>
-              Status:{" "}
-              <span className="font-medium text-slate-700 capitalize">{cluster.status.replace("_", " ")}</span>
+              <span className="text-[var(--text-muted)]">Status</span>{" "}
+              <span className="text-[var(--text-secondary)] font-medium">{statusLabel}</span>
             </span>
-            <span>·</span>
+            <span className="text-[var(--text-faint)]">·</span>
             <span>
               {completed} of {totalEnabled} pieces
             </span>
             {cluster.pillar_mode === "attached" && (
               <>
-                <span>·</span>
-                <span className="text-emerald-700 font-medium">Pillar attached</span>
+                <span className="text-[var(--text-faint)]">·</span>
+                <span className="text-[#4ade80] font-medium">Pillar attached</span>
               </>
             )}
             {cluster.pillar_mode === "proposed" && (
               <>
-                <span>·</span>
-                <span className="text-amber-700 font-medium">Pillar proposed</span>
+                <span className="text-[var(--text-faint)]">·</span>
+                <span className="text-[#fbbf24] font-medium">Pillar proposed</span>
               </>
             )}
           </div>
         </div>
-        <div className={`shrink-0 flex items-center gap-1 text-2xl font-bold ${visibilityTone}`}>
-          {visibility >= 50 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+        <div className={`shrink-0 flex items-center gap-1 text-xl font-bold ${visibilityTone}`}>
+          {visibility >= 50 ? (
+            <TrendingUp className="h-4 w-4" />
+          ) : (
+            <TrendingDown className="h-4 w-4" />
+          )}
           {visibility}%
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2">
-        {cluster.pieces.map((piece) => (
-          <span
-            key={piece.platform}
-            className={`px-2.5 py-1 rounded-md text-xs font-medium ${PIECE_BADGE_STYLES[piece.status] ?? PIECE_BADGE_STYLES.missing}`}
-          >
-            {piece.platform} · {piece.status}
-          </span>
-        ))}
+      <div className="flex flex-wrap gap-1.5">
+        {cluster.pieces.map((piece) => {
+          const tone = PIECE_TONE[piece.status] ?? PIECE_TONE.missing;
+          return (
+            <span
+              key={piece.platform}
+              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium border ${tone}`}
+              title={`${piece.platform} — ${piece.status}`}
+            >
+              <PlatformBadge platform={piece.platform} size="sm" />
+              <span className="opacity-70">·</span>
+              <span className="capitalize">{piece.status}</span>
+            </span>
+          );
+        })}
       </div>
 
-      <div className="mt-4 flex items-center justify-between">
+      <div className="flex items-center justify-between pt-1 border-t border-[var(--border-subtle)]">
         <Link
           href={`/content/${brandId}/cluster/${cluster.id}`}
-          className="text-sm font-medium text-sky-700 hover:text-sky-900"
+          className="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-foreground)] hover:text-[var(--text-primary)]"
         >
-          View cluster →
+          View cluster <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
         <button
           type="button"
           onClick={() => onRegenerate(cluster.id)}
           disabled={regenerating}
-          className="px-3 py-1.5 rounded-md border border-slate-200 text-sm hover:bg-slate-50 disabled:opacity-50"
+          className="btn btn-secondary !py-1.5 !px-3 text-xs"
         >
+          <RefreshCw className={`h-3 w-3 ${regenerating ? "animate-spin" : ""}`} />
           {regenerating ? "Regenerating…" : "Regenerate"}
         </button>
       </div>

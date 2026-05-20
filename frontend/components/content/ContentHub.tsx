@@ -28,6 +28,7 @@ import {
   BookOpen,
   Lightbulb,
   Shield,
+  Layers,
 } from 'lucide-react';
 import {
   getBrand,
@@ -2575,10 +2576,13 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
             {activePrimaryTab === 'clusters' && (
               <div>
                 {clusterList.length === 0 ? (
-                  <div className="rounded-lg border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] p-8 text-center">
-                    <p className="text-[var(--text-secondary)]">No clusters yet for this brand.</p>
-                    <p className="mt-1 text-sm text-[var(--text-faint)]">
-                      Each tracked prompt becomes a cluster. Hit Regenerate to populate.
+                  <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] p-10 text-center">
+                    <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-[rgba(95,126,166,0.08)] border border-[var(--border-subtle)] flex items-center justify-center">
+                      <Layers size={20} className="text-[var(--accent)]" />
+                    </div>
+                    <p className="text-[var(--text-primary)] font-semibold">No clusters yet for this brand.</p>
+                    <p className="mt-1.5 text-sm text-[var(--text-faint)] max-w-md mx-auto">
+                      Each tracked prompt becomes a cluster of cross-affirming pieces. Hit Regenerate on a cluster to populate it.
                     </p>
                   </div>
                 ) : (

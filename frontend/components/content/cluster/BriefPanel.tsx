@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText } from "lucide-react";
 import { editClusterBrief, type ContentBrief } from "@/lib/api";
 
 interface Props {
@@ -22,7 +22,8 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
 
   if (!brief) {
     return (
-      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-600">
+      <div className="card border-dashed flex items-center gap-3 text-sm text-[var(--text-secondary)]">
+        <FileText className="h-4 w-4 text-[var(--text-faint)] shrink-0" />
         No brief yet. Regenerate this cluster to produce one.
       </div>
     );
@@ -33,8 +34,14 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
     try {
       const updated = await editClusterBrief(brandId, clusterId, {
         positioning,
-        key_claims: keyClaims.split("\n").map((s) => s.trim()).filter(Boolean),
-        canonical_phrasings: phrasings.split("\n").map((s) => s.trim()).filter(Boolean),
+        key_claims: keyClaims
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean),
+        canonical_phrasings: phrasings
+          .split("\n")
+          .map((s) => s.trim())
+          .filter(Boolean),
         narrative_spine: narrative,
       });
       onUpdated(updated);
@@ -45,53 +52,80 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
+    <div className="card !p-0 overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-slate-50"
+        className="w-full px-5 py-3 flex items-center justify-between text-left hover:bg-[var(--bg-card)]"
       >
-        <span className="flex items-center gap-2 font-semibold text-slate-900">
-          {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-          Brief · v{brief.version}
+        <span className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">
+          {expanded ? (
+            <ChevronDown className="h-4 w-4 text-[var(--text-secondary)]" />
+          ) : (
+            <ChevronRight className="h-4 w-4 text-[var(--text-secondary)]" />
+          )}
+          Brief
+          <span className="text-xs font-medium text-[var(--text-faint)]">v{brief.version}</span>
         </span>
-        <span className="text-xs text-slate-500">Generated {new Date(brief.created_at).toLocaleString()}</span>
+        <span className="text-xs text-[var(--text-faint)]">
+          Generated {new Date(brief.created_at).toLocaleString()}
+        </span>
       </button>
 
       {expanded && (
-        <div className="border-t border-slate-200 p-4 space-y-4 text-sm">
+        <div className="border-t border-[var(--border-subtle)] p-5 space-y-5 text-sm">
           {!editing ? (
             <>
-              <Field label="Positioning">{brief.positioning}</Field>
+              <Field label="Positioning">{brief.positioning || <Empty />}</Field>
               <Field label="Canonical phrasings (appear verbatim across pieces)">
-                <ul className="list-disc list-inside text-slate-700">
-                  {brief.canonical_phrasings.map((p, i) => (
-                    <li key={i}>{p}</li>
-                  ))}
-                </ul>
+                {brief.canonical_phrasings.length ? (
+                  <ul className="space-y-1 text-[var(--text-secondary)]">
+                    {brief.canonical_phrasings.map((p, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="text-[var(--text-faint)]">•</span>
+                        <span>{p}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Empty />
+                )}
               </Field>
               <Field label="Key claims">
-                <ul className="list-disc list-inside text-slate-700">
-                  {brief.key_claims.map((c, i) => (
-                    <li key={i}>{c}</li>
-                  ))}
-                </ul>
+                {brief.key_claims.length ? (
+                  <ul className="space-y-1 text-[var(--text-secondary)]">
+                    {brief.key_claims.map((c, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="text-[var(--text-faint)]">•</span>
+                        <span>{c}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <Empty />
+                )}
               </Field>
-              <Field label="Stats">
-                <ul className="list-disc list-inside text-slate-700">
-                  {brief.stats.map((s, i) => (
-                    <li key={i}>
-                      {s.label}: {s.value}
-                    </li>
-                  ))}
-                </ul>
-              </Field>
-              <Field label="Narrative spine">{brief.narrative_spine}</Field>
-              <Field label="Tone notes">{brief.tone_notes}</Field>
+              {brief.stats.length > 0 && (
+                <Field label="Stats">
+                  <ul className="space-y-1 text-[var(--text-secondary)]">
+                    {brief.stats.map((s, i) => (
+                      <li key={i} className="flex gap-2">
+                        <span className="text-[var(--text-faint)]">•</span>
+                        <span>
+                          <span className="text-[var(--text-primary)] font-medium">{s.label}:</span>{" "}
+                          {s.value}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </Field>
+              )}
+              <Field label="Narrative spine">{brief.narrative_spine || <Empty />}</Field>
+              {brief.tone_notes && <Field label="Tone notes">{brief.tone_notes}</Field>}
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="text-sky-700 hover:text-sky-900 font-medium"
+                className="btn btn-secondary !py-1.5 text-xs"
               >
                 Edit brief
               </button>
@@ -102,7 +136,7 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
                 <textarea
                   value={positioning}
                   onChange={(e) => setPositioning(e.target.value)}
-                  className="w-full border rounded p-2"
+                  className="input"
                   rows={2}
                 />
               </Field>
@@ -110,7 +144,7 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
                 <textarea
                   value={phrasings}
                   onChange={(e) => setPhrasings(e.target.value)}
-                  className="w-full border rounded p-2 font-mono text-xs"
+                  className="input font-mono text-xs"
                   rows={4}
                 />
               </Field>
@@ -118,7 +152,7 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
                 <textarea
                   value={keyClaims}
                   onChange={(e) => setKeyClaims(e.target.value)}
-                  className="w-full border rounded p-2"
+                  className="input"
                   rows={4}
                 />
               </Field>
@@ -126,7 +160,7 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
                 <textarea
                   value={narrative}
                   onChange={(e) => setNarrative(e.target.value)}
-                  className="w-full border rounded p-2"
+                  className="input"
                   rows={2}
                 />
               </Field>
@@ -135,14 +169,14 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
                   type="button"
                   onClick={save}
                   disabled={saving}
-                  className="px-3 py-1.5 rounded bg-slate-900 text-white text-sm disabled:opacity-50"
+                  className="btn btn-primary !py-1.5 text-xs"
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>
                 <button
                   type="button"
                   onClick={() => setEditing(false)}
-                  className="px-3 py-1.5 rounded border text-sm"
+                  className="btn btn-secondary !py-1.5 text-xs"
                 >
                   Cancel
                 </button>
@@ -158,8 +192,14 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs uppercase tracking-wide text-slate-500 mb-1">{label}</div>
-      <div className="text-slate-900">{children}</div>
+      <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-1.5">
+        {label}
+      </div>
+      <div className="text-[var(--text-primary)] leading-relaxed">{children}</div>
     </div>
   );
+}
+
+function Empty() {
+  return <span className="text-[var(--text-faint)] italic">—</span>;
 }

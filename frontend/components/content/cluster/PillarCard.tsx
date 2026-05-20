@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Check, ExternalLink, Sparkles } from "lucide-react";
 import {
   acceptClusterPillar,
   rejectClusterPillar,
@@ -20,10 +21,19 @@ export function PillarCard({ brandId, cluster, candidate, onClusterUpdated }: Pr
 
   if (cluster.pillar_mode === "attached" && cluster.pillar_url) {
     return (
-      <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm">
-        <div className="font-semibold text-emerald-900 mb-1">Pillar attached</div>
-        <a href={cluster.pillar_url} target="_blank" rel="noopener noreferrer" className="text-emerald-800 underline">
+      <div className="card !p-4 bg-[rgba(34,197,94,0.06)] border-[rgba(34,197,94,0.25)]">
+        <div className="flex items-center gap-2 mb-1.5">
+          <Check className="h-4 w-4 text-[#4ade80]" />
+          <div className="font-semibold text-[#4ade80] text-sm">Pillar attached</div>
+        </div>
+        <a
+          href={cluster.pillar_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline decoration-dotted"
+        >
           {cluster.pillar_url}
+          <ExternalLink className="h-3 w-3" />
         </a>
       </div>
     );
@@ -52,31 +62,41 @@ export function PillarCard({ brandId, cluster, candidate, onClusterUpdated }: Pr
   }
 
   return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-      <div className="font-semibold text-amber-900">Pillar proposal</div>
-      <p className="mt-1 text-sm text-amber-800">
+    <div className="card !p-4 bg-[rgba(251,191,36,0.05)] border-[rgba(251,191,36,0.25)]">
+      <div className="flex items-center gap-2 mb-1">
+        <Sparkles className="h-4 w-4 text-[#fbbf24]" />
+        <div className="font-semibold text-[#fbbf24] text-sm">Pillar proposal</div>
+      </div>
+      <p className="text-sm text-[var(--text-secondary)] mb-3">
         We found an own-site page that targets this prompt and passed the tone gate.
       </p>
-      <div className="mt-3 text-sm">
-        <div className="font-medium text-slate-900">{candidate.title ?? candidate.url}</div>
+      <div className="text-sm space-y-1.5 mb-3">
+        <div className="font-medium text-[var(--text-primary)]">
+          {candidate.title ?? candidate.url}
+        </div>
         <a
           href={candidate.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sky-700 underline text-xs"
+          className="inline-flex items-center gap-1 text-xs text-[var(--accent-foreground)] hover:text-[var(--text-primary)] underline decoration-dotted"
         >
           {candidate.url}
+          <ExternalLink className="h-3 w-3" />
         </a>
-        <div className="mt-2 text-xs text-slate-600">
-          Tone score: <span className="font-mono">{candidate.tone_score.toFixed(2)}</span> · {candidate.tone_reasoning}
+        <div className="text-xs text-[var(--text-muted)]">
+          Tone score:{" "}
+          <span className="font-mono text-[var(--text-secondary)]">
+            {candidate.tone_score.toFixed(2)}
+          </span>{" "}
+          · {candidate.tone_reasoning}
         </div>
       </div>
-      <div className="mt-3 flex gap-2">
+      <div className="flex gap-2">
         <button
           type="button"
           onClick={accept}
           disabled={busy}
-          className="px-3 py-1.5 rounded bg-emerald-700 text-white text-sm disabled:opacity-50"
+          className="btn btn-primary !py-1.5 text-xs"
         >
           Accept pillar
         </button>
@@ -84,7 +104,7 @@ export function PillarCard({ brandId, cluster, candidate, onClusterUpdated }: Pr
           type="button"
           onClick={reject}
           disabled={busy}
-          className="px-3 py-1.5 rounded border text-sm disabled:opacity-50"
+          className="btn btn-secondary !py-1.5 text-xs"
         >
           Reject
         </button>

@@ -45,6 +45,8 @@ function articlePath(url: string) {
   }
 }
 
+const MONO = { fontFamily: 'var(--font-geist-mono)' } as const;
+
 export function CandidateCard({ index, brandId, candidate, onUpdated }: Props) {
   const [drafting, setDrafting] = useState(false);
   const [expanded, setExpanded] = useState(candidate.status !== 'new');
@@ -70,49 +72,44 @@ export function CandidateCard({ index, brandId, candidate, onUpdated }: Props) {
   const { host, path } = articlePath(candidate.article_url);
 
   return (
-    <article className={`relative grid grid-cols-[3rem_1fr] gap-6 py-7 px-1 transition-opacity ${isLocked ? 'opacity-55' : ''}`}>
+    <article className={`relative grid grid-cols-[2.25rem_1fr] gap-5 py-8 transition-opacity ${isLocked ? 'opacity-55' : ''}`}>
       {/* Index */}
-      <div className="flex flex-col items-start gap-2">
-        <div
-          className="text-[11px] font-medium tabular-nums text-[var(--text-faint)] tracking-wider"
-          style={{ fontFamily: 'var(--font-geist-mono)' }}
-        >
-          {index.toString().padStart(2, '0')}
-        </div>
-        <div
-          className={`text-[20px] font-semibold tabular-nums leading-none ${scoreColor(score)}`}
-          style={{ fontFamily: 'var(--font-geist-mono)' }}
-          title="Legitimacy score"
-        >
-          {score}
-        </div>
-        <div
-          className="text-[9px] uppercase tracking-[0.18em] text-[var(--text-faint)]"
-          style={{ fontFamily: 'var(--font-geist-mono)' }}
-        >
-          score
-        </div>
+      <div
+        className="pt-[5px] text-[11px] font-medium tabular-nums text-[var(--text-faint)] tracking-[0.08em]"
+        style={MONO}
+      >
+        {index.toString().padStart(2, '0')}
       </div>
 
       {/* Body */}
       <div className="min-w-0">
-        {/* Title row */}
-        <h2 className="text-[19px] font-semibold leading-[1.3] tracking-[-0.01em] text-[var(--text-primary)]">
-          <a
-            href={candidate.article_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="group inline-flex items-baseline gap-2 hover:text-[var(--accent-foreground)] transition-colors"
+        {/* Title row with score meta */}
+        <div className="flex items-start justify-between gap-6">
+          <h2 className="min-w-0 text-[19px] font-semibold leading-[1.3] tracking-[-0.01em] text-[var(--text-primary)]">
+            <a
+              href={candidate.article_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group inline-flex items-baseline gap-2 hover:text-[var(--accent-foreground)] transition-colors"
+            >
+              <span>{candidate.article_title}</span>
+              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 self-center text-[var(--text-faint)] transition-colors group-hover:text-[var(--accent-foreground)]" />
+            </a>
+          </h2>
+          <div
+            className="shrink-0 pt-[3px] text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
+            style={MONO}
+            title="Legitimacy score"
           >
-            <span>{candidate.article_title}</span>
-            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 self-center text-[var(--text-faint)] transition-colors group-hover:text-[var(--accent-foreground)]" />
-          </a>
-        </h2>
+            <span className="mr-1.5">Score</span>
+            <span className={`text-[14px] tracking-[0.02em] ${scoreColor(score)}`}>{score}</span>
+          </div>
+        </div>
 
         {/* URL */}
         <div
           className="mt-1.5 truncate text-[12px] text-[var(--text-faint)]"
-          style={{ fontFamily: 'var(--font-geist-mono)' }}
+          style={MONO}
         >
           {host}
           <span className="text-[var(--text-secondary)]">{path}</span>
@@ -123,15 +120,9 @@ export function CandidateCard({ index, brandId, candidate, onUpdated }: Props) {
           {candidate.article_summary}
         </p>
 
-        {/* Reasoning — quiet editorial annotation, no callout chrome */}
-        <p className="mt-4 max-w-[64ch] text-[13px] leading-[1.6] text-[var(--text-muted)]">
-          <span
-            className="mr-2 text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--text-faint)]"
-            style={{ fontFamily: 'var(--font-geist-mono)' }}
-          >
-            Why
-          </span>
-          <span className="italic">{candidate.legitimacy_reasoning}</span>
+        {/* Reasoning — quiet editorial annotation */}
+        <p className="mt-3 max-w-[64ch] text-[13px] leading-[1.65] italic text-[var(--text-muted)]">
+          {candidate.legitimacy_reasoning}
         </p>
 
         {/* Status + action footer */}
@@ -140,7 +131,7 @@ export function CandidateCard({ index, brandId, candidate, onUpdated }: Props) {
             <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[candidate.status]}`} />
             <span
               className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-secondary)]"
-              style={{ fontFamily: 'var(--font-geist-mono)' }}
+              style={MONO}
             >
               {STATUS_LABEL[candidate.status]}
             </span>
@@ -196,7 +187,7 @@ export function CandidateCard({ index, brandId, candidate, onUpdated }: Props) {
           <p className="mt-3 text-[12px] text-[var(--danger-text)]">{error}</p>
         )}
 
-        {/* Expanding panel via grid-template-rows trick (transform-only animation) */}
+        {/* Expanding panel via grid-template-rows */}
         <div
           className="grid transition-[grid-template-rows] duration-300"
           style={{

@@ -998,6 +998,16 @@ class ReviewClientPageOut(BaseModel):
     drafts: list[ReviewDraftOut]
 
 
+class PublicDocumentSummaryOut(BaseModel):
+    id: int
+    kind: str
+    title: str
+    generated_at: datetime
+    pdf_available: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ChangesRequestIn(BaseModel):
     feedback: str = Field(min_length=1, max_length=2000)
 

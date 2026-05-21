@@ -9,8 +9,14 @@ from sqlalchemy import select, update
 
 from app.database import AsyncSessionLocal
 from app.models import AgencyClient, AgencyStaff, ClientDocument, User
-from app.services.document_engine.pdf_renderer import _parse_markdown_sections
+from app.services.document_engine.markdown_sections import parse_sections
+from app.services.document_engine.agency_weekly_report import SECTION_MAP as WEEKLY_SECTION_MAP
 from tests.conftest import register_and_login
+
+
+def _parse_markdown_sections(body):
+    """Compatibility shim so the existing weekly-specific tests keep passing."""
+    return parse_sections(body, WEEKLY_SECTION_MAP)
 
 
 async def _make_agency_user(client, email: str = "pdf@example.com") -> None:
@@ -114,21 +120,25 @@ async def test_pdf_endpoint_returns_pdf_bytes(client):
 
 
 @pytest.mark.asyncio
-async def test_pdf_endpoint_rejects_non_weekly_kind(client):
-    await _make_agency_user(client, email="pdf2@example.com")
-    cid, _bid = await _create_agency_client(client, name="PdfCo2")
+async def test_pdf_unknown_kind_returns_400(client):
+    await _make_agency_user(client, email="pdf-unknown@example.com")
+    aid, _ = await _create_agency_client(client, "PdfUnknownCo")
     async with AsyncSessionLocal() as db:
         doc = ClientDocument(
-            agency_client_id=cid,
-            kind="monthly_report",
-            title="Monthly stub",
-            body_markdown="# foo",
+            agency_client_id=aid,
+            kind="not_a_real_kind",
+            title="x",
+            body_markdown="x",
         )
         db.add(doc)
         await db.commit()
         doc_id = doc.id
     resp = await client.get(f"/api/agency/documents/{doc_id}/pdf")
     assert resp.status_code == 400
+    # Either ValueError message is fine (template-registry vs section-map registry
+    # both raise ValueError → mapped to 400); just confirm we hit the kind-unknown path.
+    detail = resp.json()["detail"]
+    assert ("No PDF template registered" in detail) or ("Unknown template kind" in detail)
 
 
 @pytest.mark.asyncio

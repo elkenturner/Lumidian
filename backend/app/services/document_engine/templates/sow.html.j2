@@ -1,0 +1,95 @@
+{# backend/app/services/document_engine/templates/sow.html.j2 #}
+{% extends "_base.html.j2" %}
+
+{% block extra_styles %}
+  .letterhead { display: flex; align-items: center; justify-content: space-between; }
+  .letterhead .label { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-size: 14pt; color: var(--ink-mute); }
+
+  .doc-meta { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 9pt; color: var(--ink-mute); margin-top: 6pt; display: flex; gap: 18pt; }
+  .doc-meta span:not(:last-child)::after { content: "·"; margin-left: 18pt; color: var(--ink-faint); }
+
+  .sow-section { margin-top: 28pt; }
+  .sow-section h3 { font-family: "Instrument Serif", Georgia, serif; font-size: 16pt; font-weight: 400; color: var(--ink); margin-bottom: 8pt; }
+  .sow-section p, .sow-section li { font-size: 11pt; line-height: 1.55; color: var(--ink-soft); }
+  .sow-section ul { padding-left: 18pt; margin: 6pt 0; }
+
+  .num-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+{% endblock %}
+
+{% block body %}
+<div class="page">
+  <div class="letterhead">
+    <div class="lockup">
+      {% if logo_data_uri %}<img src="{{ logo_data_uri }}" alt="Lumidian" />{% endif %}
+      <span class="wordmark">Lumidian</span>
+    </div>
+    <div class="label">Statement of Work</div>
+  </div>
+  <hr class="rule" />
+  <div class="doc-meta">
+    <span>SOW-{{ '%04d' % document.id }}</span>
+    <span>Effective {{ data.today }}</span>
+    <span>Lumidian × {{ data.client.name }}</span>
+    {% if data.client.retainer_amount_usd %}<span class="num-mono">${{ "{:,.0f}".format(data.client.retainer_amount_usd) }}/mo</span>{% endif %}
+  </div>
+
+  <div class="sow-section">
+    <div class="tracker">Engagement Summary</div>
+    <h3>1. Engagement Summary</h3>
+    <div>{{ sections.engagement_summary | safe }}</div>
+  </div>
+
+  <div class="sow-section">
+    <div class="tracker">Scope</div>
+    <h3>2. Scope of Services</h3>
+    <div>{{ sections.scope | safe }}</div>
+  </div>
+
+  <div class="sow-section">
+    <div class="tracker">Deliverables</div>
+    <h3>3. Deliverables</h3>
+    <div>{{ sections.deliverables | safe }}</div>
+  </div>
+
+  <div class="sow-section">
+    <div class="tracker">Term</div>
+    <h3>4. Term</h3>
+    <div>{{ sections.term | safe }}</div>
+  </div>
+
+  <div class="sow-section">
+    <div class="tracker">Payment</div>
+    <h3>5. Payment Terms</h3>
+    <div>{{ sections.payment | safe }}</div>
+  </div>
+
+  <div class="sow-section">
+    <div class="tracker">Termination</div>
+    <h3>6. Termination</h3>
+    <div>{{ sections.termination | safe }}</div>
+  </div>
+
+  <div class="sow-section">
+    <div class="tracker">Signatures</div>
+    <h3>7. Signatures</h3>
+    <div class="sig-row">
+      <div class="sig-col">
+        <div class="sig-line"></div>
+        <div class="sig-label">Agency</div>
+        <div class="sig-name">Lumidian</div>
+      </div>
+      <div class="sig-col">
+        <div class="sig-line"></div>
+        <div class="sig-label">Client</div>
+        <div class="sig-name">{{ data.client.primary_contact_name or data.client.name }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="wordmark">Confidential</div>
+    <div>Lumidian × {{ data.client.name }}</div>
+    <div class="right">1</div>
+  </div>
+</div>
+{% endblock %}

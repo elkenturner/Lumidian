@@ -5,6 +5,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi import status as http_status
+from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,11 +14,18 @@ from app.models import (
     AgencyClient,
     AgencyStaff,
     Brand,
+    ClientDocument,
     ClientReviewLink,
     ContentDraft,
     Notification,
 )
-from app.schemas import ChangesRequestIn, RejectIn, ReviewClientPageOut, ReviewDraftOut
+from app.schemas import (
+    ChangesRequestIn,
+    PublicDocumentSummaryOut,
+    RejectIn,
+    ReviewClientPageOut,
+    ReviewDraftOut,
+)
 from app.services.agency_activity import emit_event
 
 router = APIRouter(prefix="/api/public/review", tags=["public-review"])
@@ -189,3 +197,66 @@ async def reject_draft(
         related_draft_id=draft.id,
     )
     await db.commit()
+
+
+# ── Document library endpoints ────────────────────────────────────────────────
+
+# Kinds that have a registered PDF template — must stay in sync with
+# pdf_renderer._KIND_TO_TEMPLATE.
+_PDF_AVAILABLE_KINDS = {"agency_weekly_report", "monthly_report", "sow", "audit_initial", "kickoff_checklist"}
+
+
+@router.get("/{token}/documents", response_model=list[PublicDocumentSummaryOut])
+async def list_documents(token: str, db: AsyncSession = Depends(get_db)):
+    client_id = await _resolve_client_id(db, token)
+    q = await db.execute(
+        select(ClientDocument)
+        .where(ClientDocument.agency_client_id == client_id)
+        .order_by(ClientDocument.generated_at.desc())
+    )
+    docs = list(q.scalars().all())
+    return [
+        PublicDocumentSummaryOut(
+            id=d.id,
+            kind=d.kind,
+            title=d.title,
+            generated_at=d.generated_at,
+            pdf_available=d.kind in _PDF_AVAILABLE_KINDS,
+        )
+        for d in docs
+    ]
+
+
+async def _resolve_client_doc(db: AsyncSession, token: str, doc_id: int) -> ClientDocument:
+    client_id = await _resolve_client_id(db, token)
+    doc = await db.get(ClientDocument, doc_id)
+    if doc is None or doc.agency_client_id != client_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return doc
+
+
+@router.get("/{token}/document/{doc_id}", response_class=Response)
+async def get_document_html(token: str, doc_id: int, db: AsyncSession = Depends(get_db)):
+    from app.services.document_engine.pdf_renderer import render_html, _resolve_data
+    doc = await _resolve_client_doc(db, token, doc_id)
+    data = await _resolve_data(db, doc)
+    html = render_html(doc, data)
+    return Response(content=html, media_type="text/html; charset=utf-8")
+
+
+@router.get("/{token}/document/{doc_id}/pdf", response_class=Response)
+async def get_document_pdf(token: str, doc_id: int, db: AsyncSession = Depends(get_db)):
+    from app.services.document_engine.pdf_renderer import render_pdf
+    doc = await _resolve_client_doc(db, token, doc_id)
+    try:
+        pdf_bytes = await render_pdf(db, doc)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to render PDF: {e}") from e
+    safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in doc.title)[:120].strip() or f"document-{doc.id}"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
+    )

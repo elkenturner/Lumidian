@@ -841,7 +841,7 @@ async def get_document_pdf(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_agency_staff),
 ):
-    """Render an agency_weekly_report document as PDF."""
+    """Render an agency document as PDF (any registered kind)."""
     from fastapi import Response
     import re as _re
     from app.services.document_engine.pdf_renderer import render_pdf
@@ -849,10 +849,10 @@ async def get_document_pdf(
     doc = await db.get(ClientDocument, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
-    if doc.kind != "agency_weekly_report":
-        raise HTTPException(status_code=400, detail="PDF export is only available for weekly reports")
     try:
         pdf_bytes = await render_pdf(db, doc)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to render PDF: {e}") from e
     safe_title = _re.sub(r"[^a-zA-Z0-9_-]+", "-", (doc.title or f"weekly-report-{doc.id}"))[:120].strip("-")

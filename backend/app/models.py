@@ -369,6 +369,8 @@ class ContentDraft(Base):
     cluster_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("content_clusters.id", ondelete="SET NULL"), nullable=True, index=True
     )
+    failure_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    generation_state: Mapped[str] = mapped_column(String(20), nullable=False, default="done")
 
     brand: Mapped["Brand"] = relationship("Brand")
     prompt: Mapped[Optional["Prompt"]] = relationship("Prompt")
@@ -398,6 +400,7 @@ class ContentCluster(Base):
     )
     version: Mapped[int] = mapped_column(Integer, default=1)
     last_generated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    failure_reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
@@ -416,6 +419,50 @@ class ContentBrief(Base):
     narrative_spine: Mapped[str] = mapped_column(Text, default="")
     tone_notes: Mapped[str] = mapped_column(Text, default="")
     created_by: Mapped[str] = mapped_column(String(64), default="system")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    evidence_pack_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("content_evidence_packs.id", ondelete="SET NULL", use_alter=True,
+                   name="fk_content_briefs_evidence_pack_id"),
+        nullable=True,
+    )
+
+
+class ContentEvidencePack(Base):
+    """A cluster-level evidence pack, versioned alongside ContentBrief."""
+    __tablename__ = "content_evidence_packs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    cluster_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("content_clusters.id", ondelete="CASCADE"), index=True
+    )
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    sources: Mapped[list] = mapped_column(JSON, default=list)
+    total_t1: Mapped[int] = mapped_column(Integer, default=0)
+    total_t2: Mapped[int] = mapped_column(Integer, default=0)
+    total_t3: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class ContentClusterSource(Base):
+    """Dedup'd source spine for a cluster — one row per unique URL per cluster."""
+    __tablename__ = "content_cluster_sources"
+    __table_args__ = (
+        UniqueConstraint("cluster_id", "url", name="uq_cluster_source_cluster_url"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    cluster_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("content_clusters.id", ondelete="CASCADE"), index=True
+    )
+    evidence_pack_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("content_evidence_packs.id", ondelete="CASCADE")
+    )
+    url: Mapped[str] = mapped_column(String(2048))
+    domain: Mapped[str] = mapped_column(String(255), index=True)
+    tier: Mapped[str] = mapped_column(String(2))  # "T1"/"T2"/"T3"
+    title: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    times_cited: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 

@@ -17,22 +17,39 @@ T1_DOMAINS: set[str] = {
     # Wire services & global press
     "nytimes.com", "reuters.com", "bloomberg.com", "wsj.com", "ap.org",
     "ft.com", "economist.com", "washingtonpost.com", "bbc.com", "bbc.co.uk",
-    "theguardian.com", "npr.org",
+    "theguardian.com", "npr.org", "afp.com", "time.com", "newyorker.com",
+    "theatlantic.com", "politico.com", "propublica.org", "aljazeera.com", "dw.com",
     # Peer-reviewed / scientific
     "nature.com", "science.org", "thelancet.com", "nejm.org", "pnas.org",
+    "cell.com", "jamanetwork.com", "bmj.com", "arxiv.org",
     # Top-tier business / policy
-    "hbr.org", "mckinsey.com", "brookings.edu",
+    "hbr.org", "mckinsey.com", "brookings.edu", "rand.org", "cfr.org",
+    "imf.org", "worldbank.org", "oecd.org", "pewresearch.org", "nber.org",
+    "iea.org",
+    # Standards bodies
+    "w3.org", "ietf.org", "iso.org",
 }
 
 T2_DOMAINS: set[str] = {
     # Tech trade press
     "techcrunch.com", "theverge.com", "wired.com", "arstechnica.com",
-    "venturebeat.com", "theinformation.com", "404media.co",
+    "venturebeat.com", "theinformation.com", "404media.co", "engadget.com",
+    "protocol.com", "restofworld.org", "theregister.com", "zdnet.com",
+    "cnet.com", "techradar.com", "tomshardware.com", "anandtech.com", "phoronix.com",
     # Business trade press
     "forbes.com", "fortune.com", "businessinsider.com", "fastcompany.com",
-    "cnbc.com", "axios.com",
+    "cnbc.com", "axios.com", "marketwatch.com", "barrons.com", "qz.com",
+    "pitchbook.com", "crunchbase.com", "inc.com", "entrepreneur.com",
     # SaaS / marketing trade
     "saastr.com", "a16z.com", "stratechery.com", "firstround.com",
+    "producthunt.com", "niemanlab.org", "cjr.org", "digiday.com",
+    "adage.com", "marketingbrew.com", "morningbrew.com", "puck.news",
+    # Sector trade
+    "statnews.com", "medscape.com", "endpts.com", "automotivenews.com",
+    "electrek.co", "retaildive.com", "glossy.co", "bankingdive.com",
+    "american-banker.com", "eweek.com", "infoworld.com", "vcnewsdaily.com",
+    "builtin.com", "govtech.com", "edtechmagazine.com", "govdelivery.com",
+    "federaltimes.com", "dealnews.com",
 }
 
 

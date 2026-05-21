@@ -2,10 +2,12 @@ FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# Install system deps for Pillow (qrcode), ReportLab, and Playwright Chromium
+# Install system deps for Pillow (qrcode), ReportLab, Playwright Chromium,
+# and the agency video pipeline (ffmpeg + ffprobe for audio extraction).
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpng-dev \
     libjpeg-dev \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

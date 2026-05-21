@@ -50,7 +50,7 @@ export function SuggestedEditPanel({ brandId, candidate, onUpdated }: Props) {
       </div>
 
       {/* Wikitext manuscript */}
-      <div className="relative rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[rgba(2,6,23,0.6)]">
+      <div className="relative rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)]">
         <div
           className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2"
           style={mono}
@@ -104,7 +104,7 @@ export function SuggestedEditPanel({ brandId, candidate, onUpdated }: Props) {
               type="button"
               onClick={() => updateStatus('submitted')}
               disabled={updating}
-              className="inline-flex cursor-pointer items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(255,255,255,0.03)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-primary)] transition-colors hover:bg-[rgba(255,255,255,0.07)] hover:border-[var(--border-strong)] disabled:opacity-50 active:scale-[0.97] [transition:transform_160ms_cubic-bezier(0.23,1,0.32,1),background-color_0.15s_ease,border-color_0.15s_ease]"
+              className="inline-flex cursor-pointer items-center gap-1.5 text-[12px] font-medium text-[var(--accent-foreground)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-50"
             >
               {updating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
               Mark submitted

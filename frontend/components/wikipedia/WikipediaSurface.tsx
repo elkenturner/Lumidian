@@ -66,21 +66,21 @@ export function WikipediaSurface({ brandId }: Props) {
   return (
     <div className="mx-auto max-w-4xl px-6 pt-14 pb-24">
       {/* Editorial masthead */}
-      <header className="mb-12">
+      <header className="mb-10">
         <div className="flex items-start justify-between gap-8">
           <div className="min-w-0 flex-1">
             <div
-              className="font-[var(--font-geist-mono)] text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
+              className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
               style={{ fontFamily: 'var(--font-geist-mono)' }}
             >
-              Editorial backlog · Wikipedia
+              Wikipedia
             </div>
             <h1 className="mt-3 text-[2.25rem] leading-[1.05] font-semibold tracking-[-0.025em] text-[var(--text-primary)]">
-              Citation opportunities.
+              Citation opportunities
             </h1>
             <p className="mt-4 max-w-[58ch] text-[15px] leading-[1.6] text-[var(--text-muted)]">
               Existing articles where your brand can be cited authoritatively. We surface
-              candidates, draft the edit, and hand it back. You decide what gets submitted.
+              candidates and draft the edit — you decide what gets submitted.
             </p>
           </div>
           <div className="shrink-0 pt-1">
@@ -90,13 +90,7 @@ export function WikipediaSurface({ brandId }: Props) {
       </header>
 
       {/* Filter strip */}
-      <div className="mb-8 flex flex-wrap items-baseline gap-x-6 gap-y-2 border-y border-[var(--border-subtle)] py-3">
-        <div
-          className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
-          style={{ fontFamily: 'var(--font-geist-mono)' }}
-        >
-          Filter
-        </div>
+      <div className="mb-6 flex flex-wrap items-baseline gap-x-5 gap-y-2 border-y border-[var(--border-subtle)] py-3">
         {FILTERS.map((f) => {
           const active = filter === f.key;
           const count = counts[f.key] ?? 0;
@@ -104,7 +98,7 @@ export function WikipediaSurface({ brandId }: Props) {
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              className={`group cursor-pointer text-[13px] tracking-tight transition-colors ${
+              className={`cursor-pointer text-[13px] tracking-tight transition-colors ${
                 active
                   ? 'text-[var(--text-primary)] font-medium'
                   : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
@@ -112,12 +106,12 @@ export function WikipediaSurface({ brandId }: Props) {
             >
               {f.label}
               <span
-                className={`ml-1 text-[11px] ${
+                className={`ml-1.5 text-[11px] tabular-nums ${
                   active ? 'text-[var(--accent-foreground)]' : 'text-[var(--text-faint)]'
                 }`}
                 style={{ fontFamily: 'var(--font-geist-mono)' }}
               >
-                {count.toString().padStart(2, '0')}
+                {count}
               </span>
             </button>
           );
@@ -131,10 +125,10 @@ export function WikipediaSurface({ brandId }: Props) {
           />
           Dismissed
           <span
-            className="text-[11px] text-[var(--text-faint)]"
+            className="text-[11px] tabular-nums text-[var(--text-faint)]"
             style={{ fontFamily: 'var(--font-geist-mono)' }}
           >
-            {counts.dismissed.toString().padStart(2, '0')}
+            {counts.dismissed}
           </span>
         </label>
       </div>

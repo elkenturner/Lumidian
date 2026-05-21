@@ -129,3 +129,60 @@ def gate_pack(pack: list[dict[str, Any]]) -> None:
         raise PackGateError(
             f"insufficient_authority: T1+T2 = {t1 + t2}, need at least {MIN_T1_PLUS_T2}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Task 7: top-level builder + persistence
+# ---------------------------------------------------------------------------
+
+from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
+
+from app.models import (  # noqa: E402
+    ContentCluster, ContentClusterSource, ContentEvidencePack,
+)
+
+
+async def build_cluster_pack(
+    db: AsyncSession,
+    *,
+    cluster: ContentCluster,
+    prompt_text: str,
+    key_claims: list[str],
+    version: int,
+) -> ContentEvidencePack:
+    """Build, tier, gate, and persist a cluster-level evidence pack.
+
+    Raises PackGateError if authority gates fail. On failure, nothing is
+    persisted; caller should set cluster.status = 'briefing_failed' with
+    failure_reason = str(exc).
+    """
+    queries = expand_queries(prompt_text=prompt_text, key_claims=key_claims)
+    raw = await fetch_and_dedupe(queries)
+    ranked = rank_and_tier(raw)
+    pack_sources = ranked[:PACK_CAP]
+    gate_pack(pack_sources)  # raises on failure — nothing persisted yet
+
+    pack = ContentEvidencePack(
+        cluster_id=cluster.id,
+        version=version,
+        sources=pack_sources,
+        total_t1=sum(1 for s in pack_sources if s["tier"] == "T1"),
+        total_t2=sum(1 for s in pack_sources if s["tier"] == "T2"),
+        total_t3=sum(1 for s in pack_sources if s["tier"] == "T3"),
+    )
+    db.add(pack)
+    await db.flush()  # get pack.id before referencing it in source rows
+
+    for s in pack_sources:
+        db.add(ContentClusterSource(
+            cluster_id=cluster.id,
+            evidence_pack_id=pack.id,
+            url=s["url"],
+            domain=s["domain"],
+            tier=s["tier"],
+            title=s.get("title"),
+            times_cited=0,
+        ))
+    await db.commit()
+    await db.refresh(pack)
+    return pack

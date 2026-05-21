@@ -1,7 +1,8 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
+import { staggerContainer, staggerChild } from '@/lib/motion';
 import { listWikipediaCandidates, type WikipediaCandidate } from '@/lib/api';
 import { CandidateCard } from './CandidateCard';
 import { ScanButton } from './ScanButton';
@@ -12,7 +13,14 @@ interface Props {
 
 type Filter = 'all' | WikipediaCandidate['status'];
 
-const FILTERS: Filter[] = ['all', 'new', 'drafted', 'submitted', 'accepted', 'reverted'];
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'new', label: 'New' },
+  { key: 'drafted', label: 'Drafted' },
+  { key: 'submitted', label: 'Submitted' },
+  { key: 'accepted', label: 'Accepted' },
+  { key: 'reverted', label: 'Reverted' },
+];
 
 export function WikipediaSurface({ brandId }: Props) {
   const [candidates, setCandidates] = useState<WikipediaCandidate[]>([]);
@@ -38,6 +46,17 @@ export function WikipediaSurface({ brandId }: Props) {
     setCandidates((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   }
 
+  const counts = useMemo(() => {
+    const c: Record<Filter, number> = {
+      all: 0, new: 0, drafted: 0, submitted: 0, accepted: 0, reverted: 0, dismissed: 0,
+    };
+    for (const cand of candidates) {
+      c.all += 1;
+      c[cand.status] = (c[cand.status] ?? 0) + 1;
+    }
+    return c;
+  }, [candidates]);
+
   const visible = candidates.filter((c) => {
     if (c.status === 'dismissed' && !showDismissed) return false;
     if (filter !== 'all' && c.status !== filter) return false;
@@ -45,59 +64,150 @@ export function WikipediaSurface({ brandId }: Props) {
   });
 
   return (
-    <div className="max-w-5xl mx-auto p-6">
-      <header className="flex items-start justify-between gap-6 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Wikipedia opportunities</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Find existing Wikipedia pages where your brand can be cited authoritatively.
-          </p>
+    <div className="mx-auto max-w-4xl px-6 pt-14 pb-24">
+      {/* Editorial masthead */}
+      <header className="mb-12">
+        <div className="flex items-start justify-between gap-8">
+          <div className="min-w-0 flex-1">
+            <div
+              className="font-[var(--font-geist-mono)] text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
+              style={{ fontFamily: 'var(--font-geist-mono)' }}
+            >
+              Editorial backlog · Wikipedia
+            </div>
+            <h1 className="mt-3 text-[2.25rem] leading-[1.05] font-semibold tracking-[-0.025em] text-[var(--text-primary)]">
+              Citation opportunities.
+            </h1>
+            <p className="mt-4 max-w-[58ch] text-[15px] leading-[1.6] text-[var(--text-muted)]">
+              Existing articles where your brand can be cited authoritatively. We surface
+              candidates, draft the edit, and hand it back. You decide what gets submitted.
+            </p>
+          </div>
+          <div className="shrink-0 pt-1">
+            <ScanButton brandId={brandId} onScanCompleted={refresh} />
+          </div>
         </div>
-        <ScanButton brandId={brandId} onScanCompleted={refresh} />
       </header>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`rounded-md px-3 py-1 text-xs font-medium capitalize ${
-              filter === f ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            {f}
-          </button>
-        ))}
-        <label className="ml-auto flex items-center gap-2 text-xs text-slate-600">
+      {/* Filter strip */}
+      <div className="mb-8 flex flex-wrap items-baseline gap-x-6 gap-y-2 border-y border-[var(--border-subtle)] py-3">
+        <div
+          className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
+          style={{ fontFamily: 'var(--font-geist-mono)' }}
+        >
+          Filter
+        </div>
+        {FILTERS.map((f) => {
+          const active = filter === f.key;
+          const count = counts[f.key] ?? 0;
+          return (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`group cursor-pointer text-[13px] tracking-tight transition-colors ${
+                active
+                  ? 'text-[var(--text-primary)] font-medium'
+                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+              }`}
+            >
+              {f.label}
+              <span
+                className={`ml-1 text-[11px] ${
+                  active ? 'text-[var(--accent-foreground)]' : 'text-[var(--text-faint)]'
+                }`}
+                style={{ fontFamily: 'var(--font-geist-mono)' }}
+              >
+                {count.toString().padStart(2, '0')}
+              </span>
+            </button>
+          );
+        })}
+        <label className="ml-auto flex cursor-pointer select-none items-center gap-2 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
           <input
             type="checkbox"
             checked={showDismissed}
             onChange={(e) => setShowDismissed(e.target.checked)}
-            className="h-3 w-3"
+            className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent)]"
           />
-          Show dismissed
+          Dismissed
+          <span
+            className="text-[11px] text-[var(--text-faint)]"
+            style={{ fontFamily: 'var(--font-geist-mono)' }}
+          >
+            {counts.dismissed.toString().padStart(2, '0')}
+          </span>
         </label>
       </div>
 
+      {/* Index */}
       {loading ? (
-        <div className="flex items-center gap-2 text-slate-500">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading candidates…
-        </div>
+        <SkeletonIndex />
       ) : visible.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
-          <p className="text-slate-700">
-            {candidates.length === 0
-              ? 'No scans yet. Click "Scan Wikipedia" to find candidate articles.'
-              : 'No candidates match this filter.'}
-          </p>
-        </div>
+        <EmptyState hasCandidates={candidates.length > 0} />
       ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {visible.map((c) => (
-            <CandidateCard key={c.id} brandId={brandId} candidate={c} onUpdated={onCandidateUpdated} />
+        <motion.ol
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="-mx-1"
+        >
+          {visible.map((c, i) => (
+            <motion.li
+              key={c.id}
+              variants={staggerChild}
+              className="border-t border-[var(--border-subtle)] first:border-t-0"
+            >
+              <CandidateCard
+                index={i + 1}
+                brandId={brandId}
+                candidate={c}
+                onUpdated={onCandidateUpdated}
+              />
+            </motion.li>
           ))}
-        </div>
+        </motion.ol>
       )}
+    </div>
+  );
+}
+
+function SkeletonIndex() {
+  return (
+    <div className="space-y-px">
+      {[0, 1, 2].map((i) => (
+        <div
+          key={i}
+          className="flex gap-6 border-t border-[var(--border-subtle)] py-7 first:border-t-0"
+        >
+          <div className="h-3 w-6 rounded skeleton" />
+          <div className="flex-1 space-y-3">
+            <div className="h-4 w-2/3 rounded skeleton" />
+            <div className="h-3 w-1/3 rounded skeleton" />
+            <div className="h-3 w-full rounded skeleton" />
+            <div className="h-3 w-5/6 rounded skeleton" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ hasCandidates }: { hasCandidates: boolean }) {
+  return (
+    <div className="border-t border-[var(--border-subtle)] py-20">
+      <div className="max-w-[42ch]">
+        <div
+          className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
+          style={{ fontFamily: 'var(--font-geist-mono)' }}
+        >
+          {hasCandidates ? 'No results' : 'Awaiting first scan'}
+        </div>
+        <p className="mt-3 text-[17px] leading-[1.5] text-[var(--text-secondary)]">
+          {hasCandidates
+            ? 'No candidates match this filter. Try a different status or run another scan.'
+            : 'Run a scan to find articles where your brand belongs in the citation list.'}
+        </p>
+      </div>
     </div>
   );
 }

@@ -115,3 +115,97 @@ def test_gate_fails_when_t1_plus_t2_under_4():
     ]
     with pytest.raises(PackGateError):
         gate_pack(pack)
+
+
+# ---------------------------------------------------------------------------
+# Task 7: build_cluster_pack — full builder + persistence
+# ---------------------------------------------------------------------------
+
+from sqlalchemy import select  # noqa: E402
+
+from app.database import AsyncSessionLocal  # noqa: E402
+from app.models import (  # noqa: E402
+    Brand, ContentCluster, ContentClusterSource, ContentEvidencePack,
+    Prompt, User,
+)
+from app.services.cluster_evidence import build_cluster_pack  # noqa: E402
+
+
+@pytest.mark.asyncio
+async def test_build_cluster_pack_persists_and_dedups(monkeypatch):
+    async def fake_fetch(queries):
+        return [
+            {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+            {"url": "https://nytimes.com/b", "title": "B", "snippet": "..."},
+            {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
+            {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
+            {"url": "https://randomblog.example.com/e", "title": "E", "snippet": "..."},
+        ]
+    monkeypatch.setattr("app.services.cluster_evidence.fetch_and_dedupe", fake_fetch)
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="pack@x.com", password_hash="x", name="t")
+        db.add(user); await db.flush()
+        brand = Brand(name="A", slug="a-pack-test", user_id=user.id)
+        db.add(brand); await db.flush()
+        prompt = Prompt(brand_id=brand.id, text="best CRM for solo founders")
+        db.add(prompt); await db.flush()
+        cluster = ContentCluster(brand_id=brand.id, prompt_id=prompt.id, status="briefing")
+        db.add(cluster); await db.commit(); await db.refresh(cluster)
+
+        pack = await build_cluster_pack(
+            db,
+            cluster=cluster,
+            prompt_text="best CRM for solo founders",
+            key_claims=["Notion bundles tasks and docs"],
+            version=1,
+        )
+
+        assert pack.total_t1 == 2
+        assert pack.total_t2 == 2
+        assert pack.total_t3 == 1
+        assert len(pack.sources) == 5
+
+        rows = (await db.execute(
+            select(ContentClusterSource).where(ContentClusterSource.cluster_id == cluster.id)
+        )).scalars().all()
+        assert len(rows) == 5
+        assert {r.tier for r in rows} == {"T1", "T2", "T3"}
+
+
+@pytest.mark.asyncio
+async def test_build_cluster_pack_raises_when_authority_too_low(monkeypatch):
+    async def fake_fetch(queries):
+        # Only one T1, rest T3
+        return [
+            {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+            {"url": "https://randomblog.example.com/b", "title": "B", "snippet": "..."},
+            {"url": "https://otherblog.example.com/c", "title": "C", "snippet": "..."},
+        ]
+    monkeypatch.setattr("app.services.cluster_evidence.fetch_and_dedupe", fake_fetch)
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="pack2@x.com", password_hash="x", name="t")
+        db.add(user); await db.flush()
+        brand = Brand(name="A", slug="a-pack-test-2", user_id=user.id)
+        db.add(brand); await db.flush()
+        prompt = Prompt(brand_id=brand.id, text="q")
+        db.add(prompt); await db.flush()
+        cluster = ContentCluster(brand_id=brand.id, prompt_id=prompt.id, status="briefing")
+        db.add(cluster); await db.commit(); await db.refresh(cluster)
+
+        from app.services.cluster_evidence import PackGateError
+        with pytest.raises(PackGateError):
+            await build_cluster_pack(
+                db,
+                cluster=cluster,
+                prompt_text="q",
+                key_claims=[],
+                version=1,
+            )
+
+        # Nothing persisted on failure
+        rows = (await db.execute(
+            select(ContentEvidencePack).where(ContentEvidencePack.cluster_id == cluster.id)
+        )).scalars().all()
+        assert rows == []

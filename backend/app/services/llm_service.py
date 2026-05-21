@@ -562,14 +562,21 @@ _MAX_ATTEMPTS: dict[str, int] = {
     # enough attempts to span that window. Paired with _OVERLOAD_BASE_DELAY below
     # (20s base) this gives us ~20 + 40 + 80 + 90 ≈ 3.5min of retry coverage.
     "gemini": 5,
+    # Claude: Anthropic 529 overload windows during major load events can last
+    # 1-2 minutes. With base=15s exponential+jittered, 6 attempts span roughly
+    # 15 + 30 + 60 + 90 + 90 ≈ 4.75 min, enough to ride out most outages.
+    "claude": 6,
 }
 _DEFAULT_MAX_ATTEMPTS = 3
 
 # Per-model base delay for `overload` error backoff (exponential, jittered).
 # Gemini needs a longer base because Google's high-demand spikes take tens of
-# seconds to clear; other providers usually recover within 5s.
+# seconds to clear; other providers usually recover within 5s. Claude 529s also
+# tend to span tens of seconds — the org rate limiter doesn't release capacity
+# in tight windows — so we also bump its base.
 _OVERLOAD_BASE_DELAY: dict[str, float] = {
     "gemini": 20.0,
+    "claude": 15.0,
 }
 _DEFAULT_OVERLOAD_BASE_DELAY = 5.0
 _OVERLOAD_MAX_DELAY = 90.0

@@ -229,7 +229,7 @@ All four models query the live web:
 
 Per-tier model lists are computed by `models_for_tier(brand_type, tier)` in `llm_service.py`.
 
-Concurrency guards: Perplexity `Semaphore(2)`, Claude `Semaphore(3)`, Gemini `Semaphore(2)`.
+Concurrency guards: Perplexity `Semaphore(2)`, Claude `Semaphore(1)` (serialized via `_RatePacer` at 2 RPM to stay under Anthropic's 50k input-tokens/min org cap), Gemini `Semaphore(2)`.
 
 ### Tier-Based Query Counts
 All tiers use 3 runs per prompt per model (see `RUNS_PER_PROMPT` in `llm_service.py`).
@@ -291,7 +291,7 @@ Drafts are generated on brand creation (onboarding) and manually via "Regenerate
 Per-prompt coordinated content. Each tracked prompt can have one `ContentCluster` with a shared `ContentBrief` (positioning, canonical phrasings, stats, narrative spine, tone notes). Drafts inside a cluster are generated in parallel via `asyncio.gather` from the brief; cross-references are semantic (e.g. "we covered this on Medium") — no hard URLs at generation time. Cluster platforms are linkedin, medium, reddit, quora, x — Wikipedia is excluded (handled in its own UI tab as a placeholder). Optional own-site **pillar** is opt-in and LLM-tone-gated via `cluster_pillar.propose_pillar()` — never auto-attached. Model selection routes through `drafting/models.py:CROSS_REF_SUMMARY_MODEL` (brief + tone gate) and `writer_model_for_tier(tier)` (piece generation). API surface is `/api/clusters/*` (7 endpoints). Cluster regeneration is triggered by the new `/content/[brandId]` tab; the legacy `_bg_generate_drafts` flow on `/content` is unchanged.
 
 ### LLM Concurrency & Resilience
-Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=3, Gemini=2. Overall tracking concurrency: `MAX_CONCURRENT=10` in `tracking_service.py`. Model fallbacks on overload (503): `sonar-pro` → `sonar`. Rate limit errors get 65s retry delay. Auth errors (invalid API key) are not retried. Timeouts: Claude draft generation 30s, sentiment classification 15s, Reddit scanner relevance 10s.
+Per-model semaphores in `llm_service.py`: Perplexity=2, Claude=1 (paced to 2 RPM), Gemini=2. Overall tracking concurrency: `MAX_CONCURRENT=10` in `tracking_service.py`. Model fallbacks on overload (503): `sonar-pro` → `sonar`. Rate limit errors get 65s retry delay. Auth errors (invalid API key) are not retried. Timeouts: Claude draft generation 30s, sentiment classification 15s, Reddit scanner relevance 10s.
 
 ### Run Cancellation
 `POST /api/tracking/run/{run_id}/cancel` force-cancels stuck runs. Cancellation propagates to in-flight LLM queries via `asyncio.Event`, interrupting retry backoff sleeps immediately. Cancel events cleaned up in `tracking.py:cleanup_cancel_event()`. Stale runs auto-failed after 15 minutes (dynamic threshold based on brand size).

@@ -11,12 +11,13 @@
   .page:last-child { page-break-after: auto; }
   h1, h2, h3, h4 { margin: 0; font-weight: 600; }
   h1 { font-size: 36pt; line-height: 1.15; }
-  h2 { font-size: 16pt; margin-bottom: 12pt; color: #0f172a; border-bottom: 1px solid #ececec; padding-bottom: 6pt; }
-  h3 { font-size: 12pt; margin-bottom: 4pt; color: #0f172a; }
-  h4 { font-size: 10pt; margin: 12pt 0 4pt; color: #475569; text-transform: uppercase; letter-spacing: 1pt; }
-  p { margin: 0 0 10pt; line-height: 1.55; font-size: 11pt; color: #334155; }
+  h2 { font-size: 18pt; margin-bottom: 8pt; color: #0f172a; }
+  h2 + .lede { font-size: 11pt; color: #64748b; margin-bottom: 20pt; }
+  h3 { font-size: 13pt; margin-bottom: 4pt; color: #0f172a; line-height: 1.3; }
+  h4 { font-size: 9pt; margin: 14pt 0 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 1pt; font-weight: 600; }
+  p { margin: 0 0 10pt; line-height: 1.55; font-size: 10.5pt; color: #334155; }
   ul { margin: 0 0 10pt; padding-left: 18pt; }
-  li { font-size: 11pt; line-height: 1.6; color: #334155; }
+  li { font-size: 10.5pt; line-height: 1.6; color: #334155; }
   .tracker { font-size: 9pt; letter-spacing: 2pt; text-transform: uppercase; color: #64748b; }
   .muted { color: #94a3b8; }
   .footer { position: absolute; left: 0.75in; right: 0.75in; bottom: 0.45in; display: flex; justify-content: space-between; font-size: 9pt; color: #94a3b8; }
@@ -29,24 +30,31 @@
   .cover .hero .label { font-size: 11pt; letter-spacing: 3pt; text-transform: uppercase; color: #64748b; margin-bottom: 24pt; }
   .cover .hero .name { font-family: Georgia, "Times New Roman", serif; font-size: 48pt; color: #0f172a; margin: 0 0 18pt; line-height: 1.1; word-break: break-word; }
   .cover .hero .week { font-size: 16pt; color: #475569; }
-  .cover .grade-big { font-family: Georgia, "Times New Roman", serif; font-size: 72pt; line-height: 1; margin-top: 24pt; }
+  .cover .grade-big { font-family: Georgia, "Times New Roman", serif; font-size: 96pt; line-height: 1; margin-top: 18pt; font-weight: 600; }
   .cover .grade-big.good { color: #059669; }
   .cover .grade-big.ok { color: #d97706; }
   .cover .grade-big.bad { color: #e11d48; }
+  .cover .grade-caption { font-size: 11pt; color: #475569; margin-top: 6pt; }
   .cover .meta { display: flex; justify-content: space-between; font-size: 10pt; color: #64748b; padding-top: 12pt; border-top: 1px solid #ececec; position: absolute; left: 0; right: 0; bottom: 0; }
 
   /* Score cards row */
-  .score-row { display: flex; gap: 12pt; margin: 16pt 0 24pt; }
-  .score-card { flex: 1; background: #fff; border: 1px solid #ececec; border-radius: 8px; padding: 14pt; text-align: center; }
+  .score-row { display: flex; gap: 10pt; margin: 14pt 0 22pt; }
+  .score-card { flex: 1; background: #fff; border: 1px solid #ececec; border-radius: 8px; padding: 14pt 10pt; text-align: center; }
   .score-card .label { font-size: 9pt; text-transform: uppercase; letter-spacing: 1pt; color: #64748b; }
-  .score-card .grade { font-family: Georgia, "Times New Roman", serif; font-size: 36pt; line-height: 1.1; margin: 6pt 0 2pt; color: #0f172a; }
+  .score-card .grade { font-family: Georgia, "Times New Roman", serif; font-size: 36pt; line-height: 1.1; margin: 6pt 0 2pt; color: #0f172a; font-weight: 600; }
   .score-card .num { font-size: 10pt; color: #475569; }
   .grade.good { color: #059669; }
   .grade.ok { color: #d97706; }
   .grade.bad { color: #e11d48; }
 
+  /* Legend */
+  .legend { background: #fff; border: 1px solid #ececec; border-radius: 8px; padding: 12pt 14pt; margin-bottom: 20pt; }
+  .legend .legend-title { font-size: 9pt; text-transform: uppercase; letter-spacing: 1pt; color: #64748b; margin-bottom: 8pt; }
+  .legend .row { display: flex; gap: 18pt; flex-wrap: wrap; font-size: 9.5pt; color: #475569; }
+  .legend .row span { display: inline-flex; align-items: center; gap: 6pt; }
+
   /* Badges */
-  .badges { display: flex; gap: 6pt; flex-wrap: wrap; margin-bottom: 8pt; }
+  .badges { display: flex; gap: 6pt; flex-wrap: wrap; margin-bottom: 8pt; align-items: center; }
   .badge { display: inline-block; padding: 2pt 8pt; border-radius: 10px; font-size: 9pt; font-weight: 500; letter-spacing: 0.3pt; }
   .badge.cat { background: #f1f5f9; color: #475569; }
   .badge.high { background: #fee2e2; color: #b91c1c; }
@@ -55,27 +63,59 @@
   .badge.effort-low { background: #ecfccb; color: #4d7c0f; }
   .badge.effort-medium { background: #f1f5f9; color: #475569; }
   .badge.effort-high { background: #fef3c7; color: #b45309; }
+  .badge.site-wide { background: #e0e7ff; color: #3730a3; }
 
-  /* Rec card */
-  .rec { background: #fff; border: 1px solid #ececec; border-radius: 8px; padding: 14pt; margin-bottom: 12pt; page-break-inside: avoid; }
-  .rec h3 { margin-bottom: 6pt; }
-  .rec .body { font-size: 10.5pt; color: #334155; line-height: 1.55; }
-  .rec .impact { margin-top: 6pt; font-size: 9.5pt; color: #475569; }
+  /* Priority cards */
+  .rec { background: #fff; border: 1px solid #ececec; border-radius: 10px; padding: 16pt 18pt; margin-bottom: 14pt; page-break-inside: avoid; position: relative; }
+  .rec h3 { margin: 4pt 0 8pt; padding-right: 60pt; }
+  .rec .body { font-size: 10.5pt; color: #334155; line-height: 1.55; margin-bottom: 8pt; }
+  .rec .priority-num {
+    position: absolute; top: 12pt; right: 16pt;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 32pt; line-height: 1; color: #e2e8f0; font-weight: 700;
+  }
+
+  .rec .meta-line { font-size: 9.5pt; color: #64748b; margin: 4pt 0; }
+  .rec .meta-line strong { color: #0f172a; font-weight: 600; }
+  .rec .meta-line .url { color: #475569; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9pt; }
+
+  .rec .section { margin-top: 10pt; padding-top: 10pt; border-top: 1px solid #f1f5f9; }
+  .rec .section .section-label { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1pt; color: #64748b; margin-bottom: 6pt; font-weight: 600; }
+
+  /* Install steps */
+  .steps { margin: 0; padding-left: 22pt; }
+  .steps li { font-size: 10pt; line-height: 1.5; color: #334155; margin-bottom: 4pt; }
+  .steps li code { background: #f1f5f9; padding: 1pt 4pt; border-radius: 3px; font-size: 9pt; font-family: "SF Mono", Menlo, Consolas, monospace; }
+
+  /* Platform tip */
+  .platform-tip { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 6px; padding: 8pt 12pt; font-size: 10pt; color: #1e3a8a; }
+  .platform-tip strong { color: #1e40af; }
+
+  /* Prompt linkage */
+  .prompts { background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 6px; padding: 8pt 12pt; }
+  .prompts .prompts-label { font-size: 9pt; text-transform: uppercase; letter-spacing: 1pt; color: #6d28d9; font-weight: 600; margin-bottom: 4pt; }
+  .prompts li { font-size: 9.5pt; line-height: 1.55; color: #4c1d95; font-style: italic; margin-bottom: 2pt; }
+
+  /* Compact rows for detailed list */
+  .compact-row { background: #fff; border: 1px solid #ececec; border-radius: 6px; padding: 10pt 12pt; margin-bottom: 6pt; page-break-inside: avoid; }
+  .compact-row .top { display: flex; align-items: baseline; gap: 8pt; margin-bottom: 2pt; }
+  .compact-row .title { font-size: 10.5pt; font-weight: 600; color: #0f172a; flex: 1; }
+  .compact-row .summary { font-size: 9.5pt; color: #64748b; }
+  .compact-row .pages-info { font-size: 9pt; color: #94a3b8; margin-top: 2pt; }
 
   /* Table */
-  table { width: 100%; border-collapse: collapse; font-size: 10pt; }
-  th { text-align: left; font-weight: 600; color: #64748b; padding: 6pt 8pt; border-bottom: 1px solid #ececec; font-size: 9pt; text-transform: uppercase; letter-spacing: 1pt; }
-  td { padding: 8pt; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+  table { width: 100%; border-collapse: collapse; font-size: 10pt; background: #fff; border: 1px solid #ececec; border-radius: 8px; overflow: hidden; }
+  th { text-align: left; font-weight: 600; color: #64748b; padding: 8pt 10pt; border-bottom: 1px solid #ececec; font-size: 9pt; text-transform: uppercase; letter-spacing: 1pt; background: #f9fafb; }
+  td { padding: 8pt 10pt; border-bottom: 1px solid #f1f5f9; color: #334155; vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
   td.num { font-variant-numeric: tabular-nums; text-align: right; }
+  td.url { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 9pt; max-width: 320pt; word-break: break-all; }
 
   /* Code blocks */
-  pre.artifact { background: #0f172a; color: #e2e8f0; padding: 10pt; border-radius: 6px; font-size: 8.5pt; line-height: 1.45; overflow-wrap: break-word; white-space: pre-wrap; word-break: break-all; font-family: "SF Mono", Monaco, "Cascadia Mono", "Roboto Mono", Menlo, Consolas, monospace; margin: 6pt 0 12pt; }
+  pre.artifact { background: #0f172a; color: #e2e8f0; padding: 12pt; border-radius: 6px; font-size: 8.5pt; line-height: 1.5; overflow-wrap: break-word; white-space: pre-wrap; word-break: break-all; font-family: "SF Mono", Monaco, Menlo, Consolas, monospace; margin: 0; }
 
-  /* Helpers */
-  .pill { display: inline-flex; align-items: center; gap: 6pt; padding: 4pt 10pt; border-radius: 12px; background: #f1f5f9; color: #475569; font-size: 10pt; }
-  .pill .dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; display: inline-block; }
-  .pill.good .dot { background: #059669; }
-  .pill.bad .dot { background: #e11d48; }
+  /* Platform chip */
+  .platform-chip { display: inline-flex; align-items: center; padding: 2pt 8pt; border-radius: 10px; background: #eff6ff; color: #1e3a8a; font-size: 9pt; font-weight: 500; margin-left: 6pt; }
 </style>
 </head>
 <body>
@@ -83,15 +123,15 @@
 <!-- PAGE 1 — Cover -->
 <div class="page cover">
   <div>
-    {% if logo_data_uri %}<img src="{{ logo_data_uri }}" class="logo" alt="Lumidian" />{% else %}<div class="wordmark" style="font-size:18pt;font-weight:700;color:#0f172a;">Lumidian</div>{% endif %}
+    {% if logo_data_uri %}<img src="{{ logo_data_uri }}" class="logo" alt="Lumidian" />{% else %}<div style="font-size:18pt;font-weight:700;color:#0f172a;">Lumidian</div>{% endif %}
   </div>
   <div class="hero">
     <div class="label">Site Audit Report</div>
-    <div class="name">{{ site_label }}</div>
+    <div class="name">{{ site_host }}</div>
     <div class="week">{{ audit_date }}</div>
     {% if overall_grade %}
       <div class="grade-big {{ overall_grade_class }}">{{ overall_grade }}</div>
-      <div class="muted" style="font-size:12pt;margin-top:8pt;">Overall score &middot; {{ audit.overall_score | round | int }}/100</div>
+      <div class="grade-caption">Overall AI-search visibility &middot; {{ audit.overall_score | round | int }}/100</div>
     {% endif %}
   </div>
   <div class="meta">
@@ -104,6 +144,7 @@
 <div class="page">
   <div class="tracker">Audit summary</div>
   <h2 style="margin-top:16pt;">How AI sees this site</h2>
+  <p class="lede">Four scores measure how visible {{ site_host }} is to ChatGPT, Claude, Perplexity, and Gemini.</p>
   <div class="score-row">
     {% for s in scorecards %}
       <div class="score-card">
@@ -118,96 +159,164 @@
   <table>
     <tbody>
       <tr><td style="width: 200pt; color:#64748b;">Pages crawled</td><td>{{ audit.total_pages }}{% if audit.pages_failed %} ({{ audit.pages_failed }} failed){% endif %}</td></tr>
-      <tr><td style="color:#64748b;">Render mode</td><td>{{ audit.render_mode or '&mdash;' }}{% if cms_platform %} &middot; {{ cms_platform }}{% endif %}</td></tr>
+      <tr><td style="color:#64748b;">Render mode</td><td>{{ audit.render_mode or '&mdash;' }}{% if cms_platform_display %} <span class="platform-chip">{{ cms_platform_display }}</span>{% endif %}</td></tr>
       <tr><td style="color:#64748b;">llms.txt</td><td>{% if audit.llms_txt_present %}{% if audit.llms_txt_valid %}present and valid{% else %}present but invalid{% endif %}{% else %}missing{% endif %}</td></tr>
       <tr><td style="color:#64748b;">robots.txt</td><td>{% if audit.robots_txt_raw %}present{% else %}missing{% endif %}</td></tr>
       <tr><td style="color:#64748b;">Audit completed</td><td>{{ completed_label }}</td></tr>
+      <tr><td style="color:#64748b;">Unique fixes found</td><td>{{ total_unique }}</td></tr>
     </tbody>
   </table>
 
+  <div class="legend" style="margin-top: 22pt;">
+    <div class="legend-title">How to read this report</div>
+    <div class="row">
+      <span><span class="badge high">HIGH</span> Do these first — biggest visibility gain</span>
+      <span><span class="badge medium">MEDIUM</span> Do these next</span>
+      <span><span class="badge low">LOW</span> Polish</span>
+    </div>
+    <div class="row" style="margin-top: 6pt;">
+      <span><span class="badge effort-low">low effort</span> ~5 min</span>
+      <span><span class="badge effort-medium">medium effort</span> ~20 min</span>
+      <span><span class="badge effort-high">high effort</span> ~1 hour</span>
+    </div>
+  </div>
+
   <div class="footer">
     <div class="wordmark">Lumidian</div>
-    <div>{{ site_label }}</div>
+    <div>{{ site_host }}</div>
     <div>2</div>
   </div>
 </div>
 
-<!-- PAGE 3 — Top priority fixes -->
+<!-- PAGE 3+ — Top priority fixes -->
+{% if top_groups %}
 <div class="page">
-  <h2>What we need to do &mdash; top priorities</h2>
-  {% if top_recs %}
-    {% for r in top_recs %}
-      <div class="rec">
-        <div class="badges">
-          <span class="badge {{ r.priority or 'medium' }}">{{ (r.priority or 'medium') | upper }}</span>
-          <span class="badge cat">{{ r.category }}</span>
-          {% if r.effort %}<span class="badge effort-{{ r.effort }}">Effort: {{ r.effort }}</span>{% endif %}
-        </div>
-        <h3>{{ r.title }}</h3>
-        <div class="body">{{ r.body_html | safe }}</div>
-        {% if r.expected_impact %}<div class="impact">Expected impact: {{ r.expected_impact }}</div>{% endif %}
-        {% if r.expected_lift_pp is not none %}<div class="impact">Estimated visibility lift: +{{ r.expected_lift_pp }}pp</div>{% endif %}
-        {% if r.target_url %}<div class="impact">Page: <span style="color:#475569;">{{ r.target_url }}</span></div>{% endif %}
+  <div class="tracker">Action plan</div>
+  <h2 style="margin-top:16pt;">Top {{ top_groups | length }} fixes &mdash; do these first</h2>
+  <p class="lede">Each fix is ranked by priority × impact ÷ effort. Numbers below match the priority order.</p>
+
+  {% for g in top_groups %}
+    <div class="rec">
+      <div class="priority-num">{{ loop.index }}</div>
+      <div class="badges">
+        <span class="badge {{ g.priority }}">{{ g.priority | upper }}</span>
+        <span class="badge cat">{{ g.category }}</span>
+        {% if g.effort %}<span class="badge effort-{{ g.effort }}">{{ g.effort }} effort</span>{% endif %}
+        {% if g.is_site_wide %}<span class="badge site-wide">SITE-WIDE</span>{% endif %}
       </div>
-    {% endfor %}
-  {% else %}
-    <p class="muted">No recommendations were generated for this audit. The site may already be in excellent shape, or the audit did not surface actionable findings.</p>
-  {% endif %}
+      <h3>{{ g.title }}</h3>
+      <div class="body">{{ g.body_html | safe }}</div>
+
+      <div class="meta-line">
+        {% if g.is_site_wide %}
+          <strong>Applies globally</strong> — add once to your site-wide template.
+        {% else %}
+          <strong>Affects {{ g.n_pages }} {% if g.n_pages == 1 %}page{% else %}pages{% endif %}</strong>
+          {% if g.page_urls %}
+            &middot; e.g.
+            {% for u in g.page_urls[:3] %}<span class="url">{{ u }}</span>{% if not loop.last %}, {% endif %}{% endfor %}
+            {% if g.n_pages > 3 %}<span class="muted">&nbsp;+ {{ g.n_pages - 3 }} more</span>{% endif %}
+          {% endif %}
+        {% endif %}
+      </div>
+
+      {% if g.aggregate_lift > 0 %}
+        <div class="meta-line">
+          <strong>Estimated visibility lift:</strong> +{{ g.aggregate_lift | round | int }}pp
+          {% if not g.is_site_wide and g.per_page_lift %}<span class="muted">(~{{ g.per_page_lift | round | int }}pp per page, diminishing returns across {{ g.n_pages }})</span>{% endif %}
+        </div>
+      {% endif %}
+
+      {% if g.linked_prompts %}
+        <div class="section">
+          <div class="prompts">
+            <div class="prompts-label">⌖ Helps you win {{ g.linked_prompts | length }}{% if g.more_prompts %}+{% endif %} tracked prompt{% if (g.linked_prompts | length) > 1 %}s{% endif %}</div>
+            <ul style="margin: 0; padding-left: 16pt;">
+              {% for p in g.linked_prompts %}<li>&ldquo;{{ p }}&rdquo;</li>{% endfor %}
+            </ul>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if g.impl_steps %}
+        <div class="section">
+          <div class="section-label">How to do it</div>
+          <ol class="steps">
+            {% for step in g.impl_steps %}<li>{{ step }}</li>{% endfor %}
+          </ol>
+        </div>
+      {% endif %}
+
+      {% if g.platform_tip %}
+        <div class="section">
+          <div class="platform-tip"><strong>{{ cms_platform_display }}:</strong> {{ g.platform_tip }}</div>
+        </div>
+      {% endif %}
+
+      {% if g.artifact %}
+        <div class="section">
+          <div class="section-label">Paste-ready code</div>
+          <pre class="artifact">{{ g.artifact }}</pre>
+        </div>
+      {% endif %}
+    </div>
+  {% endfor %}
+
   <div class="footer">
     <div class="wordmark">Lumidian</div>
-    <div>{{ site_label }}</div>
+    <div>{{ site_host }}</div>
     <div>3</div>
   </div>
 </div>
+{% endif %}
 
-{% if grouped_remaining %}
-<!-- PAGE 4+ — Detailed fix list by category -->
+<!-- Detailed list (condensed) -->
+{% if remaining_groups %}
 <div class="page">
-  <h2>Detailed fix list</h2>
-  {% for group in grouped_remaining %}
-    <h4>{{ group.category }}</h4>
-    {% for r in group.recs %}
-      <div class="rec">
-        <div class="badges">
-          <span class="badge {{ r.priority or 'medium' }}">{{ (r.priority or 'medium') | upper }}</span>
-          {% if r.effort %}<span class="badge effort-{{ r.effort }}">{{ r.effort }} effort</span>{% endif %}
-        </div>
-        <h3>{{ r.title }}</h3>
-        <div class="body">{{ r.body_html | safe }}</div>
-        {% if r.target_url %}<div class="impact">Page: {{ r.target_url }}</div>{% endif %}
+  <div class="tracker">After the top 5</div>
+  <h2 style="margin-top:16pt;">More fixes</h2>
+  <p class="lede">{{ remaining_groups | length }} additional unique fixes, in priority order. Full body + paste-ready code lives in the Lumidian web app.</p>
+
+  {% for g in remaining_groups %}
+    <div class="compact-row">
+      <div class="top">
+        <span class="badge {{ g.priority }}">{{ g.priority | upper }}</span>
+        <span class="badge cat">{{ g.category }}</span>
+        {% if g.effort %}<span class="badge effort-{{ g.effort }}">{{ g.effort }} effort</span>{% endif %}
+        {% if g.is_site_wide %}<span class="badge site-wide">SITE-WIDE</span>{% endif %}
       </div>
-    {% endfor %}
+      <div class="title">{{ loop.index + 5 }}. {{ g.title }}</div>
+      <div class="pages-info">
+        {% if g.is_site_wide %}
+          Site-wide
+        {% else %}
+          {{ g.n_pages }} {% if g.n_pages == 1 %}page{% else %}pages{% endif %}{% if g.page_urls %} &middot; <span class="url" style="font-family: 'SF Mono', Menlo, Consolas, monospace; font-size:8.5pt; color:#94a3b8;">{{ g.page_urls[0] }}{% if g.n_pages > 1 %} + {{ g.n_pages - 1 }} more{% endif %}</span>{% endif %}
+        {% endif %}
+        {% if g.aggregate_lift > 0 %}&middot; +{{ g.aggregate_lift | round | int }}pp{% endif %}
+      </div>
+    </div>
   {% endfor %}
+
+  {% if truncated > 0 %}
+    <p class="muted" style="margin-top: 14pt; font-size: 10pt;">
+      &hellip; and {{ truncated }} more lower-priority fix{% if truncated > 1 %}es{% endif %}. View them all at <strong>lumidian.ai/site-audit</strong>.
+    </p>
+  {% endif %}
+
   <div class="footer">
     <div class="wordmark">Lumidian</div>
-    <div>{{ site_label }}</div>
-    <div>4</div>
+    <div>{{ site_host }}</div>
+    <div>{{ detailed_page_no }}</div>
   </div>
 </div>
 {% endif %}
 
-{% if artifacts %}
-<!-- Paste-ready artifacts -->
-<div class="page">
-  <h2>Paste-ready code</h2>
-  <p>Copy these directly into the site. They are generated to match the site&rsquo;s brand and structure.</p>
-  {% for a in artifacts %}
-    <h3 style="margin-top: 14pt;">{{ a.title }}</h3>
-    {% if a.target_url %}<div class="muted" style="font-size:9.5pt; margin-bottom:6pt;">{{ a.target_url }}</div>{% endif %}
-    <pre class="artifact">{{ a.artifact }}</pre>
-  {% endfor %}
-  <div class="footer">
-    <div class="wordmark">Lumidian</div>
-    <div>{{ site_label }}</div>
-    <div>{{ artifacts_page_no }}</div>
-  </div>
-</div>
-{% endif %}
-
-{% if worst_pages %}
 <!-- Worst pages -->
+{% if worst_pages %}
 <div class="page">
-  <h2>Pages needing the most work</h2>
+  <div class="tracker">Page-level signal</div>
+  <h2 style="margin-top:16pt;">Pages needing the most work</h2>
+  <p class="lede">These 10 pages scored lowest on AI extraction. Fixing the top priorities above will lift most of them.</p>
   <table>
     <thead>
       <tr><th>URL</th><th>Type</th><th class="num">Score</th></tr>
@@ -215,7 +324,7 @@
     <tbody>
       {% for p in worst_pages %}
         <tr>
-          <td style="max-width: 320pt; word-break: break-all;">{{ p.url }}</td>
+          <td class="url">{{ p.url }}</td>
           <td>{{ p.page_type }}</td>
           <td class="num">{% if p.page_score is not none %}{{ p.page_score | round | int }}{% else %}&mdash;{% endif %}</td>
         </tr>
@@ -224,7 +333,7 @@
   </table>
   <div class="footer">
     <div class="wordmark">Lumidian</div>
-    <div>{{ site_label }}</div>
+    <div>{{ site_host }}</div>
     <div>{{ pages_page_no }}</div>
   </div>
 </div>
@@ -232,7 +341,8 @@
 
 <!-- Appendix -->
 <div class="page">
-  <h2>Appendix &mdash; Audit scope</h2>
+  <div class="tracker">For the record</div>
+  <h2 style="margin-top:16pt;">Audit scope</h2>
   <table>
     <tbody>
       <tr><td style="width: 200pt; color:#64748b;">Site</td><td style="word-break:break-all;">{{ site_label }}</td></tr>
@@ -241,13 +351,17 @@
       <tr><td style="color:#64748b;">Started</td><td>{{ started_label }}</td></tr>
       <tr><td style="color:#64748b;">Completed</td><td>{{ completed_label }}</td></tr>
       <tr><td style="color:#64748b;">Render mode</td><td>{{ audit.render_mode or '&mdash;' }}</td></tr>
-      {% if cms_platform %}<tr><td style="color:#64748b;">CMS platform</td><td>{{ cms_platform }}</td></tr>{% endif %}
+      {% if cms_platform_display %}<tr><td style="color:#64748b;">CMS platform</td><td>{{ cms_platform_display }}</td></tr>{% endif %}
       {% if audit.sitemap_url %}<tr><td style="color:#64748b;">Sitemap</td><td style="word-break:break-all;">{{ audit.sitemap_url }}</td></tr>{% endif %}
+      <tr><td style="color:#64748b;">Unique fixes surfaced</td><td>{{ total_unique }}</td></tr>
     </tbody>
   </table>
+  <p class="muted" style="margin-top: 22pt; font-size: 10pt;">
+    Lift estimates use diminishing-returns math: per-page lift × ln(n+1). Real-world gains depend on which AI crawlers retrieve the fix.
+  </p>
   <div class="footer">
     <div class="wordmark">Lumidian</div>
-    <div>{{ site_label }}</div>
+    <div>{{ site_host }}</div>
     <div>{{ appendix_page_no }}</div>
   </div>
 </div>

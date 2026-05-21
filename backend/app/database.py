@@ -475,6 +475,12 @@ async def run_migrations():
         "ALTER TABLE website_audits ADD COLUMN cms_platform TEXT",
         # 2026-05-15: Agency PDF report — persist fetch_data snapshot on ClientDocument
         "ALTER TABLE client_documents ADD COLUMN data_snapshot TEXT",
+        # 2026-05-20: Content cluster redesign — new fields + status rename
+        "ALTER TABLE content_clusters ADD COLUMN failure_reason TEXT",
+        "UPDATE content_clusters SET status='generation_partial' WHERE status='partial_failed'",
+        "ALTER TABLE content_briefs ADD COLUMN evidence_pack_id INTEGER",
+        "ALTER TABLE content_drafts ADD COLUMN failure_reason TEXT",
+        "ALTER TABLE content_drafts ADD COLUMN generation_state TEXT NOT NULL DEFAULT 'done'",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

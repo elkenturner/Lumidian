@@ -20,6 +20,7 @@ import { PromptScoresPanel } from './PromptScoresPanel';
 import { RunTrackingButton } from './RunTrackingButton';
 import { AuditSummaryCard } from './AuditSummaryCard';
 import { TaskList } from './TaskList';
+import { VideoSection } from './VideoSection';
 
 interface Props {
   client: AgencyClient;
@@ -35,6 +36,7 @@ const SECTIONS = [
   { id: 'brand', label: 'Brand' },
   { id: 'documents', label: 'Documents' },
   { id: 'audit', label: 'Audit' },
+  { id: 'video', label: 'Video' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'activity', label: 'Activity' },
 ];
@@ -179,6 +181,11 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
           <section id="audit" className="scroll-mt-24">
             <h2 className="mb-3 text-sm font-medium text-[var(--text-secondary)]">Site audit</h2>
             <AuditSummaryCard clientId={client.id} brandId={client.brand_id} />
+          </section>
+
+          <section id="video" className="scroll-mt-24">
+            <h2 className="mb-3 text-sm font-medium text-[var(--text-secondary)]">Video</h2>
+            <VideoSection clientId={client.id} />
           </section>
 
           <section id="tasks" className="scroll-mt-24">

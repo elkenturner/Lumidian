@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -183,33 +183,30 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
     }
   };
 
-  const handleNextStep = useCallback(
-    (a: NextStepAction) => {
-      switch (a.kind) {
-        case 'review_drafts':
-        case 'mark_posted':
-          handleTabChange('pipeline');
-          return;
-        case 'send_to_client':
-          setSendDraftsOpen(true);
-          return;
-        case 'nudge_client': {
-          const msg = nudgeMessageText(client.primary_contact_name ?? null, reviewLinkUrl ?? '');
-          navigator.clipboard.writeText(msg).catch(() => {});
-          return;
-        }
-        case 'run_tracking':
-          handleTabChange('tracking');
-          return;
-        case 'generate_drafts':
-          handleTabChange('pipeline');
-          return;
-        case 'all_caught_up':
-          return;
+  const handleNextStep = (a: NextStepAction) => {
+    switch (a.kind) {
+      case 'review_drafts':
+      case 'mark_posted':
+        handleTabChange('pipeline');
+        return;
+      case 'send_to_client':
+        setSendDraftsOpen(true);
+        return;
+      case 'nudge_client': {
+        const msg = nudgeMessageText(client.primary_contact_name ?? null, reviewLinkUrl ?? '');
+        navigator.clipboard.writeText(msg).catch(() => {});
+        return;
       }
-    },
-    [client.primary_contact_name, reviewLinkUrl, searchParams],
-  );
+      case 'run_tracking':
+        handleTabChange('tracking');
+        return;
+      case 'generate_drafts':
+        handleTabChange('pipeline');
+        return;
+      case 'all_caught_up':
+        return;
+    }
+  };
 
   return (
     <div className="p-8 text-[var(--text-primary)]">

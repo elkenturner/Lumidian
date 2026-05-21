@@ -6,6 +6,7 @@ import {
   Home,
   Users,
   FileText,
+  Settings as SettingsIcon,
   ArrowLeft,
   Shield,
 } from 'lucide-react';
@@ -15,6 +16,7 @@ const NAV = [
   { href: '/agency', label: 'Today', icon: Home, exact: true },
   { href: '/agency/clients', label: 'Clients', icon: Users, exact: false },
   { href: '/agency/documents', label: 'Documents', icon: FileText, exact: false },
+  { href: '/agency/settings', label: 'Settings', icon: SettingsIcon, exact: false },
 ];
 
 export function AgencySidebar() {

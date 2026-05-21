@@ -67,9 +67,19 @@ async def _enabled_platforms(db: AsyncSession, brand_id: int) -> list[str]:
 
 
 def _build_brief_context(brief: ContentBrief, sibling_platforms: list[str]) -> str:
+    """Brief context fed to every piece in the cluster.
+
+    Note: sibling_platforms is intentionally NOT included in the writer prompt.
+    Dangling sibling platform names invites the LLM to fabricate
+    cross-references it can't possibly know (the sibling text doesn't exist
+    yet when this piece is being generated). Cross-references are inserted
+    deterministically post-generation, see `_append_pillar_reference`.
+    The parameter is retained in the signature for call-site compatibility.
+    """
+    _ = sibling_platforms  # explicitly unused
     lines = [f"POSITIONING: {brief.positioning}"]
     if brief.canonical_phrasings:
-        lines.append("CANONICAL PHRASINGS (use at least 1 verbatim):")
+        lines.append("CANONICAL PHRASINGS — VERBATIM REQUIRED (include each at least once, word-for-word):")
         lines.extend(f"  - {p}" for p in brief.canonical_phrasings)
     if brief.key_claims:
         lines.append("KEY CLAIMS:")
@@ -82,9 +92,6 @@ def _build_brief_context(brief: ContentBrief, sibling_platforms: list[str]) -> s
         lines.append(f"NARRATIVE SPINE: {brief.narrative_spine}")
     if brief.tone_notes:
         lines.append(f"TONE NOTES: {brief.tone_notes}")
-    if sibling_platforms:
-        lines.append("SIBLING PLATFORMS in this cluster (reference by platform name, not URL):")
-        lines.append(f"  - {', '.join(sibling_platforms)}")
     return "\n".join(lines)
 
 

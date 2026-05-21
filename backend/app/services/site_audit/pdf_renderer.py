@@ -281,7 +281,7 @@ def _render_html(bundle: dict[str, Any]) -> str:
     return template.render(
         audit=audit,
         site_label=site_label,
-        site_host=urlparse(brand.website_url).host if brand and brand.website_url else site_label,
+        site_host=(urlparse(brand.website_url).netloc or site_label) if brand and brand.website_url else site_label,
         audit_date=audit_date,
         started_label=started_label,
         completed_label=completed_label,

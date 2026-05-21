@@ -49,3 +49,69 @@ async def test_fetch_and_dedupe_drops_dupes_across_queries():
     assert urls.count("https://reuters.com/a") == 1
     assert "https://nytimes.com/b" in urls
     assert "https://oecd.org/c" in urls
+
+
+# ---------------------------------------------------------------------------
+# Task 6: authority tiering + pack-gate
+# ---------------------------------------------------------------------------
+
+import pytest  # noqa: E402 (already imported above but repeated for clarity)
+
+from app.services.cluster_evidence import (
+    PackGateError, rank_and_tier, gate_pack,
+)
+
+
+def _src(url: str, title: str = "t", snippet: str = "s") -> dict:
+    return {"url": url, "title": title, "snippet": snippet}
+
+
+def test_rank_prefers_t1_then_t2_then_t3():
+    raw = [
+        _src("https://randomblog.example.com/a"),  # T3
+        _src("https://reuters.com/x"),              # T1
+        _src("https://techcrunch.com/y"),           # T2
+    ]
+    ranked = rank_and_tier(raw)
+    assert ranked[0]["tier"] == "T1"
+    assert ranked[1]["tier"] == "T2"
+    assert ranked[2]["tier"] == "T3"
+
+
+def test_rank_attaches_tier_and_domain():
+    raw = [_src("https://www.nytimes.com/path")]
+    ranked = rank_and_tier(raw)
+    assert ranked[0]["domain"] == "nytimes.com"
+    assert ranked[0]["tier"] == "T1"
+
+
+def test_gate_passes_with_two_t1():
+    pack = [
+        _src("https://reuters.com/a") | {"tier": "T1", "domain": "reuters.com"},
+        _src("https://nytimes.com/b") | {"tier": "T1", "domain": "nytimes.com"},
+        _src("https://techcrunch.com/c") | {"tier": "T2", "domain": "techcrunch.com"},
+        _src("https://forbes.com/d") | {"tier": "T2", "domain": "forbes.com"},
+    ]
+    gate_pack(pack)  # should not raise
+
+
+def test_gate_fails_with_one_t1():
+    pack = [
+        _src("https://reuters.com/a") | {"tier": "T1", "domain": "reuters.com"},
+        _src("https://techcrunch.com/c") | {"tier": "T2", "domain": "techcrunch.com"},
+        _src("https://forbes.com/d") | {"tier": "T2", "domain": "forbes.com"},
+        _src("https://axios.com/e") | {"tier": "T2", "domain": "axios.com"},
+    ]
+    with pytest.raises(PackGateError) as exc:
+        gate_pack(pack)
+    assert "T1" in str(exc.value)
+
+
+def test_gate_fails_when_t1_plus_t2_under_4():
+    pack = [
+        _src("https://reuters.com/a") | {"tier": "T1", "domain": "reuters.com"},
+        _src("https://nytimes.com/b") | {"tier": "T1", "domain": "nytimes.com"},
+        _src("https://techcrunch.com/c") | {"tier": "T2", "domain": "techcrunch.com"},
+    ]
+    with pytest.raises(PackGateError):
+        gate_pack(pack)

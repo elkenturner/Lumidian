@@ -7,9 +7,7 @@ import {
   type ContentDraft,
   type DraftStaffStatus,
 } from '@/lib/api';
-import { AssigneePicker } from './AssigneePicker';
 import { NudgePill } from './NudgePill';
-import { agencyAssignDraft } from '@/lib/api';
 import { isDraftStale, nudgeMessageText } from './agency-helpers';
 import { MarkPostedModal } from './MarkPostedModal';
 
@@ -219,16 +217,6 @@ export function ClientPipelineTab({ brandId, reviewLinkUrl, primaryContactName, 
                           />
                         </div>
                       )}
-                      <div className="mt-2">
-                        <AssigneePicker
-                          value={d.assigned_to_user_id ?? null}
-                          onChange={async (userId) => {
-                            await agencyAssignDraft(d.id, userId);
-                            updateLocal(d.id, { assigned_to_user_id: userId });
-                          }}
-                          compact
-                        />
-                      </div>
                       <DraftActions draft={d} onChange={(patch) => updateLocal(d.id, patch)} />
                     </li>
                   );

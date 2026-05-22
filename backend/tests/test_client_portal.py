@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import update
+from sqlalchemy import select, update
 
 from app.database import AsyncSessionLocal
 from app.models import AgencyClient, User
@@ -107,3 +107,50 @@ async def test_review_link_emits_client_url(client, agency_staff_user):
     url = resp.json()["url"]
     assert "/client/" in url, f"Expected /client/ in URL, got {url}"
     assert "/review/" not in url, f"URL should not contain /review/ anymore: {url}"
+
+
+@pytest.mark.asyncio
+async def test_client_view_context_resolves_valid_token(client, agency_staff_user):
+    """A valid token resolves to the right AgencyClient + Brand."""
+    # Create client and get token
+    resp = await client.post("/api/agency/clients", json={"name": "Acme"})
+    ac_id = resp.json()["id"]
+    brand_id = resp.json()["brand_id"]
+    resp = await client.post(f"/api/agency/clients/{ac_id}/review-link")
+    token = resp.json()["token"]
+
+    # Hit the new public brand endpoint — built in Task 5; here we just confirm
+    # the endpoint reaches the resolver. This test will fail until Task 5 ships
+    # the route.
+    resp = await client.get(f"/api/public/client/{token}/brand")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == brand_id
+
+
+@pytest.mark.asyncio
+async def test_client_view_context_rejects_unknown_token(client):
+    """Unknown tokens return 404."""
+    resp = await client.get("/api/public/client/notatoken/brand")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_client_view_context_rejects_revoked_token(client, db_session, agency_staff_user):
+    """Revoked review-link tokens return 404."""
+    from app.models import ClientReviewLink
+    from datetime import datetime
+
+    resp = await client.post("/api/agency/clients", json={"name": "Acme"})
+    ac_id = resp.json()["id"]
+    resp = await client.post(f"/api/agency/clients/{ac_id}/review-link")
+    token = resp.json()["token"]
+
+    # Revoke the link directly in the DB
+    link_q = await db_session.execute(select(ClientReviewLink).where(ClientReviewLink.token == token))
+    link = link_q.scalar_one()
+    link.revoked_at = datetime.utcnow()
+    await db_session.commit()
+
+    resp = await client.get(f"/api/public/client/{token}/brand")
+    assert resp.status_code == 404

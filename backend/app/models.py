@@ -778,6 +778,8 @@ class AgencyClient(Base):
     peec_dashboard_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     primary_contact_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     primary_contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    current_proposal_doc_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    current_proposal_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 

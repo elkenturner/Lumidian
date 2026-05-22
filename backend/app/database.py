@@ -491,6 +491,9 @@ async def run_migrations():
         )""",
         "CREATE INDEX IF NOT EXISTS idx_agency_assignments_staff ON agency_client_assignments(staff_user_id)",
         "CREATE INDEX IF NOT EXISTS idx_agency_assignments_client ON agency_client_assignments(agency_client_id)",
+        # 2026-05-22: Client portal — proposal pointer fields on agency_clients
+        "ALTER TABLE agency_clients ADD COLUMN current_proposal_doc_url VARCHAR(500)",
+        "ALTER TABLE agency_clients ADD COLUMN current_proposal_label VARCHAR(200)",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

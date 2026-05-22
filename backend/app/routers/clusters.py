@@ -171,22 +171,44 @@ async def edit_brief(
     db: DbDep,
     user: CurrentUser,
 ) -> ContentBrief:
+    """Save brief edits as a NEW version. Does NOT update last_brief_id —
+    that field only moves when pieces are actually regenerated from the brief
+    (see regenerate_cluster). This is the 'draft brief' semantics: edits are
+    persisted, but the cluster still reflects pieces generated from an earlier
+    version until the user explicitly regenerates."""
     await _ensure_brand_owned(db, brand_id, user.id)
     cluster = (await db.execute(
-        select(ContentCluster).where(ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id)
+        select(ContentCluster).where(
+            ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
+        )
     )).scalar_one_or_none()
-    if cluster is None or cluster.last_brief_id is None:
-        raise HTTPException(404, "Cluster or brief not found")
-    brief = (await db.execute(select(ContentBrief).where(ContentBrief.id == cluster.last_brief_id))).scalar_one()
+    if cluster is None:
+        raise HTTPException(404, "Cluster not found")
 
-    for field in ("positioning", "key_claims", "canonical_phrasings", "stats", "narrative_spine", "tone_notes"):
-        val = getattr(request, field)
-        if val is not None:
-            setattr(brief, field, val)
+    # Find the current head version (highest)
+    head = (await db.execute(
+        select(ContentBrief).where(ContentBrief.cluster_id == cluster.id)
+        .order_by(ContentBrief.version.desc())
+    )).scalars().first()
+    if head is None:
+        raise HTTPException(404, "No brief to edit")
 
+    new = ContentBrief(
+        cluster_id=cluster.id,
+        version=head.version + 1,
+        positioning=request.positioning if request.positioning is not None else head.positioning,
+        key_claims=request.key_claims if request.key_claims is not None else head.key_claims,
+        canonical_phrasings=request.canonical_phrasings if request.canonical_phrasings is not None else head.canonical_phrasings,
+        stats=request.stats if request.stats is not None else head.stats,
+        competitor_context=head.competitor_context,
+        narrative_spine=request.narrative_spine if request.narrative_spine is not None else head.narrative_spine,
+        tone_notes=request.tone_notes if request.tone_notes is not None else head.tone_notes,
+        created_by=f"user:{user.id}",
+    )
+    db.add(new)
     await db.commit()
-    await db.refresh(brief)
-    return brief
+    await db.refresh(new)
+    return new
 
 
 @router.post("/{brand_id}/{cluster_id}/pillar/accept", response_model=ContentClusterDetail)

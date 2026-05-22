@@ -7,6 +7,7 @@ from app.models import (
     ContentCluster,
     ContentDraft,
     DraftAttribution,
+    Prompt,
 )
 from tests.conftest import register_and_login, create_brand
 
@@ -103,3 +104,71 @@ async def test_cluster_summary_delta_null_when_posted_but_no_attribution(client,
     summary = resp.json()[0]
     assert summary["posted_count"] == 1
     assert summary["cluster_delta"] is None
+
+
+@pytest.mark.asyncio
+async def test_cluster_detail_includes_cluster_delta_and_posted_count(client, db_session):
+    await register_and_login(client, "u4@example.com")
+    brand = await create_brand(client, "Acme")
+
+    async with AsyncSessionLocal() as db:
+        prompt = Prompt(brand_id=brand["id"], text="how to X", prompt_type="standard")
+        db.add(prompt)
+        await db.flush()
+        cluster = ContentCluster(
+            brand_id=brand["id"], prompt_id=prompt.id, status="ready", pillar_mode="none",
+        )
+        db.add(cluster)
+        await db.flush()
+        draft = ContentDraft(
+            brand_id=brand["id"], prompt_id=prompt.id, cluster_id=cluster.id,
+            platform="reddit", status="posted", content_text="...",
+        )
+        db.add(draft)
+        await db.flush()
+        db.add(DraftAttribution(
+            draft_id=draft.id, brand_id=brand["id"], prompt_id=prompt.id,
+            posted_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+            score_at_posting=20.0, current_score=24.0, delta=4.0,
+            runs_since_posting=1,
+        ))
+        await db.commit()
+        cluster_id = cluster.id
+
+    resp = await client.get(
+        f"/api/clusters/{brand['id']}/{cluster_id}",
+    )
+    assert resp.status_code == 200
+    detail = resp.json()
+    assert detail["cluster_delta"] == pytest.approx(4.0)
+    assert detail["posted_count"] == 1
+    assert len(detail["drafts"]) == 1
+    assert detail["drafts"][0]["attribution_delta"] == pytest.approx(4.0)
+
+
+@pytest.mark.asyncio
+async def test_cluster_detail_draft_attribution_delta_null_without_row(client, db_session):
+    await register_and_login(client, "u5@example.com")
+    brand = await create_brand(client, "Acme")
+
+    async with AsyncSessionLocal() as db:
+        prompt = Prompt(brand_id=brand["id"], text="x", prompt_type="standard")
+        db.add(prompt)
+        await db.flush()
+        cluster = ContentCluster(
+            brand_id=brand["id"], prompt_id=prompt.id, status="ready", pillar_mode="none",
+        )
+        db.add(cluster)
+        await db.flush()
+        db.add(ContentDraft(
+            brand_id=brand["id"], prompt_id=prompt.id, cluster_id=cluster.id,
+            platform="medium", status="draft", content_text="...",
+        ))
+        await db.commit()
+        cluster_id = cluster.id
+
+    resp = await client.get(
+        f"/api/clusters/{brand['id']}/{cluster_id}",
+    )
+    detail = resp.json()
+    assert detail["drafts"][0]["attribution_delta"] is None

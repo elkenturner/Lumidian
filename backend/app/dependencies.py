@@ -375,3 +375,57 @@ async def ensure_client_access(db: AsyncSession, user: User, client_id: int) -> 
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Not assigned to this client",
         )
+
+
+# ── Client portal: read-only token-gated context ─────────────────────────────
+
+
+from dataclasses import dataclass
+
+
+@dataclass
+class ClientViewContext:
+    """Resolved context for a public token-gated client portal request.
+
+    Holds the AgencyClient + Brand the token belongs to. is_client_view is
+    always True for instances of this class — exists for symmetry with
+    require_not_client_view backstops on write endpoints.
+    """
+    agency_client: "AgencyClient"
+    brand: "Brand"
+    is_client_view: bool = True
+
+
+async def get_client_view_context(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+) -> ClientViewContext:
+    """Resolve a ClientReviewLink token to its AgencyClient + Brand.
+
+    Raises 404 if the token is unknown or revoked, or if the client has no
+    attached brand.
+    """
+    from app.models import AgencyClient, Brand, ClientReviewLink
+
+    link_q = await db.execute(
+        select(ClientReviewLink).where(
+            ClientReviewLink.token == token,
+            ClientReviewLink.revoked_at.is_(None),
+        )
+    )
+    link = link_q.scalar_one_or_none()
+    if link is None:
+        raise HTTPException(status_code=404, detail="Client portal link not found or revoked")
+
+    ac = await db.get(AgencyClient, link.agency_client_id)
+    if ac is None:
+        raise HTTPException(status_code=404, detail="Client portal link not found or revoked")
+
+    brand_q = await db.execute(
+        select(Brand).where(Brand.agency_client_id == ac.id).order_by(Brand.id.asc()).limit(1)
+    )
+    brand = brand_q.scalar_one_or_none()
+    if brand is None:
+        raise HTTPException(status_code=404, detail="No brand attached to this client")
+
+    return ClientViewContext(agency_client=ac, brand=brand)

@@ -670,6 +670,34 @@ async def run_migrations():
 
         logger.info("Migration applied: wikipedia_scans + wikipedia_candidates tables")
 
+    # --- Migration: prospect_audits (2026-05-20) ---
+    # agency staff cold-email audit deliverable
+    async with engine.begin() as conn:
+        await conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS prospect_audits (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                staff_user_id INTEGER NOT NULL REFERENCES users(id),
+                business_name TEXT NOT NULL,
+                website_url TEXT NOT NULL,
+                is_local BOOLEAN NOT NULL DEFAULT 0,
+                location TEXT,
+                status TEXT NOT NULL DEFAULT 'pending',
+                status_message TEXT,
+                error_message TEXT,
+                cancel_requested BOOLEAN NOT NULL DEFAULT 0,
+                overall_visibility_pct REAL,
+                aggregate_rvi REAL,
+                rvi_band TEXT,
+                pdf_path TEXT,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                started_at DATETIME,
+                completed_at DATETIME
+            )
+        """))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_prospect_audits_staff_user_id ON prospect_audits(staff_user_id)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_prospect_audits_status ON prospect_audits(status)"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_prospect_audits_created_at ON prospect_audits(created_at)"))
+        logger.info("Migration applied: prospect_audits table + indexes")
 
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):

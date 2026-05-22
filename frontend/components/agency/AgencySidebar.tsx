@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home,
   Users,
+  Crosshair,
   FileText,
   Settings as SettingsIcon,
   ArrowLeft,
@@ -15,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const NAV = [
   { href: '/agency', label: 'Today', icon: Home, exact: true },
   { href: '/agency/clients', label: 'Clients', icon: Users, exact: false },
+  { href: '/agency/prospects', label: 'Prospects', icon: Crosshair, exact: false },
   { href: '/agency/documents', label: 'Documents', icon: FileText, exact: false },
   { href: '/agency/settings', label: 'Settings', icon: SettingsIcon, exact: false },
 ];

@@ -1133,6 +1133,9 @@ class WikipediaCandidate(Base):
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
 
 
+# ── Prospect audits (agency) ──────────────────────────────────────────────────
+
+
 class ProspectAudit(Base):
     __tablename__ = "prospect_audits"
 

@@ -369,7 +369,7 @@ def _public_base_url(request: Request) -> str:
 
 def _link_to_out(link: ClientReviewLink, request: Request) -> ReviewLinkOut:
     base = _public_base_url(request)
-    return ReviewLinkOut(token=link.token, url=f"{base}/review/{link.token}", created_at=link.created_at)
+    return ReviewLinkOut(token=link.token, url=f"{base}/client/{link.token}", created_at=link.created_at)
 
 
 @router.get("/clients/{client_id}/review-link", response_model=ReviewLinkOut | None)

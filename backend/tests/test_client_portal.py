@@ -94,3 +94,16 @@ async def test_staff_can_clear_proposal_pointer(client, db_session, agency_staff
     await db_session.refresh(ac)
     assert ac.current_proposal_doc_url is None
     assert ac.current_proposal_label is None
+
+
+@pytest.mark.asyncio
+async def test_review_link_emits_client_url(client, agency_staff_user):
+    """POST /api/agency/clients/{id}/review-link returns a /client/{token} URL."""
+    resp = await client.post("/api/agency/clients", json={"name": "Acme"})
+    client_id = resp.json()["id"]
+
+    resp = await client.post(f"/api/agency/clients/{client_id}/review-link")
+    assert resp.status_code == 201
+    url = resp.json()["url"]
+    assert "/client/" in url, f"Expected /client/ in URL, got {url}"
+    assert "/review/" not in url, f"URL should not contain /review/ anymore: {url}"

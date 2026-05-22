@@ -2299,6 +2299,79 @@ export async function rejectClusterPillar(brandId: number, clusterId: number): P
   return res.data;
 }
 
+// ── Cluster redesign (2026-05-20) ─────────────────────────────────────────────
+
+export interface ClusterPieceStatus {
+  platform: string;
+  draft_id: number | null;
+  status: string | null;
+  generation_state: string;
+  failure_reason: string | null;
+}
+
+export interface ClusterStatusPayload {
+  status: string;
+  failure_reason: string | null;
+  pieces: ClusterPieceStatus[];
+  version: number;
+  last_generated_at: string | null;
+}
+
+export interface ClusterSourceItem {
+  url: string;
+  domain: string;
+  tier: 'T1' | 'T2' | 'T3';
+  title: string | null;
+  times_cited: number;
+}
+
+export interface ClusterSourcesPayload {
+  total_t1: number;
+  total_t2: number;
+  total_t3: number;
+  sources: ClusterSourceItem[];
+}
+
+export async function getClusterStatus(
+  brandId: number,
+  clusterId: number,
+): Promise<ClusterStatusPayload> {
+  const res = await api.get<ClusterStatusPayload>(`/clusters/${brandId}/${clusterId}/status`);
+  return res.data;
+}
+
+export async function regenerateClusterPieces(
+  brandId: number,
+  clusterId: number,
+): Promise<ContentClusterDetail> {
+  const res = await api.post<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}/regenerate-pieces`);
+  return res.data;
+}
+
+export async function rebuildCluster(
+  brandId: number,
+  clusterId: number,
+): Promise<ContentClusterDetail> {
+  const res = await api.post<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}/rebuild`);
+  return res.data;
+}
+
+export async function getClusterSources(
+  brandId: number,
+  clusterId: number,
+): Promise<ClusterSourcesPayload> {
+  const res = await api.get<ClusterSourcesPayload>(`/clusters/${brandId}/${clusterId}/sources`);
+  return res.data;
+}
+
+export async function getClusterBriefHistory(
+  brandId: number,
+  clusterId: number,
+): Promise<ContentBrief[]> {
+  const res = await api.get<ContentBrief[]>(`/clusters/${brandId}/${clusterId}/briefs`);
+  return res.data;
+}
+
 // ── Agency drafting (sub-project E, 2026-05-13) ──────────────────────────────
 
 export interface AgencyGenerateDraftIn {

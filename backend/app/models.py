@@ -1061,3 +1061,32 @@ class WikipediaCandidate(Base):
     last_drafted_at: Mapped[datetime | None] = mapped_column(nullable=True)
     last_status_change_at: Mapped[datetime | None] = mapped_column(nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(UTC).replace(tzinfo=None))
+
+
+# ── Prospect audits (agency) ──────────────────────────────────────────────────
+
+class ProspectAudit(Base):
+    __tablename__ = "prospect_audits"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    staff_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+
+    business_name: Mapped[str] = mapped_column(String, nullable=False)
+    website_url: Mapped[str] = mapped_column(String, nullable=False)
+    is_local: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    location: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending", index=True)
+    status_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    overall_visibility_pct: Mapped[float | None] = mapped_column(Float, nullable=True)
+    aggregate_rvi: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rvi_band: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    pdf_path: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

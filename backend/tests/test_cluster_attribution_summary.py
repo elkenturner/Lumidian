@@ -172,3 +172,37 @@ async def test_cluster_detail_draft_attribution_delta_null_without_row(client, d
     )
     detail = resp.json()
     assert detail["drafts"][0]["attribution_delta"] is None
+    assert detail["cluster_delta"] is None
+    assert detail["posted_count"] == 0
+
+
+@pytest.mark.asyncio
+async def test_cluster_detail_posted_draft_without_attribution(client, db_session):
+    """Posted draft at detail endpoint with no DraftAttribution row → cluster_delta None, posted_count 1."""
+    await register_and_login(client, "u6@example.com")
+    brand = await create_brand(client, "Acme")
+
+    async with AsyncSessionLocal() as db:
+        prompt = Prompt(brand_id=brand["id"], text="x", prompt_type="standard")
+        db.add(prompt)
+        await db.flush()
+        cluster = ContentCluster(
+            brand_id=brand["id"], prompt_id=prompt.id, status="ready", pillar_mode="none",
+        )
+        db.add(cluster)
+        await db.flush()
+        db.add(ContentDraft(
+            brand_id=brand["id"], prompt_id=prompt.id, cluster_id=cluster.id,
+            platform="reddit", status="posted", content_text="...",
+        ))
+        await db.commit()
+        cluster_id = cluster.id
+
+    resp = await client.get(
+        f"/api/clusters/{brand['id']}/{cluster_id}",
+    )
+    assert resp.status_code == 200, resp.text
+    detail = resp.json()
+    assert detail["cluster_delta"] is None
+    assert detail["posted_count"] == 1
+    assert detail["drafts"][0]["attribution_delta"] is None

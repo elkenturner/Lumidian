@@ -184,7 +184,7 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
         posted_deltas = [
             delta_by_draft[d.id]
             for d in posted_drafts
-            if d.id in delta_by_draft and delta_by_draft[d.id] is not None
+            if delta_by_draft.get(d.id) is not None
         ]
         if posted_deltas:
             cluster_delta = float(sum(posted_deltas))

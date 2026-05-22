@@ -232,6 +232,9 @@ export interface ContentDraft {
   updated_at: string;
   prompt_text?: string;
   assigned_to_user_id: number | null;
+  cluster_id?: number | null;
+  generation_state?: 'queued' | 'writing' | 'critic' | 'rendering' | 'done' | 'failed';
+  failure_reason?: string | null;
 }
 
 export interface ContentOpportunity {

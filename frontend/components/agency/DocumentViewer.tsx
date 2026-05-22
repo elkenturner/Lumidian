@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Copy, X } from 'lucide-react';
-import { agencyDeleteDocument, agencyUpdateDocument, type AgencyDocument } from '@/lib/api';
+import { Copy, Download, Loader2, X } from 'lucide-react';
+import { agencyDeleteDocument, agencyDownloadDocumentPdf, agencyUpdateDocument, type AgencyDocument } from '@/lib/api';
 
 interface Props {
   doc: AgencyDocument | null;
@@ -17,6 +17,7 @@ export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   if (!doc) return null;
@@ -58,6 +59,28 @@ export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
     navigator.clipboard.writeText(doc.body_markdown);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
+  };
+
+  const download = async () => {
+    if (!doc) return;
+    setDownloading(true);
+    setError(null);
+    try {
+      const blob = await agencyDownloadDocumentPdf(doc.id);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const safeName = (doc.title || `${doc.kind}-${doc.id}`).replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 120);
+      a.download = `${safeName}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to download PDF');
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -124,6 +147,14 @@ export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
                   >
                     <Copy className="h-3 w-3" />
                     {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                  <button
+                    onClick={download}
+                    disabled={downloading}
+                    className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-card)] disabled:opacity-50"
+                  >
+                    {downloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                    {downloading ? 'Rendering…' : 'Download PDF'}
                   </button>
                   <button
                     onClick={startEdit}

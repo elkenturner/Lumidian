@@ -2290,6 +2290,29 @@ export async function agencyDownloadDocumentPdf(documentId: number): Promise<Blo
   return res.data as Blob;
 }
 
+// ── Per-client staff assignment (2026-05-20) ─────────────────────────────────
+
+export interface ClientStaffAssignment {
+  user_id: number;
+  name: string | null;
+  email: string;
+  assigned_at: string;
+}
+
+export async function agencyListClientStaff(clientId: number): Promise<ClientStaffAssignment[]> {
+  const res = await api.get<ClientStaffAssignment[]>(`/agency/clients/${clientId}/staff-assigned`);
+  return res.data;
+}
+
+export async function agencyAssignStaff(clientId: number, userId: number): Promise<ClientStaffAssignment> {
+  const res = await api.post<ClientStaffAssignment>(`/agency/clients/${clientId}/staff-assigned/${userId}`);
+  return res.data;
+}
+
+export async function agencyUnassignStaff(clientId: number, userId: number): Promise<void> {
+  await api.delete(`/agency/clients/${clientId}/staff-assigned/${userId}`);
+}
+
 // ----- Content Clusters -----
 
 export interface ContentBrief {

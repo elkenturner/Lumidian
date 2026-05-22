@@ -14,6 +14,11 @@ Public API
 generate_gap_draft(db, brand_id, prompt_id, platform) -> ContentDraft
 generate_opportunity_draft(db, opportunity_id)         -> ContentDraft
 auto_draft_top_gaps(db, brand_id, max_gaps=3)         -> list[ContentDraft]
+make_cluster_draft(brand_id, prompt_id, cluster_id, **kwargs) -> ContentDraft
+    Service-layer factory that enforces cluster_id is set. Use for any new
+    draft created after the 2026-05-20 cluster redesign. Legacy creation
+    sites (generate_gap_draft, generate_opportunity_draft) remain unchanged
+    until their flows are migrated.
 """
 from __future__ import annotations
 
@@ -1528,3 +1533,37 @@ async def auto_draft_top_gaps(
         raise last_error
 
     return created
+
+
+def make_cluster_draft(
+    *,
+    brand_id: int,
+    prompt_id: int,
+    cluster_id: int,
+    platform: str,
+    content_text: str,
+    **kwargs: object,
+) -> "ContentDraft":
+    """Construct a ContentDraft for a cluster piece, enforcing cluster_id.
+
+    All new drafts created after the 2026-05-20 cluster redesign must belong
+    to a cluster. This helper raises if cluster_id is missing so service-layer
+    callers never bypass the invariant. Legacy creation sites
+    (generate_gap_draft, generate_opportunity_draft) remain unchanged until
+    their flows are migrated.
+
+    Returns an unflushed ContentDraft — caller is responsible for db.add and
+    commit.
+    """
+    if cluster_id is None:
+        raise ValueError("All new drafts must belong to a cluster (cluster_id required)")
+    return ContentDraft(
+        brand_id=brand_id,
+        prompt_id=prompt_id,
+        cluster_id=cluster_id,
+        platform=platform,
+        content_text=content_text,
+        source=kwargs.pop("source", "cluster"),
+        **kwargs,
+    )
+

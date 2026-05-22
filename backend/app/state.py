@@ -14,3 +14,11 @@ generating_brands: set[int] = set()
 
 scanning_brands: set[int] = set()
 """Brand IDs currently being scanned for live opportunities."""
+
+
+import asyncio
+
+prospect_audit_cancel_events: dict[int, asyncio.Event] = {}
+"""Map of audit_id -> Event. Set by the /cancel endpoint, consumed by the runner.
+Single-process: this lives in one uvicorn worker. Cancel intent also persists
+to ProspectAudit.cancel_requested so a process restart still observes it."""

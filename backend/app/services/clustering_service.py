@@ -35,6 +35,39 @@ logger = logging.getLogger(__name__)
 
 CLUSTER_PLATFORMS: tuple[str, ...] = ("linkedin", "medium", "reddit", "quora", "x")
 
+# Platforms that get a soft "further reading" reference to the cluster's
+# Medium piece (or own-site pillar). Asymmetric — Medium/Wikipedia get nothing.
+_APPENDS_PILLAR_REF = {
+    "linkedin_post", "linkedin_reply", "linkedin_article",
+    "reddit", "reddit_reply",
+    "quora",
+    "x_post", "x_thread", "x_reply",
+}
+
+
+def append_pillar_reference(
+    *,
+    text: str,
+    platform: str,
+    pillar_url: str | None,
+) -> str:
+    """Append an idiomatic 'further reading' link to the cluster's pillar.
+
+    Deterministic — no LLM. Medium and Wikipedia receive nothing.
+    """
+    if not pillar_url:
+        return text
+    if platform not in _APPENDS_PILLAR_REF:
+        return text
+
+    if platform.startswith("x_"):
+        # Space-constrained — bare URL, no label
+        return text.rstrip() + f"\n{pillar_url}"
+    if platform.startswith("reddit"):
+        return text.rstrip() + f"\n\nI wrote a longer version on Medium: {pillar_url}"
+    # linkedin_*, quora
+    return text.rstrip() + f"\n\nFurther reading on Medium: {pillar_url}"
+
 
 async def get_or_create_cluster(db: AsyncSession, *, brand_id: int, prompt_id: int) -> ContentCluster:
     existing = (await db.execute(

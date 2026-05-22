@@ -3,7 +3,7 @@
 > **This file is the shared brain across all Claude surfaces working on Lumidian.**
 > Claude Code, Cowork, and Claude in Chrome should all (a) read this file at the start of every session and (b) update it before ending the session. Stable architecture lives in `CLAUDE.md`; this file holds volatile state only.
 
-**Last updated:** 2026-05-19 by Claude Code (Wikipedia surface shipped — Phase 2 of content-hub consolidation)
+**Last updated:** 2026-05-21 by Claude Code (Agency portal fixes — per-client auth + Download PDF in viewer)
 
 ---
 
@@ -16,16 +16,21 @@
 
 One FastAPI backend, one Next.js frontend. The `/agency/*` routes are staff-only; everything else is the customer-facing SaaS. SaaS customers and agency clients share the same DB — agency clients are scoped via `AgencyClient → Brand` link.
 
-- **Most recent work:** **Wikipedia surface shipped on `feat/wikipedia-surface`** — Phase 2 of the content-hub consolidation. Dedicated `/wiki/[brandId]` page with real Wikipedia REST API article discovery (no LLM hallucination), free pre-filter (disambiguation / list / brand-self / competitors / thin summaries), LLM legitimacy gate via claude-haiku (`CROSS_REF_SUMMARY_MODEL`, threshold 0.55), on-demand wikitext generation reusing `build_wikipedia_prompt()` extended with `locked_article_title` / `article_section_list` / `citation_needed_hints` kwargs. User-recorded status lifecycle (`new` → `drafted` → `submitted` → `accepted` / `reverted` / `dismissed`). 2 new tables (`WikipediaCandidate`, `WikipediaScan`), 6 endpoints under `/api/wikipedia/*`, 4 frontend components, 2 routes, sidebar entry. Growth + Pro tier with rolling-30-day caps (Growth: 4 scans + 30 drafts; Pro: unlimited). 43 dedicated Wikipedia tests passing. Specs: `docs/superpowers/specs/2026-05-18-wikipedia-surface-design.md`. Plan: `docs/superpowers/plans/2026-05-19-wikipedia-surface.md`.
-- **Branch:** `feat/wikipedia-surface`
-- **Next concrete step:** Merge `feat/wikipedia-surface` to main and push (triggers Railway deploy — no destructive migration this time, just new tables). Monitor first real scans against live brands; tune legitimacy threshold if candidate quality is off. Phase 1 + Phase 2 of the content-hub consolidation are now complete.
+- **Most recent work:** **Agency portal gap-fixes** on branch `clusters-redesign-2026-05-20`. Three gaps surfaced in audit: (1) Copy-review-link button — already shipped earlier in `f35d249` as `CopyReviewLinkButton`; (2) Download-PDF affordance in `DocumentViewer` (4 of 5 doc templates were rendering as raw markdown — now exposed via the existing `agencyDownloadDocumentPdf` Blob helper); (3) Per-client authorization — previously all `/agency/*` endpoints were gated only by binary `require_agency_staff`, meaning every contractor could touch every client. New `AgencyClientAssignment(agency_client_id, staff_user_id)` join table + `require_client_access` dep + `ensure_client_access` helper for indirect-scope endpoints. 13 direct client-scoped endpoints + 11 indirect (task/doc/draft/event ids) now enforce assignment. 4 cross-client endpoints (`/clients`, `/today`, `/activity/recent`, `/documents/recent`) filter to assigned-only for non-admins. Creator auto-assigned on `POST /clients`. 3 new endpoints for staff assign/unassign (`/clients/{id}/staff-assigned[/{user_id}]`). New `ClientStaffPanel` component mounted inside the Brand tab. 9 new tests in `test_agency_client_access.py`; existing 79-test agency suite green. Admin users bypass all checks.
+- **Branch:** `clusters-redesign-2026-05-20`
+- **Next concrete step:** Verify the Download-PDF and Staff-panel UIs in the browser, then merge to main when ready. Once merged: assignment table starts empty; admins (Ken) still see everything, but any future non-admin contractor must be explicitly assigned to a client.
 - **Blockers / waiting on:** None known.
+
+### Plan reference
+- `docs/superpowers/plans/2026-05-20-agency-portal-fixes.md` (saved during this session but currently missing because the branch switch undid it — recreate or re-derive from `Recent Decisions` if needed).
 
 ---
 
 ## Recent Decisions
 
 _Append-only log. Newest first. Each entry: date — decision — rationale (1 line)._
+
+- **2026-05-21** — Closed three agency-portal gaps on `clusters-redesign-2026-05-20`. (a) `CopyReviewLinkButton` confirmed shipped earlier in `f35d249` — no work needed. (b) Added `Download PDF` button to `DocumentViewer` (reuses existing `agencyDownloadDocumentPdf` Blob helper + browser-side `URL.createObjectURL` trigger). (c) **Per-client authorization** — previously a binary `is_agency_staff` check let every staff user touch every client. New `AgencyClientAssignment` join table + `require_client_access` dep + `ensure_client_access` helper. 13 direct endpoints + 11 indirect-scope endpoints enforce assignment; 4 cross-client endpoints filter to assigned-only; creator auto-assigned on `POST /clients`; admins bypass everywhere. 3 staff-assign endpoints + `ClientStaffPanel` UI mounted in Brand tab. 9 new tests + 79-test agency suite green. Behavior change worth noting: unknown `client_id` on cockpit endpoints now returns 403 (was 404) — assignment check fires before existence check; that's intentional (less info leak) and one regression test was updated to match.
 
 - **2026-05-19** — Shipped **Wikipedia surface** (Phase 2 of content-hub consolidation) on `feat/wikipedia-surface`. Carved Wikipedia out of the marketing-content flow into its own discovery + on-demand draft surface at `/wiki/[brandId]`. Real article discovery via Wikipedia REST API, LLM legitimacy gate via claude-haiku, manual scan trigger only, user-recorded status lifecycle, Growth + Pro tier with rolling-30-day caps. Reuses existing `build_wikipedia_prompt` + `parse_wikipedia_draft` primitives via new optional kwargs (`locked_article_title`, `article_section_list`, `citation_needed_hints`). 43 dedicated tests; subagent-driven execution; no destructive migration.
 - **2026-05-13** — Shipped **agency sub-project G** (weekly comprehensive report) on `feat/agency-weekly-report`. New `agency_weekly_report` Template in `app/services/document_engine/` — markdown via Claude Sonnet, 8 sections (executive summary, visibility this week WoW, per-prompt scorecard, competitor delta, content shipped, draft→score attribution from `DraftAttribution`, top 3 gaps from `ContentGap`, next-week recs). Auto-generated at the end of `weekly_agency_sweep` via `_run_agency_brand_and_report` wrapper (non-fatal — report errors logged but don't break tracking). On-demand "Generate weekly report" button in cockpit Documents section. Zero new API surface — reuses existing `POST /agency/clients/{id}/documents` endpoint via template registry. 6 new tests + 51 regression all green. Smoke verified.
@@ -55,6 +60,12 @@ _Things to figure out. Move to "Recent Decisions" once resolved with the resolut
 ---
 
 ## Recently Changed (last session)
+
+- **Agency portal fixes (branch `clusters-redesign-2026-05-20`, unmerged):**
+  - Backend: `app/models.py` (+`AgencyClientAssignment`); `app/database.py` (+migration); `app/dependencies.py` (+`require_client_access`, +`ensure_client_access`); `app/routers/agency.py` (dep swap on 13 client-scoped endpoints, `ensure_client_access` on 11 indirect endpoints, `_accessible_client_ids` helper, cross-client filter on `list_clients`/`get_today`/`list_recent_activity`/`list_recent_documents`, auto-assign creator in `create_client`, 3 new staff-assignment endpoints, intentional skip-comment on `list_staff`); `app/schemas.py` (+`ClientStaffAssignmentOut`); `tests/conftest.py` (+truncation entry).
+  - Frontend: `components/agency/DocumentViewer.tsx` (+Download PDF button); `lib/api.ts` (+3 staff API methods + types); `components/agency/ClientStaffPanel.tsx` (new — assigned-staff list with add/remove); `components/agency/ClientCockpit.tsx` (mount staff panel inside Brand tab).
+  - Tests: new `tests/test_agency_client_access.py` (9 tests covering blocked/admin-bypass/manual-assign/auto-assign/representative-direct-endpoints/cross-client-filters/full-assign-unassign-flow). `tests/test_agency_tracking.py` (`test_trigger_tracking_unknown_client_404` renamed + updated to expect 403 since assignment check fires before existence check).
+  - Verification: 79 backend tests in the full agency suite green. `tsc --noEmit` on frontend clean. **Browser verification of Download PDF and ClientStaffPanel still pending.**
 
 - **Site Audit Fix-Factory redesign (branch `feat/site-audit-fix-factory`, merged to main):**
   - Backend: `app/services/site_audit/artifact_generator.py` (dispatcher); `generators_artifact_rule.py` (5 rule-based); `generators_artifact_llm.py` (13 LLM types); `parsers/{eeat,qa,linking,agents_md}.py` (4 new check categories); `recommendations.py` (+priority_score, +_RECS_META with 43 entries covering all existing + new check_ids); `auditor.py` (wires new parsers, persists new fields); `routers/site_audit.py` (POST /draft, PATCH /status, tier gates, monthly LLM cap); `models.py` (+8 cols on WebsiteAuditRecommendation); `database.py` (+8 ALTER TABLE migrations); `schemas.py` (+3 schemas, +8 fields on output); `scripts/backfill_rec_metadata.py` (idempotent enrichment of existing recs).

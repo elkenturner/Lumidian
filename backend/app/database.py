@@ -481,6 +481,16 @@ async def run_migrations():
         "ALTER TABLE content_briefs ADD COLUMN evidence_pack_id INTEGER",
         "ALTER TABLE content_drafts ADD COLUMN failure_reason TEXT",
         "ALTER TABLE content_drafts ADD COLUMN generation_state TEXT NOT NULL DEFAULT 'done'",
+        # 2026-05-20: Agency per-client authorization — staff↔client join table
+        """CREATE TABLE IF NOT EXISTS agency_client_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agency_client_id INTEGER NOT NULL REFERENCES agency_clients(id) ON DELETE CASCADE,
+            staff_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            assigned_at DATETIME,
+            UNIQUE(agency_client_id, staff_user_id)
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_agency_assignments_staff ON agency_client_assignments(staff_user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_agency_assignments_client ON agency_client_assignments(agency_client_id)",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

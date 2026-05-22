@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ClientBrandTab } from './ClientBrandTab';
 import { ClientPipelineTab } from './ClientPipelineTab';
+import { ClientStaffPanel } from './ClientStaffPanel';
 import { DocumentList } from './DocumentList';
 import { GenerateDraftButton } from './GenerateDraftButton';
 import { LumidianTrackingWidget } from './LumidianTrackingWidget';
@@ -369,6 +370,9 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
         </TabsContent>
 
         <TabsContent value="brand" className="mt-6">
+          <div className="mb-4">
+            <ClientStaffPanel clientId={client.id} />
+          </div>
           <ClientBrandTab brandId={client.brand_id} />
         </TabsContent>
 

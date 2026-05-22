@@ -16,10 +16,16 @@ from app.models import (
     Brand,
     ContentBrief,
     ContentCluster,
+    ContentClusterSource,
     ContentDraft,
+    ContentEvidencePack,
     Prompt,
 )
 from app.schemas import (
+    ClusterPieceStatus,
+    ClusterSourceItem,
+    ClusterSourcesPayload,
+    ClusterStatusPayload,
     ContentBriefSchema,
     ContentClusterDetail,
     ContentClusterSummary,
@@ -258,3 +264,103 @@ async def propose_pillar_endpoint(brand_id: int, cluster_id: int, db: DbDep, use
         tone_score=cand.tone_score,
         tone_reasoning=cand.tone_reasoning,
     )
+
+
+@router.get("/{brand_id}/{cluster_id}/status", response_model=ClusterStatusPayload)
+async def cluster_status(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
+    await _ensure_brand_owned(db, brand_id, user.id)
+    cluster = (await db.execute(
+        select(ContentCluster).where(
+            ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
+        )
+    )).scalar_one_or_none()
+    if cluster is None:
+        raise HTTPException(404, "Cluster not found")
+    drafts = (await db.execute(
+        select(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
+    )).scalars().all()
+    return ClusterStatusPayload(
+        status=cluster.status,
+        failure_reason=cluster.failure_reason,
+        pieces=[ClusterPieceStatus(
+            platform=d.platform, draft_id=d.id, status=d.status,
+            generation_state=d.generation_state, failure_reason=d.failure_reason,
+        ) for d in drafts],
+        version=cluster.version,
+        last_generated_at=cluster.last_generated_at,
+    )
+
+
+@router.post("/{brand_id}/{cluster_id}/regenerate-pieces", response_model=ContentClusterDetail)
+async def regenerate_pieces(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
+    await _ensure_brand_owned(db, brand_id, user.id)
+    cluster = (await db.execute(
+        select(ContentCluster).where(
+            ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
+        )
+    )).scalar_one_or_none()
+    if cluster is None:
+        raise HTTPException(404, "Cluster not found")
+    await regenerate_cluster(
+        db, cluster_id=cluster.id, tier=user.subscription_tier, rebuild_brief=False,
+    )
+    return await get_cluster(brand_id, cluster.id, db, user)  # type: ignore
+
+
+@router.post("/{brand_id}/{cluster_id}/rebuild", response_model=ContentClusterDetail)
+async def rebuild_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
+    await _ensure_brand_owned(db, brand_id, user.id)
+    cluster = (await db.execute(
+        select(ContentCluster).where(
+            ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
+        )
+    )).scalar_one_or_none()
+    if cluster is None:
+        raise HTTPException(404, "Cluster not found")
+    await regenerate_cluster(
+        db, cluster_id=cluster.id, tier=user.subscription_tier, rebuild_brief=True,
+    )
+    return await get_cluster(brand_id, cluster.id, db, user)  # type: ignore
+
+
+@router.get("/{brand_id}/{cluster_id}/sources", response_model=ClusterSourcesPayload)
+async def cluster_sources(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
+    await _ensure_brand_owned(db, brand_id, user.id)
+    cluster = (await db.execute(
+        select(ContentCluster).where(
+            ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
+        )
+    )).scalar_one_or_none()
+    if cluster is None:
+        raise HTTPException(404, "Cluster not found")
+    pack = (await db.execute(
+        select(ContentEvidencePack)
+        .where(ContentEvidencePack.cluster_id == cluster.id)
+        .order_by(ContentEvidencePack.version.desc())
+    )).scalars().first()
+    if pack is None:
+        return ClusterSourcesPayload(total_t1=0, total_t2=0, total_t3=0, sources=[])
+    rows = (await db.execute(
+        select(ContentClusterSource).where(
+            ContentClusterSource.cluster_id == cluster.id,
+        )
+    )).scalars().all()
+    tier_order = {"T1": 0, "T2": 1, "T3": 2}
+    rows = sorted(rows, key=lambda r: (tier_order[r.tier], -r.times_cited))
+    return ClusterSourcesPayload(
+        total_t1=pack.total_t1, total_t2=pack.total_t2, total_t3=pack.total_t3,
+        sources=[ClusterSourceItem(
+            url=r.url, domain=r.domain, tier=r.tier, title=r.title,
+            times_cited=r.times_cited,
+        ) for r in rows],
+    )
+
+
+@router.get("/{brand_id}/{cluster_id}/briefs", response_model=list[ContentBriefSchema])
+async def brief_history(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
+    await _ensure_brand_owned(db, brand_id, user.id)
+    rows = (await db.execute(
+        select(ContentBrief).where(ContentBrief.cluster_id == cluster_id)
+        .order_by(ContentBrief.version.desc())
+    )).scalars().all()
+    return rows

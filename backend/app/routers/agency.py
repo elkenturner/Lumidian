@@ -24,6 +24,7 @@ from app.schemas import (
     AgencyDraftGenerateIn,
     AgencyStaffOut,
     AgencyTaskCreate,
+    ClientProposalUpdateIn,
     ClientStaffAssignmentOut,
     AgencyTaskOut,
     AgencyTaskUpdate,
@@ -101,6 +102,8 @@ async def _client_to_out(db: AsyncSession, client: AgencyClient) -> AgencyClient
         brand_id=brand_id,
         drafts_pending=pending_count,
         created_at=client.created_at,
+        current_proposal_doc_url=client.current_proposal_doc_url,
+        current_proposal_label=client.current_proposal_label,
     )
 
 
@@ -1238,3 +1241,29 @@ async def mark_draft_posted(
     await db.commit()
     await db.refresh(draft)
     return _draft_to_out(draft)
+
+
+@router.patch("/clients/{client_id}/proposal", response_model=AgencyClientOut)
+async def update_client_proposal(
+    client_id: int,
+    body: ClientProposalUpdateIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_client_access),
+):
+    """Set the 'this week's proposal' pointer (Google Doc URL + label).
+
+    Either field may be set to null to clear. Used by staff after sending out
+    the weekly content proposal Google Doc.
+    """
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    data = body.model_dump(exclude_unset=True)
+    if "current_proposal_doc_url" in data:
+        client.current_proposal_doc_url = data["current_proposal_doc_url"]
+    if "current_proposal_label" in data:
+        client.current_proposal_label = data["current_proposal_label"]
+    client.updated_at = datetime.utcnow()
+    await db.commit()
+    await db.refresh(client)
+    return await _client_to_out(db, client)

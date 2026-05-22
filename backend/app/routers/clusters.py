@@ -19,6 +19,7 @@ from app.models import (
     ContentClusterSource,
     ContentDraft,
     ContentEvidencePack,
+    DraftAttribution,
     Prompt,
 )
 from app.schemas import (
@@ -70,7 +71,6 @@ def _summarize_pieces(drafts: list[ContentDraft]) -> list[dict]:
 
 @router.get("/{brand_id}", response_model=list[ContentClusterSummary])
 async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dict]:
-    from app.models import DraftAttribution
     brand = await _ensure_brand_owned(db, brand_id, user.id)
     rows = (await db.execute(
         select(ContentCluster).where(ContentCluster.brand_id == brand.id)

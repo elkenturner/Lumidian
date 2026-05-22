@@ -2,14 +2,12 @@
 from __future__ import annotations
 
 import pytest
-from httpx import AsyncClient
 
 from app.models import AgencyClient
-from tests.conftest import register_user, login_user
 
 
 @pytest.mark.asyncio
-async def test_agency_client_has_proposal_columns(client: AsyncClient, db_session):
+async def test_agency_client_has_proposal_columns(db_session):
     """AgencyClient table has current_proposal_doc_url and current_proposal_label columns."""
     ac = AgencyClient(
         name="Acme Inc",

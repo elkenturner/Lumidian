@@ -4,12 +4,18 @@ import { useState } from "react";
 import { Check, Copy, Loader2, Maximize2, RefreshCw, X } from "lucide-react";
 import PlatformBadge from "@/components/PlatformBadge";
 import { regenerateClusterPiece, type ContentDraft } from "@/lib/api";
+import { CitationsSubpanel } from "./CitationsSubpanel";
+import { CriticNotesSubpanel } from "./CriticNotesSubpanel";
 
 interface Props {
   brandId: number;
   clusterId: number;
   platform: string;
   draft: ContentDraft | null;
+  /** Per-piece visibility attribution delta (percentage points) — shown inline when present. */
+  attribution?: { delta_pp: number | null };
+  /** Whether the current user is on the Pro tier — gates the Critic Notes subpanel. */
+  isPro?: boolean;
   onUpdated: (draft: ContentDraft) => void;
 }
 
@@ -20,7 +26,7 @@ const STATUS_TONE: Record<string, string> = {
   failed: "text-[#fb7185]",
 };
 
-export function PieceCard({ brandId, clusterId, platform, draft, onUpdated }: Props) {
+export function PieceCard({ brandId, clusterId, platform, draft, attribution, isPro = false, onUpdated }: Props) {
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -52,18 +58,41 @@ export function PieceCard({ brandId, clusterId, platform, draft, onUpdated }: Pr
   return (
     <>
       <div className="card flex flex-col min-h-[220px]">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-2">
           <PlatformBadge platform={platform} />
-          {draft && (
-            <span
-              className={`text-[11px] font-semibold uppercase tracking-wide ${
-                STATUS_TONE[draft.status] ?? "text-[var(--text-muted)]"
-              }`}
-            >
-              {draft.status}
-            </span>
-          )}
+          <div className="flex items-center gap-2 min-w-0">
+            {draft?.generation_state && draft.generation_state !== "done" && draft.generation_state !== "failed" && (
+              <span className="inline-flex items-center gap-1 text-[10px] rounded-full px-1.5 py-0.5 bg-sky-500/15 text-sky-200 border border-sky-500/30">
+                <span className="h-1.5 w-1.5 rounded-full bg-sky-300 animate-pulse" />
+                {draft.generation_state}
+              </span>
+            )}
+            {attribution?.delta_pp != null && (
+              <span
+                className={`text-[11px] font-medium ${
+                  attribution.delta_pp >= 0 ? "text-emerald-300" : "text-rose-300"
+                }`}
+              >
+                {attribution.delta_pp >= 0 ? "+" : ""}
+                {attribution.delta_pp.toFixed(1)}pp
+              </span>
+            )}
+            {draft && (
+              <span
+                className={`text-[11px] font-semibold uppercase tracking-wide ${
+                  STATUS_TONE[draft.status] ?? "text-[var(--text-muted)]"
+                }`}
+              >
+                {draft.status}
+              </span>
+            )}
+          </div>
         </div>
+        {draft?.generation_state === "failed" && (
+          <div className="mb-2 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-1">
+            Failed: {draft.failure_reason || "unknown error"}
+          </div>
+        )}
 
         {draft ? (
           <>
@@ -170,6 +199,21 @@ export function PieceCard({ brandId, clusterId, platform, draft, onUpdated }: Pr
 
             <div className="flex-1 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--text-secondary)] leading-relaxed pr-2">
               {draft.content_text}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-2">
+                  Citations
+                </div>
+                <CitationsSubpanel citations={draft.citations ?? []} />
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-2">
+                  Critic notes
+                </div>
+                <CriticNotesSubpanel isPro={isPro} notes={null} />
+              </div>
             </div>
 
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">

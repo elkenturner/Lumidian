@@ -1218,6 +1218,15 @@ class AgencyStaffOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ClientStaffAssignmentOut(BaseModel):
+    user_id: int
+    name: str | None
+    email: str
+    assigned_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 # ── Agency documents (sub-project C, 2026-05-12) ─────────────────────────────
 
 
@@ -1346,8 +1355,36 @@ class ContentClusterSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ContentDraftCitationSchema(BaseModel):
+    source_ref: str
+    url: str
+    title: str | None
+    position_marker: int | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ContentClusterDraft(BaseModel):
+    """ContentDraftSchema + per-draft citations + new redesign fields."""
+    id: int
+    brand_id: int
+    prompt_id: int | None
+    cluster_id: int | None
+    platform: str
+    status: str
+    title: str | None
+    content_text: str
+    quality_score: float | None = None
+    posted_at: datetime | None = None
+    generation_state: str = "done"
+    failure_reason: str | None = None
+    citations: list[ContentDraftCitationSchema] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ContentClusterDetail(BaseModel):
-    """Full cluster — brief + drafts (existing ContentDraftSchema)."""
+    """Full cluster — brief + drafts with citations."""
     id: int
     brand_id: int
     prompt_id: int
@@ -1357,7 +1394,7 @@ class ContentClusterDetail(BaseModel):
     pillar_url: str | None
     visibility_pct: float
     brief: ContentBriefSchema | None
-    drafts: list["ContentDraftSchema"]
+    drafts: list[ContentClusterDraft]
     version: int
     last_generated_at: datetime | None
 
@@ -1383,6 +1420,37 @@ class EditBriefRequest(BaseModel):
     stats: list[dict] | None = None
     narrative_spine: str | None = None
     tone_notes: str | None = None
+
+
+class ClusterPieceStatus(BaseModel):
+    platform: str
+    draft_id: int | None = None
+    status: str | None = None
+    generation_state: str = "done"
+    failure_reason: str | None = None
+
+
+class ClusterStatusPayload(BaseModel):
+    status: str
+    failure_reason: str | None = None
+    pieces: list[ClusterPieceStatus]
+    version: int
+    last_generated_at: datetime | None = None
+
+
+class ClusterSourceItem(BaseModel):
+    url: str
+    domain: str
+    tier: str
+    title: str | None
+    times_cited: int
+
+
+class ClusterSourcesPayload(BaseModel):
+    total_t1: int
+    total_t2: int
+    total_t3: int
+    sources: list[ClusterSourceItem]
 
 
 # ── Agency drafting (sub-project E, 2026-05-13) ──────────────────────────────
@@ -1503,3 +1571,54 @@ class VideoMetadataJobOut(BaseModel):
 class VideoUploadResponse(BaseModel):
     job_id: int
     status: str
+
+
+# ── Prospect audits ──────────────────────────────────────────────────────────
+
+
+class ProspectAuditCreate(BaseModel):
+    business_name: str = Field(min_length=1, max_length=200)
+    website_url: str = Field(min_length=1, max_length=2048)
+    is_local: bool = False
+    location: str | None = Field(default=None, max_length=200)
+
+    @field_validator("location")
+    @classmethod
+    def _location_required_when_local(cls, v, info):
+        if info.data.get("is_local") and not (v and v.strip()):
+            raise ValueError("location is required when is_local is true")
+        return v.strip() if v else None
+
+    @field_validator("website_url")
+    @classmethod
+    def _coerce_url(cls, v):
+        v = v.strip()
+        if not v.startswith(("http://", "https://")):
+            v = "https://" + v
+        return v
+
+
+class ProspectAuditListItem(BaseModel):
+    id: int
+    business_name: str
+    website_url: str
+    is_local: bool
+    location: str | None
+    status: str
+    overall_visibility_pct: float | None
+    aggregate_rvi: float | None
+    rvi_band: str | None
+    created_at: datetime
+    completed_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProspectAuditOut(ProspectAuditListItem):
+    status_message: str | None
+    error_message: str | None
+    cancel_requested: bool
+    started_at: datetime | None
+    has_pdf: bool   # computed from pdf_path is not None
+
+    model_config = ConfigDict(from_attributes=True)

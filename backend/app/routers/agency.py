@@ -13,8 +13,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_agency_staff
-from app.models import AgencyClient, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, ContentPost, Prompt, User
+from app.dependencies import ensure_client_access, require_agency_staff, require_client_access
+from app.models import AgencyClient, AgencyClientAssignment, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, ContentPost, Prompt, User
 from app.schemas import (
     ActivityEventOut,
     ActivityEventWithClientOut,
@@ -24,6 +24,7 @@ from app.schemas import (
     AgencyDraftGenerateIn,
     AgencyStaffOut,
     AgencyTaskCreate,
+    ClientStaffAssignmentOut,
     AgencyTaskOut,
     AgencyTaskUpdate,
     DocumentGenerateIn,
@@ -128,12 +129,30 @@ async def _event_to_out(db: AsyncSession, event: ClientActivityEvent) -> Activit
     )
 
 
+async def _accessible_client_ids(db: AsyncSession, user: User) -> list[int] | None:
+    """Return list of client IDs this user can access, or None to mean 'all' (admin bypass)."""
+    if user.is_admin:
+        return None
+    rows = await db.execute(
+        select(AgencyClientAssignment.agency_client_id).where(
+            AgencyClientAssignment.staff_user_id == user.id
+        )
+    )
+    return [r for (r,) in rows.all()]
+
+
 @router.get("/clients", response_model=list[AgencyClientOut])
 async def list_clients(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
-    rows = await db.execute(select(AgencyClient).order_by(AgencyClient.created_at.desc()))
+    accessible = await _accessible_client_ids(db, user)
+    if accessible is not None and not accessible:
+        return []
+    stmt = select(AgencyClient).order_by(AgencyClient.created_at.desc())
+    if accessible is not None:
+        stmt = stmt.where(AgencyClient.id.in_(accessible))
+    rows = await db.execute(stmt)
     clients = rows.scalars().all()
     return [await _client_to_out(db, c) for c in clients]
 
@@ -166,6 +185,11 @@ async def create_client(
         brand_type="agency",
     )
     db.add(brand)
+    # Auto-assign creator so they can immediately access this client.
+    db.add(AgencyClientAssignment(
+        agency_client_id=client.id,
+        staff_user_id=user.id,
+    ))
     await emit_event(
         db,
         agency_client_id=client.id,
@@ -182,7 +206,7 @@ async def create_client(
 async def get_client(
     client_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    _user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -195,7 +219,7 @@ async def update_client(
     client_id: int,
     body: AgencyClientUpdate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
+    user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -223,7 +247,7 @@ async def update_client(
 async def delete_client(
     client_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    _user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -235,29 +259,48 @@ async def delete_client(
 @router.get("/today", response_model=TodayOut)
 async def get_today(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
+    accessible = await _accessible_client_ids(db, user)
+    if accessible is not None and not accessible:
+        return TodayOut(
+            drafts_to_review=[],
+            drafts_to_review_count=0,
+            active_clients=0,
+            awaiting_client=[],
+            approved=[],
+        )
+
+    def _scoped(stmt):
+        return stmt.where(AgencyClient.id.in_(accessible)) if accessible is not None else stmt
+
     awaiting_staff_q = await db.execute(
-        select(ContentDraft, Brand, AgencyClient)
-        .join(Brand, Brand.id == ContentDraft.brand_id)
-        .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
-        .where(ContentDraft.status.in_(("draft", "changes_requested")))
+        _scoped(
+            select(ContentDraft, Brand, AgencyClient)
+            .join(Brand, Brand.id == ContentDraft.brand_id)
+            .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
+            .where(ContentDraft.status.in_(("draft", "changes_requested")))
+        )
         .order_by(ContentDraft.created_at.asc())
         .limit(50)
     )
     awaiting_client_q = await db.execute(
-        select(ContentDraft, Brand, AgencyClient)
-        .join(Brand, Brand.id == ContentDraft.brand_id)
-        .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
-        .where(ContentDraft.status == "awaiting_client")
+        _scoped(
+            select(ContentDraft, Brand, AgencyClient)
+            .join(Brand, Brand.id == ContentDraft.brand_id)
+            .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
+            .where(ContentDraft.status == "awaiting_client")
+        )
         .order_by(ContentDraft.created_at.asc())
         .limit(50)
     )
     approved_q = await db.execute(
-        select(ContentDraft, Brand, AgencyClient)
-        .join(Brand, Brand.id == ContentDraft.brand_id)
-        .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
-        .where(ContentDraft.status == "approved")
+        _scoped(
+            select(ContentDraft, Brand, AgencyClient)
+            .join(Brand, Brand.id == ContentDraft.brand_id)
+            .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
+            .where(ContentDraft.status == "approved")
+        )
         .order_by(ContentDraft.created_at.asc())
         .limit(50)
     )
@@ -280,9 +323,10 @@ async def get_today(
     awaiting_client = _to_out(awaiting_client_q.all())
     approved = _to_out(approved_q.all())
 
-    active_clients_q = await db.execute(
-        select(func.count(AgencyClient.id)).where(AgencyClient.status == "active")
-    )
+    active_clients_stmt = select(func.count(AgencyClient.id)).where(AgencyClient.status == "active")
+    if accessible is not None:
+        active_clients_stmt = active_clients_stmt.where(AgencyClient.id.in_(accessible))
+    active_clients_q = await db.execute(active_clients_stmt)
     active_clients = active_clients_q.scalar_one() or 0
 
     return TodayOut(
@@ -299,11 +343,15 @@ async def assign_draft(
     draft_id: int,
     body: DraftAssignIn,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
     draft = await db.get(ContentDraft, draft_id)
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft not found")
+    brand = await db.get(Brand, draft.brand_id)
+    if brand is None or brand.agency_client_id is None:
+        raise HTTPException(status_code=404, detail="Draft has no agency client")
+    await ensure_client_access(db, user, brand.agency_client_id)
     draft.assigned_to_user_id = body.assigned_to_user_id
     await db.commit()
 
@@ -326,7 +374,7 @@ async def get_review_link(
     client_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    _user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -346,7 +394,7 @@ async def rotate_review_link(
     client_id: int,
     request: Request,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
+    user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -399,6 +447,10 @@ async def update_draft_status(
     draft = await db.get(ContentDraft, draft_id)
     if draft is None:
         raise HTTPException(status_code=404, detail="Draft not found")
+    brand = await db.get(Brand, draft.brand_id)
+    if brand is None or brand.agency_client_id is None:
+        raise HTTPException(status_code=404, detail="Draft has no agency client")
+    await ensure_client_access(db, user, brand.agency_client_id)
     prev_status = draft.status
     draft.status = body.status
     if body.status == "approved" and draft.approved_at is None:
@@ -407,7 +459,6 @@ async def update_draft_status(
         draft.posted_at = datetime.utcnow()
 
     # Emit activity event if this is an interesting transition
-    brand = await db.get(Brand, draft.brand_id)
     if brand and brand.agency_client_id is not None:
         title_label = draft.title or f"Draft #{draft.id}"
         if body.status == "awaiting_client" and prev_status != "awaiting_client":
@@ -437,7 +488,7 @@ async def list_client_activity(
     limit: int = 50,
     before: int | None = None,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    _user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -460,7 +511,7 @@ async def post_note(
     client_id: int,
     body: NoteCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
+    user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -487,6 +538,7 @@ async def edit_note(
     event = await db.get(ClientActivityEvent, event_id)
     if event is None or event.event_type != EVENT_NOTE:
         raise HTTPException(status_code=404, detail="Note not found")
+    await ensure_client_access(db, user, event.agency_client_id)
     if event.actor_user_id != user.id and not user.is_admin:
         raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not the author")
     event.body = body.body
@@ -505,6 +557,7 @@ async def delete_note(
     event = await db.get(ClientActivityEvent, event_id)
     if event is None or event.event_type != EVENT_NOTE:
         raise HTTPException(status_code=404, detail="Note not found")
+    await ensure_client_access(db, user, event.agency_client_id)
     if event.actor_user_id != user.id and not user.is_admin:
         raise HTTPException(status_code=http_status.HTTP_403_FORBIDDEN, detail="Not the author")
     await db.delete(event)
@@ -515,10 +568,13 @@ async def delete_note(
 async def list_recent_activity(
     limit: int = 10,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
     from datetime import timedelta
 
+    accessible = await _accessible_client_ids(db, user)
+    if accessible is not None and not accessible:
+        return []
     limit = max(1, min(limit, 50))
     cutoff = datetime.utcnow() - timedelta(days=7)
     stmt = (
@@ -528,6 +584,8 @@ async def list_recent_activity(
         .order_by(ClientActivityEvent.id.desc())
         .limit(limit)
     )
+    if accessible is not None:
+        stmt = stmt.where(ClientActivityEvent.agency_client_id.in_(accessible))
     rows = (await db.execute(stmt)).all()
     results: list[ActivityEventWithClientOut] = []
     for event, ac in rows:
@@ -573,7 +631,7 @@ async def list_client_tasks(
     status: str | None = None,
     assigned_to: int | None = None,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    _user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -593,7 +651,7 @@ async def create_task(
     client_id: int,
     body: AgencyTaskCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
+    user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -632,6 +690,7 @@ async def update_task(
     task = await db.get(AgencyTask, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
+    await ensure_client_access(db, user, task.agency_client_id)
     prev_assignee = task.assigned_to_user_id
     prev_status = task.status
     data = body.model_dump(exclude_unset=True)
@@ -676,11 +735,12 @@ async def update_task(
 async def delete_task(
     task_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
     task = await db.get(AgencyTask, task_id)
     if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
+    await ensure_client_access(db, user, task.agency_client_id)
     await db.delete(task)
     await db.commit()
 
@@ -736,6 +796,8 @@ async def list_staff(
     db: AsyncSession = Depends(get_db),
     _user: User = Depends(require_agency_staff),
 ):
+    # NOTE: list_staff is intentionally not per-client filtered — drafting/task UIs
+    # need the full staff roster to populate "assign to" dropdowns.
     rows = await db.execute(
         select(User)
         .join(AgencyStaff, AgencyStaff.user_id == User.id)
@@ -744,6 +806,82 @@ async def list_staff(
     )
     users = rows.scalars().all()
     return [AgencyStaffOut(id=u.id, name=u.name, email=u.email) for u in users]
+
+
+# ── Per-client staff assignment ──────────────────────────────────────────────
+
+
+@router.get("/clients/{client_id}/staff-assigned", response_model=list[ClientStaffAssignmentOut])
+async def list_client_assigned_staff(
+    client_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user: User = Depends(require_client_access),
+):
+    """Staff members assigned to this client."""
+    rows = await db.execute(
+        select(User, AgencyClientAssignment)
+        .join(AgencyClientAssignment, AgencyClientAssignment.staff_user_id == User.id)
+        .where(AgencyClientAssignment.agency_client_id == client_id)
+        .order_by(User.email.asc())
+    )
+    return [
+        ClientStaffAssignmentOut(
+            user_id=u.id, name=u.name, email=u.email, assigned_at=a.assigned_at
+        )
+        for u, a in rows.all()
+    ]
+
+
+@router.post(
+    "/clients/{client_id}/staff-assigned/{user_id}",
+    response_model=ClientStaffAssignmentOut,
+    status_code=http_status.HTTP_201_CREATED,
+)
+async def assign_staff_to_client(
+    client_id: int,
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _caller: User = Depends(require_client_access),
+):
+    """Assign a staff member to this client. Idempotent."""
+    target = await db.get(User, user_id)
+    if target is None or not getattr(target, "is_agency_staff", False):
+        raise HTTPException(status_code=404, detail="Staff user not found")
+    existing = await db.execute(
+        select(AgencyClientAssignment).where(
+            AgencyClientAssignment.agency_client_id == client_id,
+            AgencyClientAssignment.staff_user_id == user_id,
+        )
+    )
+    row = existing.scalar_one_or_none()
+    if row is None:
+        row = AgencyClientAssignment(agency_client_id=client_id, staff_user_id=user_id)
+        db.add(row)
+        await db.commit()
+        await db.refresh(row)
+    return ClientStaffAssignmentOut(
+        user_id=target.id, name=target.name, email=target.email, assigned_at=row.assigned_at
+    )
+
+
+@router.delete(
+    "/clients/{client_id}/staff-assigned/{user_id}",
+    status_code=http_status.HTTP_204_NO_CONTENT,
+)
+async def unassign_staff_from_client(
+    client_id: int,
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    _caller: User = Depends(require_client_access),
+):
+    """Remove a staff assignment. Idempotent."""
+    await db.execute(
+        AgencyClientAssignment.__table__.delete().where(
+            AgencyClientAssignment.agency_client_id == client_id,
+            AgencyClientAssignment.staff_user_id == user_id,
+        )
+    )
+    await db.commit()
 
 
 # ── Document helpers ──────────────────────────────────────────────────────────
@@ -780,7 +918,7 @@ async def list_client_documents(
     client_id: int,
     kind: str | None = None,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    _user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -798,8 +936,11 @@ async def list_recent_documents(
     limit: int = 20,
     kind: str | None = None,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
+    accessible = await _accessible_client_ids(db, user)
+    if accessible is not None and not accessible:
+        return []
     limit = max(1, min(limit, 100))
     stmt = (
         select(ClientDocument, AgencyClient)
@@ -809,6 +950,8 @@ async def list_recent_documents(
     )
     if kind:
         stmt = stmt.where(ClientDocument.kind == kind)
+    if accessible is not None:
+        stmt = stmt.where(ClientDocument.agency_client_id.in_(accessible))
     rows = (await db.execute(stmt)).all()
     results: list[DocumentWithClientOut] = []
     for doc, ac in rows:
@@ -827,11 +970,12 @@ async def list_recent_documents(
 async def get_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
     doc = await db.get(ClientDocument, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
+    await ensure_client_access(db, user, doc.agency_client_id)
     return await _doc_to_out(db, doc)
 
 
@@ -839,7 +983,7 @@ async def get_document(
 async def get_document_pdf(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
     """Render an agency document as PDF (any registered kind)."""
     from fastapi import Response
@@ -849,6 +993,7 @@ async def get_document_pdf(
     doc = await db.get(ClientDocument, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
+    await ensure_client_access(db, user, doc.agency_client_id)
     try:
         pdf_bytes = await render_pdf(db, doc)
     except ValueError as e:
@@ -868,7 +1013,7 @@ async def create_document(
     client_id: int,
     body: DocumentGenerateIn,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
+    user: User = Depends(require_client_access),
 ):
     client = await db.get(AgencyClient, client_id)
     if client is None:
@@ -889,11 +1034,12 @@ async def update_document(
     document_id: int,
     body: DocumentUpdateIn,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
     doc = await db.get(ClientDocument, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
+    await ensure_client_access(db, user, doc.agency_client_id)
     doc.body_markdown = body.body_markdown
     doc.updated_at = datetime.utcnow()
     await db.commit()
@@ -905,11 +1051,12 @@ async def update_document(
 async def delete_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_agency_staff),
+    user: User = Depends(require_agency_staff),
 ):
     doc = await db.get(ClientDocument, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
+    await ensure_client_access(db, user, doc.agency_client_id)
     await db.delete(doc)
     await db.commit()
 
@@ -922,7 +1069,7 @@ async def agency_generate_draft(
     client_id: int,
     body: AgencyDraftGenerateIn,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
+    user: User = Depends(require_client_access),
 ):
     """Generate a draft inside the agency portal. Bypasses SaaS tier checks."""
     client = await db.get(AgencyClient, client_id)
@@ -1005,7 +1152,7 @@ async def agency_generate_draft(
 async def agency_trigger_tracking(
     client_id: int,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
+    user: User = Depends(require_client_access),
 ):
     """Kick off a tracking run for an agency client's brand. Bypasses SaaS tier checks."""
     import asyncio as _asyncio
@@ -1060,6 +1207,7 @@ async def mark_draft_posted(
     brand = await db.get(Brand, draft.brand_id)
     if brand is None or brand.agency_client_id is None:
         raise HTTPException(status_code=400, detail="Draft is not on an agency brand")
+    await ensure_client_access(db, user, brand.agency_client_id)
     if draft.status == "posted":
         return _draft_to_out(draft)
     if draft.status != "approved":

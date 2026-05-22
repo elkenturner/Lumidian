@@ -1,13 +1,17 @@
 """Tests for ContentCluster and ContentBrief models."""
 import pytest
 import pytest_asyncio
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import AsyncSessionLocal
 from app.models import (
     Brand,
     ContentBrief,
     ContentCluster,
+    ContentClusterSource,
     ContentDraft,
+    ContentEvidencePack,
     Prompt,
     User,
 )
@@ -123,3 +127,65 @@ async def test_content_draft_cluster_id_nullable(db_session: AsyncSession, regis
     await db_session.flush()
     assert draft.id is not None
     assert draft.cluster_id is None
+
+
+@pytest.mark.asyncio
+async def test_evidence_pack_persists():
+    async with AsyncSessionLocal() as db:
+        user = User(email="e@example.com", password_hash="x", name="t")
+        db.add(user)
+        await db.flush()
+        brand = Brand(name="Acme", slug="acme-test-modelchk", user_id=user.id)
+        db.add(brand)
+        await db.flush()
+        prompt = Prompt(brand_id=brand.id, text="best CRM")
+        db.add(prompt)
+        await db.flush()
+        cluster = ContentCluster(
+            brand_id=brand.id, prompt_id=prompt.id, status="pending",
+        )
+        db.add(cluster)
+        await db.flush()
+        pack = ContentEvidencePack(
+            cluster_id=cluster.id, version=1,
+            sources=[{"url": "https://reuters.com/x", "tier": "T1"}],
+            total_t1=1, total_t2=0, total_t3=0,
+        )
+        db.add(pack)
+        await db.flush()
+        src = ContentClusterSource(
+            cluster_id=cluster.id, evidence_pack_id=pack.id,
+            url="https://reuters.com/x", domain="reuters.com",
+            tier="T1", title="X", times_cited=0,
+        )
+        db.add(src)
+        await db.commit()
+
+        # Re-fetch and verify
+        loaded = (await db.execute(
+            select(ContentEvidencePack).where(ContentEvidencePack.cluster_id == cluster.id)
+        )).scalar_one()
+        assert loaded.total_t1 == 1
+        assert loaded.sources[0]["url"] == "https://reuters.com/x"
+
+
+@pytest.mark.asyncio
+async def test_cluster_failure_reason_field():
+    async with AsyncSessionLocal() as db:
+        cluster = ContentCluster(
+            brand_id=1, prompt_id=1, status="briefing_failed",
+            failure_reason="insufficient_t1_sources",
+        )
+        # Just construct; ensure attribute exists
+        assert cluster.failure_reason == "insufficient_t1_sources"
+
+
+@pytest.mark.asyncio
+async def test_draft_generation_state_default():
+    draft = ContentDraft(
+        brand_id=1, platform="medium", content_text="x", source="cluster",
+    )
+    # default kicked in only after flush; here just assert the column is present
+    from app.models import ContentDraft as M
+    assert hasattr(M, "generation_state")
+    assert hasattr(M, "failure_reason")

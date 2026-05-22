@@ -35,6 +35,39 @@ logger = logging.getLogger(__name__)
 
 CLUSTER_PLATFORMS: tuple[str, ...] = ("linkedin", "medium", "reddit", "quora", "x")
 
+# Platforms that get a soft "further reading" reference to the cluster's
+# Medium piece (or own-site pillar). Asymmetric — Medium/Wikipedia get nothing.
+_APPENDS_PILLAR_REF = {
+    "linkedin_post", "linkedin_reply", "linkedin_article",
+    "reddit", "reddit_reply",
+    "quora",
+    "x_post", "x_thread", "x_reply",
+}
+
+
+def append_pillar_reference(
+    *,
+    text: str,
+    platform: str,
+    pillar_url: str | None,
+) -> str:
+    """Append an idiomatic 'further reading' link to the cluster's pillar.
+
+    Deterministic — no LLM. Medium and Wikipedia receive nothing.
+    """
+    if not pillar_url:
+        return text
+    if platform not in _APPENDS_PILLAR_REF:
+        return text
+
+    if platform.startswith("x_"):
+        # Space-constrained — bare URL, no label
+        return text.rstrip() + f"\n{pillar_url}"
+    if platform.startswith("reddit"):
+        return text.rstrip() + f"\n\nI wrote a longer version on Medium: {pillar_url}"
+    # linkedin_*, quora
+    return text.rstrip() + f"\n\nFurther reading on Medium: {pillar_url}"
+
 
 async def get_or_create_cluster(db: AsyncSession, *, brand_id: int, prompt_id: int) -> ContentCluster:
     existing = (await db.execute(
@@ -67,9 +100,19 @@ async def _enabled_platforms(db: AsyncSession, brand_id: int) -> list[str]:
 
 
 def _build_brief_context(brief: ContentBrief, sibling_platforms: list[str]) -> str:
+    """Brief context fed to every piece in the cluster.
+
+    Note: sibling_platforms is intentionally NOT included in the writer prompt.
+    Dangling sibling platform names invites the LLM to fabricate
+    cross-references it can't possibly know (the sibling text doesn't exist
+    yet when this piece is being generated). Cross-references are inserted
+    deterministically post-generation, see `_append_pillar_reference`.
+    The parameter is retained in the signature for call-site compatibility.
+    """
+    _ = sibling_platforms  # explicitly unused
     lines = [f"POSITIONING: {brief.positioning}"]
     if brief.canonical_phrasings:
-        lines.append("CANONICAL PHRASINGS (use at least 1 verbatim):")
+        lines.append("CANONICAL PHRASINGS — VERBATIM REQUIRED (include each at least once, word-for-word):")
         lines.extend(f"  - {p}" for p in brief.canonical_phrasings)
     if brief.key_claims:
         lines.append("KEY CLAIMS:")
@@ -82,9 +125,6 @@ def _build_brief_context(brief: ContentBrief, sibling_platforms: list[str]) -> s
         lines.append(f"NARRATIVE SPINE: {brief.narrative_spine}")
     if brief.tone_notes:
         lines.append(f"TONE NOTES: {brief.tone_notes}")
-    if sibling_platforms:
-        lines.append("SIBLING PLATFORMS in this cluster (reference by platform name, not URL):")
-        lines.append(f"  - {', '.join(sibling_platforms)}")
     return "\n".join(lines)
 
 
@@ -174,89 +214,160 @@ async def regenerate_cluster(
     *,
     cluster_id: int,
     tier: str | None,
+    rebuild_brief: bool = True,
 ) -> ContentCluster:
-    cluster = (await db.execute(select(ContentCluster).where(ContentCluster.id == cluster_id))).scalar_one()
+    """Regenerate all pieces in a cluster.
+
+    rebuild_brief=True  (default): runs the brief LLM + builds a fresh
+        cluster evidence pack. Use for 'Rebuild brief & pieces'.
+    rebuild_brief=False: reuses the existing head brief + most recent
+        evidence pack. Use for 'Regenerate pieces'.
+    """
+    cluster = (await db.execute(
+        select(ContentCluster).where(ContentCluster.id == cluster_id)
+    )).scalar_one()
+
+    # --- BRIEFING PHASE ---
     cluster.status = "briefing"
+    cluster.failure_reason = None
     await db.commit()
 
-    brief = await build_brief(db, cluster=cluster, tier=tier)
+    if rebuild_brief:
+        try:
+            brief = await build_brief(db, cluster=cluster, tier=tier)
+        except Exception as exc:
+            logger.exception("Brief LLM failed for cluster %s: %s", cluster.id, exc)
+            cluster.status = "briefing_failed"
+            cluster.failure_reason = "brief_llm_failure"
+            await db.commit()
+            return cluster
+    else:
+        head = (await db.execute(
+            select(ContentBrief).where(ContentBrief.cluster_id == cluster.id)
+            .order_by(ContentBrief.version.desc())
+        )).scalars().first()
+        if head is None:
+            cluster.status = "briefing_failed"
+            cluster.failure_reason = "no_brief_to_reuse"
+            await db.commit()
+            return cluster
+        brief = head
 
+    # --- EVIDENCE PACK PHASE ---
+    from app.services.cluster_evidence import build_cluster_pack, PackGateError
+    prompt_row = (await db.execute(
+        select(Prompt).where(Prompt.id == cluster.prompt_id)
+    )).scalar_one()
+
+    if rebuild_brief or brief.evidence_pack_id is None:
+        try:
+            pack = await build_cluster_pack(
+                db, cluster=cluster, prompt_text=prompt_row.text,
+                key_claims=brief.key_claims or [], version=brief.version,
+            )
+            brief.evidence_pack_id = pack.id
+            await db.commit()
+        except PackGateError as exc:
+            cluster.status = "briefing_failed"
+            cluster.failure_reason = str(exc)
+            await db.commit()
+            return cluster
+    else:
+        from app.models import ContentEvidencePack as PackModel
+        pack = await db.get(PackModel, brief.evidence_pack_id)
+
+    # --- GENERATION PHASE ---
     cluster.status = "generating"
     await db.commit()
 
-    prompt_row = (await db.execute(select(Prompt).where(Prompt.id == cluster.prompt_id))).scalar_one()
-    brand_row = (await db.execute(select(Brand).where(Brand.id == cluster.brand_id))).scalar_one()
+    brand_row = (await db.execute(
+        select(Brand).where(Brand.id == cluster.brand_id)
+    )).scalar_one()
     from app.services.drafting_service import (
         _analyze_responses_for_prompt,
         _get_prompt_visibility,
         _load_profile_context,
     )
     profile_context = await _load_profile_context(db, cluster.brand_id)
-    # NOTE: _analyze_responses_for_prompt requires brand_id as second arg
-    response_analysis = await _analyze_responses_for_prompt(db, cluster.brand_id, cluster.prompt_id)
+    response_analysis = await _analyze_responses_for_prompt(
+        db, cluster.brand_id, cluster.prompt_id,
+    )
     visibility_pct = await _get_prompt_visibility(db, cluster.prompt_id)
     enabled = await _enabled_platforms(db, cluster.brand_id)
 
-    # Delete existing cluster drafts before regenerating, then flush so the
-    # DELETE is visible within this session before the parallel gather starts.
-    await db.execute(delete(ContentDraft).where(ContentDraft.cluster_id == cluster.id))
+    # Drop existing drafts before regen
+    await db.execute(
+        delete(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
+    )
     await db.flush()
 
-    async def _gen(platform: str) -> tuple[str, str, str, float | None, list[RenderedCitation]]:
-        sibs = [p for p in enabled if p != platform]
-        ctx = _build_brief_context(brief, sibs)
-        title, body, quality_score, citations = await _generate_piece_text(
-            db,
-            brand_id=cluster.brand_id,
-            brand_name=brand_row.name,
-            prompt_id=cluster.prompt_id,
-            platform=platform,
-            prompt_text=prompt_row.text,
-            visibility_pct=visibility_pct,
-            profile_context=profile_context,
-            response_analysis=response_analysis,
-            brief_context=ctx,
-            tier=tier,
-        )
-        return platform, title, body, quality_score, citations
+    async def _gen(platform: str):
+        ctx = _build_brief_context(brief, sibling_platforms=[])
+        try:
+            title, body, q, citations = await _generate_piece_text(
+                db, brand_id=cluster.brand_id, brand_name=brand_row.name,
+                prompt_id=cluster.prompt_id, platform=platform,
+                prompt_text=prompt_row.text, visibility_pct=visibility_pct,
+                profile_context=profile_context,
+                response_analysis=response_analysis,
+                brief_context=ctx, tier=tier,
+            )
+            # L3 critic on Pro tier only
+            if tier == "pro" and citations:
+                from app.services.citation_critic import critique_citations
+                body = await critique_citations(
+                    text=body,
+                    pack_sources=(pack.sources if pack else []),
+                )
+            # Asymmetric pillar reference
+            pillar = cluster.pillar_url if cluster.pillar_mode == "attached" else None
+            body = append_pillar_reference(
+                text=body, platform=platform, pillar_url=pillar,
+            )
+            return ("ok", platform, title, body, q, citations)
+        except Exception as exc:
+            logger.exception("Piece %s failed: %s", platform, exc)
+            return ("fail", platform, str(exc))
 
-    results = await asyncio.gather(*[_gen(p) for p in enabled], return_exceptions=True)
+    results = await asyncio.gather(*[_gen(p) for p in enabled])
 
     any_failed = False
-    drafts_with_citations: list[tuple[ContentDraft, list[RenderedCitation]]] = []
+    drafts_with_citations: list[tuple[ContentDraft, list]] = []
     for r in results:
-        if isinstance(r, Exception):
-            logger.exception("Piece generation failed: %s", r)
+        if r[0] == "fail":
             any_failed = True
+            _, platform, reason = r
+            db.add(ContentDraft(
+                brand_id=cluster.brand_id, prompt_id=cluster.prompt_id,
+                cluster_id=cluster.id, platform=platform,
+                status="draft", title=None,
+                content_text="", source="cluster",
+                generation_state="failed", failure_reason=reason[:255],
+            ))
             continue
-        platform, title, body, quality_score, citations = r
+        _, platform, title, body, q, citations = r
         draft = ContentDraft(
-            brand_id=cluster.brand_id,
-            prompt_id=cluster.prompt_id,
-            cluster_id=cluster.id,
-            platform=platform,
-            status="draft",
-            title=title,
-            content_text=body,
-            source="cluster",
-            quality_score=quality_score,
+            brand_id=cluster.brand_id, prompt_id=cluster.prompt_id,
+            cluster_id=cluster.id, platform=platform,
+            status="draft", title=title or "(untitled)",
+            content_text=body, source="cluster",
+            quality_score=q, generation_state="done",
         )
         db.add(draft)
         drafts_with_citations.append((draft, citations))
 
-    # Flush so each draft gets an id, then attach citations + per-draft summary.
     await db.flush()
     for draft, citations in drafts_with_citations:
         await _persist_citations_and_summary(
             db, draft=draft, citations=citations, query=prompt_row.text,
         )
 
-    cluster.status = "partial_failed" if any_failed else "ready"
+    cluster.status = "generation_partial" if any_failed else "ready"
     cluster.last_generated_at = datetime.now(UTC)
     cluster.version += 1
+    cluster.last_brief_id = brief.id  # promote brief (even on partial — brief succeeded)
     await db.commit()
 
-    # Pillar proposal is non-fatal
     try:
         await propose_pillar(db, cluster)
     except Exception:

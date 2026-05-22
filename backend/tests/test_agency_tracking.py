@@ -56,10 +56,11 @@ async def test_trigger_tracking_rejects_non_agency_brand(client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_trigger_tracking_unknown_client_404(client):
+async def test_trigger_tracking_unknown_client_returns_403(client):
+    """Unknown client_id returns 403 (assignment check fires before existence check)."""
     await _make_agency_user(client)
     resp = await client.post("/api/agency/clients/9999/tracking/run")
-    assert resp.status_code == 404
+    assert resp.status_code == 403
 
 
 @pytest.mark.asyncio

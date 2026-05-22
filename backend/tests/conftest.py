@@ -239,6 +239,22 @@ async def create_brand(
     return resp.json()
 
 
+async def _seed_minimal_user_brand_prompt(db, *, slug: str) -> tuple[int, int]:
+    """Create one user → brand → prompt → empty cluster and return
+    (cluster_id, prompt_id). Use only inside async tests that hold an
+    AsyncSessionLocal session."""
+    from app.models import Brand, ContentCluster, Prompt, User
+    user = User(email=f"{slug}@p.com", password_hash="x", name="t")
+    db.add(user); await db.flush()
+    brand = Brand(name="B", slug=slug, user_id=user.id)
+    db.add(brand); await db.flush()
+    prompt = Prompt(brand_id=brand.id, text="best CRM")
+    db.add(prompt); await db.flush()
+    cluster = ContentCluster(brand_id=brand.id, prompt_id=prompt.id, status="pending")
+    db.add(cluster); await db.commit(); await db.refresh(cluster)
+    return cluster.id, prompt.id
+
+
 class _TmpDb:
     """Minimal async helper for reddit scanner integration tests."""
 

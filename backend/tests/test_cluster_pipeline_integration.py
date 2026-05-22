@@ -123,9 +123,19 @@ async def test_cluster_pieces_route_through_content_quality_pipeline(
         await db.flush()
         return brief
 
+    _FAKE_EVIDENCE = [
+        {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+        {"url": "https://nytimes.com/b", "title": "B", "snippet": "..."},
+        {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
+        {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
+    ]
+
     with patch(
         "app.services.clustering_service.build_brief",
         new=AsyncMock(side_effect=fake_build_brief),
+    ), patch(
+        "app.services.cluster_evidence.fetch_and_dedupe",
+        new=AsyncMock(return_value=_FAKE_EVIDENCE),
     ), patch(
         "app.services.drafting_service._generate_with_new_pipeline",
         new=AsyncMock(side_effect=fake_pipeline),
@@ -227,9 +237,19 @@ async def test_free_tier_cluster_still_persists_no_quality_or_citations(
         await db.flush()
         return brief
 
+    _FAKE_EVIDENCE_FREE = [
+        {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+        {"url": "https://nytimes.com/b", "title": "B", "snippet": "..."},
+        {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
+        {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
+    ]
+
     with patch(
         "app.services.clustering_service.build_brief",
         new=AsyncMock(side_effect=fake_build_brief),
+    ), patch(
+        "app.services.cluster_evidence.fetch_and_dedupe",
+        new=AsyncMock(return_value=_FAKE_EVIDENCE_FREE),
     ), patch(
         "app.services.drafting_service._generate_with_new_pipeline",
         new=AsyncMock(side_effect=fake_pipeline),

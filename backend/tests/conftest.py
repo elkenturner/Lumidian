@@ -120,6 +120,7 @@ async def clean_tables():
             "brand_content_settings", "account_connections",
             "notifications", "team_members", "password_reset_tokens",
             "client_documents", "client_activity_events", "client_review_links", "agency_tasks", "agency_client_assignments", "agency_staff",
+            "prospect_audits",
             "system_settings", "brands", "agency_clients", "users",
             "rate_limits",
         ]:

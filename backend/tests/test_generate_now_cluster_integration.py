@@ -54,6 +54,14 @@ async def test_bg_generate_drafts_creates_cluster_per_prompt(
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=BRIEF_JSON)), patch(
         "app.services.clustering_service._generate_piece_text",
         new=AsyncMock(return_value=("Title", "Body content.", None, [])),
+    ), patch(
+        "app.services.cluster_evidence.fetch_and_dedupe",
+        new=AsyncMock(return_value=[
+            {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+            {"url": "https://nytimes.com/b", "title": "B", "snippet": "..."},
+            {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
+            {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
+        ]),
     ):
         await _bg_generate_drafts(brand_id=brand.id, max_gaps=10, source="manual")
 
@@ -84,6 +92,14 @@ async def test_bg_generate_drafts_max_gaps_bounds_prompts(
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=BRIEF_JSON)), patch(
         "app.services.clustering_service._generate_piece_text",
         new=AsyncMock(return_value=("T", "B", None, [])),
+    ), patch(
+        "app.services.cluster_evidence.fetch_and_dedupe",
+        new=AsyncMock(return_value=[
+            {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+            {"url": "https://nytimes.com/b", "title": "B", "snippet": "..."},
+            {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
+            {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
+        ]),
     ):
         await _bg_generate_drafts(brand_id=brand.id, max_gaps=1, source="manual")
 

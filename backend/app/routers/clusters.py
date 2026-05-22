@@ -70,6 +70,7 @@ def _summarize_pieces(drafts: list[ContentDraft]) -> list[dict]:
 
 @router.get("/{brand_id}", response_model=list[ContentClusterSummary])
 async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dict]:
+    from app.models import DraftAttribution
     brand = await _ensure_brand_owned(db, brand_id, user.id)
     rows = (await db.execute(
         select(ContentCluster).where(ContentCluster.brand_id == brand.id)
@@ -81,6 +82,20 @@ async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dic
         drafts = (await db.execute(
             select(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
         )).scalars().all()
+        posted_drafts = [d for d in drafts if d.status == "posted"]
+        posted_count = len(posted_drafts)
+
+        cluster_delta: float | None = None
+        if posted_drafts:
+            attribution_rows = (await db.execute(
+                select(DraftAttribution).where(
+                    DraftAttribution.draft_id.in_([d.id for d in posted_drafts])
+                )
+            )).scalars().all()
+            deltas = [a.delta for a in attribution_rows if a.delta is not None]
+            if deltas:
+                cluster_delta = float(sum(deltas))
+
         out.append({
             "id": cluster.id,
             "brand_id": cluster.brand_id,
@@ -93,6 +108,8 @@ async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dic
             "pieces": _summarize_pieces(drafts),
             "version": cluster.version,
             "last_generated_at": cluster.last_generated_at,
+            "cluster_delta": cluster_delta,
+            "posted_count": posted_count,
         })
     # Sort by visibility ascending (lowest needs most attention)
     out.sort(key=lambda c: c["visibility_pct"])

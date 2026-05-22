@@ -1503,3 +1503,54 @@ class VideoMetadataJobOut(BaseModel):
 class VideoUploadResponse(BaseModel):
     job_id: int
     status: str
+
+
+# ── Prospect audits ──────────────────────────────────────────────────────────
+
+
+class ProspectAuditCreate(BaseModel):
+    business_name: str = Field(min_length=1, max_length=200)
+    website_url: str = Field(min_length=1, max_length=2048)
+    is_local: bool = False
+    location: str | None = Field(default=None, max_length=200)
+
+    @field_validator("location")
+    @classmethod
+    def _location_required_when_local(cls, v, info):
+        if info.data.get("is_local") and not (v and v.strip()):
+            raise ValueError("location is required when is_local is true")
+        return v.strip() if v else None
+
+    @field_validator("website_url")
+    @classmethod
+    def _coerce_url(cls, v):
+        v = v.strip()
+        if not v.startswith(("http://", "https://")):
+            v = "https://" + v
+        return v
+
+
+class ProspectAuditListItem(BaseModel):
+    id: int
+    business_name: str
+    website_url: str
+    is_local: bool
+    location: str | None
+    status: str
+    overall_visibility_pct: float | None
+    aggregate_rvi: float | None
+    rvi_band: str | None
+    created_at: datetime
+    completed_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ProspectAuditOut(ProspectAuditListItem):
+    status_message: str | None
+    error_message: str | None
+    cancel_requested: bool
+    started_at: datetime | None
+    has_pdf: bool
+
+    model_config = ConfigDict(from_attributes=True)

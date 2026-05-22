@@ -1355,8 +1355,36 @@ class ContentClusterSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class ContentDraftCitationSchema(BaseModel):
+    source_ref: str
+    url: str
+    title: str | None
+    position_marker: int | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ContentClusterDraft(BaseModel):
+    """ContentDraftSchema + per-draft citations + new redesign fields."""
+    id: int
+    brand_id: int
+    prompt_id: int | None
+    cluster_id: int | None
+    platform: str
+    status: str
+    title: str | None
+    content_text: str
+    quality_score: float | None = None
+    posted_at: datetime | None = None
+    generation_state: str = "done"
+    failure_reason: str | None = None
+    citations: list[ContentDraftCitationSchema] = []
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class ContentClusterDetail(BaseModel):
-    """Full cluster — brief + drafts (existing ContentDraftSchema)."""
+    """Full cluster — brief + drafts with citations."""
     id: int
     brand_id: int
     prompt_id: int
@@ -1366,7 +1394,7 @@ class ContentClusterDetail(BaseModel):
     pillar_url: str | None
     visibility_pct: float
     brief: ContentBriefSchema | None
-    drafts: list["ContentDraftSchema"]
+    drafts: list[ContentClusterDraft]
     version: int
     last_generated_at: datetime | None
 

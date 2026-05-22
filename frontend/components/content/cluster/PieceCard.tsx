@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Check, Copy, Loader2, Maximize2, RefreshCw, X } from "lucide-react";
 import PlatformBadge from "@/components/PlatformBadge";
 import { regenerateClusterPiece, type ContentDraft } from "@/lib/api";
+import { CitationsSubpanel } from "./CitationsSubpanel";
+import { CriticNotesSubpanel } from "./CriticNotesSubpanel";
 
 interface Props {
   brandId: number;
@@ -12,6 +14,8 @@ interface Props {
   draft: ContentDraft | null;
   /** Per-piece visibility attribution delta (percentage points) — shown inline when present. */
   attribution?: { delta_pp: number | null };
+  /** Whether the current user is on the Pro tier — gates the Critic Notes subpanel. */
+  isPro?: boolean;
   onUpdated: (draft: ContentDraft) => void;
 }
 
@@ -22,7 +26,7 @@ const STATUS_TONE: Record<string, string> = {
   failed: "text-[#fb7185]",
 };
 
-export function PieceCard({ brandId, clusterId, platform, draft, attribution, onUpdated }: Props) {
+export function PieceCard({ brandId, clusterId, platform, draft, attribution, isPro = false, onUpdated }: Props) {
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -195,6 +199,21 @@ export function PieceCard({ brandId, clusterId, platform, draft, attribution, on
 
             <div className="flex-1 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--text-secondary)] leading-relaxed pr-2">
               {draft.content_text}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-2">
+                  Citations
+                </div>
+                <CitationsSubpanel citations={draft.citations ?? []} />
+              </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-2">
+                  Critic notes
+                </div>
+                <CriticNotesSubpanel isPro={isPro} notes={null} />
+              </div>
             </div>
 
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">

@@ -235,6 +235,12 @@ export interface ContentDraft {
   cluster_id?: number | null;
   generation_state?: 'queued' | 'writing' | 'critic' | 'rendering' | 'done' | 'failed';
   failure_reason?: string | null;
+  citations?: Array<{
+    source_ref: string;
+    url: string;
+    title: string | null;
+    position_marker: number | null;
+  }>;
 }
 
 export interface ContentOpportunity {

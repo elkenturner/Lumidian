@@ -52,9 +52,19 @@ async def test_full_cluster_lifecycle(
     db_session.add(prompt)
     await db_session.commit()
 
+    _FAKE_PACK = [
+        {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+        {"url": "https://nytimes.com/b", "title": "B", "snippet": "..."},
+        {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
+        {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
+    ]
+
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=BRIEF_JSON)), patch(
         "app.services.clustering_service._generate_piece_text",
         new=AsyncMock(return_value=("Title", "Body.", None, [])),
+    ), patch(
+        "app.services.cluster_evidence.fetch_and_dedupe",
+        new=AsyncMock(return_value=_FAKE_PACK),
     ):
         # 1. Trigger cluster regeneration
         r1 = await client.post(f"/api/clusters/{brand.id}/by-prompt/{prompt.id}/regenerate")

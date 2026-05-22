@@ -2513,3 +2513,68 @@ export async function updateWikipediaCandidateStatus(
   const res = await api.patch<WikipediaCandidate>(`/wikipedia/${brandId}/candidates/${candidateId}/status`, { status });
   return res.data;
 }
+
+
+// ── Prospect audits ──────────────────────────────────────────────────────────
+
+export interface ProspectAuditCreate {
+  business_name: string;
+  website_url: string;
+  is_local: boolean;
+  location?: string | null;
+}
+
+export interface ProspectAuditListItem {
+  id: number;
+  business_name: string;
+  website_url: string;
+  is_local: boolean;
+  location: string | null;
+  status: string;
+  overall_visibility_pct: number | null;
+  aggregate_rvi: number | null;
+  rvi_band: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface ProspectAuditOut extends ProspectAuditListItem {
+  status_message: string | null;
+  error_message: string | null;
+  cancel_requested: boolean;
+  started_at: string | null;
+  has_pdf: boolean;
+}
+
+export async function listProspectAudits(): Promise<ProspectAuditListItem[]> {
+  const res = await api.get<ProspectAuditListItem[]>("/agency/prospects");
+  return res.data;
+}
+
+export async function getProspectAudit(id: number): Promise<ProspectAuditOut> {
+  const res = await api.get<ProspectAuditOut>(`/agency/prospects/${id}`);
+  return res.data;
+}
+
+export async function createProspectAudit(payload: ProspectAuditCreate): Promise<ProspectAuditOut> {
+  const res = await api.post<ProspectAuditOut>("/agency/prospects", payload);
+  return res.data;
+}
+
+export async function cancelProspectAudit(id: number): Promise<void> {
+  await api.post(`/agency/prospects/${id}/cancel`);
+}
+
+export async function retryProspectAudit(id: number): Promise<ProspectAuditOut> {
+  const res = await api.post<ProspectAuditOut>(`/agency/prospects/${id}/retry`);
+  return res.data;
+}
+
+export async function deleteProspectAudit(id: number): Promise<void> {
+  await api.delete(`/agency/prospects/${id}`);
+}
+
+export function prospectAuditPdfUrl(id: number): string {
+  const base = api.defaults.baseURL ?? "";
+  return `${base}/agency/prospects/${id}/pdf`;
+}

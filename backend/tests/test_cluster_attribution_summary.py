@@ -4,11 +4,9 @@ from datetime import datetime, timezone
 
 from app.database import AsyncSessionLocal
 from app.models import (
-    Brand,
     ContentCluster,
     ContentDraft,
     DraftAttribution,
-    Prompt,
 )
 from tests.conftest import register_and_login, create_brand
 

@@ -543,7 +543,44 @@ async def _pitch_expiry_sweep() -> None:
         else:
             logger.info("Scheduler: no expired pitch brands to delete")
 
+    # Prospect audits — 60-day retention
+    try:
+        await cleanup_stale_prospect_audits()
+    except Exception:
+        logger.exception("prospect-audit cleanup failed inside daily sweep")
+
     logger.info("Scheduler: pitch expiry sweep complete")
+
+
+async def cleanup_stale_prospect_audits(retention_days: int = 60) -> int:
+    """Delete ProspectAudit rows older than `retention_days`. Returns delete count.
+
+    Silently logs and continues on missing PDF files."""
+    from datetime import datetime, timedelta
+    from pathlib import Path
+
+    from sqlalchemy import select
+
+    from app.database import AsyncSessionLocal
+    from app.models import ProspectAudit
+
+    cutoff = datetime.utcnow() - timedelta(days=retention_days)
+    deleted = 0
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(ProspectAudit).where(ProspectAudit.created_at < cutoff))
+        stale = result.scalars().all()
+        for a in stale:
+            if a.pdf_path:
+                try:
+                    Path(a.pdf_path).unlink(missing_ok=True)
+                except Exception as exc:
+                    logger.warning("prospect-audit cleanup: failed to remove PDF %s: %s", a.pdf_path, exc)
+            await db.delete(a)
+            deleted += 1
+        if deleted:
+            await db.commit()
+            logger.info("Scheduler: cleaned up %d stale prospect audits (>%d days old)", deleted, retention_days)
+    return deleted
 
 
 def start_scheduler() -> None:

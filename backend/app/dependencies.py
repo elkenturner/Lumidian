@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from time import monotonic
 from typing import Annotated
@@ -378,9 +379,6 @@ async def ensure_client_access(db: AsyncSession, user: User, client_id: int) -> 
 
 
 # ── Client portal: read-only token-gated context ─────────────────────────────
-
-
-from dataclasses import dataclass
 
 
 @dataclass

@@ -109,9 +109,15 @@ async def test_review_link_emits_client_url(client, agency_staff_user):
     assert "/review/" not in url, f"URL should not contain /review/ anymore: {url}"
 
 
+@pytest.mark.xfail(reason="Route mounted in Task 5; xfail flips off when route lands", strict=True)
 @pytest.mark.asyncio
 async def test_client_view_context_resolves_valid_token(client, agency_staff_user):
-    """A valid token resolves to the right AgencyClient + Brand."""
+    """A valid token resolves to the right AgencyClient + Brand.
+
+    Task 4 ships the dep but no route uses it yet, so the request 404s.
+    Task 5 mounts /api/public/client/{token}/brand and this test starts passing.
+    The strict xfail will then flip to XPASS, signaling: remove the marker.
+    """
     # Create client and get token
     resp = await client.post("/api/agency/clients", json={"name": "Acme"})
     ac_id = resp.json()["id"]
@@ -119,9 +125,6 @@ async def test_client_view_context_resolves_valid_token(client, agency_staff_use
     resp = await client.post(f"/api/agency/clients/{ac_id}/review-link")
     token = resp.json()["token"]
 
-    # Hit the new public brand endpoint — built in Task 5; here we just confirm
-    # the endpoint reaches the resolver. This test will fail until Task 5 ships
-    # the route.
     resp = await client.get(f"/api/public/client/{token}/brand")
     assert resp.status_code == 200
     body = resp.json()
@@ -130,14 +133,22 @@ async def test_client_view_context_resolves_valid_token(client, agency_staff_use
 
 @pytest.mark.asyncio
 async def test_client_view_context_rejects_unknown_token(client):
-    """Unknown tokens return 404."""
+    """Unknown tokens return 404.
+
+    Currently passes because the route is not yet mounted (Task 5 lands it);
+    after Task 5 it will pass for the right reason — the dep itself raises 404.
+    """
     resp = await client.get("/api/public/client/notatoken/brand")
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_client_view_context_rejects_revoked_token(client, db_session, agency_staff_user):
-    """Revoked review-link tokens return 404."""
+    """Revoked review-link tokens return 404.
+
+    Currently passes for the wrong reason (route not mounted); after Task 5
+    the dep's revoked-link branch will trigger the 404 instead.
+    """
     from app.models import ClientReviewLink
     from datetime import datetime
 

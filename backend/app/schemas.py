@@ -1382,6 +1382,8 @@ class ContentClusterDraft(BaseModel):
     generation_state: str = "done"
     failure_reason: str | None = None
     citations: list[ContentDraftCitationSchema] = []
+    # Per-piece attribution lift (DraftAttribution.delta if a row exists)
+    attribution_delta: float | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1400,6 +1402,9 @@ class ContentClusterDetail(BaseModel):
     drafts: list[ContentClusterDraft]
     version: int
     last_generated_at: datetime | None
+    # Mirrors ContentClusterSummary
+    cluster_delta: float | None
+    posted_count: int
 
     model_config = ConfigDict(from_attributes=True)
 

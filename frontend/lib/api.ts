@@ -232,6 +232,15 @@ export interface ContentDraft {
   updated_at: string;
   prompt_text?: string;
   assigned_to_user_id: number | null;
+  cluster_id?: number | null;
+  generation_state?: 'queued' | 'writing' | 'critic' | 'rendering' | 'done' | 'failed';
+  failure_reason?: string | null;
+  citations?: Array<{
+    source_ref: string;
+    url: string;
+    title: string | null;
+    position_marker: number | null;
+  }>;
 }
 
 export interface ContentOpportunity {
@@ -1062,24 +1071,6 @@ export interface AgencyClientCreate {
   primary_contact_email?: string;
 }
 
-export interface AgencyTodayDraft {
-  draft_id: number;
-  title: string | null;
-  platform: string;
-  client_id: number;
-  client_name: string;
-  assigned_to_user_id: number | null;
-  created_at: string;
-}
-
-export interface AgencyTodayResponse {
-  drafts_to_review: AgencyTodayDraft[];
-  drafts_to_review_count: number;
-  active_clients: number;
-  awaiting_client: AgencyTodayDraft[];
-  approved: AgencyTodayDraft[];
-}
-
 export async function agencyListClients(): Promise<AgencyClient[]> {
   const res = await api.get<AgencyClient[]>('/agency/clients');
   return res.data;
@@ -1105,15 +1096,6 @@ export async function agencyUpdateClient(
 
 export async function agencyDeleteClient(id: number): Promise<void> {
   await api.delete(`/agency/clients/${id}`);
-}
-
-export async function agencyToday(): Promise<AgencyTodayResponse> {
-  const res = await api.get<AgencyTodayResponse>('/agency/today');
-  return res.data;
-}
-
-export async function agencyAssignDraft(draftId: number, userId: number | null): Promise<void> {
-  await api.patch(`/agency/drafts/${draftId}/assign`, { assigned_to_user_id: userId });
 }
 
 // ── Agency portal shell (2026-05-11) ─────────────────────────────────────────
@@ -2062,70 +2044,6 @@ export const siteAudit = {
     api.get(`/site-audit/audit/${auditId}/pdf`, { responseType: 'blob' }).then(r => r.data as Blob),
 }
 
-// ── Agency activity log (2026-05-12) ─────────────────────────────────────────
-
-export type ActivityEventType =
-  | 'note'
-  | 'client_created'
-  | 'client_status_changed'
-  | 'draft_sent_to_client'
-  | 'draft_marked_posted'
-  | 'review_link_generated'
-  | 'review_link_rotated'
-  | 'client_approved'
-  | 'client_changes_requested'
-  | 'client_rejected';
-
-export interface ActivityEvent {
-  id: number;
-  agency_client_id: number;
-  event_type: ActivityEventType | string;
-  actor_user_id: number | null;
-  actor_name: string | null;
-  body: string;
-  payload: Record<string, unknown> | null;
-  related_draft_id: number | null;
-  created_at: string;
-  updated_at: string | null;
-}
-
-export interface ActivityEventWithClient extends ActivityEvent {
-  client_id: number;
-  client_name: string;
-}
-
-export async function agencyListActivity(
-  clientId: number,
-  opts: { limit?: number; before?: number } = {},
-): Promise<ActivityEvent[]> {
-  const params: Record<string, number> = {};
-  if (opts.limit !== undefined) params.limit = opts.limit;
-  if (opts.before !== undefined) params.before = opts.before;
-  const res = await api.get<ActivityEvent[]>(`/agency/clients/${clientId}/activity`, { params });
-  return res.data;
-}
-
-export async function agencyPostNote(clientId: number, body: string): Promise<ActivityEvent> {
-  const res = await api.post<ActivityEvent>(`/agency/clients/${clientId}/activity/note`, { body });
-  return res.data;
-}
-
-export async function agencyEditNote(eventId: number, body: string): Promise<ActivityEvent> {
-  const res = await api.patch<ActivityEvent>(`/agency/activity/${eventId}/note`, { body });
-  return res.data;
-}
-
-export async function agencyDeleteNote(eventId: number): Promise<void> {
-  await api.delete(`/agency/activity/${eventId}/note`);
-}
-
-export async function agencyRecentActivity(limit = 10): Promise<ActivityEventWithClient[]> {
-  const res = await api.get<ActivityEventWithClient[]>(`/agency/activity/recent`, {
-    params: { limit },
-  });
-  return res.data;
-}
-
 // ── Agency tasks (sub-project B, 2026-05-12) ─────────────────────────────────
 
 export type TaskStatus = 'open' | 'in_progress' | 'done';
@@ -2143,21 +2061,6 @@ export interface AgencyTask {
   created_at: string;
   updated_at: string | null;
   completed_at: string | null;
-}
-
-export interface AgencyTaskCreate {
-  title: string;
-  description?: string;
-  due_at?: string;
-  assigned_to_user_id?: number | null;
-}
-
-export interface AgencyTaskUpdate {
-  title?: string;
-  description?: string | null;
-  status?: TaskStatus;
-  due_at?: string | null;
-  assigned_to_user_id?: number | null;
 }
 
 export interface AgencyStaffMember {
@@ -2179,27 +2082,6 @@ export interface MyQueueDraft {
 export interface MyQueueResponse {
   drafts: MyQueueDraft[];
   tasks: AgencyTask[];
-}
-
-export async function agencyListTasks(clientId: number, status?: TaskStatus): Promise<AgencyTask[]> {
-  const params: Record<string, string> = {};
-  if (status) params.status = status;
-  const res = await api.get<AgencyTask[]>(`/agency/clients/${clientId}/tasks`, { params });
-  return res.data;
-}
-
-export async function agencyCreateTask(clientId: number, body: AgencyTaskCreate): Promise<AgencyTask> {
-  const res = await api.post<AgencyTask>(`/agency/clients/${clientId}/tasks`, body);
-  return res.data;
-}
-
-export async function agencyUpdateTask(taskId: number, body: AgencyTaskUpdate): Promise<AgencyTask> {
-  const res = await api.patch<AgencyTask>(`/agency/tasks/${taskId}`, body);
-  return res.data;
-}
-
-export async function agencyDeleteTask(taskId: number): Promise<void> {
-  await api.delete(`/agency/tasks/${taskId}`);
 }
 
 export async function agencyMyQueue(): Promise<MyQueueResponse> {
@@ -2288,6 +2170,29 @@ export async function agencyDownloadDocumentPdf(documentId: number): Promise<Blo
     responseType: 'blob',
   });
   return res.data as Blob;
+}
+
+// ── Per-client staff assignment (2026-05-20) ─────────────────────────────────
+
+export interface ClientStaffAssignment {
+  user_id: number;
+  name: string | null;
+  email: string;
+  assigned_at: string;
+}
+
+export async function agencyListClientStaff(clientId: number): Promise<ClientStaffAssignment[]> {
+  const res = await api.get<ClientStaffAssignment[]>(`/agency/clients/${clientId}/staff-assigned`);
+  return res.data;
+}
+
+export async function agencyAssignStaff(clientId: number, userId: number): Promise<ClientStaffAssignment> {
+  const res = await api.post<ClientStaffAssignment>(`/agency/clients/${clientId}/staff-assigned/${userId}`);
+  return res.data;
+}
+
+export async function agencyUnassignStaff(clientId: number, userId: number): Promise<void> {
+  await api.delete(`/agency/clients/${clientId}/staff-assigned/${userId}`);
 }
 
 // ----- Content Clusters -----
@@ -2400,6 +2305,79 @@ export async function acceptClusterPillar(brandId: number, clusterId: number): P
 
 export async function rejectClusterPillar(brandId: number, clusterId: number): Promise<ContentClusterDetail> {
   const res = await api.post<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}/pillar/reject`);
+  return res.data;
+}
+
+// ── Cluster redesign (2026-05-20) ─────────────────────────────────────────────
+
+export interface ClusterPieceStatus {
+  platform: string;
+  draft_id: number | null;
+  status: string | null;
+  generation_state: string;
+  failure_reason: string | null;
+}
+
+export interface ClusterStatusPayload {
+  status: string;
+  failure_reason: string | null;
+  pieces: ClusterPieceStatus[];
+  version: number;
+  last_generated_at: string | null;
+}
+
+export interface ClusterSourceItem {
+  url: string;
+  domain: string;
+  tier: 'T1' | 'T2' | 'T3';
+  title: string | null;
+  times_cited: number;
+}
+
+export interface ClusterSourcesPayload {
+  total_t1: number;
+  total_t2: number;
+  total_t3: number;
+  sources: ClusterSourceItem[];
+}
+
+export async function getClusterStatus(
+  brandId: number,
+  clusterId: number,
+): Promise<ClusterStatusPayload> {
+  const res = await api.get<ClusterStatusPayload>(`/clusters/${brandId}/${clusterId}/status`);
+  return res.data;
+}
+
+export async function regenerateClusterPieces(
+  brandId: number,
+  clusterId: number,
+): Promise<ContentClusterDetail> {
+  const res = await api.post<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}/regenerate-pieces`);
+  return res.data;
+}
+
+export async function rebuildCluster(
+  brandId: number,
+  clusterId: number,
+): Promise<ContentClusterDetail> {
+  const res = await api.post<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}/rebuild`);
+  return res.data;
+}
+
+export async function getClusterSources(
+  brandId: number,
+  clusterId: number,
+): Promise<ClusterSourcesPayload> {
+  const res = await api.get<ClusterSourcesPayload>(`/clusters/${brandId}/${clusterId}/sources`);
+  return res.data;
+}
+
+export async function getClusterBriefHistory(
+  brandId: number,
+  clusterId: number,
+): Promise<ContentBrief[]> {
+  const res = await api.get<ContentBrief[]>(`/clusters/${brandId}/${clusterId}/briefs`);
   return res.data;
 }
 

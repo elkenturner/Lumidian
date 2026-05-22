@@ -326,3 +326,52 @@ async def require_agency_staff(user: User = Depends(get_current_user)) -> User:
             detail="Agency staff access required",
         )
     return user
+
+
+async def require_client_access(
+    client_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_agency_staff),
+) -> User:
+    """Verify the agency staff member is assigned to this client.
+
+    Admins bypass entirely. Non-admin staff must have a row in
+    agency_client_assignments matching (client_id, user.id).
+    """
+    if user.is_admin:
+        return user
+    from app.models import AgencyClientAssignment
+    result = await db.execute(
+        select(AgencyClientAssignment).where(
+            AgencyClientAssignment.agency_client_id == client_id,
+            AgencyClientAssignment.staff_user_id == user.id,
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not assigned to this client",
+        )
+    return user
+
+
+async def ensure_client_access(db: AsyncSession, user: User, client_id: int) -> None:
+    """Helper for indirect-scope endpoints (task_id, draft_id, doc_id, event_id).
+
+    Raises 403 if a non-admin staff member is not assigned to client_id.
+    Admins bypass. Call this after resolving the parent client_id from the resource.
+    """
+    if user.is_admin:
+        return
+    from app.models import AgencyClientAssignment
+    result = await db.execute(
+        select(AgencyClientAssignment).where(
+            AgencyClientAssignment.agency_client_id == client_id,
+            AgencyClientAssignment.staff_user_id == user.id,
+        )
+    )
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not assigned to this client",
+        )

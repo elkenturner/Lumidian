@@ -7,9 +7,7 @@ import {
   type ContentDraft,
   type DraftStaffStatus,
 } from '@/lib/api';
-import { AssigneePicker } from './AssigneePicker';
 import { NudgePill } from './NudgePill';
-import { agencyAssignDraft } from '@/lib/api';
 import { isDraftStale, nudgeMessageText } from './agency-helpers';
 import { MarkPostedModal } from './MarkPostedModal';
 
@@ -17,6 +15,10 @@ interface Props {
   brandId: number | null;
   reviewLinkUrl?: string | null;
   primaryContactName?: string | null;
+  /** Drafts already fetched by the cockpit. When provided, ClientPipelineTab does not refetch. */
+  lifted?: AgencyDraft[] | null;
+  /** Optional: called after a draft mutation (status change, posted) so the cockpit can refresh. */
+  onDraftsChanged?: () => void;
 }
 
 // ContentDraft.status covers core states; agency workflow adds extras at runtime.
@@ -95,13 +97,18 @@ const COLUMNS: Array<{ key: string; label: string; matchesStatus: (s: string) =>
   },
 ];
 
-export function ClientPipelineTab({ brandId, reviewLinkUrl, primaryContactName }: Props) {
+export function ClientPipelineTab({ brandId, reviewLinkUrl, primaryContactName, lifted, onDraftsChanged }: Props) {
   const [drafts, setDrafts] = useState<AgencyDraft[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRejected, setShowRejected] = useState(false);
 
   useEffect(() => {
+    if (lifted != null) {
+      setDrafts(lifted);
+      setLoading(false);
+      return;
+    }
     if (brandId == null) {
       setLoading(false);
       return;
@@ -110,10 +117,11 @@ export function ClientPipelineTab({ brandId, reviewLinkUrl, primaryContactName }
       .then((data) => setDrafts(data as AgencyDraft[]))
       .catch((e) => setError(String(e?.message ?? e)))
       .finally(() => setLoading(false));
-  }, [brandId]);
+  }, [brandId, lifted]);
 
   const updateLocal = (id: number, patch: Partial<AgencyDraft>) => {
     setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, ...patch } : d)));
+    onDraftsChanged?.();
   };
 
   if (brandId == null) {
@@ -209,16 +217,6 @@ export function ClientPipelineTab({ brandId, reviewLinkUrl, primaryContactName }
                           />
                         </div>
                       )}
-                      <div className="mt-2">
-                        <AssigneePicker
-                          value={d.assigned_to_user_id ?? null}
-                          onChange={async (userId) => {
-                            await agencyAssignDraft(d.id, userId);
-                            updateLocal(d.id, { assigned_to_user_id: userId });
-                          }}
-                          compact
-                        />
-                      </div>
                       <DraftActions draft={d} onChange={(patch) => updateLocal(d.id, patch)} />
                     </li>
                   );

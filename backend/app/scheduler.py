@@ -23,6 +23,7 @@ from datetime import UTC
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 logger = logging.getLogger(__name__)
 
@@ -601,6 +602,24 @@ def start_scheduler() -> None:
         name="Weekly agency tracking sweep (Sunday 02:00 UTC)",
         replace_existing=True,
         misfire_grace_time=3600,
+    )
+
+    async def _stale_cluster_cleanup_tick() -> None:
+        from app.database import AsyncSessionLocal
+        from app.services.cluster_cleanup import auto_fail_stale_clusters
+        async with AsyncSessionLocal() as db:
+            try:
+                await auto_fail_stale_clusters(db, max_age_minutes=15)
+            except Exception as exc:
+                logger.warning("cluster stale cleanup failed: %s", exc)
+
+    scheduler.add_job(
+        _stale_cluster_cleanup_tick,
+        trigger=IntervalTrigger(minutes=5),
+        id="cluster_stale_cleanup",
+        name="Auto-fail stuck content clusters (every 5 min)",
+        replace_existing=True,
+        misfire_grace_time=300,
     )
 
     scheduler.start()

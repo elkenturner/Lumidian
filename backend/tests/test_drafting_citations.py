@@ -25,12 +25,15 @@ def test_render_medium_emits_inline_links_and_footer():
     assert len(citations) == 2
 
 
-def test_render_reddit_uses_inline_domain():
+def test_render_reddit_uses_conversational_block():
+    # Updated 2026-05-20 cluster redesign: Reddit moved from inline
+    # "(source: domain)" to a trailing "More on this:" conversational block.
     text = "Studies show 94% accuracy [S1]."
     pack = _pack(("S1", "https://nature.com/a", "Nature"))
     rendered, _ = render_citations(text=text, pack=pack, platform="reddit")
-    assert "(source: nature.com)" in rendered
-    assert "Sources" not in rendered
+    assert "(source: nature.com)" not in rendered
+    assert "More on this:" in rendered
+    assert "nature.com" in rendered
 
 
 def test_render_x_strips_markers():

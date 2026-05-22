@@ -22,6 +22,14 @@ from app.services.clustering_service import (
     regenerate_piece,
 )
 
+# Fake evidence that satisfies the pack gate (2× T1 + 2× T2)
+_FAKE_EVIDENCE = [
+    {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+    {"url": "https://nytimes.com/b", "title": "B", "snippet": "..."},
+    {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
+    {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
+]
+
 
 SAMPLE_BRIEF_JSON = """{
   "positioning": "Pos",
@@ -74,6 +82,7 @@ async def test_regenerate_cluster_produces_5_pieces(db_session: AsyncSession, re
     cluster = await get_or_create_cluster(db_session, brand_id=brand.id, prompt_id=prompt.id)
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
+         patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
          patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body content here.", None, []))):
         result = await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
 
@@ -98,6 +107,7 @@ async def test_regenerate_cluster_respects_disabled_platform(db_session: AsyncSe
     cluster = await get_or_create_cluster(db_session, brand_id=brand.id, prompt_id=prompt.id)
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
+         patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
          patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body.", None, []))):
         await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
 
@@ -119,6 +129,7 @@ async def test_regenerate_piece_replaces_only_target(db_session: AsyncSession, r
     cluster = await get_or_create_cluster(db_session, brand_id=brand.id, prompt_id=prompt.id)
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
+         patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
          patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("First", "First body.", None, []))):
         await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
 

@@ -1351,6 +1351,9 @@ class ContentClusterSummary(BaseModel):
     pieces: list[ClusterPieceSummary]
     version: int
     last_generated_at: datetime | None
+    # New: cluster-effect signal aggregated from DraftAttribution rows
+    cluster_delta: float | None  # sum of delta across posted pieces with attribution; None if no posted attribution data
+    posted_count: int  # count of pieces with status='posted' in this cluster
 
     model_config = ConfigDict(from_attributes=True)
 

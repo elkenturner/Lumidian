@@ -96,25 +96,81 @@ def _build_action_blocks(
     prompt_scores: list[PromptScore],
     per_prompt_top_competitor: dict[int, tuple[str | None, float | None]],
 ) -> list[dict]:
-    """Pick the 3 prompts that most need action and tag each with its 'kind'.
+    """Pick 3 prompts that tell a story: where you're losing, where it's open,
+    where you're already winning. Variety > repetition.
 
-    Mirrors the runner's `_action_priority`: losses > untapped > everything else.
+    Strategy:
+        slot 1: biggest loss (widest peer_avg - own gap)  ← if any losses exist
+        slot 2: most actionable untapped (lowest prompt_index among untapped)
+        slot 3: best lead/uncontested win (biggest own - peer_avg gap)
+
+    Falls through gracefully if a category is empty (e.g., no losses → fill
+    that slot with the next best untapped).
+
+    Each block also gets a `variant_index` so the template can rotate copy
+    when two consecutive blocks share the same kind.
     """
-    def _priority(p: PromptScore) -> tuple[int, float, int]:
-        gap = p.own_visibility_pct - p.peer_avg_visibility_pct
-        if gap < 0:
-            return (1, gap, p.prompt_index)
-        if p.own_visibility_pct == 0 and p.peer_avg_visibility_pct == 0:
-            return (2, 0.0, p.prompt_index)
-        return (3, -gap, p.prompt_index)
+    by_kind: dict[str, list[PromptScore]] = {}
+    for ps in prompt_scores:
+        by_kind.setdefault(_kind_for(ps), []).append(ps)
 
-    chosen = sorted(prompt_scores, key=_priority)[:3]
+    # Sort each kind list by what's most interesting first
+    if "loss" in by_kind:
+        by_kind["loss"].sort(key=lambda p: p.own_visibility_pct - p.peer_avg_visibility_pct)
+    if "untapped" in by_kind:
+        by_kind["untapped"].sort(key=lambda p: p.prompt_index)
+    if "uncontested" in by_kind:
+        by_kind["uncontested"].sort(key=lambda p: -p.own_visibility_pct)
+    if "lead" in by_kind:
+        by_kind["lead"].sort(key=lambda p: -(p.own_visibility_pct - p.peer_avg_visibility_pct))
+    if "tied" in by_kind:
+        by_kind["tied"].sort(key=lambda p: p.prompt_index)
+
+    chosen: list[PromptScore] = []
+    used_indexes: set[int] = set()
+
+    def _take(kind: str) -> PromptScore | None:
+        for p in by_kind.get(kind, []):
+            if p.prompt_index not in used_indexes:
+                used_indexes.add(p.prompt_index)
+                return p
+        return None
+
+    # Slot 1: biggest loss
+    p = _take("loss")
+    if p:
+        chosen.append(p)
+    # Slot 2: most actionable untapped (or 2nd loss if no untapped)
+    p = _take("untapped") or _take("loss")
+    if p:
+        chosen.append(p)
+    # Slot 3: best win to defend (uncontested → lead) — or fall through
+    p = _take("uncontested") or _take("lead") or _take("untapped") or _take("tied") or _take("loss")
+    if p:
+        chosen.append(p)
+
+    # If still under 3, pad from any kind
+    if len(chosen) < 3:
+        for ps in prompt_scores:
+            if ps.prompt_index in used_indexes:
+                continue
+            chosen.append(ps)
+            used_indexes.add(ps.prompt_index)
+            if len(chosen) >= 3:
+                break
+
+    # Annotate with variant_index for copy rotation when same kind appears twice
     blocks = []
-    for ps in chosen:
+    kind_seen: dict[str, int] = {}
+    for ps in chosen[:3]:
+        kind = _kind_for(ps)
+        variant = kind_seen.get(kind, 0)
+        kind_seen[kind] = variant + 1
         top_name, top_pct = per_prompt_top_competitor.get(ps.prompt_index, (None, None))
         blocks.append({
             "prompt_text": prompts[ps.prompt_index],
-            "kind": _kind_for(ps),
+            "kind": kind,
+            "variant_index": variant,
             "own_visibility_pct": ps.own_visibility_pct,
             "peer_avg_visibility_pct": ps.peer_avg_visibility_pct,
             "top_competitor_name": top_name,

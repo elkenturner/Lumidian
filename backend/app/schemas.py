@@ -936,19 +936,26 @@ class AgencyClientUpdate(BaseModel):
     primary_contact_email: str | None = None
 
 
+class ClientProposalUpdateIn(BaseModel):
+    current_proposal_doc_url: str | None = Field(default=None, max_length=500)
+    current_proposal_label: str | None = Field(default=None, max_length=200)
+
+
 class AgencyClientOut(BaseModel):
     id: int
     name: str
     slug: str
     status: str
-    retainer_amount_usd: int | None
-    retainer_started_at: datetime | None
-    peec_dashboard_url: str | None
-    primary_contact_name: str | None
-    primary_contact_email: str | None
-    brand_id: int | None
-    drafts_pending: int
+    retainer_amount_usd: int | None = None
+    retainer_started_at: datetime | None = None
+    peec_dashboard_url: str | None = None
+    primary_contact_name: str | None = None
+    primary_contact_email: str | None = None
+    brand_id: int | None = None
+    drafts_pending: int = 0
     created_at: datetime
+    current_proposal_doc_url: str | None = None
+    current_proposal_label: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

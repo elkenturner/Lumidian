@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import update
 
 from app.database import AsyncSessionLocal
@@ -19,7 +20,7 @@ async def _make_agency_user(client, email: str = "staff@example.com") -> None:
         await db.commit()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def agency_staff_user(client):
     """Log in as an agency staff user; return the httpx client (with cookies set)."""
     await _make_agency_user(client, email="staff@example.com")
@@ -87,3 +88,9 @@ async def test_staff_can_clear_proposal_pointer(client, db_session, agency_staff
     assert resp.status_code == 200
     assert resp.json()["current_proposal_doc_url"] is None
     assert resp.json()["current_proposal_label"] is None
+
+    # Verify the clear persisted to the DB
+    ac = await db_session.get(AgencyClient, client_id)
+    await db_session.refresh(ac)
+    assert ac.current_proposal_doc_url is None
+    assert ac.current_proposal_label is None

@@ -11,6 +11,13 @@ from tests.conftest import register_and_login
 
 SAMPLE_BRIEF_JSON = '{"positioning":"P","key_claims":["c"],"canonical_phrasings":["acme tracks x"],"stats":[],"narrative_spine":"n","tone_notes":"t"}'
 
+_FAKE_EVIDENCE = [
+    {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+    {"url": "https://nytimes.com/b", "title": "B", "snippet": "..."},
+    {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
+    {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
+]
+
 pytestmark = pytest.mark.asyncio
 
 
@@ -41,6 +48,7 @@ async def test_regenerate_cluster_endpoint_creates_pieces(client: httpx.AsyncCli
     await db_session.commit()
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
+         patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
          patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("T", "Body.", None, []))):
         r = await client.post(
             f"/api/clusters/{brand.id}/by-prompt/{prompt.id}/regenerate",

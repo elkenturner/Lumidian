@@ -139,3 +139,143 @@ async def test_get_404_when_not_owner(client: httpx.AsyncClient):
     await _make_staff(client, email="s2@example.com")
     resp = await client.get(f"/api/agency/prospects/{audit_id}")
     assert resp.status_code == 404
+
+
+# ── Task 14: cancel / retry / delete / pdf endpoints ─────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_cancel_sets_event_and_db_flag(client: httpx.AsyncClient):
+    await _make_staff(client)
+    with patch("app.routers.prospect_audit.run_audit"):
+        resp = await client.post(
+            "/api/agency/prospects",
+            json={"business_name": "Acme", "website_url": "https://acme.com", "is_local": False},
+        )
+    audit_id = resp.json()["id"]
+
+    import asyncio
+    from app.state import prospect_audit_cancel_events
+    prospect_audit_cancel_events[audit_id] = asyncio.Event()
+
+    cancel = await client.post(f"/api/agency/prospects/{audit_id}/cancel")
+    assert cancel.status_code == 204
+    assert prospect_audit_cancel_events[audit_id].is_set()
+
+    detail = await client.get(f"/api/agency/prospects/{audit_id}")
+    assert detail.json()["cancel_requested"] is True
+
+
+@pytest.mark.asyncio
+async def test_retry_409_when_non_terminal(client: httpx.AsyncClient):
+    await _make_staff(client)
+    with patch("app.routers.prospect_audit.run_audit"):
+        resp = await client.post(
+            "/api/agency/prospects",
+            json={"business_name": "Acme", "website_url": "https://acme.com", "is_local": False},
+        )
+    audit_id = resp.json()["id"]
+    retry = await client.post(f"/api/agency/prospects/{audit_id}/retry")
+    assert retry.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_retry_succeeds_when_failed(client: httpx.AsyncClient, tmp_path):
+    await _make_staff(client)
+    with patch("app.routers.prospect_audit.run_audit"):
+        resp = await client.post(
+            "/api/agency/prospects",
+            json={"business_name": "Acme", "website_url": "https://acme.com", "is_local": False},
+        )
+    audit_id = resp.json()["id"]
+
+    from app.database import AsyncSessionLocal
+    from app.models import ProspectAudit
+    from sqlalchemy import select
+    stale_pdf = tmp_path / "stale.pdf"
+    stale_pdf.write_bytes(b"%PDF stale")
+    async with AsyncSessionLocal() as db:
+        a = (await db.execute(select(ProspectAudit).where(ProspectAudit.id == audit_id))).scalar_one()
+        a.status = "failed"
+        a.error_message = "boom"
+        a.pdf_path = str(stale_pdf)
+        await db.commit()
+
+    with patch("app.routers.prospect_audit.run_audit") as mock_run:
+        retry = await client.post(f"/api/agency/prospects/{audit_id}/retry")
+    assert retry.status_code == 200, retry.text
+    body = retry.json()
+    assert body["status"] == "pending"
+    assert body["error_message"] is None
+    assert not stale_pdf.exists()
+    mock_run.assert_called_once_with(audit_id)
+
+
+@pytest.mark.asyncio
+async def test_delete_removes_row_and_pdf(client: httpx.AsyncClient, tmp_path):
+    await _make_staff(client)
+    with patch("app.routers.prospect_audit.run_audit"):
+        resp = await client.post(
+            "/api/agency/prospects",
+            json={"business_name": "Acme", "website_url": "https://acme.com", "is_local": False},
+        )
+    audit_id = resp.json()["id"]
+
+    pdf_file = tmp_path / "del.pdf"
+    pdf_file.write_bytes(b"%PDF")
+    from app.database import AsyncSessionLocal
+    from app.models import ProspectAudit
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as db:
+        a = (await db.execute(select(ProspectAudit).where(ProspectAudit.id == audit_id))).scalar_one()
+        a.pdf_path = str(pdf_file)
+        await db.commit()
+
+    del_resp = await client.delete(f"/api/agency/prospects/{audit_id}")
+    assert del_resp.status_code == 204
+    assert not pdf_file.exists()
+
+    after = await client.get(f"/api/agency/prospects/{audit_id}")
+    assert after.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_pdf_returns_404_when_not_completed(client: httpx.AsyncClient):
+    await _make_staff(client)
+    with patch("app.routers.prospect_audit.run_audit"):
+        resp = await client.post(
+            "/api/agency/prospects",
+            json={"business_name": "Acme", "website_url": "https://acme.com", "is_local": False},
+        )
+    audit_id = resp.json()["id"]
+    pdf = await client.get(f"/api/agency/prospects/{audit_id}/pdf")
+    assert pdf.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_pdf_streams_when_completed(client: httpx.AsyncClient, tmp_path):
+    await _make_staff(client)
+    with patch("app.routers.prospect_audit.run_audit"):
+        resp = await client.post(
+            "/api/agency/prospects",
+            json={"business_name": "Acme", "website_url": "https://acme.com", "is_local": False},
+        )
+    audit_id = resp.json()["id"]
+
+    pdf_bytes = b"%PDF-1.4\nfake"
+    pdf_file = tmp_path / "stream.pdf"
+    pdf_file.write_bytes(pdf_bytes)
+    from app.database import AsyncSessionLocal
+    from app.models import ProspectAudit
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as db:
+        a = (await db.execute(select(ProspectAudit).where(ProspectAudit.id == audit_id))).scalar_one()
+        a.status = "completed"
+        a.pdf_path = str(pdf_file)
+        await db.commit()
+
+    pdf = await client.get(f"/api/agency/prospects/{audit_id}/pdf")
+    assert pdf.status_code == 200
+    assert pdf.headers["content-type"] == "application/pdf"
+    assert "attachment" in pdf.headers["content-disposition"].lower()
+    assert pdf.content == pdf_bytes

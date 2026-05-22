@@ -115,6 +115,39 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
     drafts = (await db.execute(
         select(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
     )).scalars().all()
+    # Per-draft citations — single batched query keyed by draft id.
+    from app.models import ContentDraftCitation
+    citation_rows = (await db.execute(
+        select(ContentDraftCitation).where(
+            ContentDraftCitation.draft_id.in_([d.id for d in drafts] or [-1])
+        )
+    )).scalars().all()
+    cites_by_draft: dict[int, list] = {}
+    for c in citation_rows:
+        cites_by_draft.setdefault(c.draft_id, []).append({
+            "source_ref": c.source_ref,
+            "url": c.url,
+            "title": c.title,
+            "position_marker": c.position_marker,
+        })
+
+    drafts_out = []
+    for d in drafts:
+        drafts_out.append({
+            "id": d.id,
+            "brand_id": d.brand_id,
+            "prompt_id": d.prompt_id,
+            "cluster_id": d.cluster_id,
+            "platform": d.platform,
+            "status": d.status,
+            "title": d.title,
+            "content_text": d.content_text,
+            "quality_score": d.quality_score,
+            "posted_at": d.posted_at,
+            "generation_state": d.generation_state,
+            "failure_reason": d.failure_reason,
+            "citations": cites_by_draft.get(d.id, []),
+        })
 
     return {
         "id": cluster.id,
@@ -126,7 +159,7 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
         "pillar_url": cluster.pillar_url,
         "visibility_pct": await _get_prompt_visibility(db, cluster.prompt_id),
         "brief": ContentBriefSchema.model_validate(brief) if brief else None,
-        "drafts": [ContentDraftSchema.model_validate(d) for d in drafts],
+        "drafts": drafts_out,
         "version": cluster.version,
         "last_generated_at": cluster.last_generated_at,
     }

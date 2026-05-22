@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home,
   Users,
+  Crosshair,
   FileText,
   ArrowLeft,
   Shield,
@@ -14,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 const NAV = [
   { href: '/agency', label: 'Today', icon: Home, exact: true },
   { href: '/agency/clients', label: 'Clients', icon: Users, exact: false },
+  { href: '/agency/prospects', label: 'Prospects', icon: Crosshair, exact: false },
   { href: '/agency/documents', label: 'Documents', icon: FileText, exact: false },
 ];
 

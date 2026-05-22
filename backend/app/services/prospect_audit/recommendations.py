@@ -62,11 +62,11 @@ Worst-performing prompts:
 {worst_block}
 
 Lumidian's deliverables (use these explicitly when tying each recommendation to "what we'd do"):
-- 12+ AI-optimized long-form articles per month, distributed across LinkedIn, Medium, Reddit, Quora, and X — structured for how ChatGPT, Perplexity, and Gemini actually extract content
-- YouTube video AI-readability optimization — we take {s.business_name}'s existing videos, transcribe them, restructure the descriptions/captions/chapters so AI models can pull facts from them, and re-publish for citation surface
+- Content clusters — 12+ AI-optimized articles per month grouped into coordinated clusters (LinkedIn + Medium + Reddit + Quora + X around a single topic, briefed from the audit data so each piece reinforces the same cited claims)
+- YouTube video AI-readability optimization — we take {s.business_name}'s existing videos, transcribe them, restructure descriptions/captions/chapters so AI models can pull facts from them, and re-publish for citation surface
 - Website AI-readability audit — we identify the highest-impact wins on the prospect's site (schema markup, content gaps, citation surfaces, FAQ structure) so AI models can confidently cite their pages
-- Weekly visibility tracking across ChatGPT, Claude, Perplexity, and Gemini — so we see exactly which prompts moved and why
-- Competitor monitoring — flagged within days when a peer publishes AI-citable content in {s.business_name}'s category
+- Lumidian tracking dashboard — live per-prompt visibility tracking across ChatGPT, Claude, Perplexity, and Gemini, with cluster-level attribution showing which articles moved which queries. {s.business_name} sees results the same week, not in monthly reports
+- Competitor monitoring — flagged within days when a peer publishes AI-citable content in {s.business_name}'s category, with alerts surfaced in the dashboard
 
 Write 3–5 recommendations as numbered markdown items. Each one:
 - Bold one-line claim (e.g. "**Publish 12 long-form articles on Invisalign in Austin**")

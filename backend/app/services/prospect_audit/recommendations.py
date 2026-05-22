@@ -61,12 +61,17 @@ Audit summary:
 Worst-performing prompts:
 {worst_block}
 
-Lumidian's deliverables: 12+ AI-optimized long-form drafts per month posted across LinkedIn, Medium, Reddit, Quora, X; weekly AI visibility tracking; site-audit + schema fixes; competitor monitoring.
+Lumidian's deliverables (use these explicitly when tying each recommendation to "what we'd do"):
+- 12+ AI-optimized long-form articles per month, distributed across LinkedIn, Medium, Reddit, Quora, and X — structured for how ChatGPT, Perplexity, and Gemini actually extract content
+- YouTube video AI-readability optimization — we take {s.business_name}'s existing videos, transcribe them, restructure the descriptions/captions/chapters so AI models can pull facts from them, and re-publish for citation surface
+- Website AI-readability audit — we identify the highest-impact wins on the prospect's site (schema markup, content gaps, citation surfaces, FAQ structure) so AI models can confidently cite their pages
+- Weekly visibility tracking across ChatGPT, Claude, Perplexity, and Gemini — so we see exactly which prompts moved and why
+- Competitor monitoring — flagged within days when a peer publishes AI-citable content in {s.business_name}'s category
 
 Write 3–5 recommendations as numbered markdown items. Each one:
 - Bold one-line claim (e.g. "**Publish 12 long-form articles on Invisalign in Austin**")
 - 2 sentences of justification tied to the actual gap above (name the competitor where relevant)
-- Tie to a specific Lumidian deliverable
+- Tie to ONE of the specific Lumidian deliverables listed above (mix across them — don't tie every rec to the same deliverable)
 
 Output ONLY the numbered markdown list. No preamble, no closing remarks, no explanation."""
 

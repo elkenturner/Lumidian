@@ -188,10 +188,24 @@ async def _run_audit_inner(audit_id: int, cancel_event: asyncio.Event) -> None:
 
     # Step 5: recommendations (non-fatal)
     await _persist_status(audit_id, status="drafting_recs")
-    worst_three = sorted(
-        prompt_scores,
-        key=lambda p: (p.rvi if p.rvi is not None else (-1.0 if p.rvi_band == "dominant" else 0.0)),
-    )[:3]
+
+    # Pick the 3 prompts where the prospect most needs action.
+    # Tier 1 — real losses: own < peer_avg, sorted by widest gap first.
+    # Tier 2 — untapped territory: both own AND peer_avg are 0 (no one is winning yet,
+    #          the prospect can define the category). Sorted by prompt order (arbitrary).
+    # Tier 3 — even/winning prompts get skipped unless we need padding. No "action needed."
+    def _action_priority(p: PromptScore) -> tuple[int, float, int]:
+        gap = p.own_visibility_pct - p.peer_avg_visibility_pct
+        if gap < 0:
+            # Real loss — surface first, widest gap before smaller gaps.
+            return (1, gap, p.prompt_index)
+        if p.own_visibility_pct == 0 and p.peer_avg_visibility_pct == 0:
+            # Untapped territory — surface second.
+            return (2, 0, p.prompt_index)
+        # Even or winning — last priority. Negative gap so wins-by-most sort last.
+        return (3, -gap, p.prompt_index)
+
+    worst_three = sorted(prompt_scores, key=_action_priority)[:3]
 
     def _top_comp_for(prompt_index: int) -> tuple[str | None, float | None]:
         prompt_results = per_prompt_queries.get(prompt_index, [])

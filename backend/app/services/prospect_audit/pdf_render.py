@@ -23,10 +23,157 @@ _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _env = Environment(loader=FileSystemLoader(str(_TEMPLATE_DIR)), autoescape=select_autoescape(["html", "j2"]))
 
 
-def _sort_key(p: PromptScore) -> tuple[int, float]:
-    """Sort worst-first: invisible/losing prompts before even/winning/dominant."""
-    band_order = {"invisible": 0, "losing": 1, "even": 2, "winning": 3, "dominant": 4}
-    return (band_order.get(p.rvi_band, 5), p.rvi if p.rvi is not None else 99.0)
+def _kind_for(p: PromptScore) -> str:
+    """Classify a prompt by what action it suggests.
+
+    - 'loss' — competitors lead (own < peer_avg)
+    - 'untapped' — both own and peers at 0% (greenfield)
+    - 'uncontested' — own > 0, peers at 0%
+    - 'tied' — own == peer_avg, both > 0
+    - 'lead' — own > peer_avg, both > 0
+    """
+    own = p.own_visibility_pct
+    peer = p.peer_avg_visibility_pct
+    if own == 0 and peer == 0:
+        return "untapped"
+    if peer == 0 and own > 0:
+        return "uncontested"
+    if own < peer:
+        return "loss"
+    if own == peer:
+        return "tied"
+    return "lead"
+
+
+_KIND_DISPLAY_ORDER = {"loss": 0, "untapped": 1, "tied": 2, "lead": 3, "uncontested": 4}
+
+
+def _scorecard_sort_key(p: PromptScore) -> tuple[int, float, int]:
+    """Sort the per-prompt scorecard: losses first, untapped next, then wins."""
+    kind = _kind_for(p)
+    own = p.own_visibility_pct
+    peer = p.peer_avg_visibility_pct
+    if kind == "loss":
+        # Widest absolute gap (peer - own) first
+        return (0, -(peer - own), p.prompt_index)
+    if kind == "untapped":
+        return (1, 0.0, p.prompt_index)
+    if kind == "tied":
+        return (2, 0.0, p.prompt_index)
+    if kind == "lead":
+        # Smallest lead first (fragile wins on top)
+        return (3, own - peer, p.prompt_index)
+    # uncontested: biggest absolute own_pct first
+    return (4, -own, p.prompt_index)
+
+
+def _smart_title_case(name: str) -> str:
+    """Title-case a business name only if it looks like a slug/URL (all-lower/upper, no spaces).
+
+    Leaves CamelCase, "iPad", and properly-cased names untouched.
+    """
+    stripped = name.strip()
+    if not stripped:
+        return name
+    if stripped == stripped.lower() or stripped == stripped.upper():
+        return stripped.title()
+    return stripped
+
+
+def _join_peer_names(competitors: list[DetectedCompetitor]) -> str:
+    names = [c.name for c in competitors if not c.is_subject][:3]
+    if not names:
+        return "your peer group"
+    if len(names) == 1:
+        return names[0]
+    if len(names) == 2:
+        return f"{names[0]} and {names[1]}"
+    return ", ".join(names[:-1]) + f", and {names[-1]}"
+
+
+def _build_action_blocks(
+    prompts: list[str],
+    prompt_scores: list[PromptScore],
+    per_prompt_top_competitor: dict[int, tuple[str | None, float | None]],
+) -> list[dict]:
+    """Pick the 3 prompts that most need action and tag each with its 'kind'.
+
+    Mirrors the runner's `_action_priority`: losses > untapped > everything else.
+    """
+    def _priority(p: PromptScore) -> tuple[int, float, int]:
+        gap = p.own_visibility_pct - p.peer_avg_visibility_pct
+        if gap < 0:
+            return (1, gap, p.prompt_index)
+        if p.own_visibility_pct == 0 and p.peer_avg_visibility_pct == 0:
+            return (2, 0.0, p.prompt_index)
+        return (3, -gap, p.prompt_index)
+
+    chosen = sorted(prompt_scores, key=_priority)[:3]
+    blocks = []
+    for ps in chosen:
+        top_name, top_pct = per_prompt_top_competitor.get(ps.prompt_index, (None, None))
+        blocks.append({
+            "prompt_text": prompts[ps.prompt_index],
+            "kind": _kind_for(ps),
+            "own_visibility_pct": ps.own_visibility_pct,
+            "peer_avg_visibility_pct": ps.peer_avg_visibility_pct,
+            "top_competitor_name": top_name,
+            "top_competitor_visibility_pct": top_pct,
+        })
+    return blocks
+
+
+def _headline_framing(overall_pct: float, peer_avg_pct: float, location: str | None) -> dict:
+    """Return the headline copy bundle that drives the cover + executive summary.
+
+    Strategy: lead with the absolute number, framed as a gap. This is the
+    cold-email hook. The relative position (RVI band) is supporting detail,
+    NOT the lead — a 17%-visibility prospect is not "dominant" in any way
+    that matters to the business owner, even if peers are at 3%.
+    """
+    missing_pct = max(0, round(100 - overall_pct))
+    own_int = round(overall_pct)
+    peer_int = round(peer_avg_pct)
+
+    # Cover hook — what gets the prospect to open page 2
+    if overall_pct < 25:
+        cover_hook = f"AI models mention you in only {own_int}% of relevant searches."
+        cover_sub = f"{missing_pct}% of potential customers asking these questions never hear your name."
+    elif overall_pct < 50:
+        cover_hook = f"You appear in {own_int}% of relevant AI searches."
+        cover_sub = f"More than half of customers asking these questions never see your name."
+    elif overall_pct < 80:
+        cover_hook = f"You appear in {own_int}% of relevant AI searches."
+        cover_sub = "There's still significant room to widen the lead."
+    else:
+        cover_hook = f"You appear in {own_int}% of relevant AI searches — strong position."
+        cover_sub = "The audit below shows where to defend and where to widen the gap."
+
+    # Executive summary lead sentence
+    geo = f" in {location}" if location else ""
+    if overall_pct < peer_avg_pct:
+        # Real loss case
+        summary_lead = (
+            f"Customers searching for what you offer{geo} mention you in only {own_int}% of "
+            f"AI responses. Competitors are mentioned {peer_int}% of the time. You're losing the conversation."
+        )
+    elif overall_pct == 0 and peer_avg_pct == 0:
+        summary_lead = (
+            f"AI models don't surface you OR your competitors{geo} for these questions. "
+            f"Whoever publishes first owns this category in AI search."
+        )
+    else:
+        summary_lead = (
+            f"You appear in {own_int}% of AI responses about your category{geo}. "
+            f"Competitors average {peer_int}%. You're ahead, but {missing_pct}% of relevant searches still don't mention you."
+        )
+
+    return {
+        "cover_hook": cover_hook,
+        "cover_sub": cover_sub,
+        "summary_lead": summary_lead,
+        "missing_pct": missing_pct,
+    }
 
 
 async def render_prospect_pdf(
@@ -43,29 +190,23 @@ async def render_prospect_pdf(
     """Render the audit HTML template and return PDF bytes."""
     template = _env.get_template("prospect_audit.html.j2")
 
-    sorted_scores = sorted(prompt_scores, key=_sort_key)
-    worst_three = sorted_scores[:3]
-
-    winner_blocks = []
-    for ps in worst_three:
-        top_name, top_pct = per_prompt_top_competitor.get(ps.prompt_index, (None, None))
-        winner_blocks.append({
+    display_name = _smart_title_case(audit.business_name)
+    sorted_scores = sorted(prompt_scores, key=_scorecard_sort_key)
+    # Annotate each prompt score with its kind for the template
+    scorecard = []
+    for ps in sorted_scores:
+        scorecard.append({
             "prompt_text": prompts[ps.prompt_index],
+            "kind": _kind_for(ps),
             "own_visibility_pct": ps.own_visibility_pct,
             "peer_avg_visibility_pct": ps.peer_avg_visibility_pct,
-            "top_competitor_name": top_name,
-            "top_competitor_visibility_pct": top_pct,
+            "rvi": ps.rvi,
+            "rvi_band": ps.rvi_band,
         })
 
-    peer_names = [c.name for c in competitors if not c.is_subject][:3]
-    if not peer_names:
-        peer_names_joined = "your peer group"
-    elif len(peer_names) == 1:
-        peer_names_joined = peer_names[0]
-    elif len(peer_names) == 2:
-        peer_names_joined = f"{peer_names[0]} and {peer_names[1]}"
-    else:
-        peer_names_joined = ", ".join(peer_names[:-1]) + f", and {peer_names[-1]}"
+    action_blocks = _build_action_blocks(prompts, prompt_scores, per_prompt_top_competitor)
+    peer_names_joined = _join_peer_names(competitors)
+    framing = _headline_framing(summary.overall_visibility_pct, summary.peer_avg_visibility_pct, summary.location)
 
     recommendations_html = _md.markdown(recommendations_md) if recommendations_md else None
 
@@ -73,20 +214,28 @@ async def render_prospect_pdf(
     cta_email = os.getenv("PROSPECT_AUDIT_CTA_EMAIL") or os.getenv("SUPPORT_EMAIL") or ""
 
     html = template.render(
-        business_name=audit.business_name,
-        location=audit.location if audit.is_local else None,
+        business_name=display_name,
+        location=summary.location,
         logo_data_uri=logo_data_uri,
         audit_month=datetime.utcnow().strftime("%B %Y"),
         generated_label=datetime.utcnow().strftime("%B %d, %Y"),
+        # Headline + framing
+        cover_hook=framing["cover_hook"],
+        cover_sub=framing["cover_sub"],
+        summary_lead=framing["summary_lead"],
+        missing_pct=framing["missing_pct"],
+        # Stats
         rvi_band=summary.rvi_band,
         aggregate_rvi=summary.aggregate_rvi,
         overall_visibility_pct=summary.overall_visibility_pct,
         peer_avg_overall=summary.peer_avg_visibility_pct,
         peer_names_joined=peer_names_joined,
-        prompts=prompts,
-        sorted_prompt_scores=sorted_scores,
-        winner_blocks=winner_blocks,
+        # Data tables
+        scorecard=scorecard,
+        action_blocks=action_blocks,
+        # Recommendations
         recommendations_html=recommendations_html,
+        # CTA
         cta_url=cta_url,
         cta_email=cta_email,
     )

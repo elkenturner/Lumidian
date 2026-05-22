@@ -1514,12 +1514,13 @@ class ProspectAuditCreate(BaseModel):
     is_local: bool = False
     location: str | None = Field(default=None, max_length=200)
 
-    @field_validator("location")
-    @classmethod
-    def _location_required_when_local(cls, v, info):
-        if info.data.get("is_local") and not (v and v.strip()):
+    @model_validator(mode="after")
+    def _location_required_when_local(self) -> "ProspectAuditCreate":
+        if self.is_local and not (self.location and self.location.strip()):
             raise ValueError("location is required when is_local is true")
-        return v.strip() if v else None
+        if self.location:
+            self.location = self.location.strip()
+        return self
 
     @field_validator("website_url")
     @classmethod

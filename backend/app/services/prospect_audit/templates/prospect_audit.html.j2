@@ -7,180 +7,189 @@
   @page { size: Letter; margin: 0; }
   * { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, sans-serif; color: #0f172a; background: #fafafa; }
-  .page { width: 8.5in; min-height: 11in; padding: 0.75in 0.75in 1in; page-break-after: always; position: relative; background: #fafafa; }
-  .page:last-child { page-break-after: auto; }
+  .page { width: 8.5in; padding: 0.55in 0.75in 0.75in; position: relative; background: #fafafa; }
+  .page-cover, .page-cta { min-height: 11in; page-break-after: always; }
+  .page-break { page-break-before: always; }
   h1, h2, h3, h4 { margin: 0; font-weight: 600; }
-  h2 { font-size: 22pt; line-height: 1.2; color: #0f172a; }
+  h2 { font-size: 20pt; line-height: 1.2; color: #0f172a; margin-bottom: 4pt; }
   h3 { font-size: 13pt; margin-bottom: 4pt; color: #0f172a; line-height: 1.3; }
-  h4 { font-size: 9pt; margin: 14pt 0 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 1.5pt; font-weight: 600; }
+  h4 { font-size: 9pt; margin: 0 0 6pt; color: #64748b; text-transform: uppercase; letter-spacing: 1.5pt; font-weight: 600; }
   p { margin: 0 0 10pt; line-height: 1.6; font-size: 10.5pt; color: #334155; }
-  .muted { color: #94a3b8; }
+  .muted { color: #94a3b8; font-size: 10.5pt; }
+  .subtitle { color: #64748b; font-size: 11pt; margin-bottom: 18pt; line-height: 1.5; }
   .footer { position: absolute; left: 0.75in; right: 0.75in; bottom: 0.45in; display: flex; justify-content: space-between; font-size: 9pt; color: #94a3b8; }
   .footer .wordmark { font-weight: 600; color: #64748b; }
 
   /* Cover */
-  .cover { position: relative; height: 9.5in; }
-  .cover .logo { width: 140px; height: auto; max-height: 80px; object-fit: contain; }
-  .cover .hero { text-align: center; position: absolute; left: 0; right: 0; top: 46%; transform: translateY(-50%); padding: 0 0.75in; }
-  .cover .hero .label { font-size: 11pt; letter-spacing: 3pt; text-transform: uppercase; color: #64748b; margin-bottom: 28pt; }
-  .cover .hero .name { font-family: Georgia, "Times New Roman", serif; font-size: 44pt; color: #0f172a; margin: 0 0 16pt; line-height: 1.1; word-break: break-word; }
-  .cover .hero .date { font-size: 15pt; color: #475569; margin-bottom: 32pt; }
-  .cover .band-badge { display: inline-block; padding: 8pt 22pt; border-radius: 999px; font-family: Georgia, serif; font-size: 22pt; font-weight: 600; letter-spacing: 1pt; }
-  .cover .band-rvi { font-size: 11pt; color: #475569; margin-top: 14pt; letter-spacing: 1pt; }
-  .cover .meta { display: flex; justify-content: space-between; font-size: 10pt; color: #64748b; padding-top: 14pt; border-top: 1px solid #ececec; position: absolute; left: 0.75in; right: 0.75in; bottom: 0.75in; }
+  .page-cover { display: flex; flex-direction: column; }
+  .cover-top { display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.4in; }
+  .cover-top .logo { max-width: 120px; max-height: 70px; object-fit: contain; }
+  .cover-top .lumidian-wordmark { font-size: 10pt; letter-spacing: 2pt; color: #64748b; text-transform: uppercase; font-weight: 600; }
+  .cover-hero { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; max-width: 6in; }
+  .cover-hero .eyebrow { font-size: 10pt; letter-spacing: 2.5pt; text-transform: uppercase; color: #64748b; margin-bottom: 12pt; }
+  .cover-hero .name { font-family: Georgia, "Times New Roman", serif; font-size: 36pt; color: #0f172a; margin: 0 0 6pt; line-height: 1.1; word-break: break-word; font-weight: 600; }
+  .cover-hero .date { font-size: 12pt; color: #64748b; margin-bottom: 36pt; }
+  .cover-hero .hook { font-family: Georgia, serif; font-size: 26pt; line-height: 1.25; color: #0f172a; margin-bottom: 14pt; font-weight: 500; }
+  .cover-hero .sub { font-size: 13pt; color: #475569; line-height: 1.5; margin-bottom: 28pt; }
+  .cover-hero .pill-row { display: flex; gap: 8pt; align-items: center; }
+  .cover-meta { display: flex; justify-content: space-between; padding-top: 14pt; border-top: 1px solid #ececec; font-size: 9.5pt; color: #94a3b8; }
 
-  /* Band colors */
-  .band-dominant   { background: #ecfdf5; color: #059669; border: 1px solid #6ee7b7; }
-  .band-winning    { background: #f0fdf4; color: #16a34a; border: 1px solid #86efac; }
-  .band-even       { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
-  .band-losing     { background: #fffbeb; color: #d97706; border: 1px solid #fcd34d; }
-  .band-invisible  { background: #fef2f2; color: #e11d48; border: 1px solid #fca5a5; }
+  /* Pill (used in cover + scorecard) */
+  .pill { display: inline-block; padding: 3pt 12pt; border-radius: 999px; font-size: 9pt; font-weight: 600; letter-spacing: 0.5pt; text-transform: uppercase; }
+  .pill-loss { background: #fef2f2; color: #b91c1c; }
+  .pill-untapped { background: #fffbeb; color: #b45309; }
+  .pill-tied { background: #f1f5f9; color: #475569; }
+  .pill-lead { background: #f0fdf4; color: #16a34a; }
+  .pill-uncontested { background: #ecfdf5; color: #059669; }
 
   /* Executive summary */
-  .headline { font-family: Georgia, serif; font-size: 26pt; line-height: 1.2; color: #0f172a; margin: 24pt 0 20pt; }
-  .headline strong { font-weight: 600; }
-  .score-row { display: flex; gap: 12pt; margin: 14pt 0 28pt; }
-  .score-card { flex: 1; background: #fff; border: 1px solid #ececec; border-radius: 10px; padding: 16pt 14pt; text-align: center; }
-  .score-card .label { font-size: 9pt; text-transform: uppercase; letter-spacing: 1.5pt; color: #64748b; margin-bottom: 10pt; }
-  .score-card .value { font-family: Georgia, serif; font-size: 38pt; line-height: 1; color: #0f172a; font-weight: 600; }
-  .score-card .caption { font-size: 9.5pt; color: #475569; margin-top: 8pt; line-height: 1.45; }
-  .methodology { font-size: 9pt; color: #94a3b8; line-height: 1.6; margin-top: 24pt; padding-top: 14pt; border-top: 1px solid #ececec; }
+  .lede-block { background: #fff; border-left: 3pt solid #5f7ea6; padding: 14pt 18pt; margin: 0 0 22pt; font-size: 13pt; line-height: 1.55; color: #0f172a; }
+  .lede-block strong { font-weight: 700; }
+  .score-row { display: flex; gap: 11pt; margin: 0 0 20pt; }
+  .score-card { flex: 1; background: #fff; border: 1px solid #ececec; border-radius: 10px; padding: 14pt 12pt 12pt; text-align: center; }
+  .score-card .label { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1.5pt; color: #64748b; margin-bottom: 8pt; font-weight: 600; }
+  .score-card .value { font-family: Georgia, serif; font-size: 34pt; line-height: 1; color: #0f172a; font-weight: 600; }
+  .score-card .caption { font-size: 9pt; color: #64748b; margin-top: 7pt; line-height: 1.4; }
+  .methodology { font-size: 8.5pt; color: #94a3b8; line-height: 1.6; margin-top: 22pt; padding-top: 12pt; border-top: 1px solid #ececec; }
 
   /* Per-prompt scorecard */
-  .prompt-card { background: #fff; border: 1px solid #ececec; border-radius: 8px; padding: 14pt 16pt; margin-bottom: 10pt; page-break-inside: avoid; }
-  .prompt-card .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 14pt; margin-bottom: 10pt; }
-  .prompt-card .q { font-style: italic; color: #0f172a; font-size: 10.5pt; line-height: 1.5; flex: 1; }
-  .prompt-card .rvi-num { font-family: Georgia, serif; font-size: 16pt; color: #0f172a; font-weight: 600; }
-  .pill { display: inline-block; padding: 2pt 10pt; border-radius: 999px; font-size: 8.5pt; font-weight: 600; letter-spacing: 0.5pt; text-transform: uppercase; }
-  .bar-row { display: flex; align-items: center; gap: 10pt; margin: 4pt 0; font-size: 9.5pt; }
-  .bar-row .bar-label { width: 60pt; color: #64748b; }
+  .prompt-card { background: #fff; border: 1px solid #ececec; border-radius: 8px; padding: 12pt 14pt; margin-bottom: 8pt; page-break-inside: avoid; }
+  .prompt-card.kind-loss { border-left: 3pt solid #b91c1c; }
+  .prompt-card.kind-untapped { border-left: 3pt solid #b45309; }
+  .prompt-card.kind-tied { border-left: 3pt solid #94a3b8; }
+  .prompt-card.kind-lead { border-left: 3pt solid #16a34a; }
+  .prompt-card.kind-uncontested { border-left: 3pt solid #059669; }
+  .prompt-card .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12pt; margin-bottom: 8pt; }
+  .prompt-card .q { font-style: italic; color: #0f172a; font-size: 10.5pt; line-height: 1.4; flex: 1; }
+  .prompt-card .badge-stack { text-align: right; }
+  .bar-row { display: flex; align-items: center; gap: 10pt; margin: 3pt 0; font-size: 9.5pt; }
+  .bar-row .bar-label { width: 58pt; color: #64748b; }
   .bar-row .bar { flex: 1; height: 8pt; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
   .bar-row .bar > span { display: block; height: 100%; }
-  .bar-row .pct { width: 38pt; text-align: right; color: #334155; font-variant-numeric: tabular-nums; }
+  .bar-row .pct { width: 36pt; text-align: right; color: #334155; font-variant-numeric: tabular-nums; font-weight: 500; }
   .bar-own > span  { background: #5f7ea6; }
-  .bar-peer > span { background: #94a3b8; }
+  .bar-peer > span { background: #cbd5e1; }
 
-  /* Who's winning */
-  .winner-block { background: #fff; border: 1px solid #ececec; border-radius: 10px; padding: 18pt 20pt; margin-bottom: 14pt; page-break-inside: avoid; }
-  .winner-block .q { font-style: italic; color: #475569; font-size: 10pt; margin-bottom: 10pt; }
-  .winner-block .punch { font-size: 13pt; line-height: 1.5; color: #0f172a; margin-bottom: 8pt; }
-  .winner-block .punch strong { font-weight: 700; }
-  .winner-block .cause { font-size: 10pt; color: #64748b; line-height: 1.5; }
-  .model-dots { display: inline-flex; gap: 5pt; margin-left: 6pt; }
-  .model-dots span { display: inline-block; width: 9pt; height: 9pt; border-radius: 50%; }
-  .dot-chatgpt    { background: #10a37f; }
-  .dot-perplexity { background: #8b5cf6; }
-  .dot-gemini     { background: #4285f4; }
+  /* Action / "Where you can win" blocks */
+  .action-block { background: #fff; border: 1px solid #ececec; border-radius: 10px; padding: 16pt 18pt; margin-bottom: 12pt; page-break-inside: avoid; }
+  .action-block.kind-loss { border-left: 4pt solid #b91c1c; }
+  .action-block.kind-untapped { border-left: 4pt solid #b45309; }
+  .action-block.kind-uncontested { border-left: 4pt solid #059669; }
+  .action-block.kind-tied { border-left: 4pt solid #94a3b8; }
+  .action-block.kind-lead { border-left: 4pt solid #16a34a; }
+  .action-block .q { font-style: italic; color: #475569; font-size: 10pt; margin-bottom: 10pt; }
+  .action-block .punch { font-size: 12pt; line-height: 1.5; color: #0f172a; margin-bottom: 8pt; }
+  .action-block .punch strong { font-weight: 700; }
+  .action-block .why { font-size: 10pt; color: #64748b; line-height: 1.55; }
 
   /* Recommendations */
-  .rec { background: #fff; border: 1px solid #ececec; border-radius: 10px; padding: 18pt 20pt; margin-bottom: 14pt; position: relative; page-break-inside: avoid; }
-  .rec .priority-num { position: absolute; top: 14pt; right: 22pt; font-family: Georgia, serif; font-size: 36pt; line-height: 1; color: #e2e8f0; font-weight: 700; }
-  .rec .body { font-size: 10.5pt; color: #334155; line-height: 1.6; }
-  .rec .body p { margin: 4pt 0; }
-  .rec .body strong { color: #0f172a; font-weight: 700; }
-  .rec ol, .rec ul { margin: 6pt 0; padding-left: 22pt; }
-  .static-fallback { background: #fff; border: 1px solid #ececec; border-radius: 10px; padding: 18pt 20pt; }
-  .static-fallback ul { margin: 8pt 0; padding-left: 22pt; }
+  .recs { background: #fff; border: 1px solid #ececec; border-radius: 10px; padding: 16pt 20pt; }
+  .recs ol { margin: 0; padding-left: 22pt; }
+  .recs ol li { font-size: 10.5pt; color: #334155; line-height: 1.6; margin-bottom: 12pt; }
+  .recs ol li:last-child { margin-bottom: 0; }
+  .recs strong { color: #0f172a; font-weight: 700; }
+  .recs p { margin: 4pt 0; }
+  .static-fallback { background: #fff; border: 1px solid #ececec; border-radius: 10px; padding: 16pt 20pt; }
+  .static-fallback ul { margin: 6pt 0; padding-left: 22pt; }
   .static-fallback li { margin-bottom: 6pt; font-size: 10.5pt; line-height: 1.55; color: #334155; }
 
   /* CTA page */
-  .cta-page { text-align: center; padding-top: 1.5in; }
-  .cta-page .hook { font-family: Georgia, serif; font-size: 32pt; color: #0f172a; line-height: 1.2; margin-bottom: 28pt; }
-  .cta-page .cta-body { font-size: 12pt; color: #334155; line-height: 1.6; max-width: 5in; margin: 0 auto 18pt; }
-  .cta-page .cta-link { display: inline-block; margin: 8pt 0; font-size: 11pt; color: #5f7ea6; font-weight: 500; text-decoration: none; }
-  .cta-page .credit { margin-top: 48pt; font-size: 10pt; color: #64748b; }
-  .cta-page .credit .who { font-weight: 600; color: #0f172a; }
+  .page-cta { display: flex; flex-direction: column; }
+  .cta-content { flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; max-width: 6in; }
+  .cta-content .eyebrow { font-size: 10pt; letter-spacing: 2.5pt; text-transform: uppercase; color: #64748b; margin-bottom: 14pt; }
+  .cta-content .hook { font-family: Georgia, serif; font-size: 30pt; line-height: 1.2; color: #0f172a; margin-bottom: 18pt; font-weight: 500; }
+  .cta-content .body { font-size: 12pt; color: #334155; line-height: 1.6; margin-bottom: 22pt; max-width: 5.5in; }
+  .offer-block { background: #fff; border: 1px solid #ececec; border-radius: 10px; padding: 16pt 20pt; margin-bottom: 22pt; }
+  .offer-block .offer-title { font-size: 10pt; font-weight: 700; color: #0f172a; text-transform: uppercase; letter-spacing: 1.5pt; margin-bottom: 10pt; }
+  .offer-block ul { margin: 0; padding-left: 18pt; }
+  .offer-block li { font-size: 10.5pt; color: #334155; line-height: 1.55; margin-bottom: 6pt; }
+  .offer-block li:last-child { margin-bottom: 0; }
+  .offer-block li strong { color: #0f172a; font-weight: 700; }
+  .cta-contacts { font-size: 11pt; color: #5f7ea6; }
+  .cta-contacts a { color: #5f7ea6; text-decoration: none; font-weight: 500; }
+  .cta-contacts .item { margin-bottom: 6pt; }
+  .cta-footer { font-size: 9.5pt; color: #94a3b8; padding-top: 14pt; border-top: 1px solid #ececec; margin-top: auto; display: flex; justify-content: space-between; }
+  .cta-footer .who { font-weight: 700; color: #0f172a; }
 </style>
 </head>
 <body>
 
-<!-- PAGE 1 — Cover -->
-<div class="page cover">
-  <div>
+<!-- ───────────────────────────────────── COVER ───────────────────────────────────── -->
+<div class="page page-cover">
+  <div class="cover-top">
     {% if logo_data_uri %}
       <img src="{{ logo_data_uri }}" class="logo" alt="{{ business_name }}" />
     {% else %}
-      <div style="font-size:18pt;font-weight:700;color:#0f172a;">{{ business_name }}</div>
+      <div style="font-size:14pt;font-weight:700;color:#0f172a;">{{ business_name }}</div>
     {% endif %}
+    <div class="lumidian-wordmark">Lumidian</div>
   </div>
-  <div class="hero">
-    <div class="label">AI Visibility Audit</div>
+
+  <div class="cover-hero">
+    <div class="eyebrow">AI Visibility Audit</div>
     <div class="name">{{ business_name }}</div>
-    <div class="date">{{ audit_month }}</div>
-    <div class="band-badge band-{{ rvi_band }}">{{ rvi_band|upper }}</div>
-    <div class="band-rvi">
-      {% if aggregate_rvi is not none %}Aggregate RVI · {{ "%.2f"|format(aggregate_rvi) }}{% else %}Peer group absent on these prompts{% endif %}
-    </div>
+    <div class="date">{{ audit_month }}{% if location %} · {{ location }}{% endif %}</div>
+
+    <div class="hook">{{ cover_hook }}</div>
+    <div class="sub">{{ cover_sub }}</div>
   </div>
-  <div class="meta">
+
+  <div class="cover-meta">
     <div>Prepared by Lumidian</div>
     <div>{{ generated_label }}</div>
   </div>
 </div>
 
-<!-- PAGE 2 — Executive summary -->
+<!-- ─────────────────────────────── EXECUTIVE SUMMARY ─────────────────────────────── -->
 <div class="page">
   <h4>Executive Summary</h4>
-  <div class="headline">
-    {{ business_name }} is <strong>{{ rvi_band }}</strong> on AI search.
-  </div>
+  <h2>Where {{ business_name }} stands on AI search</h2>
+  <div class="subtitle">90 queries to ChatGPT, Perplexity, and Gemini — questions a real customer would ask.</div>
+
+  <div class="lede-block">{{ summary_lead }}</div>
 
   <div class="score-row">
     <div class="score-card">
       <div class="label">Your Visibility</div>
       <div class="value">{{ overall_visibility_pct|round|int }}%</div>
-      <div class="caption">your name appears in {{ overall_visibility_pct|round|int }}% of relevant AI responses</div>
+      <div class="caption">of relevant AI responses mention you</div>
     </div>
     <div class="score-card">
       <div class="label">Peer Average</div>
       <div class="value">{{ peer_avg_overall|round|int }}%</div>
-      <div class="caption">competitors averaged {{ peer_avg_overall|round|int }}% across the same prompts</div>
+      <div class="caption">competitors averaged this across the same prompts</div>
     </div>
     <div class="score-card">
-      <div class="label">RVI</div>
-      <div class="value">{% if aggregate_rvi is not none %}{{ "%.2f"|format(aggregate_rvi) }}{% else %}—{% endif %}</div>
-      <div class="caption">
-        {% if aggregate_rvi is not none %}
-          you're at {{ (aggregate_rvi * 100)|round|int }}% of peer average
-        {% else %}
-          peer group absent — you dominated these prompts
-        {% endif %}
-      </div>
+      <div class="label">Searches Missing You</div>
+      <div class="value">{{ missing_pct|round|int }}%</div>
+      <div class="caption">of potential customers don't hear your name</div>
     </div>
   </div>
 
-  <p>
-    Across 90 queries to ChatGPT, Perplexity, and Gemini — questions a
-    {% if location %}potential customer in {{ location }}{% else %}potential customer{% endif %}
-    would actually ask when researching this space — <strong>{{ business_name }}</strong> appeared in
-    <strong>{{ overall_visibility_pct|round|int }}%</strong> of relevant responses. Your peer group
-    ({{ peer_names_joined }}) averaged <strong>{{ peer_avg_overall|round|int }}%</strong>.
-    {% if rvi_band == "losing" or rvi_band == "invisible" %}
-      That puts you at roughly {{ (aggregate_rvi * 100)|round|int if aggregate_rvi else 0 }}% of peer-group visibility — there's significant room to recover ground.
-    {% elif rvi_band == "even" %}
-      That puts you roughly in line with peers — small wins on the right prompts could move you ahead.
-    {% else %}
-      That puts you ahead of your peer group on AI search — the goal now is widening that gap.
-    {% endif %}
-  </p>
+  <p>Your peer group: {{ peer_names_joined }}.</p>
 
   <p class="methodology">
-    <strong>Methodology:</strong> 10 generated prompts × 3 models (ChatGPT search, Perplexity Sonar-Pro, Gemini 2.5 Flash) × 3 runs = 90 queries total. RVI = your visibility ÷ peer-group average visibility per prompt; aggregate is the mean across all prompts. Generated {{ generated_label }}.
+    <strong>Methodology:</strong> 10 generated prompts × 3 models (ChatGPT search, Perplexity Sonar-Pro, Gemini 2.5 Flash) × 3 runs = 90 queries total. Visibility = the share of those queries where {{ business_name }} appeared in the response. Generated {{ generated_label }}.
   </p>
 </div>
 
-<!-- PAGE 3 — Per-prompt scorecard -->
-<div class="page">
-  <h2>Per-prompt scorecard</h2>
-  <p class="muted" style="margin-bottom: 18pt;">Sorted worst RVI first — where the biggest gaps are.</p>
+<!-- ────────────────────────── PER-PROMPT SCORECARD ────────────────────────── -->
+<div class="page page-break">
+  <h2>Per-prompt breakdown</h2>
+  <div class="subtitle">All 10 prompts, sorted by what needs your attention first.</div>
 
-  {% for ps in sorted_prompt_scores %}
-  <div class="prompt-card">
+  {% for ps in scorecard %}
+  <div class="prompt-card kind-{{ ps.kind }}">
     <div class="top">
-      <div class="q">"{{ prompts[ps.prompt_index] }}"</div>
-      <div style="text-align: right;">
-        <div class="rvi-num">{% if ps.rvi is not none %}{{ "%.2f"|format(ps.rvi) }}{% else %}∞{% endif %}</div>
-        <span class="pill band-{{ ps.rvi_band }}">{{ ps.rvi_band }}</span>
+      <div class="q">"{{ ps.prompt_text }}"</div>
+      <div class="badge-stack">
+        <span class="pill pill-{{ ps.kind }}">
+          {% if ps.kind == 'loss' %}LOSING
+          {% elif ps.kind == 'untapped' %}UNTAPPED
+          {% elif ps.kind == 'tied' %}TIED
+          {% elif ps.kind == 'lead' %}AHEAD
+          {% else %}UNCONTESTED{% endif %}
+        </span>
       </div>
     </div>
     <div class="bar-row bar-own">
@@ -197,81 +206,98 @@
   {% endfor %}
 </div>
 
-<!-- PAGE 4 — Who's winning, where -->
-<div class="page">
-  <h2>Who's winning, where</h2>
-  <p class="muted" style="margin-bottom: 18pt;">The three prompts where the gap matters most.</p>
+<!-- ────────────────────────── WHERE TO ACT ────────────────────────── -->
+<div class="page page-break">
+  <h2>Where to focus first</h2>
+  <div class="subtitle">The three prompts where the move matters most.</div>
 
-  {% for w in winner_blocks %}
-  <div class="winner-block">
+  {% for w in action_blocks %}
+  <div class="action-block kind-{{ w.kind }}">
     <div class="q">"{{ w.prompt_text }}"</div>
     <div class="punch">
-      {% if w.top_competitor_name %}
-        <strong>{{ w.top_competitor_name }}</strong> dominates this question with
-        <strong>{{ w.top_competitor_visibility_pct|round|int }}%</strong> visibility —
-        you sit at <strong>{{ w.own_visibility_pct|round|int }}%</strong>.
+      {% if w.kind == 'loss' and w.top_competitor_name %}
+        <strong>{{ w.top_competitor_name }}</strong> dominates this question with <strong>{{ w.top_competitor_visibility_pct|round|int }}%</strong> visibility — you're at <strong>{{ w.own_visibility_pct|round|int }}%</strong>.
+      {% elif w.kind == 'loss' %}
+        Competitors collectively appear in <strong>{{ w.peer_avg_visibility_pct|round|int }}%</strong> of responses — you're at <strong>{{ w.own_visibility_pct|round|int }}%</strong>.
+      {% elif w.kind == 'untapped' %}
+        No competitor and no one in your industry surfaces here yet — this is an open category in AI search. Whoever publishes first owns it.
+      {% elif w.kind == 'uncontested' %}
+        Only you appear in responses to this — peers are at <strong>0%</strong>. A fragile lead worth defending with more content.
+      {% elif w.kind == 'tied' %}
+        You and competitors are tied at <strong>{{ w.own_visibility_pct|round|int }}%</strong>. A small content push pulls you clear.
       {% else %}
-        No single competitor dominates this prompt — your peer group averages
-        <strong>{{ w.peer_avg_visibility_pct|round|int }}%</strong> visibility while you sit at
-        <strong>{{ w.own_visibility_pct|round|int }}%</strong>.
+        You're ahead at <strong>{{ w.own_visibility_pct|round|int }}%</strong> vs peers at <strong>{{ w.peer_avg_visibility_pct|round|int }}%</strong>. Defend and widen.
       {% endif %}
     </div>
-    <div class="cause">
-      Likely because they've published content the AI models are pulling from. Models cited:
-      <span class="model-dots">
-        <span class="dot-chatgpt" title="ChatGPT"></span>
-        <span class="dot-perplexity" title="Perplexity"></span>
-        <span class="dot-gemini" title="Gemini"></span>
-      </span>
+    <div class="why">
+      {% if w.kind == 'loss' %}
+        AI models are pulling from competitor content. The fastest way to close the gap is publishing on the same surfaces they're being cited from (LinkedIn, Medium, Reddit, Quora).
+      {% elif w.kind == 'untapped' %}
+        AI models have no authoritative source to pull from in your local market. A single well-structured long-form piece can become THE citation across all three models.
+      {% elif w.kind == 'uncontested' %}
+        The position is real but fragile — any competitor publishing one strong piece could flip the citation.
+      {% else %}
+        Maintain the lead with regular updates and structured schema so AI models keep citing you.
+      {% endif %}
     </div>
   </div>
   {% endfor %}
 </div>
 
-<!-- PAGE 5 — What we'd do about it -->
-<div class="page">
+<!-- ────────────────────────── RECOMMENDATIONS ────────────────────────── -->
+<div class="page page-break">
   <h2>What we'd do about it</h2>
-  <p class="muted" style="margin-bottom: 18pt;">Three to five recommendations, ranked by impact.</p>
+  <div class="subtitle">3–5 recommendations, ranked by impact.</div>
 
   {% if recommendations_html %}
-    <div class="rec">
-      <div class="body">{{ recommendations_html|safe }}</div>
-    </div>
+    <div class="recs">{{ recommendations_html|safe }}</div>
   {% else %}
     <div class="static-fallback">
       <p>Lumidian closes AI visibility gaps with a recurring monthly playbook:</p>
       <ul>
-        <li><strong>12+ AI-optimized long-form drafts every month</strong> — published across LinkedIn, Medium, Reddit, Quora, and X, structured for how ChatGPT and Perplexity actually cite content.</li>
+        <li><strong>12+ AI-optimized long-form articles every month</strong> — distributed across LinkedIn, Medium, Reddit, Quora, and X, structured for how ChatGPT, Perplexity, and Gemini actually extract content.</li>
+        <li><strong>YouTube video AI-readability optimization</strong> — we take your existing videos, transcribe them, restructure descriptions and chapters, and re-publish so AI models can pull facts directly from them.</li>
+        <li><strong>Website audit for highest-impact AI-readability wins</strong> — schema, structure, citation surfaces, FAQ markup; the technical layer that determines whether AI models cite your pages.</li>
         <li><strong>Weekly visibility tracking</strong> across ChatGPT, Claude, Perplexity, and Gemini — so you know which prompts moved and why.</li>
-        <li><strong>Site &amp; schema audit</strong> — fixes the technical issues that block AI crawlers from pulling your site (robots.txt, schema, llms.txt).</li>
-        <li><strong>Competitor monitoring</strong> — when a peer publishes something that's now being cited, you know within days and can respond.</li>
-        <li><strong>Authority surface building</strong> — citations, mentions, and verified profiles where AI models look for trust signals.</li>
+        <li><strong>Competitor monitoring</strong> — flagged within days when a peer publishes AI-citable content in your category.</li>
       </ul>
     </div>
   {% endif %}
 </div>
 
-<!-- PAGE 6 — CTA + methodology -->
-<div class="page cta-page">
-  <div class="hook">Want to be the answer instead?</div>
-  <div class="cta-body">
-    Lumidian builds AI visibility for businesses like {{ business_name }}.
-    Reply to this email — or book a 20-minute call below.
-  </div>
-  {% if cta_url %}
-  <a class="cta-link" href="{{ cta_url }}">{{ cta_url }}</a><br/>
-  {% endif %}
-  {% if cta_email %}
-  <a class="cta-link" href="mailto:{{ cta_email }}">{{ cta_email }}</a>
-  {% endif %}
-
-  <div class="credit">
-    <div class="who">Lumidian</div>
-    <div class="muted">AI visibility audits and content for B2B teams</div>
+<!-- ────────────────────────── CTA ────────────────────────── -->
+<div class="page page-cta page-break">
+  <div class="cover-top">
+    <div></div>
+    <div class="lumidian-wordmark">Lumidian</div>
   </div>
 
-  <div class="footer">
-    <div class="wordmark">Lumidian</div>
+  <div class="cta-content">
+    <div class="eyebrow">Next step</div>
+    <div class="hook">Ready to close the {{ missing_pct|round|int }}% gap?</div>
+    <div class="body">
+      Lumidian builds AI visibility for {{ business_name }} and businesses like it. We turn audits like this one into measurable visibility lift across ChatGPT, Perplexity, and Gemini within 60 days.
+    </div>
+
+    <div class="offer-block">
+      <div class="offer-title">What you'd get</div>
+      <ul>
+        <li><strong>12+ AI-optimized articles a month</strong> on LinkedIn, Medium, Reddit, Quora, X — structured for how AI models actually cite content.</li>
+        <li><strong>YouTube video optimization</strong> — we restructure your existing videos (transcripts, descriptions, chapters) so AI models can pull from them.</li>
+        <li><strong>Website AI-readability audit</strong> — the highest-impact technical wins (schema, structure, citation surfaces) that move the needle fastest.</li>
+        <li><strong>Weekly tracking</strong> across all four major AI search engines, with competitor alerts when peers move.</li>
+      </ul>
+    </div>
+
+    <div class="cta-contacts">
+      <div class="item">Reply to this email — or:</div>
+      {% if cta_url %}<div class="item"><a href="{{ cta_url }}">{{ cta_url }}</a></div>{% endif %}
+      {% if cta_email %}<div class="item"><a href="mailto:{{ cta_email }}">{{ cta_email }}</a></div>{% endif %}
+    </div>
+  </div>
+
+  <div class="cta-footer">
+    <div><span class="who">Lumidian</span> · AI visibility audits and content</div>
     <div>{{ generated_label }}</div>
   </div>
 </div>

@@ -1,7 +1,8 @@
 """Generate 10 high-value AI-visibility tracking prompts for a prospect.
 
-For local businesses, prompts must be geographically anchored — include the
-city name explicitly in roughly half, and use "near me"-style framing in others.
+For local businesses, EVERY prompt must contain the explicit city name —
+"near me" and "in my area" don't anchor for AI search engines and return
+generic results, which makes the audit useless for local prospects.
 """
 from __future__ import annotations
 
@@ -25,11 +26,25 @@ def _system_prompt(business_name: str, website_url: str, homepage_excerpt: str, 
         context += f"\nHomepage content (excerpt):\n{homepage_excerpt.strip()[:3000]}"
 
     if location:
+        # First token of location is usually the city ("Austin" from "Austin, TX")
+        city = location.split(",")[0].strip() or location
         geo_block = f"""
-This is a LOCAL business in {location}. EVERY prompt must be geographically sensitive:
-- Include "{location}" or the city name explicitly in at least half of the prompts
-- Use "near me", "in {location}", or similar framing in the rest
-- DO NOT generate generic prompts — every question must be one a person physically near {location} would ask"""
+This is a LOCAL business in {location}. CRITICAL: every single prompt MUST include the literal text "{location}" OR "{city}" — by name.
+
+AI search engines (ChatGPT, Perplexity, Gemini) cannot anchor "near me" or "in my area" to a specific city. Generic geo phrasing returns empty or non-local results, which makes the audit useless. The prompt MUST name the city.
+
+REQUIRED phrasing examples:
+  ✓ "Best LASIK surgery clinic in {location}?"
+  ✓ "Where to find Invisalign treatment in {city}?"
+  ✓ "How much does dental implant surgery cost in {location}?"
+  ✓ "{city} dermatologists who specialize in acne treatment?"
+
+FORBIDDEN phrasing:
+  ✗ "Best dentist near me?"  (unanchored)
+  ✗ "LASIK clinics in my area?"  (unanchored)
+  ✗ "Dental implants nearby?"  (unanchored)
+
+Every one of the {_MIN_PROMPTS_REQUIRED} prompts must contain "{location}" or "{city}". If you generate even one prompt without explicit city naming, the audit fails."""
     else:
         geo_block = ""
 
@@ -94,5 +109,20 @@ async def generate_prompts(
 
     if len(cleaned) < _MIN_PROMPTS_REQUIRED - 2:   # tolerate 8 — 9 hard failures fall here
         raise RuntimeError(f"Only {len(cleaned)} valid prompts returned, need at least {_MIN_PROMPTS_REQUIRED - 1}")
+
+    # For local prospects, drop any prompts that don't actually mention the city.
+    # The system prompt forbids this but Claude occasionally slips up — better
+    # to have 8 city-anchored prompts than 10 mixed.
+    if location:
+        city = location.split(",")[0].strip().lower() or location.lower()
+        loc_lower = location.lower()
+        anchored = [
+            s for s in cleaned
+            if city in s.lower() or loc_lower in s.lower()
+        ]
+        if len(anchored) >= _MIN_PROMPTS_REQUIRED - 2:
+            cleaned = anchored
+        # If too many were dropped, keep the original list — better to have
+        # some non-anchored prompts than fail the audit outright.
 
     return cleaned[:_MIN_PROMPTS_REQUIRED]

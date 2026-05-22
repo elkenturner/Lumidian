@@ -3,7 +3,7 @@
 > **This file is the shared brain across all Claude surfaces working on Lumidian.**
 > Claude Code, Cowork, and Claude in Chrome should all (a) read this file at the start of every session and (b) update it before ending the session. Stable architecture lives in `CLAUDE.md`; this file holds volatile state only.
 
-**Last updated:** 2026-05-21 by Claude Code (Agency portal fixes — per-client auth + Download PDF in viewer)
+**Last updated:** 2026-05-21 by Claude Code (Agency portal cleanup — shelf + 5 tabs, Today queue-only, 8 components deleted)
 
 ---
 
@@ -29,6 +29,8 @@ One FastAPI backend, one Next.js frontend. The `/agency/*` routes are staff-only
 ## Recent Decisions
 
 _Append-only log. Newest first. Each entry: date — decision — rationale (1 line)._
+
+- **2026-05-21** — Shipped **agency portal cleanup** on `clusters-redesign-2026-05-20` (spec `docs/superpowers/specs/2026-05-20-agency-portal-cleanup-design.md`, plan `docs/superpowers/plans/2026-05-20-agency-portal-cleanup.md`). Cockpit collapsed from an 8-section vertical stack + right rail into **header → "Next step" shelf → 5 tabs (Pipeline default / Tracking / Audit / Brand / Documents)**. Status pill row replaced by a single dropdown chip; contact info moves to a popover; new compact `CopyReviewLinkButton` + small `Video studio →` header link. New `ClientNextStepShelf` surfaces the single highest-priority next action (review drafts → send → nudge → run tracking → generate → all caught up). Today stripped to queue-only. Dead stub routes (`/agency/calendar`, `/agency/opportunities`, `/agency/performance`) deleted. 8 unused components removed: `ClientQuickActionsRail`, `TaskList`, `TaskRow`, `AssigneePicker`, `ActivityFeed`, `RecentActivitySection`, `activity-icons`, `ReviewLinkSection`. `lib/api.ts` pruned of orphaned exports (`agencyToday` + types, `agencyAssignDraft`, the activity-log section, task CRUD functions). Backend endpoints for tasks/activity/today remain in place as dead code on the server side (follow-up to remove later). Build clean; 113/113 backend agency tests pass; smoke verification in browser still pending.
 
 - **2026-05-21** — Closed three agency-portal gaps on `clusters-redesign-2026-05-20`. (a) `CopyReviewLinkButton` confirmed shipped earlier in `f35d249` — no work needed. (b) Added `Download PDF` button to `DocumentViewer` (reuses existing `agencyDownloadDocumentPdf` Blob helper + browser-side `URL.createObjectURL` trigger). (c) **Per-client authorization** — previously a binary `is_agency_staff` check let every staff user touch every client. New `AgencyClientAssignment` join table + `require_client_access` dep + `ensure_client_access` helper. 13 direct endpoints + 11 indirect-scope endpoints enforce assignment; 4 cross-client endpoints filter to assigned-only; creator auto-assigned on `POST /clients`; admins bypass everywhere. 3 staff-assign endpoints + `ClientStaffPanel` UI mounted in Brand tab. 9 new tests + 79-test agency suite green. Behavior change worth noting: unknown `client_id` on cockpit endpoints now returns 403 (was 404) — assignment check fires before existence check; that's intentional (less info leak) and one regression test was updated to match.
 

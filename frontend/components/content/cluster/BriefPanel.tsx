@@ -3,15 +3,18 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, FileText } from "lucide-react";
 import { editClusterBrief, type ContentBrief } from "@/lib/api";
+import { BriefVersionHistory } from "./BriefVersionHistory";
 
 interface Props {
   brandId: number;
   clusterId: number;
   brief: ContentBrief | null;
+  /** Version pieces were generated from. Defaults to brief.version when omitted. */
+  currentVersion?: number;
   onUpdated: (b: ContentBrief) => void;
 }
 
-export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
+export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdated }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [positioning, setPositioning] = useState(brief?.positioning ?? "");
@@ -19,6 +22,9 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
   const [phrasings, setPhrasings] = useState((brief?.canonical_phrasings ?? []).join("\n"));
   const [narrative, setNarrative] = useState(brief?.narrative_spine ?? "");
   const [saving, setSaving] = useState(false);
+  const [draftDirty, setDraftDirty] = useState(false);
+  const [draftVersion, setDraftVersion] = useState<number>(brief?.version ?? 1);
+  const effectiveCurrentVersion = currentVersion ?? brief?.version ?? 1;
 
   if (!brief) {
     return (
@@ -45,6 +51,8 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
         narrative_spine: narrative,
       });
       onUpdated(updated);
+      setDraftVersion(updated.version);
+      setDraftDirty(false);
       setEditing(false);
     } finally {
       setSaving(false);
@@ -74,6 +82,17 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
 
       {expanded && (
         <div className="border-t border-[var(--border-subtle)] p-5 space-y-5 text-sm">
+          {draftDirty && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+              You have unsaved brief changes. Click <strong>Save</strong> below to persist.
+            </div>
+          )}
+          {draftVersion > effectiveCurrentVersion && (
+            <div className="rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-200">
+              Brief is at v{draftVersion}; pieces below were generated from v{effectiveCurrentVersion}.
+              Click <strong>Regenerate pieces</strong> on the cluster page to apply the new brief.
+            </div>
+          )}
           {!editing ? (
             <>
               <Field label="Positioning">{brief.positioning || <Empty />}</Field>
@@ -135,7 +154,10 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
               <Field label="Positioning">
                 <textarea
                   value={positioning}
-                  onChange={(e) => setPositioning(e.target.value)}
+                  onChange={(e) => {
+                    setPositioning(e.target.value);
+                    setDraftDirty(true);
+                  }}
                   className="input"
                   rows={2}
                 />
@@ -143,7 +165,10 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
               <Field label="Canonical phrasings (one per line)">
                 <textarea
                   value={phrasings}
-                  onChange={(e) => setPhrasings(e.target.value)}
+                  onChange={(e) => {
+                    setPhrasings(e.target.value);
+                    setDraftDirty(true);
+                  }}
                   className="input font-mono text-xs"
                   rows={4}
                 />
@@ -151,7 +176,10 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
               <Field label="Key claims (one per line)">
                 <textarea
                   value={keyClaims}
-                  onChange={(e) => setKeyClaims(e.target.value)}
+                  onChange={(e) => {
+                    setKeyClaims(e.target.value);
+                    setDraftDirty(true);
+                  }}
                   className="input"
                   rows={4}
                 />
@@ -159,7 +187,10 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
               <Field label="Narrative spine">
                 <textarea
                   value={narrative}
-                  onChange={(e) => setNarrative(e.target.value)}
+                  onChange={(e) => {
+                    setNarrative(e.target.value);
+                    setDraftDirty(true);
+                  }}
                   className="input"
                   rows={2}
                 />
@@ -183,6 +214,19 @@ export function BriefPanel({ brandId, clusterId, brief, onUpdated }: Props) {
               </div>
             </>
           )}
+          <BriefVersionHistory
+            brandId={brandId}
+            clusterId={clusterId}
+            currentVersion={effectiveCurrentVersion}
+            onRevert={(b) => {
+              setPositioning(b.positioning);
+              setPhrasings((b.canonical_phrasings ?? []).join("\n"));
+              setKeyClaims((b.key_claims ?? []).join("\n"));
+              setNarrative(b.narrative_spine ?? "");
+              setDraftDirty(true);
+              setEditing(true);
+            }}
+          />
         </div>
       )}
     </div>

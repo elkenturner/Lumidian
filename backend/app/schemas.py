@@ -1394,6 +1394,37 @@ class EditBriefRequest(BaseModel):
     tone_notes: str | None = None
 
 
+class ClusterPieceStatus(BaseModel):
+    platform: str
+    draft_id: int | None = None
+    status: str | None = None
+    generation_state: str = "done"
+    failure_reason: str | None = None
+
+
+class ClusterStatusPayload(BaseModel):
+    status: str
+    failure_reason: str | None = None
+    pieces: list[ClusterPieceStatus]
+    version: int
+    last_generated_at: datetime | None = None
+
+
+class ClusterSourceItem(BaseModel):
+    url: str
+    domain: str
+    tier: str
+    title: str | None
+    times_cited: int
+
+
+class ClusterSourcesPayload(BaseModel):
+    total_t1: int
+    total_t2: int
+    total_t3: int
+    sources: list[ClusterSourceItem]
+
+
 # ── Agency drafting (sub-project E, 2026-05-13) ──────────────────────────────
 
 

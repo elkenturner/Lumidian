@@ -118,7 +118,7 @@ async def test_create_and_rotate_review_link(client):
     assert first.status_code == 201
     first_data = first.json()
     assert first_data["token"]
-    assert first_data["url"].endswith(f"/review/{first_data['token']}")
+    assert first_data["url"].endswith(f"/client/{first_data['token']}")
 
     # Rotating produces a new token; old one is revoked
     second = await client.post(f"/api/agency/clients/{cid}/review-link")

@@ -373,7 +373,7 @@ export function ClientCockpit({ client, onChange, reviewLinkUrl }: Props) {
           <div className="mb-4">
             <ClientStaffPanel clientId={client.id} />
           </div>
-          <ClientBrandTab brandId={client.brand_id} />
+          <ClientBrandTab brandId={client.brand_id} client={client} />
         </TabsContent>
 
         <TabsContent value="documents" className="mt-6">

@@ -169,6 +169,7 @@ async def list_responses(
             "mentioned": bool(qr.mentioned),
             "sentiment": qr.sentiment,
             "latency_ms": qr.latency_ms,
+            "error": qr.error,
         })
     return out
 

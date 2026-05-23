@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { BarChart3, FileText, Globe, LayoutDashboard, MessageSquare, Search, Send, Users } from 'lucide-react';
+import { BarChart3, FileText, Globe, LayoutDashboard, Lightbulb, MessageSquare, PenSquare, Search, Users } from 'lucide-react';
 
 const NAV = (token: string) => [
   { href: `/client/${token}`, label: 'Home', icon: LayoutDashboard, exact: true },
@@ -9,9 +9,9 @@ const NAV = (token: string) => [
   { href: `/client/${token}/transcripts`, label: 'Transcripts', icon: MessageSquare },
   { href: `/client/${token}/competitors`, label: 'Competitors', icon: Users },
   { href: `/client/${token}/site-audit`, label: 'Site audit', icon: Search },
-  { href: `/client/${token}/strategy`, label: 'Strategy', icon: Send },
+  { href: `/client/${token}/strategy`, label: 'Strategy', icon: Lightbulb },
   { href: `/client/${token}/wikipedia`, label: 'Wikipedia', icon: Globe },
-  { href: `/client/${token}/content`, label: 'Content posted', icon: FileText },
+  { href: `/client/${token}/content`, label: 'Content posted', icon: PenSquare },
   { href: `/client/${token}/reports`, label: 'Reports', icon: FileText },
 ];
 
@@ -29,6 +29,7 @@ export default function ClientPortalSidebar({ token }: { token: string }) {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? 'page' : undefined}
               className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors ${
                 active ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100'
               }`}

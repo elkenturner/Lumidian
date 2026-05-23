@@ -4,6 +4,7 @@ import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { CheckCircle2, Link as LinkIcon, X } from 'lucide-react';
 import { agencyMarkDraftPosted, type ContentDraft } from '@/lib/api';
+import { useClientView } from '@/lib/client-view';
 
 interface Props {
   open: boolean;
@@ -13,6 +14,12 @@ interface Props {
 }
 
 export function MarkPostedModal({ open, onOpenChange, draft, onPosted }: Props) {
+  // Defensive gate: suppress this write-action component when rendered inside
+  // the /client/[token] portal shell. Portal pages don't import this today,
+  // but this guard prevents future accidents. (Task 16 narrowed-scope audit.)
+  const { isClientView } = useClientView();
+  if (isClientView) return null;
+
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -24,6 +24,15 @@ export default function ClientPortalLayout({
 
   if (error) notFound();
 
+  // Hold render until the brand resolves so child pages never see brandId: null.
+  if (brandId === null) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+        <div className="text-sm text-neutral-500">Loading…</div>
+      </div>
+    );
+  }
+
   return (
     <ClientViewProvider token={token} brandId={brandId}>
       <div className="min-h-screen bg-neutral-50 flex">

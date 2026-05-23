@@ -109,7 +109,6 @@ async def test_review_link_emits_client_url(client, agency_staff_user):
     assert "/review/" not in url, f"URL should not contain /review/ anymore: {url}"
 
 
-@pytest.mark.xfail(reason="Route mounted in Task 5; xfail flips off when route lands", strict=True)
 @pytest.mark.asyncio
 async def test_client_view_context_resolves_valid_token(client, agency_staff_user):
     """A valid token resolves to the right AgencyClient + Brand.
@@ -165,3 +164,54 @@ async def test_client_view_context_rejects_revoked_token(client, db_session, age
 
     resp = await client.get(f"/api/public/client/{token}/brand")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_client_portal_brand_returns_brand_summary(client, agency_staff_user):
+    """GET /api/public/client/{token}/brand returns brand id, name, slug, type."""
+    resp = await client.post("/api/agency/clients", json={"name": "Acme Inc"})
+    ac_id = resp.json()["id"]
+    brand_id = resp.json()["brand_id"]
+    resp = await client.post(f"/api/agency/clients/{ac_id}/review-link")
+    token = resp.json()["token"]
+
+    resp = await client.get(f"/api/public/client/{token}/brand")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["id"] == brand_id
+    assert body["name"] == "Acme Inc"
+    assert body["brand_type"] == "agency"
+
+
+@pytest.mark.asyncio
+async def test_client_portal_proposal_returns_pointer(client, agency_staff_user):
+    """GET /api/public/client/{token}/proposal returns current proposal fields."""
+    resp = await client.post("/api/agency/clients", json={"name": "Acme"})
+    ac_id = resp.json()["id"]
+    await client.patch(
+        f"/api/agency/clients/{ac_id}/proposal",
+        json={"current_proposal_doc_url": "https://docs.google.com/document/d/abc", "current_proposal_label": "Week of May 22"},
+    )
+    resp = await client.post(f"/api/agency/clients/{ac_id}/review-link")
+    token = resp.json()["token"]
+
+    resp = await client.get(f"/api/public/client/{token}/proposal")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["doc_url"] == "https://docs.google.com/document/d/abc"
+    assert body["label"] == "Week of May 22"
+
+
+@pytest.mark.asyncio
+async def test_client_portal_proposal_null_when_unset(client, agency_staff_user):
+    """If proposal not set, endpoint returns nulls (not 404)."""
+    resp = await client.post("/api/agency/clients", json={"name": "Acme"})
+    ac_id = resp.json()["id"]
+    resp = await client.post(f"/api/agency/clients/{ac_id}/review-link")
+    token = resp.json()["token"]
+
+    resp = await client.get(f"/api/public/client/{token}/proposal")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["doc_url"] is None
+    assert body["label"] is None

@@ -7,12 +7,20 @@ import {
   agencyRotateReviewLink,
   type ReviewLinkOut,
 } from '@/lib/api';
+import { useClientView } from '@/lib/client-view';
 
 interface Props {
   clientId: number;
 }
 
 export function CopyReviewLinkButton({ clientId }: Props) {
+  // Defensive gate: suppress this write-action component when rendered inside
+  // the /client/[token] portal shell. Clients shouldn't see their own portal
+  // link; this guard also prevents future import accidents.
+  // (Task 16 narrowed-scope audit.)
+  const { isClientView } = useClientView();
+  if (isClientView) return null;
+
   const [link, setLink] = useState<ReviewLinkOut | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);

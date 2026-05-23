@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { agencyTriggerTracking } from '@/lib/api';
+import { useClientView } from '@/lib/client-view';
 
 interface Props {
   clientId: number;
@@ -10,6 +11,12 @@ interface Props {
 }
 
 export function RunTrackingButton({ clientId, onTriggered }: Props) {
+  // Defensive gate: suppress this write-action component when rendered inside
+  // the /client/[token] portal shell. Portal pages don't import this today,
+  // but this guard prevents future accidents. (Task 16 narrowed-scope audit.)
+  const { isClientView } = useClientView();
+  if (isClientView) return null;
+
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);

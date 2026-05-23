@@ -9,6 +9,7 @@ import {
   type ContentDraft,
   type Prompt,
 } from '@/lib/api';
+import { useClientView } from '@/lib/client-view';
 
 interface Props {
   clientId: number;
@@ -27,6 +28,12 @@ const PLATFORMS: Array<{ value: string; label: string }> = [
 ];
 
 export function GenerateDraftButton({ clientId, brandId, onGenerated }: Props) {
+  // Defensive gate: suppress this write-action component when rendered inside
+  // the /client/[token] portal shell. Portal pages don't import this today,
+  // but this guard prevents future accidents. (Task 16 narrowed-scope audit.)
+  const { isClientView } = useClientView();
+  if (isClientView) return null;
+
   const [open, setOpen] = useState(false);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [promptId, setPromptId] = useState<number | ''>('');

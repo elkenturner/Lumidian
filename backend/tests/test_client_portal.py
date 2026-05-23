@@ -492,3 +492,38 @@ async def test_client_portal_token_isolated_to_own_brand(client, db_session, age
     names = [c["name"] for c in resp.json()]
     assert "OnlyOnA" in names
     assert "OnlyOnB" not in names
+
+
+@pytest.mark.asyncio
+async def test_client_portal_document_detail_blocks_cross_client_access(client, db_session, agency_staff_user):
+    """Token for client A cannot fetch a ClientDocument belonging to client B (cross-client guard)."""
+    from app.models import ClientDocument
+    from datetime import datetime
+
+    # Two separate clients
+    r1 = await client.post("/api/agency/clients", json={"name": "Acme"})
+    a_id = r1.json()["id"]
+    r2 = await client.post("/api/agency/clients", json={"name": "Globex"})
+    b_id = r2.json()["id"]
+
+    # Create a document under client B
+    b_doc = ClientDocument(
+        agency_client_id=b_id, kind="agency_weekly_report",
+        title="B-only report", body_markdown="# Secret",
+        generated_at=datetime.utcnow(),
+    )
+    db_session.add(b_doc)
+    await db_session.commit()
+    await db_session.refresh(b_doc)
+
+    # Get token for client A
+    r = await client.post(f"/api/agency/clients/{a_id}/review-link")
+    a_token = r.json()["token"]
+
+    # Token A trying to fetch B's document by ID must 404
+    resp = await client.get(f"/api/public/client/{a_token}/documents/{b_doc.id}")
+    assert resp.status_code == 404
+
+    # Token A also cannot pull B's PDF
+    resp = await client.get(f"/api/public/client/{a_token}/documents/{b_doc.id}/pdf")
+    assert resp.status_code == 404

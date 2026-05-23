@@ -269,3 +269,78 @@ async def test_client_portal_runs_returns_recent_runs(client, agency_brand_with_
     assert isinstance(runs, list)
     assert len(runs) >= 1
     assert all(r.get("brand_id") == brand_id for r in runs)
+
+
+@pytest.mark.asyncio
+async def test_client_portal_responses_returns_transcripts(client, db_session, agency_brand_with_run):
+    """GET /api/public/client/{token}/responses returns raw LLM transcripts for the latest run."""
+    from app.models import QueryResult, Prompt, TrackingRun
+    from sqlalchemy import select
+
+    ac_id, brand_id, token = agency_brand_with_run
+
+    # Add a prompt and a query result
+    prompt = Prompt(brand_id=brand_id, text="best CRM for startups")
+    db_session.add(prompt)
+    await db_session.commit()
+    await db_session.refresh(prompt)
+
+    run_q = await db_session.execute(select(TrackingRun).where(TrackingRun.brand_id == brand_id).limit(1))
+    run = run_q.scalar_one()
+
+    qr = QueryResult(
+        tracking_run_id=run.id,
+        prompt_id=prompt.id,
+        model="chatgpt",
+        run_number=1,
+        response_text="Acme is the best CRM for startups.",
+        mentioned=True,
+    )
+    db_session.add(qr)
+    await db_session.commit()
+
+    resp = await client.get(f"/api/public/client/{token}/responses")
+    assert resp.status_code == 200
+    rows = resp.json()
+    assert isinstance(rows, list)
+    assert any(r.get("response_text") == "Acme is the best CRM for startups." for r in rows)
+
+
+@pytest.mark.asyncio
+async def test_client_portal_competitors_returns_list(client, db_session, agency_brand_with_run):
+    """GET /api/public/client/{token}/competitors returns competitor list."""
+    from app.models import Competitor
+
+    ac_id, brand_id, token = agency_brand_with_run
+    db_session.add(Competitor(brand_id=brand_id, name="Salesforce", website_url="https://salesforce.com"))
+    await db_session.commit()
+
+    resp = await client.get(f"/api/public/client/{token}/competitors")
+    assert resp.status_code == 200
+    competitors = resp.json()
+    assert any(c["name"] == "Salesforce" for c in competitors)
+
+
+@pytest.mark.asyncio
+async def test_client_portal_posted_content_excludes_in_progress(client, db_session, agency_brand_with_run):
+    """GET /api/public/client/{token}/content returns ONLY posted drafts (status='posted')."""
+    from app.models import ContentDraft, Prompt
+    from datetime import datetime
+
+    ac_id, brand_id, token = agency_brand_with_run
+    prompt = Prompt(brand_id=brand_id, text="best CRM")
+    db_session.add(prompt)
+    await db_session.commit()
+    await db_session.refresh(prompt)
+
+    posted = ContentDraft(brand_id=brand_id, prompt_id=prompt.id, platform="linkedin", status="posted", title="Posted piece", content_text="...", posted_at=datetime.utcnow())
+    in_progress = ContentDraft(brand_id=brand_id, prompt_id=prompt.id, platform="linkedin", status="awaiting_client", title="In progress", content_text="...")
+    db_session.add_all([posted, in_progress])
+    await db_session.commit()
+
+    resp = await client.get(f"/api/public/client/{token}/content")
+    assert resp.status_code == 200
+    drafts = resp.json()
+    titles = [d["title"] for d in drafts]
+    assert "Posted piece" in titles
+    assert "In progress" not in titles

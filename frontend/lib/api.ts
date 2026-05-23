@@ -1060,6 +1060,8 @@ export interface AgencyClient {
   brand_id: number | null;
   drafts_pending: number;
   created_at: string;
+  current_proposal_doc_url: string | null;
+  current_proposal_label: string | null;
 }
 
 export interface AgencyClientCreate {

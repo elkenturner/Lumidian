@@ -7,12 +7,15 @@ import {
   getBrand,
   getBrandProfile,
   updateBrandProfile,
+  type AgencyClient,
   type BrandDetail,
   type BrandProfile,
 } from '@/lib/api';
+import ClientProposalForm from './ClientProposalForm';
 
 interface Props {
   brandId: number | null;
+  client?: AgencyClient;
 }
 
 const linesToArray = (s: string): string[] =>
@@ -21,7 +24,7 @@ const linesToArray = (s: string): string[] =>
 const arrayToLines = (xs: string[] | null | undefined): string =>
   Array.isArray(xs) ? xs.join('\n') : '';
 
-export function ClientBrandTab({ brandId }: Props) {
+export function ClientBrandTab({ brandId, client }: Props) {
   const [profile, setProfile] = useState<BrandProfile | null>(null);
   const [brand, setBrand] = useState<BrandDetail | null>(null);
   const [newPrompt, setNewPrompt] = useState('');
@@ -87,7 +90,15 @@ export function ClientBrandTab({ brandId }: Props) {
     'w-full rounded-md border border-[var(--border-default)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-primary)]';
 
   return (
-    <div className="grid grid-cols-1 gap-6 text-[var(--text-primary)] lg:grid-cols-2">
+    <div className="space-y-6 text-[var(--text-primary)]">
+      {client != null && (
+        <ClientProposalForm
+          clientId={client.id}
+          initialDocUrl={client.current_proposal_doc_url ?? null}
+          initialLabel={client.current_proposal_label ?? null}
+        />
+      )}
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
       <section className="space-y-3">
         <h3 className="text-sm font-medium">Brand profile</h3>
 
@@ -218,6 +229,7 @@ export function ClientBrandTab({ brandId }: Props) {
           </button>
         </div>
       </section>
+    </div>
     </div>
   );
 }

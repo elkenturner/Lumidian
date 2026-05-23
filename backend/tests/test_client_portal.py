@@ -215,3 +215,57 @@ async def test_client_portal_proposal_null_when_unset(client, agency_staff_user)
     body = resp.json()
     assert body["doc_url"] is None
     assert body["label"] is None
+
+
+@pytest_asyncio.fixture
+async def agency_brand_with_run(client, db_session, agency_staff_user):
+    """Create an agency client + completed tracking run + return (ac_id, brand_id, token)."""
+    from datetime import datetime
+    from app.models import TrackingRun
+
+    resp = await client.post("/api/agency/clients", json={"name": "Acme"})
+    ac_id = resp.json()["id"]
+    brand_id = resp.json()["brand_id"]
+
+    # Insert a completed run directly
+    run = TrackingRun(
+        brand_id=brand_id,
+        status="completed",
+        run_type="manual",
+        overall_score=42.0,
+        total_queries=10,
+        total_mentions=4,
+        started_at=datetime.utcnow(),
+        completed_at=datetime.utcnow(),
+    )
+    db_session.add(run)
+    await db_session.commit()
+
+    resp = await client.post(f"/api/agency/clients/{ac_id}/review-link")
+    token = resp.json()["token"]
+    return ac_id, brand_id, token
+
+
+@pytest.mark.asyncio
+async def test_client_portal_dashboard_returns_overview(client, agency_brand_with_run):
+    """GET /api/public/client/{token}/dashboard returns visibility overview."""
+    ac_id, _brand_id, token = agency_brand_with_run
+
+    resp = await client.get(f"/api/public/client/{token}/dashboard")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "overall_score" in body
+    assert "total_runs" in body
+
+
+@pytest.mark.asyncio
+async def test_client_portal_runs_returns_recent_runs(client, agency_brand_with_run):
+    """GET /api/public/client/{token}/runs returns the run list."""
+    ac_id, brand_id, token = agency_brand_with_run
+
+    resp = await client.get(f"/api/public/client/{token}/runs")
+    assert resp.status_code == 200
+    runs = resp.json()
+    assert isinstance(runs, list)
+    assert len(runs) >= 1
+    assert all(r.get("brand_id") == brand_id for r in runs)

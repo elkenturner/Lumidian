@@ -941,6 +941,19 @@ class ClientProposalUpdateIn(BaseModel):
     current_proposal_label: str | None = Field(default=None, max_length=200)
 
 
+class ClientPortalBrandOut(BaseModel):
+    id: int
+    name: str
+    slug: str
+    brand_type: str
+    website_url: str | None = None
+
+
+class ClientPortalProposalOut(BaseModel):
+    doc_url: str | None = None
+    label: str | None = None
+
+
 class AgencyClientOut(BaseModel):
     id: int
     name: str

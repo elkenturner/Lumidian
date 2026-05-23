@@ -69,6 +69,7 @@ from app.routers import errors as errors_router
 from app.routers import notifications as notifications_router
 from app.routers import reports as reports_router
 from app.routers import review_public as review_public_router
+from app.routers import client_portal as client_portal_router
 from app.routers import site_audit as site_audit_router
 from app.routers import support as support_router
 from app.routers import team as team_router
@@ -245,6 +246,7 @@ app.include_router(support_router.router, prefix="/api")
 app.include_router(agency_router.router, prefix="/api")
 app.include_router(agency_video_router.router)
 app.include_router(review_public_router.router)
+app.include_router(client_portal_router.router)
 app.include_router(coach.router)
 app.include_router(site_audit_router.router)
 app.include_router(wikipedia_router.router, prefix="/api")

@@ -2556,3 +2556,96 @@ export function prospectAuditPdfUrl(id: number): string {
   const base = api.defaults.baseURL ?? "";
   return `${base}/agency/prospects/${id}/pdf`;
 }
+
+// ─── Client portal (token-gated, no auth) ───────────────────────────────────
+
+export interface ClientPortalBrand {
+  id: number;
+  name: string;
+  slug: string;
+  brand_type: string;
+  website_url: string | null;
+}
+
+export interface ClientPortalProposal {
+  doc_url: string | null;
+  label: string | null;
+}
+
+export interface ClientPortalDashboard {
+  overall_score: number | null;
+  latest_run_at: string | null;
+  total_runs: number;
+  sparkline: { completed_at: string | null; score: number | null }[];
+}
+
+const CLIENT_BASE = '/public/client';
+
+export async function clientPortalGetBrand(token: string): Promise<ClientPortalBrand> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/brand`);
+  return data;
+}
+
+export async function clientPortalGetProposal(token: string): Promise<ClientPortalProposal> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/proposal`);
+  return data;
+}
+
+export async function clientPortalGetDashboard(token: string): Promise<ClientPortalDashboard> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/dashboard`);
+  return data;
+}
+
+export async function clientPortalListRuns(token: string): Promise<any[]> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/runs`);
+  return data;
+}
+
+export async function clientPortalListResponses(token: string, runId?: number): Promise<any[]> {
+  const params = runId ? `?run_id=${runId}` : '';
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/responses${params}`);
+  return data;
+}
+
+export async function clientPortalListCompetitors(token: string): Promise<any[]> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/competitors`);
+  return data;
+}
+
+export async function clientPortalGetSiteAudit(token: string): Promise<any> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/site-audit`);
+  return data;
+}
+
+export async function clientPortalListClusters(token: string): Promise<any[]> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/clusters`);
+  return data;
+}
+
+export async function clientPortalListWikipedia(token: string): Promise<any[]> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/wikipedia`);
+  return data;
+}
+
+export async function clientPortalListDocuments(token: string): Promise<any[]> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/documents`);
+  return data;
+}
+
+export async function clientPortalGetDocument(token: string, docId: number): Promise<any> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/documents/${docId}`);
+  return data;
+}
+
+export async function clientPortalListPostedContent(token: string): Promise<any[]> {
+  const { data } = await api.get(`${CLIENT_BASE}/${token}/content`);
+  return data;
+}
+
+export async function agencySetClientProposal(
+  clientId: number,
+  body: { current_proposal_doc_url: string | null; current_proposal_label: string | null },
+): Promise<any> {
+  const { data } = await api.patch(`/agency/clients/${clientId}/proposal`, body);
+  return data;
+}

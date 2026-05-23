@@ -344,3 +344,151 @@ async def test_client_portal_posted_content_excludes_in_progress(client, db_sess
     titles = [d["title"] for d in drafts]
     assert "Posted piece" in titles
     assert "In progress" not in titles
+
+
+@pytest.mark.asyncio
+async def test_client_portal_site_audit_returns_latest(client, db_session, agency_brand_with_run):
+    """GET /api/public/client/{token}/site-audit returns the latest audit + findings."""
+    from app.models import WebsiteAudit
+    from datetime import datetime
+
+    ac_id, brand_id, token = agency_brand_with_run
+    audit = WebsiteAudit(brand_id=brand_id, status="completed", overall_score=72.0, started_at=datetime.utcnow(), completed_at=datetime.utcnow())
+    db_session.add(audit)
+    await db_session.commit()
+    await db_session.refresh(audit)
+
+    resp = await client.get(f"/api/public/client/{token}/site-audit")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["audit"]["id"] == audit.id
+    assert body["audit"]["overall_score"] == 72.0
+
+
+@pytest.mark.asyncio
+async def test_client_portal_site_audit_returns_empty_when_no_audit(client, agency_brand_with_run):
+    """GET /api/public/client/{token}/site-audit returns null audit when none exists."""
+    ac_id, brand_id, token = agency_brand_with_run
+
+    resp = await client.get(f"/api/public/client/{token}/site-audit")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["audit"] is None
+    assert body["findings"] == []
+    assert body["recommendations"] == []
+
+
+@pytest.mark.asyncio
+async def test_client_portal_clusters_returns_brand_clusters(client, db_session, agency_brand_with_run):
+    """GET /api/public/client/{token}/clusters returns this brand's clusters."""
+    from app.models import ContentCluster, Prompt
+
+    ac_id, brand_id, token = agency_brand_with_run
+    p = Prompt(brand_id=brand_id, text="best CRM")
+    db_session.add(p)
+    await db_session.commit()
+    await db_session.refresh(p)
+    c = ContentCluster(brand_id=brand_id, prompt_id=p.id, status="ready")
+    db_session.add(c)
+    await db_session.commit()
+
+    resp = await client.get(f"/api/public/client/{token}/clusters")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert any(cl["prompt_id"] == p.id for cl in body)
+
+
+@pytest.mark.asyncio
+async def test_client_portal_wikipedia_candidates_returns_brand_scoped(client, db_session, agency_brand_with_run):
+    """GET /api/public/client/{token}/wikipedia returns brand's wikipedia candidates."""
+    from app.models import WikipediaCandidate, WikipediaScan
+    from datetime import datetime
+
+    ac_id, brand_id, token = agency_brand_with_run
+    scan = WikipediaScan(brand_id=brand_id, status="completed", started_at=datetime.utcnow())
+    db_session.add(scan)
+    await db_session.commit()
+    await db_session.refresh(scan)
+    cand = WikipediaCandidate(
+        brand_id=brand_id, scan_id=scan.id, article_title="Customer relationship management",
+        article_url="https://en.wikipedia.org/wiki/CRM", pageid=12345, status="new",
+    )
+    db_session.add(cand)
+    await db_session.commit()
+
+    resp = await client.get(f"/api/public/client/{token}/wikipedia")
+    assert resp.status_code == 200
+    candidates = resp.json()
+    assert any(c["article_title"] == "Customer relationship management" for c in candidates)
+
+
+@pytest.mark.asyncio
+async def test_client_portal_documents_returns_client_docs(client, db_session, agency_brand_with_run):
+    """GET /api/public/client/{token}/documents returns the client's documents."""
+    from app.models import ClientDocument
+    from datetime import datetime
+
+    ac_id, brand_id, token = agency_brand_with_run
+    doc = ClientDocument(
+        agency_client_id=ac_id, kind="agency_weekly_report",
+        title="Week of May 22", body_markdown="# Weekly Report\n...",
+        generated_at=datetime.utcnow(),
+    )
+    db_session.add(doc)
+    await db_session.commit()
+
+    resp = await client.get(f"/api/public/client/{token}/documents")
+    assert resp.status_code == 200
+    docs = resp.json()
+    assert any(d["title"] == "Week of May 22" for d in docs)
+
+
+@pytest.mark.asyncio
+async def test_client_portal_document_detail_returns_body(client, db_session, agency_brand_with_run):
+    """GET /api/public/client/{token}/documents/{id} returns body_markdown."""
+    from app.models import ClientDocument
+    from datetime import datetime
+
+    ac_id, brand_id, token = agency_brand_with_run
+    doc = ClientDocument(
+        agency_client_id=ac_id, kind="agency_weekly_report",
+        title="Week of May 22", body_markdown="# Hello",
+        generated_at=datetime.utcnow(),
+    )
+    db_session.add(doc)
+    await db_session.commit()
+    await db_session.refresh(doc)
+
+    resp = await client.get(f"/api/public/client/{token}/documents/{doc.id}")
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["body_markdown"] == "# Hello"
+
+
+@pytest.mark.asyncio
+async def test_client_portal_token_isolated_to_own_brand(client, db_session, agency_staff_user):
+    """A token for client A cannot access client B's data (multi-tenancy guard)."""
+    from app.models import Competitor
+
+    # Two separate clients
+    r1 = await client.post("/api/agency/clients", json={"name": "Acme"})
+    a_id = r1.json()["id"]
+    a_brand = r1.json()["brand_id"]
+    r2 = await client.post("/api/agency/clients", json={"name": "Globex"})
+    b_brand = r2.json()["brand_id"]
+
+    # Add a competitor to Acme (brand A)
+    db_session.add(Competitor(brand_id=a_brand, name="OnlyOnA"))
+    # Add a competitor to Globex (brand B)
+    db_session.add(Competitor(brand_id=b_brand, name="OnlyOnB"))
+    await db_session.commit()
+
+    # Get token for Acme
+    r = await client.post(f"/api/agency/clients/{a_id}/review-link")
+    a_token = r.json()["token"]
+
+    # Token A's competitors endpoint should NOT see OnlyOnB
+    resp = await client.get(f"/api/public/client/{a_token}/competitors")
+    names = [c["name"] for c in resp.json()]
+    assert "OnlyOnA" in names
+    assert "OnlyOnB" not in names

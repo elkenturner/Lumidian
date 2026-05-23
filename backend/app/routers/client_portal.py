@@ -5,13 +5,25 @@ attached to the AgencyClient that owns the token.
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import ClientViewContext, get_client_view_context
-from app.models import Competitor, ContentDraft, Prompt, QueryResult, TrackingRun
+from app.models import (
+    ClientDocument,
+    Competitor,
+    ContentCluster,
+    ContentDraft,
+    Prompt,
+    QueryResult,
+    TrackingRun,
+    WebsiteAudit,
+    WebsiteAuditFinding,
+    WebsiteAuditRecommendation,
+    WikipediaCandidate,
+)
 from app.schemas import (
     ClientPortalBrandOut,
     ClientPortalProposalOut,
@@ -217,3 +229,177 @@ async def list_posted_content(
         }
         for d in rows.scalars().all()
     ]
+
+
+@router.get("/{token}/site-audit")
+async def get_site_audit(
+    ctx: ClientViewContext = Depends(get_client_view_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Latest site audit for this brand with findings + recommendations."""
+    brand_id = ctx.brand.id
+    audit_q = await db.execute(
+        select(WebsiteAudit)
+        .where(WebsiteAudit.brand_id == brand_id, WebsiteAudit.status == "completed")
+        .order_by(desc(WebsiteAudit.completed_at))
+        .limit(1)
+    )
+    audit = audit_q.scalar_one_or_none()
+    if audit is None:
+        return {"audit": None, "findings": [], "recommendations": []}
+
+    findings_q = await db.execute(
+        select(WebsiteAuditFinding).where(WebsiteAuditFinding.audit_id == audit.id)
+    )
+    findings = findings_q.scalars().all()
+    recs_q = await db.execute(
+        select(WebsiteAuditRecommendation).where(WebsiteAuditRecommendation.audit_id == audit.id)
+    )
+    recs = recs_q.scalars().all()
+
+    return {
+        "audit": {
+            "id": audit.id,
+            "overall_score": audit.overall_score,
+            "bot_access_score": getattr(audit, "bot_access_score", None),
+            "content_score": getattr(audit, "content_score", None),
+            "schema_score": getattr(audit, "schema_score", None),
+            "technical_score": getattr(audit, "technical_score", None),
+            "completed_at": audit.completed_at.isoformat() if audit.completed_at else None,
+        },
+        "findings": [
+            {
+                "id": f.id, "check_id": f.check_id, "severity": f.severity,
+                "category": f.category, "message": f.message,
+            }
+            for f in findings
+        ],
+        "recommendations": [
+            {
+                "id": r.id, "priority": r.priority, "effort": r.effort,
+                "category": r.category, "title": r.title, "body": r.body,
+                "status": getattr(r, "status", None),
+                "priority_score": getattr(r, "priority_score", None),
+            }
+            for r in recs
+        ],
+    }
+
+
+@router.get("/{token}/clusters")
+async def list_clusters(
+    ctx: ClientViewContext = Depends(get_client_view_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """All clusters for this brand (read-only view of strategy)."""
+    rows = await db.execute(
+        select(ContentCluster, Prompt.text)
+        .join(Prompt, Prompt.id == ContentCluster.prompt_id)
+        .where(ContentCluster.brand_id == ctx.brand.id)
+        .order_by(ContentCluster.id.desc())
+    )
+    return [
+        {
+            "id": c.id,
+            "prompt_id": c.prompt_id,
+            "prompt_text": ptext,
+            "status": c.status,
+            "pillar_mode": c.pillar_mode,
+            "pillar_url": c.pillar_url,
+            "version": c.version,
+            "last_generated_at": c.last_generated_at.isoformat() if c.last_generated_at else None,
+        }
+        for c, ptext in rows.all()
+    ]
+
+
+@router.get("/{token}/wikipedia")
+async def list_wikipedia_candidates(
+    ctx: ClientViewContext = Depends(get_client_view_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Wikipedia candidates for this brand."""
+    rows = await db.execute(
+        select(WikipediaCandidate)
+        .where(WikipediaCandidate.brand_id == ctx.brand.id)
+        .order_by(desc(WikipediaCandidate.legitimacy_score))
+    )
+    return [
+        {
+            "id": w.id,
+            "article_title": w.article_title,
+            "article_url": w.article_url,
+            "article_summary": w.article_summary,
+            "legitimacy_score": w.legitimacy_score,
+            "legitimacy_reasoning": w.legitimacy_reasoning,
+            "status": w.status,
+            "last_status_change_at": w.last_status_change_at.isoformat() if w.last_status_change_at else None,
+        }
+        for w in rows.scalars().all()
+    ]
+
+
+@router.get("/{token}/documents")
+async def list_documents(
+    ctx: ClientViewContext = Depends(get_client_view_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Client-facing documents (weekly reports, etc.)."""
+    rows = await db.execute(
+        select(ClientDocument)
+        .where(ClientDocument.agency_client_id == ctx.agency_client.id)
+        .order_by(desc(ClientDocument.generated_at))
+    )
+    return [
+        {
+            "id": d.id,
+            "kind": d.kind,
+            "title": d.title,
+            "generated_at": d.generated_at.isoformat() if d.generated_at else None,
+        }
+        for d in rows.scalars().all()
+    ]
+
+
+@router.get("/{token}/documents/{document_id}")
+async def get_document(
+    document_id: int,
+    ctx: ClientViewContext = Depends(get_client_view_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Single document's markdown body."""
+    doc = await db.get(ClientDocument, document_id)
+    if doc is None or doc.agency_client_id != ctx.agency_client.id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return {
+        "id": doc.id,
+        "kind": doc.kind,
+        "title": doc.title,
+        "body_markdown": doc.body_markdown,
+        "generated_at": doc.generated_at.isoformat() if doc.generated_at else None,
+    }
+
+
+@router.get("/{token}/documents/{document_id}/pdf")
+async def get_document_pdf(
+    document_id: int,
+    ctx: ClientViewContext = Depends(get_client_view_context),
+    db: AsyncSession = Depends(get_db),
+):
+    """Render a client document as PDF."""
+    import re as _re
+    from app.services.document_engine.pdf_renderer import render_pdf
+
+    doc = await db.get(ClientDocument, document_id)
+    if doc is None or doc.agency_client_id != ctx.agency_client.id:
+        raise HTTPException(status_code=404, detail="Document not found")
+    try:
+        pdf_bytes = await render_pdf(db, doc)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    safe_title = _re.sub(r"[^a-zA-Z0-9_-]+", "-", (doc.title or f"document-{doc.id}"))[:120].strip("-")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
+    )

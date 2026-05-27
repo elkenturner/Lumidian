@@ -38,3 +38,56 @@ async def test_create_client_allowed_for_admin(client):
     assert resp.status_code == 201
     body = resp.json()
     assert body["name"] == "Acme"
+
+
+# ── llm_service tier-up helpers ──────────────────────────────────────────────
+
+
+def test_models_for_tier_agency_returns_pro_list():
+    """Agency brands get all 4 models regardless of subscription tier."""
+    from app.services.llm_service import models_for_tier
+
+    expected = ["chatgpt", "claude", "perplexity", "gemini"]
+    assert models_for_tier("agency", None) == expected
+    assert models_for_tier("agency", "basic") == expected
+    assert models_for_tier("agency", "starter") == expected
+    assert models_for_tier("agency", "pro") == expected
+
+
+def test_models_for_tier_non_agency_unchanged():
+    """Regression: standard/pitch brands keep their existing tier-based model lists."""
+    from app.services.llm_service import models_for_tier
+
+    # Pitch always gets free models regardless of tier.
+    assert models_for_tier("pitch", "pro") == ["perplexity", "gemini"]
+    # Standard brand on no subscription gets free models.
+    assert models_for_tier("standard", None) == ["perplexity", "gemini"]
+    # Standard brand on basic gets paid non-pro list (no Claude).
+    assert models_for_tier("standard", "basic") == ["chatgpt", "perplexity", "gemini"]
+    # Standard brand on pro gets all 4.
+    assert models_for_tier("standard", "pro") == ["chatgpt", "claude", "perplexity", "gemini"]
+
+
+def test_runs_per_prompt_for_brand():
+    """Agency = 5 runs/prompt, all others = 3."""
+    from app.services.llm_service import runs_per_prompt_for_brand
+
+    assert runs_per_prompt_for_brand("agency") == 5
+    assert runs_per_prompt_for_brand("standard") == 3
+    assert runs_per_prompt_for_brand("pitch") == 3
+
+
+def test_is_pro_for_brand():
+    """Agency is always Pro; standard depends on subscription tier."""
+    from app.services.llm_service import is_pro_for_brand
+
+    # Agency: always Pro regardless of tier.
+    assert is_pro_for_brand("agency", None) is True
+    assert is_pro_for_brand("agency", "basic") is True
+    assert is_pro_for_brand("agency", "pro") is True
+    # Standard: follows subscription.
+    assert is_pro_for_brand("standard", None) is False
+    assert is_pro_for_brand("standard", "basic") is True   # is_paid_tier == True for basic+
+    assert is_pro_for_brand("standard", "pro") is True
+    # Pitch: never Pro.
+    assert is_pro_for_brand("pitch", "pro") is False

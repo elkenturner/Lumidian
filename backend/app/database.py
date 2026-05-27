@@ -494,6 +494,20 @@ async def run_migrations():
         # 2026-05-22: Client portal — proposal pointer fields on agency_clients
         "ALTER TABLE agency_clients ADD COLUMN current_proposal_doc_url VARCHAR(500)",
         "ALTER TABLE agency_clients ADD COLUMN current_proposal_label VARCHAR(200)",
+        # 2026-05-26: Agency cockpit playbook redesign — milestone table
+        """CREATE TABLE IF NOT EXISTS agency_client_milestones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            agency_client_id INTEGER NOT NULL REFERENCES agency_clients(id) ON DELETE CASCADE,
+            kind VARCHAR(32) NOT NULL,
+            status VARCHAR(16) NOT NULL DEFAULT 'not_started',
+            started_at DATETIME,
+            target_at DATETIME,
+            completed_at DATETIME,
+            completed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            notes TEXT,
+            UNIQUE(agency_client_id, kind)
+        )""",
+        "CREATE INDEX IF NOT EXISTS idx_agency_client_milestones_client ON agency_client_milestones(agency_client_id)",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

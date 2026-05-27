@@ -973,6 +973,39 @@ class AgencyClientOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+MILESTONE_KINDS = (
+    "kickoff",
+    "sow",
+    "initial_audit",
+    "strategy_locked",
+    "wikipedia_plan",
+    "site_plan",
+)
+MILESTONE_STATUSES = ("not_started", "in_progress", "done", "skipped")
+
+
+class AgencyClientMilestoneOut(BaseModel):
+    id: int
+    agency_client_id: int
+    kind: str
+    status: str
+    started_at: datetime | None = None
+    target_at: datetime | None = None
+    completed_at: datetime | None = None
+    completed_by: int | None = None
+    completed_by_name: str | None = None
+    notes: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AgencyClientMilestoneUpdate(BaseModel):
+    status: str | None = None
+    started_at: datetime | None = None
+    target_at: datetime | None = None
+    notes: str | None = None
+
+
 class DraftAssignIn(BaseModel):
     assigned_to_user_id: int | None  # null to unassign
 

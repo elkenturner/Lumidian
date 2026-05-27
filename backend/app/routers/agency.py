@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import ensure_client_access, require_agency_staff, require_client_access
+from app.dependencies import ensure_client_access, require_admin, require_agency_staff, require_client_access
 from app.models import AgencyClient, AgencyClientAssignment, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, ContentPost, Prompt, User
 from app.schemas import (
     ActivityEventOut,
@@ -164,7 +164,7 @@ async def list_clients(
 async def create_client(
     body: AgencyClientCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
+    user: User = Depends(require_admin),
 ):
     base_slug = _slugify(body.name)
     slug = await _unique_slug(db, base_slug)

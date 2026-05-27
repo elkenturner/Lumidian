@@ -83,3 +83,97 @@ async def test_list_milestones_admin_bypass(client):
     await _make_agency_admin(client, "admin2@example.com")
     res = await client.get(f"/api/agency/clients/{cid}/milestones")
     assert res.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_patch_status_done_autosets_completed_fields(client):
+    await _make_agency_admin(client, "admin@example.com")
+    res = await client.post("/api/agency/clients", json={"name": "Acme"})
+    cid = res.json()["id"]
+    # auto-create
+    await client.get(f"/api/agency/clients/{cid}/milestones")
+
+    # Get the admin's user_id by querying /auth/me
+    me = await client.get("/api/auth/me")
+    admin_user_id = me.json()["id"]
+
+    res = await client.patch(
+        f"/api/agency/clients/{cid}/milestones/kickoff",
+        json={"status": "done"},
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["status"] == "done"
+    assert body["completed_at"] is not None
+    assert body["completed_by"] == admin_user_id
+
+
+@pytest.mark.asyncio
+async def test_patch_status_unwind_done_clears_completed_fields(client):
+    await _make_agency_admin(client, "admin@example.com")
+    res = await client.post("/api/agency/clients", json={"name": "Acme"})
+    cid = res.json()["id"]
+    await client.get(f"/api/agency/clients/{cid}/milestones")
+
+    await client.patch(
+        f"/api/agency/clients/{cid}/milestones/sow",
+        json={"status": "done"},
+    )
+    res = await client.patch(
+        f"/api/agency/clients/{cid}/milestones/sow",
+        json={"status": "in_progress"},
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["status"] == "in_progress"
+    assert body["completed_at"] is None
+    assert body["completed_by"] is None
+
+
+@pytest.mark.asyncio
+async def test_patch_engagement_dates(client):
+    await _make_agency_admin(client, "admin@example.com")
+    res = await client.post("/api/agency/clients", json={"name": "Acme"})
+    cid = res.json()["id"]
+    await client.get(f"/api/agency/clients/{cid}/milestones")
+
+    res = await client.patch(
+        f"/api/agency/clients/{cid}/milestones/wikipedia_plan",
+        json={
+            "status": "in_progress",
+            "started_at": "2026-05-26T00:00:00",
+            "target_at": "2026-06-26T00:00:00",
+            "notes": "Targeting 8 articles",
+        },
+    )
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["started_at"] is not None
+    assert body["target_at"] is not None
+    assert body["notes"] == "Targeting 8 articles"
+
+
+@pytest.mark.asyncio
+async def test_patch_unknown_kind_returns_422(client):
+    await _make_agency_admin(client, "admin@example.com")
+    res = await client.post("/api/agency/clients", json={"name": "Acme"})
+    cid = res.json()["id"]
+    res = await client.patch(
+        f"/api/agency/clients/{cid}/milestones/bogus_kind",
+        json={"status": "done"},
+    )
+    assert res.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_patch_unassigned_staff_gets_403(client):
+    await _make_agency_admin(client, "admin@example.com")
+    res = await client.post("/api/agency/clients", json={"name": "Acme"})
+    cid = res.json()["id"]
+    await client.post("/api/auth/logout")
+    await _make_agency_user_unassigned(client, "staff@example.com")
+    res = await client.patch(
+        f"/api/agency/clients/{cid}/milestones/kickoff",
+        json={"status": "done"},
+    )
+    assert res.status_code == 403

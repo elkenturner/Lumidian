@@ -46,9 +46,14 @@ from app import database as db_module
 
 
 def test_database_stale_estimator_uses_runs_per_prompt_constant():
-    """The estimator inside fail_stale_runs_for_brand must use RUNS_PER_PROMPT."""
+    """The estimator inside fail_stale_runs_for_brand must reference the
+    brand-aware runs-per-prompt helper, not a hardcoded literal. Agency brands
+    run 5/prompt, so a literal `* 3` would under-estimate their threshold and
+    let the daily stale cleanup kill legitimate long runs."""
     src = inspect.getsource(db_module.fail_stale_runs_for_brand)
-    assert "RUNS_PER_PROMPT" in src, "fail_stale_runs_for_brand should reference RUNS_PER_PROMPT"
+    assert "runs_per_prompt_for_brand" in src, (
+        "fail_stale_runs_for_brand should reference runs_per_prompt_for_brand"
+    )
 
 
 # ── Phase 2: gemini-2.5-pro killed ────────────────────────────────────────────
@@ -442,7 +447,7 @@ async def test_run_tracking_skips_chatgpt_for_pitch_brand(monkeypatch):
 
     call_log: list[str] = []
 
-    async def fake_query_model(model, prompt, brand_name, pro=False, cancel_event=None):
+    async def fake_query_model(model, prompt, brand_name, *, pro=False, brand_type="standard", cancel_event=None):
         call_log.append(model)
         return {"response_text": f"text-from-{model}", "mentioned": False,
                 "latency_ms": 1, "error": None}

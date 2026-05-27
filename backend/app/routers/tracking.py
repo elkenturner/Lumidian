@@ -329,7 +329,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
     from app.database import AsyncSessionLocal
     from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
-    from app.services.llm_service import RUNS_PER_PROMPT, models_for_tier, is_paid_tier, query_model
+    from app.services.llm_service import models_for_tier, is_pro_for_brand, runs_per_prompt_for_brand, query_model
     from app.services.tracking_service import _compute_overall_score, _persist_prompt_run_scores
 
     def utcnow():
@@ -362,7 +362,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
         user_result = await db.execute(select(User).where(User.id == brand.user_id))
         user_obj = user_result.scalar_one_or_none()
         tier = user_obj.subscription_tier if user_obj else None
-        is_paid = is_paid_tier(tier)
+        is_paid = is_pro_for_brand(brand_type, tier)
 
         prompts_result = await db.execute(
             select(Prompt).where(Prompt.brand_id == brand_id)
@@ -386,13 +386,13 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
                 await err_db.commit()
         return
 
-    runs_per_prompt = RUNS_PER_PROMPT
+    runs_per_prompt = runs_per_prompt_for_brand(brand_type)
     semaphore = asyncio.Semaphore(10)
     cancel_evt = get_cancel_event(run_id)
 
     async def _bounded_query(prompt_id: int, prompt_text: str, model: str, run_number: int):
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_paid, cancel_event=cancel_evt)
+            result = await query_model(model, prompt_text, brand_name, pro=is_paid, brand_type=brand_type, cancel_event=cancel_evt)
         return QueryResult(
             tracking_run_id=run_id,
             prompt_id=prompt_id,
@@ -715,11 +715,11 @@ async def _background_prompt_run(
     from app.database import AsyncSessionLocal
     from app.models import QueryResult, RunModelScore
     from app.models import TrackingRun as TR
-    from app.services.llm_service import RUNS_PER_PROMPT, is_paid_tier, models_for_tier, query_model
+    from app.services.llm_service import is_pro_for_brand, models_for_tier, runs_per_prompt_for_brand, query_model
     from app.services.tracking_service import _compute_overall_score, _persist_prompt_run_scores
 
     active_models = models_for_tier(brand_type, tier)
-    is_paid = is_paid_tier(tier)
+    is_paid = is_pro_for_brand(brand_type, tier)
 
     def utcnow():
         return datetime.now(UTC).replace(tzinfo=None)
@@ -732,12 +732,12 @@ async def _background_prompt_run(
             run.started_at = utcnow()
             await db.commit()
 
-    runs_per_prompt = RUNS_PER_PROMPT
+    runs_per_prompt = runs_per_prompt_for_brand(brand_type)
     semaphore = _asyncio.Semaphore(10)
 
     async def _bounded_query(model: str, run_number: int):
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_paid)
+            result = await query_model(model, prompt_text, brand_name, pro=is_paid, brand_type=brand_type)
         return QueryResult(
             tracking_run_id=run_id,
             prompt_id=prompt_id,

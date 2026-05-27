@@ -246,7 +246,7 @@ async def _make_agency_user(client, email: str = "video-staff@example.com") -> i
     """Register, log in, and elevate to is_agency_staff. Returns the user's id."""
     await register_and_login(client, email=email)
     async with AsyncSessionLocal() as db:
-        await db.execute(update(User).where(User.email == email).values(is_agency_staff=True))
+        await db.execute(update(User).where(User.email == email).values(is_agency_staff=True, is_admin=True))
         user = (await db.execute(select(User).where(User.email == email))).scalar_one()
         if not (
             await db.execute(select(AgencyStaff).where(AgencyStaff.user_id == user.id))

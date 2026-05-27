@@ -13,7 +13,7 @@ async def _make_agency_user(client, email: str = "act@example.com") -> None:
     from sqlalchemy import update
     await register_and_login(client, email=email)
     async with AsyncSessionLocal() as db:
-        await db.execute(update(User).where(User.email == email).values(is_agency_staff=True))
+        await db.execute(update(User).where(User.email == email).values(is_agency_staff=True, is_admin=True))
         await db.commit()
 
 

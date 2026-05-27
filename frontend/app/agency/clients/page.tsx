@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { agencyListClients, type AgencyClient } from '@/lib/api';
 import { NewClientDialog } from '@/components/agency/NewClientDialog';
+import { useAuth } from '@/contexts/AuthContext';
 
 const STATUS_COLORS: Record<string, string> = {
   onboarding: 'bg-amber-500/20 text-amber-300',
@@ -22,6 +23,7 @@ export default function AgencyClientsPage() {
   const router = useRouter();
   const pathname = usePathname();
   const openNewOnMount = searchParams.get('new') === '1';
+  const { user } = useAuth();
 
   useEffect(() => {
     if (openNewOnMount) {
@@ -43,7 +45,9 @@ export default function AgencyClientsPage() {
           <h1 className="text-2xl font-semibold tracking-tight">Clients</h1>
           <p className="text-sm text-[var(--text-muted)]">{clients.length} total</p>
         </div>
-        <NewClientDialog initialOpen={openNewOnMount} onCreated={(c) => setClients((prev) => [c, ...prev])} />
+        {user?.is_admin && (
+          <NewClientDialog initialOpen={openNewOnMount} onCreated={(c) => setClients((prev) => [c, ...prev])} />
+        )}
       </div>
 
       {loading && <p className="text-sm text-[var(--text-muted)]">Loading…</p>}

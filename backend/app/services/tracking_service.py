@@ -26,7 +26,14 @@ from app.database import AsyncSessionLocal
 from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
 from app.models import utcnow as _utcnow
 from app.services.drafting_service import auto_draft_top_gaps
-from app.services.llm_service import RUNS_PER_PROMPT, SUPPORTED_MODELS, models_for_tier, is_paid_tier, query_model
+from app.services.llm_service import (
+    SUPPORTED_MODELS,
+    models_for_tier,
+    is_paid_tier,
+    is_pro_for_brand,
+    runs_per_prompt_for_brand,
+    query_model,
+)
 from app.services.quora_scanner_service import scan_brand_opportunities as quora_scan
 from app.services.reddit_scanner_service import scan_brand_opportunities as reddit_scan
 
@@ -194,7 +201,7 @@ async def run_tracking(
     # Extract values as plain Python types while the session is open, so we
     # never access SQLAlchemy-managed attributes on detached objects later.
     brand_name: str = ""
-    is_paid: bool = False   # True for any paid tier (Starter/Growth/Pro) — gates ChatGPT search + sonar-pro
+    is_paid: bool = False   # True for any paid tier or agency brand — gates ChatGPT search + sonar-pro
     prompt_data: list[tuple[int, str]] = []  # (prompt_id, prompt_text)
     run_id: int = 0
 
@@ -213,7 +220,7 @@ async def run_tracking(
         user_result = await db.execute(select(User).where(User.id == brand.user_id))
         user = user_result.scalar_one_or_none()
         tier = user.subscription_tier if user else None
-        is_paid = is_paid_tier(tier)
+        is_paid = is_pro_for_brand(brand_type, tier)
 
         active_models = models_for_tier(brand_type, tier)
 
@@ -224,7 +231,7 @@ async def run_tracking(
         if not prompt_data:
             raise ValueError(f"Brand {brand_id} has no prompts configured")
 
-        runs_per_prompt = RUNS_PER_PROMPT
+        runs_per_prompt = runs_per_prompt_for_brand(brand_type)
 
         logger.info(
             "Scheduled run starting — brand=%r prompts=%d runs_per_prompt=%d",
@@ -261,7 +268,7 @@ async def run_tracking(
         run_number: int,
     ) -> QueryResult:
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_paid, cancel_event=cancel_evt)
+            result = await query_model(model, prompt_text, brand_name, pro=is_paid, brand_type=brand_type, cancel_event=cancel_evt)
         response_text = result.get("response_text")
         error = result.get("error")
 

@@ -91,3 +91,69 @@ def test_is_pro_for_brand():
     assert is_pro_for_brand("standard", "pro") is True
     # Pitch: never Pro.
     assert is_pro_for_brand("pitch", "pro") is False
+
+
+# ── End-to-end: tracking run on an agency brand ──────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_agency_tracking_run_uses_4_models_and_5_runs(client, monkeypatch):
+    """A tracking run on an agency brand produces 4 models × 5 runs × N prompts QueryResults,
+    and query_model is called with pro=True for every query."""
+    from app.database import AsyncSessionLocal
+    from app.models import AgencyClient, Brand, Prompt, QueryResult, TrackingRun, User
+    from sqlalchemy import select
+
+    # Stub query_model so we don't hit real LLM APIs.
+    captured_calls: list[dict] = []
+
+    async def fake_query_model(model, prompt, brand_name, *, pro: bool = False, cancel_event=None):
+        captured_calls.append({"model": model, "pro": pro})
+        return {
+            "response_text": f"sample response mentioning {brand_name}",
+            "mentioned": True,
+            "latency_ms": 1,
+            "error": None,
+        }
+
+    monkeypatch.setattr("app.services.tracking_service.query_model", fake_query_model)
+
+    # Seed: an admin user + agency client + agency brand + 2 prompts (no HTTP needed).
+    async with AsyncSessionLocal() as db:
+        user = User(email="admin-int@example.com", password_hash="x", name="A",
+                    email_verified=True, is_admin=True, is_agency_staff=True)
+        db.add(user); await db.flush()
+        agency_client = AgencyClient(name="IntegrationCo", slug="integration-co", status="active")
+        db.add(agency_client); await db.flush()
+        brand = Brand(
+            name="IntegrationCo Brand",
+            slug=f"agency-integration-co",
+            user_id=user.id,
+            agency_client_id=agency_client.id,
+            brand_type="agency",
+            website_url="https://integration.example",
+        )
+        db.add(brand); await db.flush()
+        db.add(Prompt(brand_id=brand.id, text="Prompt one?", prompt_type="standard"))
+        db.add(Prompt(brand_id=brand.id, text="Prompt two?", prompt_type="standard"))
+        await db.commit()
+        brand_id = brand.id
+
+    from app.services.tracking_service import run_tracking
+
+    run_id = await run_tracking(brand_id=brand_id, run_type="manual", schedule_slot=None)
+    assert run_id is not None
+
+    async with AsyncSessionLocal() as db:
+        run = (await db.execute(select(TrackingRun).where(TrackingRun.id == run_id))).scalar_one()
+        assert run.status == "completed"
+        rows = (await db.execute(select(QueryResult).where(QueryResult.tracking_run_id == run_id))).scalars().all()
+
+    # 2 prompts × 4 models × 5 runs = 40 QueryResult rows.
+    assert len(rows) == 40, f"Expected 40 query results, got {len(rows)}"
+    models_seen = {r.model for r in rows}
+    assert models_seen == {"chatgpt", "claude", "perplexity", "gemini"}
+    # Every call should have used pro=True.
+    assert all(c["pro"] is True for c in captured_calls), (
+        f"Expected pro=True on every call, got {[c for c in captured_calls if not c['pro']]}"
+    )

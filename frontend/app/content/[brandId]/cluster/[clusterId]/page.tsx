@@ -7,8 +7,6 @@ import {
   Loader2,
   RefreshCw,
   RotateCw,
-  TrendingDown,
-  TrendingUp,
 } from "lucide-react";
 import {
   getCluster,
@@ -119,13 +117,16 @@ export default function ClusterDetailPage() {
     }
   }
 
-  const visibility = Math.round(cluster.visibility_pct);
-  const visibilityTone =
-    visibility >= 60
-      ? "text-[#4ade80]"
-      : visibility >= 30
-      ? "text-[#fbbf24]"
-      : "text-[#fb7185]";
+  const delta = cluster.cluster_delta;
+  const hasDelta = delta !== null && delta !== undefined;
+  const deltaTone = !hasDelta
+    ? "text-[var(--text-faint)]"
+    : delta! >= 0
+    ? "text-[#4ade80]"
+    : "text-[#fb7185]";
+  const deltaLabel = !hasDelta
+    ? "—"
+    : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)}pp`;
   const statusLabel = STATUS_LABEL[effectiveStatus] ?? effectiveStatus.replace("_", " ");
 
   function updateDraft(updated: ContentDraft) {
@@ -228,17 +229,12 @@ export default function ClusterDetailPage() {
             </button>
           </div>
         </div>
-        <div className={`shrink-0 text-right ${visibilityTone}`}>
-          <div className="flex items-center justify-end gap-1.5 text-3xl font-bold">
-            {visibility >= 50 ? (
-              <TrendingUp className="h-6 w-6" />
-            ) : (
-              <TrendingDown className="h-6 w-6" />
-            )}
-            {visibility}%
+        <div className="shrink-0 text-right">
+          <div className={`flex items-center justify-end gap-1.5 text-3xl font-bold ${deltaTone}`}>
+            {deltaLabel}
           </div>
           <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
-            Visibility
+            Cluster lift
           </div>
         </div>
       </header>
@@ -249,7 +245,26 @@ export default function ClusterDetailPage() {
         </div>
       )}
 
-      {/* ZONE 1 — Brief + Source spine */}
+      {/* ZONE 1 — Pieces (the primary action) */}
+      <div>
+        <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-3">
+          Pieces
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {PLATFORMS.map((platform) => (
+            <PieceCard
+              key={platform}
+              brandId={brandId}
+              clusterId={cluster.id}
+              platform={platform}
+              draft={draftsByPlatform.get(platform) ?? null}
+              onUpdated={updateDraft}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* ZONE 2 — Brief + Source spine (supporting context, collapsed by default) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <BriefPanel
           brandId={brandId}
@@ -267,25 +282,6 @@ export default function ClusterDetailPage() {
           <div className="p-5">
             <SourceSpinePanel brandId={brandId} clusterId={cluster.id} />
           </div>
-        </div>
-      </div>
-
-      {/* ZONE 2 — Pieces */}
-      <div>
-        <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-3">
-          Pieces
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {PLATFORMS.map((platform) => (
-            <PieceCard
-              key={platform}
-              brandId={brandId}
-              clusterId={cluster.id}
-              platform={platform}
-              draft={draftsByPlatform.get(platform) ?? null}
-              onUpdated={updateDraft}
-            />
-          ))}
         </div>
       </div>
 

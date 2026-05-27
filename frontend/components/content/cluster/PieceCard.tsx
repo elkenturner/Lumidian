@@ -12,8 +12,6 @@ interface Props {
   clusterId: number;
   platform: string;
   draft: ContentDraft | null;
-  /** Per-piece visibility attribution delta (percentage points) — shown inline when present. */
-  attribution?: { delta_pp: number | null };
   /** Whether the current user is on the Pro tier — gates the Critic Notes subpanel. */
   isPro?: boolean;
   onUpdated: (draft: ContentDraft) => void;
@@ -26,7 +24,59 @@ const STATUS_TONE: Record<string, string> = {
   failed: "text-[#fb7185]",
 };
 
-export function PieceCard({ brandId, clusterId, platform, draft, attribution, isPro = false, onUpdated }: Props) {
+function PieceStatusChip({
+  status,
+  delta,
+}: {
+  status: string;
+  delta: number | null | undefined;
+}) {
+  if (status === "draft") {
+    return (
+      <span className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border-subtle)] bg-[rgba(148,163,184,0.10)] text-[var(--text-secondary)]">
+        Drafted
+      </span>
+    );
+  }
+  if (status === "approved") {
+    return (
+      <span className="text-[11px] px-2 py-0.5 rounded-md border border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.10)] text-[#fbbf24]">
+        Approved
+      </span>
+    );
+  }
+  if (status === "failed") {
+    return (
+      <span className="text-[11px] px-2 py-0.5 rounded-md border border-[rgba(244,63,94,0.22)] bg-[rgba(244,63,94,0.10)] text-[#fb7185]">
+        Failed
+      </span>
+    );
+  }
+  if (status === "posted") {
+    if (delta === null || delta === undefined) {
+      return (
+        <span className="text-[11px] px-2 py-0.5 rounded-md border border-[rgba(56,189,248,0.22)] bg-[rgba(56,189,248,0.10)] text-[#7dd3fc]">
+          Posted, no lift yet
+        </span>
+      );
+    }
+    const positive = delta >= 0;
+    return (
+      <span
+        className={`text-[11px] px-2 py-0.5 rounded-md border ${
+          positive
+            ? "border-[rgba(34,197,94,0.22)] bg-[rgba(34,197,94,0.10)] text-[#4ade80]"
+            : "border-[rgba(244,63,94,0.22)] bg-[rgba(244,63,94,0.10)] text-[#fb7185]"
+        }`}
+      >
+        Posted {positive ? "+" : ""}{delta.toFixed(1)}pp
+      </span>
+    );
+  }
+  return null;
+}
+
+export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, onUpdated }: Props) {
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -67,24 +117,8 @@ export function PieceCard({ brandId, clusterId, platform, draft, attribution, is
                 {draft.generation_state}
               </span>
             )}
-            {attribution?.delta_pp != null && (
-              <span
-                className={`text-[11px] font-medium ${
-                  attribution.delta_pp >= 0 ? "text-emerald-300" : "text-rose-300"
-                }`}
-              >
-                {attribution.delta_pp >= 0 ? "+" : ""}
-                {attribution.delta_pp.toFixed(1)}pp
-              </span>
-            )}
             {draft && (
-              <span
-                className={`text-[11px] font-semibold uppercase tracking-wide ${
-                  STATUS_TONE[draft.status] ?? "text-[var(--text-muted)]"
-                }`}
-              >
-                {draft.status}
-              </span>
+              <PieceStatusChip status={draft.status} delta={draft.attribution_delta} />
             )}
           </div>
         </div>
@@ -173,13 +207,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, attribution, is
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="flex items-center gap-2 min-w-0">
                 <PlatformBadge platform={platform} />
-                <span
-                  className={`text-[11px] font-semibold uppercase tracking-wide ${
-                    STATUS_TONE[draft.status] ?? "text-[var(--text-muted)]"
-                  }`}
-                >
-                  {draft.status}
-                </span>
+                <PieceStatusChip status={draft.status} delta={draft.attribution_delta} />
               </div>
               <button
                 type="button"

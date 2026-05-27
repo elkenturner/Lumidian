@@ -81,6 +81,35 @@
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  /* Tinted elevation (replaces 50+ inline rgba(255,255,255,0.06)) */
+  --bg-tinted: rgba(255,255,255,0.06);
+  --bg-tinted-hover: rgba(255,255,255,0.10);
+  --border-faint: rgba(255,255,255,0.08);
+
+  /* Explicit so a future accent shift doesn't break button text */
+  --text-on-accent: #ffffff;
+
+  /* Named shadow tokens (replaces 12+ hand-tuned box-shadow declarations) */
+  --shadow-card: 0 2px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03);
+  --shadow-card-hover: 0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
+  --shadow-elevated: 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+
+  /* Signature gradient — recurring brand fingerprint */
+  --gradient-signature: linear-gradient(135deg, oklch(0.58 0.06 235) 0%, oklch(0.50 0.08 235) 50%, transparent 100%);
+
+  /* Typography scale (display = hero only; h1-h3 + body + caption) */
+  --text-display: 3rem;     /* 48px, Syne, -2px tracking */
+  --text-h1: 2rem;          /* 32px, Syne, -1px tracking */
+  --text-h2: 1.5rem;        /* 24px, Syne, -0.5px tracking */
+  --text-h3: 1.125rem;      /* 18px, Inter 600 */
+  --text-body: 0.875rem;    /* 14px, Inter 400 */
+  --text-caption: 0.75rem;  /* 12px, Inter 500 */
+
+  /* Mono stat sizes (formalizes .stat-value-lg / .stat-value-sm) */
+  --text-mono-lg: 3.5rem;   /* 56px hero stats (visibility score) */
+  --text-mono-md: 2.25rem;  /* 36px (current .stat-value-lg) */
+  --text-mono-sm: 1.5rem;   /* 24px (current .stat-value-sm) */
 }
 
 /* ── Base ──────────────────────────────────────────────────────────────────── */
@@ -114,19 +143,19 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 20px;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.03);
+  box-shadow: var(--shadow-card);
 }
 .card-hover:hover {
   background: var(--bg-card);
   border-color: var(--border-default);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
+  box-shadow: var(--shadow-card-hover);
 }
 .card-elevated {
   background: linear-gradient(135deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.4) 100%);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   padding: 20px;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+  box-shadow: var(--shadow-elevated);
 }
 
 /* ── Interactive card hover (pointer devices only) ────────────────────────── */
@@ -135,11 +164,19 @@ body {
     transform: translateY(-1px);
     background: var(--bg-card);
     border-color: var(--border-default);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04);
+    box-shadow: var(--shadow-card-hover);
   }
   .card-hover {
     transition: transform 200ms var(--ease-out), background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
   }
+}
+
+/* ── Tinted surface utility (one-off elevation, no card chrome) ─────────── */
+.bg-tinted {
+  background: var(--bg-tinted);
+}
+.bg-tinted-hover:hover {
+  background: var(--bg-tinted-hover);
 }
 
 /* ── Model card with background tint (no side-stripe borders) ─────────────── */

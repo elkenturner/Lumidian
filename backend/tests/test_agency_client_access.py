@@ -22,7 +22,7 @@ async def _make_agency_user(client, email: str = "staff@example.com", admin: boo
 @pytest.mark.asyncio
 async def test_non_admin_staff_blocked_from_unassigned_client(client):
     """A non-admin staff member cannot GET a client they're not assigned to."""
-    await _make_agency_user(client, email="staff-a@example.com")
+    await _make_agency_user(client, email="staff-a@example.com", admin=True)
     create = await client.post("/api/agency/clients", json={"name": "Owned"})
     cid = create.json()["id"]
 
@@ -36,7 +36,7 @@ async def test_non_admin_staff_blocked_from_unassigned_client(client):
 @pytest.mark.asyncio
 async def test_admin_bypasses_assignment_check(client):
     """Admins access any client regardless of assignment."""
-    await _make_agency_user(client, email="staff-a@example.com")
+    await _make_agency_user(client, email="staff-a@example.com", admin=True)
     create = await client.post("/api/agency/clients", json={"name": "Owned"})
     cid = create.json()["id"]
 
@@ -49,7 +49,7 @@ async def test_admin_bypasses_assignment_check(client):
 @pytest.mark.asyncio
 async def test_assigned_staff_can_access_client(client):
     """Manually-assigned staff (no create) can access the client."""
-    await _make_agency_user(client, email="staff-a@example.com")
+    await _make_agency_user(client, email="staff-a@example.com", admin=True)
     create = await client.post("/api/agency/clients", json={"name": "Shared"})
     cid = create.json()["id"]
 
@@ -68,7 +68,7 @@ async def test_assigned_staff_can_access_client(client):
 @pytest.mark.asyncio
 async def test_creating_client_auto_assigns_creator(client):
     """POST /clients creates an AgencyClientAssignment for the calling user."""
-    await _make_agency_user(client, email="creator@example.com")
+    await _make_agency_user(client, email="creator@example.com", admin=True)
     create = await client.post("/api/agency/clients", json={"name": "AutoAssign"})
     cid = create.json()["id"]
 
@@ -86,7 +86,7 @@ async def test_creating_client_auto_assigns_creator(client):
 @pytest.mark.asyncio
 async def test_non_admin_blocked_from_unassigned_client_documents(client):
     """List documents endpoint enforces assignment (representative direct endpoint)."""
-    await _make_agency_user(client, email="owner@example.com")
+    await _make_agency_user(client, email="owner@example.com", admin=True)
     create = await client.post("/api/agency/clients", json={"name": "DocClient"})
     cid = create.json()["id"]
 
@@ -99,7 +99,7 @@ async def test_non_admin_blocked_from_unassigned_client_documents(client):
 @pytest.mark.asyncio
 async def test_non_admin_blocked_from_creating_task_on_unassigned_client(client):
     """POST /clients/{id}/tasks enforces assignment (representative direct endpoint)."""
-    await _make_agency_user(client, email="owner@example.com")
+    await _make_agency_user(client, email="owner@example.com", admin=True)
     create = await client.post("/api/agency/clients", json={"name": "TaskClient"})
     cid = create.json()["id"]
 
@@ -115,13 +115,19 @@ async def test_non_admin_blocked_from_creating_task_on_unassigned_client(client)
 @pytest.mark.asyncio
 async def test_list_clients_filters_to_assigned_only(client):
     """A staff member only sees clients they're assigned to (cross-client filter)."""
-    await _make_agency_user(client, email="staff-a@example.com")
+    await _make_agency_user(client, email="staff-a@example.com", admin=True)
     await client.post("/api/agency/clients", json={"name": "A One"})
     await client.post("/api/agency/clients", json={"name": "A Two"})
 
     await client.post("/api/auth/logout")
-    await _make_agency_user(client, email="staff-b@example.com")
+    # Temporarily admin so staff-b can create; demoted back to non-admin before list assertion.
+    await _make_agency_user(client, email="staff-b@example.com", admin=True)
     await client.post("/api/agency/clients", json={"name": "B One"})
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            update(User).where(User.email == "staff-b@example.com").values(is_admin=False)
+        )
+        await db.commit()
 
     resp = await client.get("/api/agency/clients")
     assert resp.status_code == 200
@@ -132,7 +138,7 @@ async def test_list_clients_filters_to_assigned_only(client):
 @pytest.mark.asyncio
 async def test_recent_activity_filters_to_assigned(client):
     """list_recent_activity filters to assigned clients only."""
-    await _make_agency_user(client, email="staff-a@example.com")
+    await _make_agency_user(client, email="staff-a@example.com", admin=True)
     await client.post("/api/agency/clients", json={"name": "Owned"})
 
     await client.post("/api/auth/logout")
@@ -145,7 +151,7 @@ async def test_recent_activity_filters_to_assigned(client):
 @pytest.mark.asyncio
 async def test_assign_and_unassign_staff_endpoints(client):
     """Owner can assign another staff member; that member then gets access."""
-    await _make_agency_user(client, email="owner@example.com")
+    await _make_agency_user(client, email="owner@example.com", admin=True)
     create = await client.post("/api/agency/clients", json={"name": "ShareMe"})
     cid = create.json()["id"]
 

@@ -13,7 +13,7 @@ async def _make_agency_user(client, email: str = "agency@example.com") -> None:
     """Register, verify, log in, then flip is_agency_staff=True. Cookies stick on `client`."""
     await register_and_login(client, email=email)
     async with AsyncSessionLocal() as db:
-        await db.execute(update(User).where(User.email == email).values(is_agency_staff=True))
+        await db.execute(update(User).where(User.email == email).values(is_agency_staff=True, is_admin=True))
         await db.commit()
 
 

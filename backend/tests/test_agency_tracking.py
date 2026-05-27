@@ -14,7 +14,7 @@ from tests.conftest import register_and_login
 async def _make_agency_user(client, email: str = "track@example.com") -> None:
     await register_and_login(client, email=email)
     async with AsyncSessionLocal() as db:
-        await db.execute(update(User).where(User.email == email).values(is_agency_staff=True))
+        await db.execute(update(User).where(User.email == email).values(is_agency_staff=True, is_admin=True))
         user = (await db.execute(select(User).where(User.email == email))).scalar_one()
         existing = (
             await db.execute(select(AgencyStaff).where(AgencyStaff.user_id == user.id))
@@ -56,11 +56,11 @@ async def test_trigger_tracking_rejects_non_agency_brand(client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_trigger_tracking_unknown_client_returns_403(client):
-    """Unknown client_id returns 403 (assignment check fires before existence check)."""
+async def test_trigger_tracking_unknown_client_returns_404(client):
+    """Unknown client_id returns 404 for admins (assignment check bypassed; existence check fires)."""
     await _make_agency_user(client)
     resp = await client.post("/api/agency/clients/9999/tracking/run")
-    assert resp.status_code == 403
+    assert resp.status_code == 404
 
 
 @pytest.mark.asyncio

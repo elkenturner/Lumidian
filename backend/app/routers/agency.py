@@ -14,11 +14,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import ensure_client_access, require_admin, require_agency_staff, require_client_access
-from app.models import AgencyClient, AgencyClientAssignment, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, ContentPost, Prompt, User
+from app.models import AgencyClient, AgencyClientAssignment, AgencyClientMilestone, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, ContentPost, Prompt, User
 from app.schemas import (
     ActivityEventOut,
     ActivityEventWithClientOut,
     AgencyClientCreate,
+    AgencyClientMilestoneOut,
+    AgencyClientMilestoneUpdate,
     AgencyClientOut,
     AgencyClientUpdate,
     AgencyDraftGenerateIn,
@@ -37,6 +39,8 @@ from app.schemas import (
     DraftOut,
     DraftStatusUpdateIn,
     MarkPostedIn,
+    MILESTONE_KINDS,
+    MILESTONE_STATUSES,
     MyQueueDraft,
     MyQueueOut,
     NoteCreate,
@@ -1267,3 +1271,53 @@ async def update_client_proposal(
     await db.commit()
     await db.refresh(client)
     return await _client_to_out(db, client)
+
+
+async def _milestone_to_out(db: AsyncSession, m: AgencyClientMilestone) -> AgencyClientMilestoneOut:
+    completed_by_name: str | None = None
+    if m.completed_by is not None:
+        u = await db.execute(select(User.name, User.email).where(User.id == m.completed_by))
+        row = u.first()
+        if row is not None:
+            completed_by_name = row.name or row.email
+    return AgencyClientMilestoneOut(
+        id=m.id,
+        agency_client_id=m.agency_client_id,
+        kind=m.kind,
+        status=m.status,
+        started_at=m.started_at,
+        target_at=m.target_at,
+        completed_at=m.completed_at,
+        completed_by=m.completed_by,
+        completed_by_name=completed_by_name,
+        notes=m.notes,
+    )
+
+
+@router.get("/clients/{client_id}/milestones", response_model=list[AgencyClientMilestoneOut])
+async def list_client_milestones(
+    client_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_client_access),
+) -> list[AgencyClientMilestoneOut]:
+    existing_q = await db.execute(
+        select(AgencyClientMilestone).where(AgencyClientMilestone.agency_client_id == client_id)
+    )
+    existing = {m.kind: m for m in existing_q.scalars().all()}
+
+    created_any = False
+    for kind in MILESTONE_KINDS:
+        if kind not in existing:
+            row = AgencyClientMilestone(agency_client_id=client_id, kind=kind, status="not_started")
+            db.add(row)
+            existing[kind] = row
+            created_any = True
+    if created_any:
+        await db.commit()
+        for kind in MILESTONE_KINDS:
+            await db.refresh(existing[kind])
+
+    out = []
+    for kind in MILESTONE_KINDS:
+        out.append(await _milestone_to_out(db, existing[kind]))
+    return out

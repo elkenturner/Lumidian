@@ -28,8 +28,6 @@ async def create_agency_client_for_admin(client, *, name: str = "Test client") -
     return res.json()["id"]
 
 
-# TODO(Task 3): remove this xfail once GET /clients/{id}/milestones is implemented.
-@pytest.mark.xfail(reason="endpoint implemented in Task 3", strict=False)
 @pytest.mark.asyncio
 async def test_list_milestones_autocreates_six_rows(client):
     await _make_agency_admin(client)
@@ -46,3 +44,42 @@ async def test_list_milestones_autocreates_six_rows(client):
         assert m["completed_by"] is None
         assert m["completed_by_name"] is None
         assert m["notes"] is None
+
+
+async def _make_agency_user_unassigned(client, email: str) -> None:
+    """Register + login + flip is_agency_staff=True (but not is_admin)."""
+    await register_and_login(client, email=email)
+    async with AsyncSessionLocal() as db:
+        await db.execute(
+            update(User).where(User.email == email).values(is_agency_staff=True)
+        )
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_list_milestones_unassigned_staff_gets_403(client):
+    # Create an admin and a separate non-admin staff user
+    await _make_agency_admin(client, "admin@example.com")
+    # ...create a client as admin
+    res = await client.post("/api/agency/clients", json={"name": "Acme"})
+    assert res.status_code == 201
+    cid = res.json()["id"]
+    # Logout admin, log in a non-admin agency staffer who isn't assigned
+    await client.post("/api/auth/logout")
+    await _make_agency_user_unassigned(client, "staff@example.com")
+    res = await client.get(f"/api/agency/clients/{cid}/milestones")
+    assert res.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_list_milestones_admin_bypass(client):
+    # First admin creates a client
+    await _make_agency_admin(client, "admin1@example.com")
+    res = await client.post("/api/agency/clients", json={"name": "Acme"})
+    assert res.status_code == 201
+    cid = res.json()["id"]
+    # Log out, log in as a different admin (admin bypass)
+    await client.post("/api/auth/logout")
+    await _make_agency_admin(client, "admin2@example.com")
+    res = await client.get(f"/api/agency/clients/{cid}/milestones")
+    assert res.status_code == 200

@@ -339,25 +339,7 @@ body {
   30%       { transform: translate(3%, 2.5%) scale(1.06); }
   65%       { transform: translate(-2%, 4%) scale(0.96); }
 }
-@keyframes orb-drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  40%       { transform: translate(-4%, -3%) scale(1.08); }
-  72%       { transform: translate(2.5%, -1%) scale(0.94); }
-}
-@keyframes orb-drift-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  35%       { transform: translate(2%, -3.5%) scale(1.07); }
-  70%       { transform: translate(-3%, 2%) scale(0.97); }
-}
-@keyframes orb-drift-4 {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  45%       { transform: translate(3.5%, 3%) scale(1.05); }
-  80%       { transform: translate(-1.5%, -2%) scale(0.95); }
-}
 .orb-1 { animation: orb-drift-1 50s ease-in-out infinite; }
-.orb-2 { animation: orb-drift-2 42s ease-in-out infinite; }
-.orb-3 { animation: orb-drift-3 58s ease-in-out infinite; }
-.orb-4 { animation: orb-drift-4 36s ease-in-out infinite; }
 
 @keyframes ctaOrb {
   0%, 100% { transform: translate(-50%, -50%) scale(1); }
@@ -455,42 +437,6 @@ body {
 @keyframes glowPulse {
   0%, 100% { box-shadow: 0 0 24px oklch(0.58 0.06 235 / 0.4); }
   50% { box-shadow: 0 0 32px oklch(0.58 0.06 235 / 0.6); }
-}
-
-@keyframes drawLine {
-  from {
-    stroke-dashoffset: 1000;
-  }
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-
-@keyframes slideInLeft {
-  from {
-    opacity: 0;
-    transform: translateX(-40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-@keyframes glow-pulse {
-  0%, 100% { box-shadow: 0 0 20px oklch(0.58 0.06 235 / 0.12), 0 0 6px oklch(0.58 0.06 235 / 0.06); }
-  50% { box-shadow: 0 0 30px oklch(0.58 0.06 235 / 0.22), 0 0 12px oklch(0.58 0.06 235 / 0.10); }
-}
-
-@keyframes slideInRight {
-  from {
-    opacity: 0;
-    transform: translateX(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
 }
 
 .diamond-pulse-active {

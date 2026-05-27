@@ -119,6 +119,7 @@ async def clean_tables():
             "competitors", "prompts", "brand_profiles",
             "brand_content_settings", "account_connections",
             "notifications", "team_members", "password_reset_tokens",
+            "agency_client_milestones",
             "client_documents", "client_activity_events", "client_review_links", "agency_tasks", "agency_client_assignments", "agency_staff",
             "prospect_audits",
             "system_settings", "brands", "agency_clients", "users",

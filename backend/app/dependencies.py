@@ -319,6 +319,13 @@ async def require_owner_only(db: AsyncSession, user: User) -> None:
 # ── Agency portal access ─────────────────────────────────────────────────────
 
 
+async def require_admin(user: User = Depends(get_current_user)) -> User:
+    """Allow only users with is_admin=True. 403 otherwise."""
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
+
 async def require_agency_staff(user: User = Depends(get_current_user)) -> User:
     """Allow only users with is_agency_staff=True or is_admin=True."""
     if not (getattr(user, "is_agency_staff", False) or user.is_admin):

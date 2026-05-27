@@ -95,12 +95,18 @@ def _api_key_placeholder(model: str) -> dict:
     }
 
 RUNS_PER_PROMPT = 3
+AGENCY_RUNS_PER_PROMPT = 5
 
 TIER_RUNS = {
     "basic": RUNS_PER_PROMPT,
     "standard": RUNS_PER_PROMPT,
     "premium": RUNS_PER_PROMPT,
 }
+
+
+def runs_per_prompt_for_brand(brand_type: str) -> int:
+    """How many runs per prompt this brand_type gets. Agency = 5, all others = 3."""
+    return AGENCY_RUNS_PER_PROMPT if brand_type == "agency" else RUNS_PER_PROMPT
 
 # Model versions per subscription tier. Paid tiers get upgraded ChatGPT (GA
 # gpt-4o-mini + hosted web_search tool via Responses API) and Perplexity
@@ -513,14 +519,32 @@ def is_paid_tier(tier: str | None) -> bool:
     return tier in _PAID_TIERS
 
 
+def is_pro_for_brand(brand_type: str, tier: str | None) -> bool:
+    """Whether query_model() should request Pro-variant model versions.
+
+    True for agency brands (unconditionally) and for any paid subscription tier
+    (except pitch brands, which are always free-tier regardless of subscription).
+    Used by tracking_service to set the pro= kwarg on query_model().
+    """
+    if brand_type == "agency":
+        return True
+    if brand_type == "pitch":
+        return False
+    return is_paid_tier(tier)
+
+
 def models_for_tier(brand_type: str, tier: str | None) -> list[str]:
     """Return the model list this (brand_type, subscription tier) combo is allowed to query.
 
+    - brand_type="agency" always returns the full Pro model list, regardless of tier
+      (agency brands are managed retainer clients, not SaaS-tier-bound).
     - brand_type="pitch" always means free-tier semantics, regardless of the user's subscription
       (pitch brands are temporary free-trial objects; they auto-upgrade on subscribe).
     - tier is the internal subscription_tier string: None, "basic" (Starter), "starter" (Growth),
       or "pro".
     """
+    if brand_type == "agency":
+        return list(_PRO_MODELS)
     if brand_type == "pitch" or tier is None:
         return list(_FREE_MODELS)
     if tier in ("basic", "starter"):

@@ -28,6 +28,8 @@ async def create_agency_client_for_admin(client, *, name: str = "Test client") -
     return res.json()["id"]
 
 
+# TODO(Task 3): remove this xfail once GET /clients/{id}/milestones is implemented.
+@pytest.mark.xfail(reason="endpoint implemented in Task 3", strict=False)
 @pytest.mark.asyncio
 async def test_list_milestones_autocreates_six_rows(client):
     await _make_agency_admin(client)

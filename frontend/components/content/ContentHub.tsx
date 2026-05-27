@@ -12,7 +12,6 @@ import {
   ChevronDown,
   ExternalLink,
   Zap,
-  Radio,
   Clock,
   CheckCircle2,
   Trash2,
@@ -67,14 +66,15 @@ import {
 import { ClusterCard } from '@/components/content/cluster/ClusterCard';
 import PlatformBadge from '@/components/PlatformBadge';
 import PlatformIcon from '@/components/PlatformIcon';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ContentTabPanels } from '@/components/content/ContentTabPanels';
+import { ImpactStrip } from '@/components/content/ImpactStrip';
+import { PostedHistoryModal } from '@/components/content/PostedHistoryModal';
+import { OpportunitiesPanel } from '@/components/content/OpportunitiesPanel';
 import { AppToast, ToastData } from '@/components/AppToast';
 import {
   AttachPromptPopover,
@@ -95,9 +95,7 @@ import { renderPreviewHtml, getBasePlatform } from '@/components/content/helpers
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type QueueTab = 'drafts' | 'scheduled' | 'opportunities' | 'posted';
-type PrimaryTab = 'clusters' | 'opportunities' | 'content_drafts' | 'posted';
-type ContentDraftsSubTab = 'queue' | 'scheduled';
+type PrimaryTab = 'clusters' | 'opportunities';
 
 // ── Draft card (Drafts tab) ───────────────────────────────────────────────────
 
@@ -1458,13 +1456,8 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialBrandId]);
-  const [activePrimaryTab, setActivePrimaryTab] = useState<PrimaryTab>('content_drafts');
-  const [activeSubTab, setActiveSubTab] = useState<ContentDraftsSubTab>('queue');
-  const activeTab: QueueTab = activePrimaryTab === 'content_drafts'
-    ? (activeSubTab === 'scheduled' ? 'scheduled' : 'drafts')
-    : activePrimaryTab === 'opportunities'
-    ? 'opportunities'
-    : 'posted';
+  const [activePrimaryTab, setActivePrimaryTab] = useState<PrimaryTab>('clusters');
+  const [postedModalOpen, setPostedModalOpen] = useState(false);
   const [toast, setToast] = useState<ToastData | null>(null);
   useEffect(() => {
     if (!toast) return;
@@ -1476,18 +1469,12 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
   useEffect(() => { document.title = 'Content Hub — Lumidian'; }, []);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const tab = new URLSearchParams(window.location.search).get('tab');
     if (tab === 'opportunities') {
       setActivePrimaryTab('opportunities');
-    } else if (tab === 'drafts') {
-      setActivePrimaryTab('content_drafts');
-      setActiveSubTab('queue');
-    } else if (tab === 'scheduled' || tab === 'saved') {
-      setActivePrimaryTab('content_drafts');
-      setActiveSubTab('scheduled');
-    } else if (tab === 'posted') {
-      setActivePrimaryTab('posted');
     }
+    // anything else (including legacy ?tab=drafts/scheduled/saved/posted) silently falls back to clusters
   }, []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1567,22 +1554,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
   useEffect(() => {
     setDraftPlatformFilter('all');
     setOppPlatformFilter('all');
-  }, [activeTab]);
-
-  // Tab counts (total per tab, unaffected by toggles)
-  const tabCounts = {
-    drafts: draftItems.length,
-    scheduled: scheduledItems.length,
-    opportunities: opportunities.length,
-    posted: postedItems.length,
-  };
-
-  const primaryTabCounts = {
-    clusters: clusterList.length,
-    opportunities: opportunities.length,
-    content_drafts: draftItems.length + scheduledItems.length,
-    posted: postedItems.length,
-  };
+  }, [activePrimaryTab]);
 
   // ── Load data ──────────────────────────────────────────────────────────────
 
@@ -1828,7 +1800,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
       setPinnedDraftId(draft.id);
       // Refresh status so the count is accurate
       if (selectedBrandId) getDraftStatus(selectedBrandId).then(setDraftStatus).catch((err) => logError(err, 'Content: refresh draft status after drafting opportunity'));
-      setActivePrimaryTab('content_drafts'); setActiveSubTab('queue');
+      // opportunity drafted — stay on current tab
     } catch (e: unknown) {
       const err = e as { response?: { status?: number; data?: { detail?: string | Array<{ msg?: string }> } } };
       const rawDetail = err?.response?.data?.detail;
@@ -1853,10 +1825,8 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
     setToast({ message: 'Opportunity dismissed', type: 'info' });
   }
 
-  function handleNavigateToQueueDraft(draftId: number) {
-    setActivePrimaryTab('content_drafts');
-    setActiveSubTab('queue');
-    setPinnedDraftId(draftId);
+  function handleNavigateToQueueDraft(_draftId: number) {
+    // Drafts tab removed — no-op navigation stub kept to satisfy OpportunitiesPanel prop
   }
 
   // ── Right panel actions ────────────────────────────────────────────────────
@@ -1870,7 +1840,6 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
 
     // Clear drafts UI immediately to show we're refreshing
     setDraftItems([]);
-    setActivePrimaryTab('content_drafts'); setActiveSubTab('queue');
 
     try {
       // Backend starts generation in the background and returns 202 immediately.
@@ -2104,8 +2073,6 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
   const PRIMARY_TABS: { key: PrimaryTab; label: string }[] = [
     { key: 'clusters', label: 'Clusters' },
     { key: 'opportunities', label: 'Visibility Opportunities' },
-    { key: 'content_drafts', label: 'Content Drafts' },
-    { key: 'posted', label: 'Posted' },
   ];
 
   return (
@@ -2125,7 +2092,6 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
           onClose={() => setRequestDraftOpen(false)}
           onCreated={(draft) => {
             setDraftItems((prev) => [draft, ...prev]);
-            setActivePrimaryTab('content_drafts'); setActiveSubTab('queue');
           }}
         />
       )}
@@ -2521,10 +2487,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
               {PRIMARY_TABS.map((tab) => (
                 <button
                   key={tab.key}
-                  onClick={() => {
-                    setActivePrimaryTab(tab.key);
-                    if (tab.key === 'content_drafts') setActiveSubTab('queue');
-                  }}
+                  onClick={() => setActivePrimaryTab(tab.key)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-[color,background-color,border-color] ${
                     activePrimaryTab === tab.key
                       ? 'bg-[rgba(95,126,166,0.18)] text-[var(--accent-foreground)] border border-[rgba(95,126,166,0.30)] shadow-[0_0_14px_rgba(95,126,166,0.14)]'
@@ -2532,49 +2495,34 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
                   }`}
                 >
                   {tab.label}
-                  {primaryTabCounts[tab.key] > 0 && (
+                  {tab.key === 'opportunities' && opportunities.length > 0 && (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                       activePrimaryTab === tab.key
                         ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]'
                         : 'bg-[rgba(255,255,255,0.08)] text-[var(--text-faint)]'
                     }`}>
-                      {primaryTabCounts[tab.key]}
+                      {opportunities.length}
+                    </span>
+                  )}
+                  {tab.key === 'clusters' && clusterList.length > 0 && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                      activePrimaryTab === tab.key
+                        ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]'
+                        : 'bg-[rgba(255,255,255,0.08)] text-[var(--text-faint)]'
+                    }`}>
+                      {clusterList.length}
                     </span>
                   )}
                 </button>
               ))}
             </div>
 
-            {/* Sub-tabs for Content Drafts */}
-            {activePrimaryTab === 'content_drafts' && (
-              <div className="flex gap-1 mb-5 pl-0.5">
-                {([
-                  { key: 'queue' as ContentDraftsSubTab, label: 'Queue', count: tabCounts.drafts },
-                  { key: 'scheduled' as ContentDraftsSubTab, label: 'Saved', count: tabCounts.scheduled },
-                ]).map((sub) => (
-                  <button
-                    key={sub.key}
-                    onClick={() => setActiveSubTab(sub.key)}
-                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-[color,background-color] ${
-                      activeSubTab === sub.key
-                        ? 'bg-[var(--bg-card)] text-[var(--text-primary)]'
-                        : 'text-[var(--text-faint)] hover:text-[var(--text-secondary)]'
-                    }`}
-                  >
-                    {sub.label}
-                    {sub.count > 0 && (
-                      <span className="text-[10px] ml-1 text-[var(--accent)]">{sub.count}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {activePrimaryTab !== 'content_drafts' && <div className="mb-2" />}
+            <div className="mb-2" />
 
             {/* Clusters tab content */}
-            {activePrimaryTab === 'clusters' && (
-              <div>
+            {activePrimaryTab === 'clusters' && selectedBrandId != null && (
+              <>
+                <ImpactStrip brandId={selectedBrandId} onSeeAll={() => setPostedModalOpen(true)} />
                 {clusterList.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--bg-card)] p-10 text-center">
                     <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-[rgba(95,126,166,0.08)] border border-[var(--border-subtle)] flex items-center justify-center">
@@ -2610,52 +2558,57 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
                     ))}
                   </div>
                 )}
-              </div>
+                <PostedHistoryModal
+                  brandId={selectedBrandId}
+                  open={postedModalOpen}
+                  onClose={() => setPostedModalOpen(false)}
+                />
+              </>
             )}
 
-            {/* Tab content */}
-            {activePrimaryTab !== 'clusters' && (
-            <ContentTabPanels
-              activeTab={activeTab}
-              brands={brands}
-              selectedBrandId={selectedBrandId}
-              draftItems={draftItems}
-              setDraftItems={setDraftItems}
-              visibleDraftItems={visibleDraftItems}
-              scheduledItems={scheduledItems}
-              visibleScheduledItems={visibleScheduledItems}
-              postedItems={postedItems}
-              visiblePostedItems={visiblePostedItems}
-              draftAttributions={draftAttributions}
-              opportunities={opportunities}
-              visibleOpportunities={visibleOpportunities}
-              brandProfile={brandProfile}
-              brandPrompts={brandPrompts}
-              draftPlatformFilter={draftPlatformFilter}
-              setDraftPlatformFilter={setDraftPlatformFilter}
-              oppPlatformFilter={oppPlatformFilter}
-              setOppPlatformFilter={setOppPlatformFilter}
-              _disabledPlatforms={_disabledPlatforms}
-              draftStatus={draftStatus}
-              generating={generating}
-              reportRunning={reportRunning}
-              pinnedDraftId={pinnedDraftId}
-              handleGenerateNow={handleGenerateNow}
-              handleApprove={handleApprove}
-              handleApproveAll={handleApproveAll}
-              handleDelete={handleDelete}
-              handleSaved={handleSaved}
-              handleMarkAsPosted={handleMarkAsPosted}
-              handleMoveBackToDrafts={handleMoveBackToDrafts}
-              handleDraftOpportunity={handleDraftOpportunity}
-              handleDismissOpportunity={handleDismissOpportunity}
-              onNavigateToQueueDraft={handleNavigateToQueueDraft}
-              setOppHelpOpen={setOppHelpOpen}
-              user={user}
-              onRequestDraft={() => setRequestDraftOpen(true)}
-              onOpenAttach={(draftId) => setAttachPopoverDraftId(draftId)}
-              onOpenExplainer={() => setExplainerOpen(true)}
-            />
+            {/* Opportunities tab content */}
+            {activePrimaryTab === 'opportunities' && (
+              <OpportunitiesPanel
+                activeTab="opportunities"
+                brands={brands}
+                selectedBrandId={selectedBrandId}
+                draftItems={draftItems}
+                setDraftItems={setDraftItems}
+                visibleDraftItems={visibleDraftItems}
+                scheduledItems={scheduledItems}
+                visibleScheduledItems={visibleScheduledItems}
+                postedItems={postedItems}
+                visiblePostedItems={visiblePostedItems}
+                draftAttributions={draftAttributions}
+                opportunities={opportunities}
+                visibleOpportunities={visibleOpportunities}
+                brandProfile={brandProfile}
+                brandPrompts={brandPrompts}
+                draftPlatformFilter={draftPlatformFilter}
+                setDraftPlatformFilter={setDraftPlatformFilter}
+                oppPlatformFilter={oppPlatformFilter}
+                setOppPlatformFilter={setOppPlatformFilter}
+                _disabledPlatforms={_disabledPlatforms}
+                draftStatus={draftStatus}
+                generating={generating}
+                reportRunning={reportRunning}
+                pinnedDraftId={null}
+                handleGenerateNow={handleGenerateNow}
+                handleApprove={handleApprove}
+                handleApproveAll={handleApproveAll}
+                handleDelete={handleDelete}
+                handleSaved={handleSaved}
+                handleMarkAsPosted={handleMarkAsPosted}
+                handleMoveBackToDrafts={handleMoveBackToDrafts}
+                handleDraftOpportunity={handleDraftOpportunity}
+                handleDismissOpportunity={handleDismissOpportunity}
+                onNavigateToQueueDraft={handleNavigateToQueueDraft}
+                setOppHelpOpen={setOppHelpOpen}
+                user={user}
+                onRequestDraft={() => setRequestDraftOpen(true)}
+                onOpenAttach={(draftId) => setAttachPopoverDraftId(draftId)}
+                onOpenExplainer={() => setExplainerOpen(true)}
+              />
             )}
           </div>
 

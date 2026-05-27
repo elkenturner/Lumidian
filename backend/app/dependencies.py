@@ -322,7 +322,7 @@ async def require_owner_only(db: AsyncSession, user: User) -> None:
 async def require_admin(user: User = Depends(get_current_user)) -> User:
     """Allow only users with is_admin=True. 403 otherwise."""
     if not user.is_admin:
-        raise HTTPException(status_code=403, detail="Admin access required")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return user
 
 

@@ -186,6 +186,9 @@ def _headline_framing(overall_pct: float, peer_avg_pct: float, location: str | N
     cold-email hook. The relative position (RVI band) is supporting detail,
     NOT the lead — a 17%-visibility prospect is not "dominant" in any way
     that matters to the business owner, even if peers are at 3%.
+
+    Returns both the plain `cover_hook` and a tagged `cover_hook_html` so the
+    template can render the percentage in the accent color.
     """
     missing_pct = max(0, round(100 - overall_pct))
     own_int = round(overall_pct)
@@ -194,15 +197,19 @@ def _headline_framing(overall_pct: float, peer_avg_pct: float, location: str | N
     # Cover hook — what gets the prospect to open page 2
     if overall_pct < 25:
         cover_hook = f"AI models mention you in only {own_int}% of relevant searches."
+        cover_hook_html = f'AI models mention you in only <span class="accent">{own_int}%</span> of relevant searches.'
         cover_sub = f"{missing_pct}% of potential customers asking these questions never hear your name."
     elif overall_pct < 50:
         cover_hook = f"You appear in {own_int}% of relevant AI searches."
+        cover_hook_html = f'You appear in <span class="accent">{own_int}%</span> of relevant AI searches.'
         cover_sub = f"More than half of customers asking these questions never see your name."
     elif overall_pct < 80:
         cover_hook = f"You appear in {own_int}% of relevant AI searches."
+        cover_hook_html = f'You appear in <span class="accent">{own_int}%</span> of relevant AI searches.'
         cover_sub = "There's still significant room to widen the lead."
     else:
         cover_hook = f"You appear in {own_int}% of relevant AI searches — strong position."
+        cover_hook_html = f'You appear in <span class="accent">{own_int}%</span> of relevant AI searches — strong position.'
         cover_sub = "The audit below shows where to defend and where to widen the gap."
 
     # Executive summary lead sentence
@@ -226,6 +233,7 @@ def _headline_framing(overall_pct: float, peer_avg_pct: float, location: str | N
 
     return {
         "cover_hook": cover_hook,
+        "cover_hook_html": cover_hook_html,
         "cover_sub": cover_sub,
         "summary_lead": summary_lead,
         "missing_pct": missing_pct,
@@ -277,6 +285,7 @@ async def render_prospect_pdf(
         generated_label=datetime.utcnow().strftime("%B %d, %Y"),
         # Headline + framing
         cover_hook=framing["cover_hook"],
+        cover_hook_html=framing["cover_hook_html"],
         cover_sub=framing["cover_sub"],
         summary_lead=framing["summary_lead"],
         missing_pct=framing["missing_pct"],

@@ -1,385 +1,925 @@
+{# AI Visibility Audit — editorial research-report layout.
+
+Type stack:
+  - Spectral (Production Type, free on Google Fonts) — display + body
+  - Hanken Grotesk (Hanken Design Co.) — labels, numerics, metadata
+  Both pulled at render time via Playwright with wait_until="networkidle".
+
+Status conventions (no colored side-borders — small inline marks only):
+  loss/losing   ▼  rust accent label
+  untapped      ○  ink-muted label
+  tied          =  ink-muted label
+  lead/ahead    ▲  positive label
+  uncontested   ●  positive label
+#}
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <title>AI Visibility Audit — {{ business_name }}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,600&family=Hanken+Grotesk:wght@400;500;600;700&display=swap" />
 <style>
+  /* ─────────────────────── palette (oklch, warm-tinted neutrals) ─────────────────────── */
+  :root {
+    --paper:       oklch(0.985 0.005 80);   /* warm cream */
+    --paper-soft:  oklch(0.965 0.008 75);   /* slightly darker, for callouts */
+    --ink:         oklch(0.20 0.012 55);    /* deep warm black for display */
+    --ink-body:    oklch(0.32 0.010 55);    /* body prose */
+    --ink-muted:   oklch(0.50 0.008 55);    /* labels, secondary */
+    --ink-faint:   oklch(0.62 0.006 55);    /* tertiary metadata */
+    --rule:        oklch(0.82 0.008 60);    /* hairlines */
+    --rule-faint:  oklch(0.91 0.005 60);    /* fainter dividers */
+    --accent:      oklch(0.52 0.16 35);     /* burnt sienna / rust — used sparingly */
+    --accent-soft: oklch(0.92 0.025 35);    /* pale rust wash */
+    --positive:    oklch(0.50 0.085 145);   /* muted forest, used for ahead/uncontested */
+  }
+
   @page { size: Letter; margin: 0; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Helvetica, sans-serif; color: #0f172a; background: #fafafa; }
+  html, body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink-body);
+    font-family: "Spectral", Georgia, "Times New Roman", serif;
+    font-size: 10pt;
+    line-height: 1.55;
+    font-feature-settings: "kern" 1, "liga" 1, "onum" 1;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 
-  /* Page primitives — only cover & CTA get fixed full-page height. Others flow. */
-  .page { width: 8.5in; padding: 0.55in 0.7in 0.65in; position: relative; background: #fafafa; }
-  .page-cover, .page-cta { min-height: 11in; page-break-after: always; }
-  .page-break { page-break-before: always; }
+  /* ─────────────────────── page primitives ─────────────────────── */
+  .page {
+    width: 8.5in;
+    min-height: 11in;
+    max-height: 11in;
+    padding: 0.5in 0.65in 0.5in;
+    position: relative;
+    background: var(--paper);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .page + .page { page-break-before: always; }
+  .page-body { flex: 1; min-height: 0; }
 
-  /* Typography */
-  h1, h2, h3, h4 { margin: 0; font-weight: 600; }
-  h2 { font-size: 19pt; line-height: 1.2; color: #0f172a; margin-bottom: 3pt; letter-spacing: -0.2pt; }
-  h3 { font-size: 12pt; margin-bottom: 4pt; color: #0f172a; line-height: 1.3; }
-  h4 { font-size: 9pt; margin: 0 0 5pt; color: #5f7ea6; text-transform: uppercase; letter-spacing: 2pt; font-weight: 700; }
-  p  { margin: 0 0 10pt; line-height: 1.55; font-size: 10.5pt; color: #334155; }
-  .muted    { color: #94a3b8; font-size: 10pt; }
-  .subtitle { color: #64748b; font-size: 10.5pt; margin-bottom: 14pt; line-height: 1.5; }
+  /* ─────────────────────── masthead + footer ─────────────────────── */
+  .masthead {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-bottom: 8pt;
+    border-bottom: 0.5pt solid var(--ink);
+    margin-bottom: 20pt;
+    flex-shrink: 0;
+  }
+  .masthead .mark {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 8.5pt;
+    color: var(--ink);
+    letter-spacing: 1.2pt;
+    text-transform: uppercase;
+  }
+  .masthead .mark .sep {
+    color: var(--ink-faint);
+    margin: 0 6pt;
+    letter-spacing: 0;
+    font-weight: 400;
+  }
+  .masthead .mark .doc {
+    color: var(--ink-body);
+    font-weight: 500;
+    letter-spacing: 0.8pt;
+  }
+  .masthead .meta {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-weight: 500;
+    font-size: 8.5pt;
+    color: var(--ink-muted);
+    letter-spacing: 0.8pt;
+    text-transform: uppercase;
+  }
+  .masthead .meta-name {
+    font-family: "Spectral", Georgia, serif;
+    font-weight: 500;
+    font-style: italic;
+    font-size: 11pt;
+    color: var(--ink-body);
+    letter-spacing: 0;
+    text-transform: none;
+  }
 
-  /* Cover */
-  .page-cover { display: flex; flex-direction: column; padding-top: 0.65in; padding-bottom: 0.65in; }
-  .cover-top { display: flex; justify-content: space-between; align-items: center; }
-  .cover-top .logo { max-width: 96px; max-height: 60px; object-fit: contain; }
-  .cover-top .logo-fallback { font-family: Georgia, serif; font-size: 20pt; font-weight: 600; color: #0f172a; letter-spacing: -0.4pt; }
-  .cover-top .wordmark { font-size: 9pt; letter-spacing: 2.5pt; color: #5f7ea6; text-transform: uppercase; font-weight: 700; }
+  .footer {
+    margin-top: 16pt;
+    padding-top: 8pt;
+    border-top: 0.5pt solid var(--rule);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 7.5pt;
+    color: var(--ink-faint);
+    letter-spacing: 0.3pt;
+    flex-shrink: 0;
+  }
+  .footer .who { font-weight: 600; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.8pt; }
 
-  .cover-hero { flex: 1; display: flex; flex-direction: column; justify-content: center; max-width: 6.4in; padding: 0; }
-  .cover-hero .eyebrow { font-size: 9pt; letter-spacing: 3pt; text-transform: uppercase; color: #5f7ea6; margin-bottom: 8pt; font-weight: 700; }
-  .cover-hero .name { font-family: Georgia, "Times New Roman", serif; font-size: 38pt; color: #0f172a; margin: 0 0 4pt; line-height: 1.05; word-break: break-word; font-weight: 600; letter-spacing: -1pt; }
-  .cover-hero .date { font-size: 11pt; color: #64748b; margin-bottom: 26pt; }
-  .cover-hero .hook { font-family: Georgia, serif; font-size: 24pt; line-height: 1.2; color: #0f172a; margin-bottom: 10pt; font-weight: 500; letter-spacing: -0.3pt; }
-  .cover-hero .sub { font-size: 12pt; color: #475569; line-height: 1.5; margin-bottom: 22pt; max-width: 5.5in; }
+  /* ─────────────────────── typography ─────────────────────── */
+  h1, h2, h3 { margin: 0; font-weight: 400; color: var(--ink); }
+  p { margin: 0 0 9pt; }
+  p:last-child { margin-bottom: 0; }
 
-  .cover-bar { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14pt 18pt 16pt; margin-top: 0; }
-  .cover-bar .label-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 9pt; letter-spacing: 1.5pt; text-transform: uppercase; color: #64748b; margin-bottom: 6pt; font-weight: 600; }
-  .cover-bar .label-row .right { color: #b91c1c; }
-  .cover-bar .stripe { height: 12pt; background: #f1f5f9; border-radius: 6pt; overflow: hidden; position: relative; }
-  .cover-bar .stripe .own { height: 100%; background: linear-gradient(90deg, #5f7ea6 0%, #4a6a90 100%); border-radius: 6pt 0 0 6pt; }
-  .cover-bar .stripe-legend { display: flex; gap: 14pt; font-size: 9pt; color: #64748b; margin-top: 8pt; }
-  .cover-bar .stripe-legend .dot { display: inline-block; width: 8pt; height: 8pt; border-radius: 50%; margin-right: 5pt; vertical-align: middle; }
-  .cover-bar .stripe-legend .dot-own { background: #5f7ea6; }
-  .cover-bar .stripe-legend .dot-missing { background: #e2e8f0; }
+  .business-name {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 34pt;
+    font-weight: 500;
+    line-height: 1.0;
+    letter-spacing: -0.9pt;
+    color: var(--ink);
+    margin: 0 0 6pt;
+    word-break: break-word;
+  }
+  .business-sub {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 9pt;
+    color: var(--ink-muted);
+    letter-spacing: 0.8pt;
+    text-transform: uppercase;
+    font-weight: 500;
+    margin: 0 0 26pt;
+  }
 
-  .cover-meta { display: flex; justify-content: space-between; padding-top: 10pt; border-top: 1px solid #e2e8f0; font-size: 9pt; color: #94a3b8; }
+  .hook {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 25pt;
+    font-weight: 400;
+    line-height: 1.2;
+    letter-spacing: -0.3pt;
+    color: var(--ink);
+    margin: 0 0 12pt;
+    max-width: 6.3in;
+  }
+  .hook em { font-style: italic; font-weight: 400; }
+  .hook .accent {
+    color: var(--accent);
+    font-style: italic;
+    font-weight: 500;
+    font-variant-numeric: lining-nums;
+  }
+  .hook-sub {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 12pt;
+    font-style: italic;
+    line-height: 1.45;
+    color: var(--ink-muted);
+    max-width: 5.3in;
+    margin: 0 0 22pt;
+    font-weight: 400;
+  }
 
-  /* Pills */
-  .pill { display: inline-block; padding: 2pt 10pt; border-radius: 999px; font-size: 8.5pt; font-weight: 700; letter-spacing: 0.6pt; text-transform: uppercase; }
-  .pill-loss        { background: #fef2f2; color: #b91c1c; }
-  .pill-untapped    { background: #fffbeb; color: #b45309; }
-  .pill-tied        { background: #f1f5f9; color: #475569; }
-  .pill-lead        { background: #f0fdf4; color: #16a34a; }
-  .pill-uncontested { background: #ecfdf5; color: #059669; }
+  /* ─────────────────────── section markers ─────────────────────── */
+  .section { margin-top: 22pt; }
+  .section + .section { margin-top: 20pt; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 14pt;
+    padding-bottom: 7pt;
+    border-bottom: 0.5pt solid var(--rule);
+    margin-bottom: 14pt;
+    page-break-after: avoid;
+  }
+  .section-prose, .focus-block, .prompt-table thead, .recs ol li { break-inside: avoid; }
+  .section-num {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 20pt;
+    font-weight: 400;
+    color: var(--accent);
+    letter-spacing: -0.4pt;
+    line-height: 1;
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .section-title {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 9.5pt;
+    font-weight: 600;
+    color: var(--ink);
+    letter-spacing: 0.8pt;
+    text-transform: uppercase;
+    line-height: 1;
+  }
+  .section-tagline {
+    margin-left: auto;
+    font-family: "Spectral", Georgia, serif;
+    font-size: 9.5pt;
+    font-style: italic;
+    color: var(--ink-muted);
+    line-height: 1;
+    letter-spacing: 0;
+  }
+  .section-prose {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: var(--ink-body);
+    max-width: 5.6in;
+  }
+  .section-prose strong { color: var(--ink); font-weight: 600; }
+  .section-prose .accent { color: var(--accent); font-weight: 500; }
 
-  /* Executive summary */
-  .lede-block { background: #fff; border: 1px solid #e2e8f0; border-left: 3pt solid #5f7ea6; padding: 12pt 16pt; margin: 0 0 18pt; font-size: 12pt; line-height: 1.55; color: #0f172a; border-radius: 6px; }
-  .lede-block strong { font-weight: 700; }
-  .score-row { display: flex; gap: 10pt; margin: 0 0 14pt; }
-  .score-card { flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12pt 14pt 14pt; }
-  .score-card .label { font-size: 8.5pt; text-transform: uppercase; letter-spacing: 1.4pt; color: #64748b; margin-bottom: 4pt; font-weight: 700; }
-  .score-card .value-row { display: flex; align-items: baseline; justify-content: space-between; gap: 6pt; }
-  .score-card .value { font-family: Georgia, serif; font-size: 30pt; line-height: 1; color: #0f172a; font-weight: 600; letter-spacing: -1pt; }
-  .score-card .caption { font-size: 9pt; color: #64748b; margin-top: 6pt; line-height: 1.4; }
-  .score-card.is-gap .value { color: #b45309; }
-  .score-bar { height: 5pt; background: #f1f5f9; border-radius: 3pt; overflow: hidden; margin-top: 10pt; }
-  .score-bar > span { display: block; height: 100%; }
-  .score-bar.own > span    { background: #5f7ea6; }
-  .score-bar.peer > span   { background: #94a3b8; }
-  .score-bar.miss > span   { background: linear-gradient(90deg, #f59e0b, #d97706); }
-  .peer-line { font-size: 10pt; color: #475569; margin: 4pt 0 18pt; }
-  .methodology { font-size: 8.5pt; color: #94a3b8; line-height: 1.55; margin-top: 16pt; padding-top: 10pt; border-top: 1px solid #e2e8f0; }
+  /* ─────────────────────── cover chart ─────────────────────── */
+  .chart {
+    margin: 6pt 0 18pt;
+    padding: 0;
+  }
+  .chart-label {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 7.5pt;
+    color: var(--ink);
+    letter-spacing: 0.8pt;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding-bottom: 6pt;
+    margin-bottom: 14pt;
+    border-bottom: 0.5pt solid var(--ink);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .chart-label .right {
+    color: var(--ink-faint);
+    font-weight: 500;
+    letter-spacing: 0.4pt;
+    text-transform: none;
+    font-family: "Spectral", Georgia, serif;
+    font-style: italic;
+    font-size: 9pt;
+  }
+  .chart-row {
+    display: grid;
+    grid-template-columns: 56pt 1fr 56pt;
+    align-items: center;
+    gap: 14pt;
+    padding: 9pt 0;
+    border-bottom: 0.5pt solid var(--rule-faint);
+  }
+  .chart-row:last-of-type { border-bottom: 0; }
+  .chart-row .name {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 8pt;
+    color: var(--ink-muted);
+    letter-spacing: 0.6pt;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .chart-row .track {
+    position: relative;
+    height: 14pt;
+    background: var(--paper-soft);
+    border: 0.5pt solid var(--rule);
+    border-radius: 0;
+    overflow: hidden;
+  }
+  .chart-row .fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    height: 100%;
+    min-width: 0;
+  }
+  .chart-row.is-you .fill   { background: var(--ink); }
+  .chart-row.is-peer .fill  { background: var(--ink-muted); }
+  .chart-row.is-miss .fill  { background: var(--accent); }
+  .chart-row.is-zero .track::after {
+    /* visible marker for 0% so the bar reads as "empty, not missing data" */
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 50%;
+    width: 3pt;
+    height: 3pt;
+    background: var(--ink-muted);
+    transform: translateY(-50%);
+  }
+  .chart-row .pct {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 13pt;
+    color: var(--ink);
+    font-weight: 600;
+    text-align: right;
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.3pt;
+  }
+  .chart-row.is-zero .pct { color: var(--accent); }
+  .chart-row .pct .pct-unit { color: var(--ink-faint); font-size: 9pt; margin-left: 1pt; font-weight: 500; }
 
-  /* Per-prompt scorecard */
-  .prompt-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 9pt 12pt 10pt; margin-bottom: 6pt; page-break-inside: avoid; }
-  .prompt-card.kind-loss        { border-left: 3pt solid #b91c1c; }
-  .prompt-card.kind-untapped    { border-left: 3pt solid #b45309; }
-  .prompt-card.kind-tied        { border-left: 3pt solid #94a3b8; }
-  .prompt-card.kind-lead        { border-left: 3pt solid #16a34a; }
-  .prompt-card.kind-uncontested { border-left: 3pt solid #059669; }
-  .prompt-card .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12pt; margin-bottom: 6pt; }
-  .prompt-card .q { font-style: italic; color: #0f172a; font-size: 10pt; line-height: 1.35; flex: 1; }
-  .bar-row { display: flex; align-items: center; gap: 8pt; margin: 2pt 0; font-size: 9pt; }
-  .bar-row .bar-label { width: 50pt; color: #64748b; }
-  .bar-row .bar { flex: 1; height: 7pt; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
-  .bar-row .bar > span { display: block; height: 100%; }
-  .bar-row .pct { width: 34pt; text-align: right; color: #334155; font-variant-numeric: tabular-nums; font-weight: 600; }
-  .bar-own > span  { background: #5f7ea6; }
-  .bar-peer > span { background: #cbd5e1; }
+  .chart-meta {
+    margin-top: 16pt;
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 9pt;
+    color: var(--ink-muted);
+    line-height: 1.55;
+    display: grid;
+    grid-template-columns: 56pt 1fr;
+    gap: 6pt 14pt;
+    padding-top: 11pt;
+    border-top: 0.5pt solid var(--rule-faint);
+  }
+  .chart-meta dt {
+    font-weight: 600;
+    letter-spacing: 1.2pt;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-size: 7.5pt;
+    align-self: baseline;
+  }
+  .chart-meta dd { margin: 0; color: var(--ink-body); font-family: "Spectral", Georgia, serif; font-size: 9.5pt; }
+  .chart-meta dd strong { color: var(--ink); font-weight: 600; }
 
-  /* Action blocks */
-  .action-block { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14pt 18pt; margin-bottom: 10pt; page-break-inside: avoid; }
-  .action-block.kind-loss        { border-left: 4pt solid #b91c1c; }
-  .action-block.kind-untapped    { border-left: 4pt solid #b45309; }
-  .action-block.kind-uncontested { border-left: 4pt solid #059669; }
-  .action-block.kind-tied        { border-left: 4pt solid #94a3b8; }
-  .action-block.kind-lead        { border-left: 4pt solid #16a34a; }
-  .action-block .q { font-style: italic; color: #475569; font-size: 9.5pt; margin-bottom: 8pt; }
-  .action-block .punch { font-size: 11.5pt; line-height: 1.45; color: #0f172a; margin-bottom: 6pt; }
-  .action-block .punch strong { font-weight: 700; }
-  .action-block .why { font-size: 9.5pt; color: #64748b; line-height: 1.5; }
+  /* ─────────────────────── per-prompt table ─────────────────────── */
+  .prompt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: "Spectral", Georgia, serif;
+  }
+  .prompt-table thead th {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 7.5pt;
+    font-weight: 600;
+    color: var(--ink-faint);
+    letter-spacing: 0.8pt;
+    text-transform: uppercase;
+    padding: 4pt 0 9pt;
+    border-bottom: 0.5pt solid var(--ink);
+    text-align: left;
+    vertical-align: bottom;
+  }
+  .prompt-table thead th.num { width: 24pt; }
+  .prompt-table thead th.you, .prompt-table thead th.peers { width: 56pt; text-align: right; }
+  .prompt-table thead th.status { width: 76pt; text-align: right; }
+  .prompt-table tbody tr {
+    border-bottom: 0.5pt solid var(--rule-faint);
+    page-break-inside: avoid;
+  }
+  .prompt-table tbody tr.divider td {
+    padding: 0;
+    border-bottom: 0.5pt solid var(--rule);
+    height: 0;
+    line-height: 0;
+  }
+  .prompt-table tbody td {
+    padding: 6pt 0;
+    font-size: 9.75pt;
+    color: var(--ink-body);
+    line-height: 1.35;
+    vertical-align: top;
+  }
+  .prompt-table tbody td.num {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 9pt;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums lining-nums;
+    font-weight: 500;
+    padding-right: 4pt;
+  }
+  .prompt-table tbody td.q {
+    padding-right: 12pt;
+    color: var(--ink);
+    font-size: 10pt;
+    font-style: italic;
+    font-weight: 400;
+  }
+  .prompt-table tbody td.you, .prompt-table tbody td.peers {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 10.5pt;
+    font-weight: 600;
+    color: var(--ink);
+    text-align: right;
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.2pt;
+  }
+  .prompt-table tbody td.you .unit, .prompt-table tbody td.peers .unit {
+    color: var(--ink-faint);
+    font-size: 8pt;
+    margin-left: 1pt;
+    font-weight: 500;
+  }
+  .prompt-table tbody td.peers { color: var(--ink-muted); }
+  .prompt-table tbody td.status {
+    text-align: right;
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 7.5pt;
+    letter-spacing: 0.6pt;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+  .prompt-table tbody td.status .mark { margin-right: 5pt; font-size: 8.5pt; }
 
-  /* Recommendations */
-  .recs { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14pt 20pt 8pt; }
-  .recs ol { margin: 0; padding-left: 22pt; }
-  .recs ol li { font-size: 10.25pt; color: #334155; line-height: 1.55; margin-bottom: 10pt; padding-left: 4pt; }
-  .recs ol li:last-child { margin-bottom: 4pt; }
-  .recs strong { color: #0f172a; font-weight: 700; }
-  .recs p { margin: 3pt 0; }
-  .static-fallback { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14pt 20pt; }
-  .static-fallback ul { margin: 6pt 0; padding-left: 20pt; }
-  .static-fallback li { margin-bottom: 5pt; font-size: 10.25pt; line-height: 1.5; color: #334155; }
+  .status-loss        { color: var(--accent) !important; }
+  .status-loss .mark  { color: var(--accent); }
+  .status-untapped    { color: var(--ink-muted) !important; }
+  .status-tied        { color: var(--ink-muted) !important; }
+  .status-lead        { color: var(--positive) !important; }
+  .status-uncontested { color: var(--positive) !important; }
 
-  /* CTA page */
-  .page-cta { display: flex; flex-direction: column; padding-top: 0.65in; padding-bottom: 0.65in; }
-  .cta-top { display: flex; justify-content: space-between; align-items: center; }
-  .cta-top .wordmark { font-size: 9pt; letter-spacing: 2.5pt; color: #5f7ea6; text-transform: uppercase; font-weight: 700; }
-  .cta-content { flex: 1; display: flex; flex-direction: column; justify-content: flex-start; padding-top: 26pt; }
-  .cta-content .eyebrow { font-size: 9pt; letter-spacing: 3pt; text-transform: uppercase; color: #5f7ea6; margin-bottom: 8pt; font-weight: 700; }
-  .cta-content .hook { font-family: Georgia, serif; font-size: 28pt; line-height: 1.15; color: #0f172a; margin-bottom: 12pt; font-weight: 500; letter-spacing: -0.5pt; }
-  .cta-content .body { font-size: 11pt; color: #334155; line-height: 1.55; margin-bottom: 22pt; max-width: 6in; }
-  .cta-content .body strong { color: #0f172a; font-weight: 700; }
+  .legend {
+    margin-top: 10pt;
+    padding-top: 8pt;
+    border-top: 0.5pt solid var(--rule-faint);
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 7pt;
+    color: var(--ink-faint);
+    letter-spacing: 0.3pt;
+    display: flex;
+    gap: 16pt;
+    flex-wrap: wrap;
+  }
+  .legend span .mark { margin-right: 4pt; font-size: 8pt; }
 
-  .two-col { display: flex; gap: 12pt; margin-bottom: 18pt; }
-  .col-block { flex: 1; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14pt 16pt 12pt; }
-  .col-block .col-title { font-size: 9pt; font-weight: 700; color: #5f7ea6; text-transform: uppercase; letter-spacing: 1.8pt; margin-bottom: 10pt; padding-bottom: 8pt; border-bottom: 1px solid #f1f5f9; }
-  .col-block ul { margin: 0; padding-left: 14pt; }
-  .col-block li { font-size: 9.75pt; color: #334155; line-height: 1.5; margin-bottom: 8pt; }
-  .col-block li:last-child { margin-bottom: 0; }
-  .col-block li strong { color: #0f172a; font-weight: 700; }
+  /* ─────────────────────── focus blocks ─────────────────────── */
+  .focus-block {
+    margin-bottom: 10pt;
+    page-break-inside: avoid;
+    max-width: 6.3in;
+    display: grid;
+    grid-template-columns: 24pt 1fr;
+    gap: 4pt 12pt;
+    padding-bottom: 10pt;
+    border-bottom: 0.5pt solid var(--rule-faint);
+  }
+  .focus-block:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+  .focus-block .marker {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 11pt;
+    font-weight: 500;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums lining-nums;
+    line-height: 1.3;
+    text-align: right;
+    padding-top: 0;
+  }
+  .focus-block .body { min-width: 0; }
+  .focus-block .q {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 9pt;
+    font-style: italic;
+    color: var(--ink-muted);
+    margin: 0 0 3pt;
+    line-height: 1.3;
+  }
+  .focus-block .q::before { content: "“"; }
+  .focus-block .q::after { content: "”"; }
+  .focus-block .lede {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 10pt;
+    font-weight: 400;
+    line-height: 1.4;
+    color: var(--ink);
+    margin: 0;
+  }
+  .focus-block .lede strong { font-weight: 600; }
+  .focus-block .lede .accent { color: var(--accent); font-weight: 500; }
+  .focus-block .lede .quiet { color: var(--ink-muted); }
 
-  .platform-pill { display: inline-block; padding: 4pt 12pt; border-radius: 999px; font-size: 9pt; color: #5f7ea6; background: #eef2f6; font-weight: 600; margin-bottom: 14pt; letter-spacing: 0.5pt; }
+  /* ─────────────────────── recommendations ─────────────────────── */
+  .recs ol {
+    margin: 0;
+    padding: 0;
+    counter-reset: rec;
+    list-style: none;
+  }
+  .recs ol li {
+    counter-increment: rec;
+    position: relative;
+    padding: 9pt 0 9pt 30pt;
+    border-bottom: 0.5pt solid var(--rule-faint);
+    font-family: "Spectral", Georgia, serif;
+    font-size: 9.75pt;
+    color: var(--ink-body);
+    line-height: 1.45;
+    page-break-inside: avoid;
+    max-width: 6.3in;
+  }
+  .recs ol li:first-child { padding-top: 3pt; }
+  .recs ol li:last-child { border-bottom: 0; padding-bottom: 0; }
+  .recs ol li::before {
+    content: counter(rec, decimal-leading-zero);
+    position: absolute;
+    left: 0;
+    top: 10pt;
+    font-family: "Spectral", Georgia, serif;
+    font-size: 11pt;
+    font-weight: 500;
+    color: var(--accent);
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  .recs ol li:first-child::before { top: 4pt; }
+  .recs ol li p { margin: 0 0 4pt; }
+  .recs ol li p:last-child { margin-bottom: 0; }
+  .recs ol li strong { color: var(--ink); font-weight: 600; }
 
-  .cta-action { background: #0f172a; color: #fff; border-radius: 12px; padding: 18pt 22pt; margin-top: 0; }
-  .cta-action .ask { font-size: 13pt; line-height: 1.5; margin-bottom: 12pt; color: #fff; }
-  .cta-action .ask strong { color: #fff; font-weight: 700; }
-  .cta-action .links { display: flex; flex-direction: column; gap: 5pt; font-size: 10.5pt; }
-  .cta-action .links a { color: #cbd5e1; text-decoration: none; }
-  .cta-action .links a:hover { color: #fff; }
-  .cta-action .links .label { color: #94a3b8; font-size: 9pt; text-transform: uppercase; letter-spacing: 1.5pt; margin-right: 6pt; }
+  /* fallback static recs (markdown not provided) */
+  .recs-static {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 10.25pt;
+    color: var(--ink-body);
+    line-height: 1.55;
+    max-width: 6.2in;
+  }
+  .recs-static p { margin: 0 0 10pt; }
+  .recs-static ul { margin: 6pt 0 0; padding-left: 18pt; }
+  .recs-static li { margin-bottom: 6pt; }
+  .recs-static strong { color: var(--ink); font-weight: 600; }
 
-  .cta-footer { font-size: 9pt; color: #94a3b8; padding-top: 12pt; border-top: 1px solid #e2e8f0; margin-top: 22pt; display: flex; justify-content: space-between; }
-  .cta-footer .who { font-weight: 700; color: #0f172a; }
+  /* ─────────────────────── CTA page ─────────────────────── */
+  .cta-hook {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 30pt;
+    font-weight: 400;
+    font-style: italic;
+    line-height: 1.1;
+    letter-spacing: -0.6pt;
+    color: var(--ink);
+    margin: 0 0 14pt;
+    max-width: 6in;
+  }
+  .cta-hook .accent { color: var(--accent); }
+  .cta-intro {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 11.5pt;
+    line-height: 1.55;
+    color: var(--ink-body);
+    max-width: 5.6in;
+    margin: 0 0 26pt;
+  }
+  .cta-intro strong { color: var(--ink); font-weight: 600; }
+
+  .cta-two {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 38pt;
+    margin-bottom: 28pt;
+  }
+  .cta-col h3 {
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 8.5pt;
+    font-weight: 600;
+    color: var(--ink-faint);
+    letter-spacing: 1pt;
+    text-transform: uppercase;
+    margin: 0 0 12pt;
+    padding-bottom: 8pt;
+    border-bottom: 0.5pt solid var(--rule);
+  }
+  .cta-col dl { margin: 0; }
+  .cta-col dt {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 10.5pt;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 3pt;
+    line-height: 1.35;
+  }
+  .cta-col dd {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 9.5pt;
+    color: var(--ink-body);
+    line-height: 1.45;
+    margin: 0 0 10pt;
+  }
+  .cta-col dd:last-child { margin-bottom: 0; }
+
+  .cta-action {
+    padding: 18pt 0 0;
+    border-top: 0.5pt solid var(--ink);
+    margin-top: 6pt;
+  }
+  .cta-action .ask {
+    font-family: "Spectral", Georgia, serif;
+    font-size: 12.5pt;
+    line-height: 1.45;
+    color: var(--ink);
+    margin: 0 0 14pt;
+    max-width: 5.6in;
+  }
+  .cta-action .ask strong { font-weight: 600; }
+  .cta-links {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6pt 18pt;
+    font-family: "Hanken Grotesk", system-ui, sans-serif;
+    font-size: 10pt;
+    color: var(--ink);
+    align-items: baseline;
+  }
+  .cta-links .label {
+    font-size: 7.5pt;
+    font-weight: 600;
+    color: var(--ink-faint);
+    letter-spacing: 0.8pt;
+    text-transform: uppercase;
+  }
+  .cta-links a {
+    color: var(--ink);
+    text-decoration: none;
+    border-bottom: 0.5pt solid var(--accent);
+    padding-bottom: 1pt;
+  }
 </style>
 </head>
 <body>
 
-<!-- ───────────────────────────────────── COVER ───────────────────────────────────── -->
-<div class="page page-cover">
-  <div class="cover-top">
-    {% if logo_data_uri %}
-      <img src="{{ logo_data_uri }}" class="logo" alt="{{ business_name }}" />
-    {% else %}
-      <div class="logo-fallback">{{ business_name }}</div>
-    {% endif %}
-    <div class="wordmark">Lumidian</div>
-  </div>
-
-  <div class="cover-hero">
-    <div class="eyebrow">AI Visibility Audit</div>
-    <div class="name">{{ business_name }}</div>
-    <div class="date">{{ audit_month }}{% if location %} · {{ location }}{% endif %}</div>
-
-    <div class="hook">{{ cover_hook }}</div>
-    <div class="sub">{{ cover_sub }}</div>
-
-    <div class="cover-bar">
-      <div class="label-row">
-        <span>Share of relevant AI searches mentioning {{ business_name }}</span>
-        <span class="right">{{ missing_pct|round|int }}% missing</span>
-      </div>
-      <div class="stripe">
-        <div class="own" style="width: {{ overall_visibility_pct }}%"></div>
-      </div>
-      <div class="stripe-legend">
-        <span><span class="dot dot-own"></span>You mentioned · {{ overall_visibility_pct|round|int }}%</span>
-        <span><span class="dot dot-missing"></span>Searches without you · {{ missing_pct|round|int }}%</span>
-      </div>
-    </div>
-  </div>
-
-  <div class="cover-meta">
-    <div>Prepared by Lumidian</div>
-    <div>{{ generated_label }}</div>
-  </div>
-</div>
-
-<!-- ─────────────────────────────── EXECUTIVE SUMMARY ─────────────────────────────── -->
+<!-- ═════════════════════════════════════════════════════════════════════════
+     PAGE 1 — COVER + EXECUTIVE SUMMARY
+     ═════════════════════════════════════════════════════════════════════════ -->
 <div class="page">
-  <h4>Executive Summary</h4>
-  <h2>Where {{ business_name }} stands on AI search</h2>
-  <div class="subtitle">90 queries to ChatGPT, Perplexity, and Gemini — questions a real customer would ask.</div>
-
-  <div class="lede-block">{{ summary_lead }}</div>
-
-  <div class="score-row">
-    <div class="score-card">
-      <div class="label">Your Visibility</div>
-      <div class="value-row"><div class="value">{{ overall_visibility_pct|round|int }}%</div></div>
-      <div class="score-bar own"><span style="width: {{ overall_visibility_pct }}%"></span></div>
-      <div class="caption">of relevant AI responses mention you</div>
+  <div class="masthead">
+    <div class="mark">
+      Lumidian<span class="sep">·</span><span class="doc">AI Visibility Audit</span>
     </div>
-    <div class="score-card">
-      <div class="label">Peer Average</div>
-      <div class="value-row"><div class="value">{{ peer_avg_overall|round|int }}%</div></div>
-      <div class="score-bar peer"><span style="width: {{ peer_avg_overall }}%"></span></div>
-      <div class="caption">competitors averaged this across the same prompts</div>
-    </div>
-    <div class="score-card is-gap">
-      <div class="label">Searches Missing You</div>
-      <div class="value-row"><div class="value">{{ missing_pct|round|int }}%</div></div>
-      <div class="score-bar miss"><span style="width: {{ missing_pct }}%"></span></div>
-      <div class="caption">of potential customers don't hear your name</div>
-    </div>
+    <div class="meta">{{ audit_month }}</div>
   </div>
 
-  <div class="peer-line">Your peer group: <strong>{{ peer_names_joined }}</strong>.</div>
-
-  <p class="methodology">
-    <strong>Methodology:</strong> 10 generated prompts × 3 models (ChatGPT search, Perplexity Sonar-Pro, Gemini 2.5 Flash) × 3 runs = 90 queries total. Visibility = the share of those queries where {{ business_name }} appeared in the response. Generated {{ generated_label }}.
-  </p>
-</div>
-
-<!-- ────────────────────────── PER-PROMPT SCORECARD ────────────────────────── -->
-<div class="page page-break">
-  <h2>Per-prompt breakdown</h2>
-  <div class="subtitle">All 10 prompts, sorted by what needs your attention first.</div>
-
-  {% for ps in scorecard %}
-  <div class="prompt-card kind-{{ ps.kind }}">
-    <div class="top">
-      <div class="q">"{{ ps.prompt_text }}"</div>
-      <span class="pill pill-{{ ps.kind }}">
-        {% if ps.kind == 'loss' %}LOSING
-        {% elif ps.kind == 'untapped' %}UNTAPPED
-        {% elif ps.kind == 'tied' %}TIED
-        {% elif ps.kind == 'lead' %}AHEAD
-        {% else %}UNCONTESTED{% endif %}
-      </span>
-    </div>
-    <div class="bar-row bar-own">
-      <div class="bar-label">You</div>
-      <div class="bar"><span style="width: {{ ps.own_visibility_pct }}%"></span></div>
-      <div class="pct">{{ ps.own_visibility_pct|round|int }}%</div>
-    </div>
-    <div class="bar-row bar-peer">
-      <div class="bar-label">Peers</div>
-      <div class="bar"><span style="width: {{ ps.peer_avg_visibility_pct }}%"></span></div>
-      <div class="pct">{{ ps.peer_avg_visibility_pct|round|int }}%</div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
-
-<!-- ────────────────────────── WHERE TO ACT ────────────────────────── -->
-<div class="page page-break">
-  <h2>Where to focus first</h2>
-  <div class="subtitle">Three prompts that show the full picture — what to fix, what to capture, what to defend.</div>
-
-  {% for w in action_blocks %}
-  <div class="action-block kind-{{ w.kind }}">
-    <div class="q">"{{ w.prompt_text }}"</div>
-
-    <div class="punch">
-      {% if w.kind == 'loss' and w.top_competitor_name %}
-        <strong>{{ w.top_competitor_name }}</strong> dominates this question with <strong>{{ w.top_competitor_visibility_pct|round|int }}%</strong> visibility — you're at <strong>{{ w.own_visibility_pct|round|int }}%</strong>.
-      {% elif w.kind == 'loss' %}
-        Competitors collectively appear in <strong>{{ w.peer_avg_visibility_pct|round|int }}%</strong> of responses — you're at <strong>{{ w.own_visibility_pct|round|int }}%</strong>.
-      {% elif w.kind == 'untapped' %}
-        {% if w.variant_index == 0 %}
-          Nobody surfaces here yet — not you, not your peers. Whoever publishes first owns this question in AI search.
-        {% elif w.variant_index == 1 %}
-          Another open category: zero competitor content, zero from you. AI models default to generic answers because no source is authoritative.
-        {% else %}
-          A third clear opening — this query has no clear winner in {{ location or "your market" }}, just placeholder text from AI models.
-        {% endif %}
-      {% elif w.kind == 'uncontested' %}
-        Only you appear in responses to this — peers are at <strong>0%</strong>. A fragile lead worth defending with more content.
-      {% elif w.kind == 'tied' %}
-        You and competitors are tied at <strong>{{ w.own_visibility_pct|round|int }}%</strong>. A small content push pulls you clear.
-      {% else %}
-        You're ahead at <strong>{{ w.own_visibility_pct|round|int }}%</strong> vs peers at <strong>{{ w.peer_avg_visibility_pct|round|int }}%</strong>. Defend and widen.
-      {% endif %}
+  <div class="page-body">
+    <h1 class="business-name">{{ business_name }}</h1>
+    <div class="business-sub">
+      {%- if location %}{{ location }}{% else %}Prospect{% endif -%}
     </div>
 
-    <div class="why">
-      {% if w.kind == 'loss' %}
-        {% if w.variant_index == 0 %}
-          AI models are pulling from competitor content. Closing the gap means publishing on the same surfaces being cited — LinkedIn, Medium, Reddit, Quora.
-        {% else %}
-          Same playbook: match where the competitor is being cited from, not just on your own domain.
-        {% endif %}
-      {% elif w.kind == 'untapped' %}
-        {% if w.variant_index == 0 %}
-          A single well-structured long-form piece can become THE citation across all three models. First mover wins.
-        {% elif w.variant_index == 1 %}
-          Different topic, same dynamic — one detailed answer published on the right surfaces becomes the default citation.
-        {% else %}
-          Pattern is consistent across these openings: zero competitor presence means low effort to dominate.
-        {% endif %}
-      {% elif w.kind == 'uncontested' %}
-        The position is real but fragile — any competitor publishing one strong piece could flip the citation.
-      {% else %}
-        Maintain the lead with regular updates and structured schema so AI models keep citing you.
-      {% endif %}
-    </div>
-  </div>
-  {% endfor %}
-</div>
+    <p class="hook">{{ cover_hook_html|safe }}</p>
+    <p class="hook-sub">{{ cover_sub }}</p>
 
-<!-- ────────────────────────── RECOMMENDATIONS ────────────────────────── -->
-<div class="page page-break">
-  <h2>What we'd do about it</h2>
-  <div class="subtitle">3–5 recommendations, ranked by impact.</div>
-
-  {% if recommendations_html %}
-    <div class="recs">{{ recommendations_html|safe }}</div>
-  {% else %}
-    <div class="static-fallback">
-      <p>Lumidian closes AI visibility gaps with a recurring monthly playbook:</p>
-      <ul>
-        <li><strong>12+ AI-optimized articles every month</strong> — distributed across LinkedIn, Medium, Reddit, Quora, and X as coordinated content clusters.</li>
-        <li><strong>YouTube video AI-readability optimization</strong> — we restructure descriptions, captions, and chapters so models can extract from your videos.</li>
-        <li><strong>Website AI-readability audit</strong> — a one-time engagement to diagnose schema, structure, and citation surfaces. (Future work, not yet performed.)</li>
-        <li><strong>Live tracking dashboard</strong> across ChatGPT, Claude, Perplexity, and Gemini.</li>
-        <li><strong>Competitor monitoring</strong> — flagged within days when a peer publishes AI-citable content in your category.</li>
-      </ul>
-    </div>
-  {% endif %}
-</div>
-
-<!-- ────────────────────────── CTA ────────────────────────── -->
-<div class="page page-cta page-break">
-  <div class="cta-top">
-    <div></div>
-    <div class="wordmark">Lumidian</div>
-  </div>
-
-  <div class="cta-content">
-    <div class="eyebrow">Next step</div>
-    <div class="hook">Ready to close the {{ missing_pct|round|int }}% gap?</div>
-
-    <div class="platform-pill">Software · or done-for-you</div>
-    <div class="body">
-      Lumidian is the AI visibility platform — a tracking dashboard, a content-cluster engine, and a site auditor in one. <strong>Run it yourself, or have our team run it for you.</strong> Either way, you turn audits like this one into measurable visibility lift across ChatGPT, Perplexity, and Gemini.
-    </div>
-
-    <div class="two-col">
-      <div class="col-block">
-        <div class="col-title">How the platform works</div>
-        <ul>
-          <li><strong>Live dashboard, not monthly emails.</strong> Article moves a query, you see it the same week. Competitor publishes, you see it within days.</li>
-          <li><strong>Content engineered from your audit data.</strong> Each piece is briefed from the prompts you're losing and the sources AI models actually cite.</li>
-          <li><strong>Coordinated clusters, not one-offs.</strong> One topic, five surfaces (LinkedIn, Medium, Reddit, Quora, X) — same brief, reinforcing citations.</li>
-        </ul>
+    {# ───────── cover chart: 3-row horizontal bar comparison ───────── #}
+    <div class="chart">
+      <div class="chart-label">
+        <span>Share of relevant AI searches</span>
+        <span class="right">90 queries · 3 models · 3 runs</span>
       </div>
-      <div class="col-block">
-        <div class="col-title">What you'd get</div>
-        <ul>
-          <li><strong>12+ AI-optimized articles a month</strong>, coordinated as clusters around your highest-priority queries.</li>
-          <li><strong>YouTube video optimization</strong> — your existing videos restructured so AI models can extract from them.</li>
-          <li><strong>Website AI-readability audit</strong> (one-time engagement) — highest-impact technical wins.</li>
-          <li><strong>Tracking + competitor alerts</strong> across ChatGPT, Claude, Perplexity, and Gemini.</li>
-        </ul>
+
+      <div class="chart-row is-you{% if overall_visibility_pct|round|int == 0 %} is-zero{% endif %}">
+        <div class="name">You</div>
+        <div class="track"><div class="fill" style="width: {{ overall_visibility_pct }}%;"></div></div>
+        <div class="pct">{{ overall_visibility_pct|round|int }}<span class="pct-unit">%</span></div>
+      </div>
+
+      <div class="chart-row is-peer{% if peer_avg_overall|round|int == 0 %} is-zero{% endif %}">
+        <div class="name">Peers</div>
+        <div class="track"><div class="fill" style="width: {{ peer_avg_overall }}%;"></div></div>
+        <div class="pct">{{ peer_avg_overall|round|int }}<span class="pct-unit">%</span></div>
+      </div>
+
+      <div class="chart-row is-miss">
+        <div class="name">Missing</div>
+        <div class="track"><div class="fill" style="width: {{ missing_pct }}%;"></div></div>
+        <div class="pct">{{ missing_pct|round|int }}<span class="pct-unit">%</span></div>
+      </div>
+
+      <dl class="chart-meta">
+        <dt>Peers</dt>
+        <dd><strong>{{ peer_names_joined }}</strong></dd>
+        <dt>Models</dt>
+        <dd>ChatGPT search · Perplexity Sonar-Pro · Gemini 2.5 Flash</dd>
+      </dl>
+    </div>
+
+    {# ───────── executive summary (right under the chart) ───────── #}
+    <div class="section">
+      <div class="section-head">
+        <div class="section-num">01</div>
+        <div class="section-title">Executive Summary</div>
+        <div class="section-tagline">Where {{ business_name }} stands today</div>
+      </div>
+      <div class="section-prose">
+        <p>{{ summary_lead }}</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="who">Prepared by Lumidian</span>
+    <span>{{ generated_label }}</span>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════════════════
+     PAGE 2 — PER-PROMPT BREAKDOWN
+     ═════════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="mark">
+      Lumidian<span class="sep">·</span><span class="doc">AI Visibility Audit</span>
+    </div>
+    <div class="meta meta-name">{{ business_name }}</div>
+  </div>
+
+  <div class="page-body">
+    <div class="section" style="margin-top: 0;">
+      <div class="section-head">
+        <div class="section-num">02</div>
+        <div class="section-title">Per-prompt Breakdown</div>
+        <div class="section-tagline">All 10 prompts, sorted by what needs attention</div>
+      </div>
+
+      <table class="prompt-table">
+        <thead>
+          <tr>
+            <th class="num">#</th>
+            <th class="q">Prompt</th>
+            <th class="you">You</th>
+            <th class="peers">Peers</th>
+            <th class="status">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% set ns = namespace(prev_kind=None) %}
+          {% for ps in scorecard %}
+            {% if ns.prev_kind and ns.prev_kind != ps.kind %}
+              <tr class="divider"><td colspan="5"></td></tr>
+            {% endif %}
+            <tr>
+              <td class="num">{{ "%02d"|format(loop.index) }}</td>
+              <td class="q">{{ ps.prompt_text }}</td>
+              <td class="you">{{ ps.own_visibility_pct|round|int }}<span class="unit">%</span></td>
+              <td class="peers">{{ ps.peer_avg_visibility_pct|round|int }}<span class="unit">%</span></td>
+              <td class="status status-{{ ps.kind }}">
+                {%- if ps.kind == 'loss' %}<span class="mark">▼</span>Losing
+                {%- elif ps.kind == 'untapped' %}<span class="mark">○</span>Untapped
+                {%- elif ps.kind == 'tied' %}<span class="mark">=</span>Tied
+                {%- elif ps.kind == 'lead' %}<span class="mark">▲</span>Ahead
+                {%- elif ps.kind == 'uncontested' %}<span class="mark">●</span>Uncontested
+                {%- endif -%}
+              </td>
+            </tr>
+            {% set ns.prev_kind = ps.kind %}
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div class="legend">
+        <span class="status-loss"><span class="mark">▼</span>Losing — peers ahead</span>
+        <span class="status-untapped"><span class="mark">○</span>Untapped — no one cited</span>
+        <span class="status-lead"><span class="mark">▲</span>Ahead — you lead peers</span>
+        <span class="status-uncontested"><span class="mark">●</span>Uncontested — only you</span>
+      </div>
+    </div>
+
+    {# ───────── 03 · where to focus first (on same page if room) ───────── #}
+    <div class="section">
+      <div class="section-head">
+        <div class="section-num">03</div>
+        <div class="section-title">Where to Focus First</div>
+        <div class="section-tagline">Three prompts that tell the full story</div>
+      </div>
+
+      {% for w in action_blocks %}
+      <div class="focus-block">
+        <div class="marker">{{ "%02d"|format(loop.index) }}</div>
+        <div class="body">
+          <p class="q">{{ w.prompt_text }}</p>
+          <p class="lede">
+            {%- if w.kind == 'loss' and w.top_competitor_name -%}
+              <strong>{{ w.top_competitor_name }}</strong> dominates this question with <span class="accent">{{ w.top_competitor_visibility_pct|round|int }}%</span> visibility — you're at <span class="accent">{{ w.own_visibility_pct|round|int }}%</span>. <span class="quiet">AI models are pulling from competitor content; closing the gap means publishing on the same surfaces being cited — LinkedIn, Medium, Reddit, Quora.</span>
+            {%- elif w.kind == 'loss' -%}
+              Competitors collectively appear in <span class="accent">{{ w.peer_avg_visibility_pct|round|int }}%</span> of responses — you're at <span class="accent">{{ w.own_visibility_pct|round|int }}%</span>. <span class="quiet">Same playbook: match where competitors are being cited from, not just on your own domain.</span>
+            {%- elif w.kind == 'untapped' -%}
+              {%- if w.variant_index == 0 -%}
+                Nobody surfaces here yet — not you, not your peers. Whoever publishes first owns this question in AI search. <span class="quiet">A single well-structured long-form piece can become the citation across all three models. First mover wins.</span>
+              {%- elif w.variant_index == 1 -%}
+                Another open category — zero competitor content, zero from you. AI models default to generic answers because no source is authoritative. <span class="quiet">Different topic, same dynamic: one detailed answer published on the right surfaces becomes the default citation.</span>
+              {%- else -%}
+                A third clear opening — this query has no clear winner in {{ location or "your market" }}, just placeholder text from AI models. <span class="quiet">Zero competitor presence means low effort to dominate.</span>
+              {%- endif -%}
+            {%- elif w.kind == 'uncontested' -%}
+              Only you appear in responses to this — peers are at <strong>0%</strong>. <span class="quiet">A fragile lead: any competitor publishing one strong piece could flip the citation.</span>
+            {%- elif w.kind == 'tied' -%}
+              You and competitors are tied at <strong>{{ w.own_visibility_pct|round|int }}%</strong>. <span class="quiet">A small content push pulls you clear of the pack.</span>
+            {%- else -%}
+              You're ahead at <strong>{{ w.own_visibility_pct|round|int }}%</strong> vs peers at <strong>{{ w.peer_avg_visibility_pct|round|int }}%</strong>. <span class="quiet">Defend the lead with regular updates and structured schema so AI models keep citing you.</span>
+            {%- endif -%}
+          </p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="who">{{ business_name }}</span>
+    <span>{{ generated_label }}</span>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════════════════
+     PAGE 3 — RECOMMENDATIONS
+     ═════════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="mark">
+      Lumidian<span class="sep">·</span><span class="doc">AI Visibility Audit</span>
+    </div>
+    <div class="meta meta-name">{{ business_name }}</div>
+  </div>
+
+  <div class="page-body">
+    <div class="section" style="margin-top: 0;">
+      <div class="section-head">
+        <div class="section-num">04</div>
+        <div class="section-title">What We'd Do About It</div>
+        <div class="section-tagline">Recommendations, ranked by impact</div>
+      </div>
+
+      {% if recommendations_html %}
+        <div class="recs">{{ recommendations_html|safe }}</div>
+      {% else %}
+        <div class="recs-static">
+          <p>Lumidian closes AI visibility gaps with a recurring monthly playbook:</p>
+          <ul>
+            <li><strong>12+ AI-optimized articles every month</strong> — distributed across LinkedIn, Medium, Reddit, Quora, and X as coordinated content clusters.</li>
+            <li><strong>YouTube video AI-readability optimization</strong> — we restructure descriptions, captions, and chapters so models can extract from your videos.</li>
+            <li><strong>Website AI-readability audit</strong> — a one-time engagement to diagnose schema, structure, and citation surfaces.</li>
+            <li><strong>Live tracking dashboard</strong> across ChatGPT, Claude, Perplexity, and Gemini.</li>
+            <li><strong>Competitor monitoring</strong> — flagged within days when a peer publishes AI-citable content in your category.</li>
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="footer">
+    <span class="who">{{ business_name }}</span>
+    <span>{{ generated_label }}</span>
+  </div>
+</div>
+
+<!-- ═════════════════════════════════════════════════════════════════════════
+     PAGE 4 — NEXT STEP / CTA
+     ═════════════════════════════════════════════════════════════════════════ -->
+<div class="page">
+  <div class="masthead">
+    <div class="mark">
+      Lumidian<span class="sep">·</span><span class="doc">AI Visibility Audit</span>
+    </div>
+    <div class="meta">Next Step</div>
+  </div>
+
+  <div class="page-body">
+    <p class="cta-hook">
+      Ready to close the
+      <span class="accent">{{ missing_pct|round|int }}% gap?</span>
+    </p>
+    <p class="cta-intro">
+      Lumidian is the AI visibility platform — a tracking dashboard, a content-cluster engine, and a site auditor in one. <strong>Run it yourself, or have our team run it for you.</strong> Either way, you turn audits like this one into measurable visibility lift across ChatGPT, Perplexity, and Gemini.
+    </p>
+
+    <div class="cta-two">
+      <div class="cta-col">
+        <h3>How the platform works</h3>
+        <dl>
+          <dt>Live dashboard, not monthly emails.</dt>
+          <dd>Article moves a query, you see it the same week. Competitor publishes, you see it within days.</dd>
+          <dt>Content engineered from your audit data.</dt>
+          <dd>Each piece is briefed from the prompts you're losing and the sources AI models actually cite.</dd>
+          <dt>Coordinated clusters, not one-offs.</dt>
+          <dd>One topic, five surfaces (LinkedIn, Medium, Reddit, Quora, X) — same brief, reinforcing citations.</dd>
+        </dl>
+      </div>
+      <div class="cta-col">
+        <h3>What you'd get</h3>
+        <dl>
+          <dt>12+ AI-optimized articles a month.</dt>
+          <dd>Coordinated as clusters around your highest-priority queries.</dd>
+          <dt>YouTube video optimization.</dt>
+          <dd>Your existing videos restructured so AI models can extract from them.</dd>
+          <dt>Website AI-readability audit.</dt>
+          <dd>One-time engagement covering the highest-impact technical wins on your domain.</dd>
+          <dt>Tracking + competitor alerts.</dt>
+          <dd>Across ChatGPT, Claude, Perplexity, and Gemini.</dd>
+        </dl>
       </div>
     </div>
 
     <div class="cta-action">
-      <div class="ask">Reply to this email to set up a 20-minute call — <strong>or start a self-serve trial below.</strong></div>
-      <div class="links">
-        {% if cta_url %}<div><span class="label">Platform</span><a href="{{ cta_url }}">{{ cta_url }}</a></div>{% endif %}
-        {% if cta_email %}<div><span class="label">Email</span><a href="mailto:{{ cta_email }}">{{ cta_email }}</a></div>{% endif %}
+      <p class="ask">Reply to this email to set up a 20-minute call — <strong>or start a self-serve trial below.</strong></p>
+      <div class="cta-links">
+        {% if cta_url %}
+          <span class="label">Platform</span>
+          <a href="{{ cta_url }}">{{ cta_url }}</a>
+        {% endif %}
+        {% if cta_email %}
+          <span class="label">Email</span>
+          <a href="mailto:{{ cta_email }}">{{ cta_email }}</a>
+        {% endif %}
       </div>
     </div>
   </div>
 
-  <div class="cta-footer">
-    <div><span class="who">Lumidian</span> · AI visibility platform + done-for-you service</div>
-    <div>{{ generated_label }}</div>
+  <div class="footer">
+    <span class="who">Lumidian · AI visibility platform + done-for-you service</span>
+    <span>{{ generated_label }}</span>
   </div>
 </div>
 

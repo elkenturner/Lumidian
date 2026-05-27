@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, TrendingUp, TrendingDown, RefreshCw } from "lucide-react";
+import { ArrowUpRight, MoreHorizontal, RefreshCw } from "lucide-react";
+import { useState } from "react";
 import PlatformBadge from "@/components/PlatformBadge";
 import type { ContentClusterSummary } from "@/lib/api";
 
@@ -31,14 +32,17 @@ const STATUS_LABEL: Record<string, string> = {
 
 export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Props) {
   const totalEnabled = cluster.pieces.length || 5;
-  const completed = cluster.pieces.filter((p) => p.status !== "missing").length;
-  const visibility = Math.round(cluster.visibility_pct);
-  const visibilityTone =
-    visibility >= 60
-      ? "text-[#4ade80]"
-      : visibility >= 30
-      ? "text-[#fbbf24]"
-      : "text-[#fb7185]";
+  const postedCount = cluster.posted_count;
+  const delta = cluster.cluster_delta;
+  const hasDelta = delta !== null && delta !== undefined;
+  const deltaTone = !hasDelta
+    ? "text-[var(--text-faint)]"
+    : delta! >= 0
+    ? "text-[#4ade80]"
+    : "text-[#fb7185]";
+  const deltaLabel = !hasDelta
+    ? "—"
+    : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)}pp`;
   const statusLabel = STATUS_LABEL[cluster.status] ?? cluster.status.replace("_", " ");
 
   return (
@@ -54,9 +58,7 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
               <span className="text-[var(--text-secondary)] font-medium">{statusLabel}</span>
             </span>
             <span className="text-[var(--text-faint)]">·</span>
-            <span>
-              {completed} of {totalEnabled} pieces
-            </span>
+            <span>Posted {postedCount} of {totalEnabled}</span>
             {cluster.pillar_mode === "attached" && (
               <>
                 <span className="text-[var(--text-faint)]">·</span>
@@ -71,13 +73,13 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
             )}
           </div>
         </div>
-        <div className={`shrink-0 flex items-center gap-1 text-xl font-bold ${visibilityTone}`}>
-          {visibility >= 50 ? (
-            <TrendingUp className="h-4 w-4" />
-          ) : (
-            <TrendingDown className="h-4 w-4" />
-          )}
-          {visibility}%
+        <div className="shrink-0 text-right">
+          <div className={`flex items-center justify-end gap-1 text-xl font-bold ${deltaTone}`}>
+            {deltaLabel}
+          </div>
+          <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
+            Cluster lift
+          </div>
         </div>
       </div>
 
@@ -105,16 +107,52 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
         >
           View cluster <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
-        <button
-          type="button"
-          onClick={() => onRegenerate(cluster.id)}
-          disabled={regenerating}
-          className="btn btn-secondary !py-1.5 !px-3 text-xs"
-        >
-          <RefreshCw className={`h-3 w-3 ${regenerating ? "animate-spin" : ""}`} />
-          {regenerating ? "Regenerating…" : "Regenerate"}
-        </button>
+        <ClusterCardKebab
+          regenerating={regenerating}
+          onRegenerate={() => onRegenerate(cluster.id)}
+        />
       </div>
+    </div>
+  );
+}
+
+function ClusterCardKebab({
+  regenerating,
+  onRegenerate,
+}: {
+  regenerating: boolean;
+  onRegenerate: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        aria-label="Cluster actions"
+        onClick={() => setOpen((o) => !o)}
+        className="p-1.5 rounded-md text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-base)]"
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 mt-1 w-56 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] shadow-lg z-10"
+          onMouseLeave={() => setOpen(false)}
+        >
+          <button
+            type="button"
+            disabled={regenerating}
+            onClick={() => {
+              onRegenerate();
+              setOpen(false);
+            }}
+            className="w-full text-left px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-base)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
+            {regenerating ? "Regenerating…" : "Regenerate all pieces"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

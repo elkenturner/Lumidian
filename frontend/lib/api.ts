@@ -241,6 +241,7 @@ export interface ContentDraft {
     title: string | null;
     position_marker: number | null;
   }>;
+  attribution_delta?: number | null;
 }
 
 export interface ContentOpportunity {
@@ -2234,6 +2235,8 @@ export interface ContentClusterSummary {
   pieces: ClusterPieceSummary[];
   version: number;
   last_generated_at: string | null;
+  cluster_delta: number | null;
+  posted_count: number;
 }
 
 export interface ContentClusterDetail {
@@ -2249,6 +2252,8 @@ export interface ContentClusterDetail {
   drafts: ContentDraft[];
   version: number;
   last_generated_at: string | null;
+  cluster_delta: number | null;
+  posted_count: number;
 }
 
 export interface PillarCandidate {

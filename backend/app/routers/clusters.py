@@ -19,6 +19,7 @@ from app.models import (
     ContentClusterSource,
     ContentDraft,
     ContentEvidencePack,
+    DraftAttribution,
     Prompt,
 )
 from app.schemas import (
@@ -81,6 +82,20 @@ async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dic
         drafts = (await db.execute(
             select(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
         )).scalars().all()
+        posted_drafts = [d for d in drafts if d.status == "posted"]
+        posted_count = len(posted_drafts)
+
+        cluster_delta: float | None = None
+        if posted_drafts:
+            attribution_rows = (await db.execute(
+                select(DraftAttribution).where(
+                    DraftAttribution.draft_id.in_([d.id for d in posted_drafts])
+                )
+            )).scalars().all()
+            deltas = [a.delta for a in attribution_rows if a.delta is not None]
+            if deltas:
+                cluster_delta = float(sum(deltas))
+
         out.append({
             "id": cluster.id,
             "brand_id": cluster.brand_id,
@@ -93,6 +108,8 @@ async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dic
             "pieces": _summarize_pieces(drafts),
             "version": cluster.version,
             "last_generated_at": cluster.last_generated_at,
+            "cluster_delta": cluster_delta,
+            "posted_count": posted_count,
         })
     # Sort by visibility ascending (lowest needs most attention)
     out.sort(key=lambda c: c["visibility_pct"])
@@ -117,9 +134,10 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
     )).scalars().all()
     # Per-draft citations — single batched query keyed by draft id.
     from app.models import ContentDraftCitation
+    draft_ids = [d.id for d in drafts] or [-1]
     citation_rows = (await db.execute(
         select(ContentDraftCitation).where(
-            ContentDraftCitation.draft_id.in_([d.id for d in drafts] or [-1])
+            ContentDraftCitation.draft_id.in_(draft_ids)
         )
     )).scalars().all()
     cites_by_draft: dict[int, list] = {}
@@ -130,6 +148,14 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
             "title": c.title,
             "position_marker": c.position_marker,
         })
+
+    # Per-draft attribution — single batched query keyed by draft id.
+    attribution_rows = (await db.execute(
+        select(DraftAttribution).where(
+            DraftAttribution.draft_id.in_(draft_ids)
+        )
+    )).scalars().all()
+    delta_by_draft: dict[int, float | None] = {a.draft_id: a.delta for a in attribution_rows}
 
     drafts_out = []
     for d in drafts:
@@ -147,7 +173,21 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
             "generation_state": d.generation_state,
             "failure_reason": d.failure_reason,
             "citations": cites_by_draft.get(d.id, []),
+            "attribution_delta": delta_by_draft.get(d.id),
         })
+
+    # Aggregate cluster-level attribution from posted drafts only.
+    posted_drafts = [d for d in drafts if d.status == "posted"]
+    posted_count = len(posted_drafts)
+    cluster_delta: float | None = None
+    if posted_drafts:
+        posted_deltas = [
+            delta_by_draft[d.id]
+            for d in posted_drafts
+            if delta_by_draft.get(d.id) is not None
+        ]
+        if posted_deltas:
+            cluster_delta = float(sum(posted_deltas))
 
     return {
         "id": cluster.id,
@@ -162,6 +202,8 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
         "drafts": drafts_out,
         "version": cluster.version,
         "last_generated_at": cluster.last_generated_at,
+        "cluster_delta": cluster_delta,
+        "posted_count": posted_count,
     }
 
 

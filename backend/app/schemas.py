@@ -1371,6 +1371,9 @@ class ContentClusterSummary(BaseModel):
     pieces: list[ClusterPieceSummary]
     version: int
     last_generated_at: datetime | None
+    # New: cluster-effect signal aggregated from DraftAttribution rows
+    cluster_delta: float | None  # sum of delta across posted pieces with attribution; None if no posted attribution data
+    posted_count: int  # count of pieces with status='posted' in this cluster
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1399,6 +1402,8 @@ class ContentClusterDraft(BaseModel):
     generation_state: str = "done"
     failure_reason: str | None = None
     citations: list[ContentDraftCitationSchema] = []
+    # Per-piece attribution lift (DraftAttribution.delta if a row exists)
+    attribution_delta: float | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1417,6 +1422,9 @@ class ContentClusterDetail(BaseModel):
     drafts: list[ContentClusterDraft]
     version: int
     last_generated_at: datetime | None
+    # Mirrors ContentClusterSummary
+    cluster_delta: float | None
+    posted_count: int
 
     model_config = ConfigDict(from_attributes=True)
 

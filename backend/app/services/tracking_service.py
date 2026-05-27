@@ -201,7 +201,7 @@ async def run_tracking(
     # Extract values as plain Python types while the session is open, so we
     # never access SQLAlchemy-managed attributes on detached objects later.
     brand_name: str = ""
-    is_paid: bool = False   # True for any paid tier (Starter/Growth/Pro) — gates ChatGPT search + sonar-pro
+    is_paid: bool = False   # True for any paid tier or agency brand — gates ChatGPT search + sonar-pro
     prompt_data: list[tuple[int, str]] = []  # (prompt_id, prompt_text)
     run_id: int = 0
 

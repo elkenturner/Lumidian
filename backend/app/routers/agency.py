@@ -1321,3 +1321,53 @@ async def list_client_milestones(
     for kind in MILESTONE_KINDS:
         out.append(await _milestone_to_out(db, existing[kind]))
     return out
+
+
+@router.patch(
+    "/clients/{client_id}/milestones/{kind}",
+    response_model=AgencyClientMilestoneOut,
+)
+async def update_client_milestone(
+    client_id: int,
+    kind: str,
+    body: AgencyClientMilestoneUpdate,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_client_access),
+) -> AgencyClientMilestoneOut:
+    if kind not in MILESTONE_KINDS:
+        raise HTTPException(status_code=422, detail=f"Unknown milestone kind: {kind}")
+    if body.status is not None and body.status not in MILESTONE_STATUSES:
+        raise HTTPException(status_code=422, detail=f"Unknown status: {body.status}")
+
+    row_q = await db.execute(
+        select(AgencyClientMilestone)
+        .where(
+            AgencyClientMilestone.agency_client_id == client_id,
+            AgencyClientMilestone.kind == kind,
+        )
+    )
+    row = row_q.scalar_one_or_none()
+    if row is None:
+        row = AgencyClientMilestone(agency_client_id=client_id, kind=kind, status="not_started")
+        db.add(row)
+        await db.flush()
+
+    prev_status = row.status
+    if body.status is not None:
+        row.status = body.status
+        if body.status == "done" and prev_status != "done":
+            row.completed_at = datetime.utcnow()
+            row.completed_by = user.id
+        elif body.status != "done" and prev_status == "done":
+            row.completed_at = None
+            row.completed_by = None
+    if body.started_at is not None:
+        row.started_at = body.started_at
+    if body.target_at is not None:
+        row.target_at = body.target_at
+    if body.notes is not None:
+        row.notes = body.notes
+
+    await db.commit()
+    await db.refresh(row)
+    return await _milestone_to_out(db, row)

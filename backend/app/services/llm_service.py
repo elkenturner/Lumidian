@@ -593,6 +593,30 @@ _MAX_ATTEMPTS: dict[str, int] = {
 }
 _DEFAULT_MAX_ATTEMPTS = 3
 
+# Per-model retry budgets for AGENCY runs. Bumped higher than SaaS budgets
+# because agency runs sustain 50+ calls per model over 20-30 minutes — a
+# provider outage of 5-7 minutes can otherwise cause multiple individual
+# calls to each exhaust their SaaS budget, partially nuking that model's
+# contribution to the run.
+_AGENCY_MAX_ATTEMPTS: dict[str, int] = {
+    "perplexity": 7,
+    "gemini": 7,
+    "claude": 9,
+}
+_AGENCY_DEFAULT_MAX_ATTEMPTS = 5
+
+
+def max_attempts_for(model_key: str, brand_type: str) -> int:
+    """Return the per-call retry budget for this model + brand_type combo.
+
+    Agency brands get higher budgets (see _AGENCY_MAX_ATTEMPTS) because a single
+    agency tracking run sustains far more calls per model than SaaS runs.
+    """
+    if brand_type == "agency":
+        return _AGENCY_MAX_ATTEMPTS.get(model_key, _AGENCY_DEFAULT_MAX_ATTEMPTS)
+    return _MAX_ATTEMPTS.get(model_key, _DEFAULT_MAX_ATTEMPTS)
+
+
 # Per-model base delay for `overload` error backoff (exponential, jittered).
 # Gemini needs a longer base because Google's high-demand spikes take tens of
 # seconds to clear; other providers usually recover within 5s. Claude 529s also
@@ -718,7 +742,7 @@ async def _with_retry(handler, prompt: str, brand_name: str, model_key: str, max
     }
 
 
-async def query_model(model: str, prompt: str, brand_name: str, pro: bool = False, cancel_event: asyncio.Event | None = None) -> dict:
+async def query_model(model: str, prompt: str, brand_name: str, *, pro: bool = False, brand_type: str = "standard", cancel_event: asyncio.Event | None = None) -> dict:
     """
     Query a single LLM model with the given prompt.
 
@@ -727,6 +751,8 @@ async def query_model(model: str, prompt: str, brand_name: str, pro: bool = Fals
         prompt:     The text prompt to send.
         brand_name: The brand name to check for in the response.
         pro:        Whether the user has a Pro subscription (selects upgraded models).
+        brand_type: Brand type string ('standard', 'agency', 'pitch', etc.); used to
+                    select the per-call retry budget via max_attempts_for().
         cancel_event: Optional asyncio.Event; if set, retries stop immediately.
 
     Returns:
@@ -747,4 +773,4 @@ async def query_model(model: str, prompt: str, brand_name: str, pro: bool = Fals
         }
 
     model_version = _get_model_version(model, pro)
-    return await _with_retry(handler, prompt, brand_name, model, model_version=model_version, cancel_event=cancel_event)
+    return await _with_retry(handler, prompt, brand_name, model, max_attempts=max_attempts_for(model, brand_type), model_version=model_version, cancel_event=cancel_event)

@@ -763,7 +763,7 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
         )
         prompt_count = prompt_count_result.scalar_one() or 1
 
-        from app.services.llm_service import RUNS_PER_PROMPT, models_for_tier
+        from app.services.llm_service import runs_per_prompt_for_brand, models_for_tier
         # Look up the brand owner's tier so stale-run threshold reflects
         # the actual model count for this run.
         tier = None
@@ -772,7 +772,8 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
             user = await db.get(User, brand.user_id)
             tier = user.subscription_tier if user else None
         model_count = len(models_for_tier(brand.brand_type, tier)) if brand else 4
-        total_queries = prompt_count * model_count * RUNS_PER_PROMPT
+        runs_per_prompt = runs_per_prompt_for_brand(brand.brand_type) if brand else 3
+        total_queries = prompt_count * model_count * runs_per_prompt
         # ~8 effective concurrent queries, ~3s each
         est_minutes = (total_queries / 8 * 3) / 60
         max_age_minutes = max(15, int(est_minutes * 2))

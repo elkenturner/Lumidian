@@ -107,7 +107,7 @@ async def test_agency_tracking_run_uses_4_models_and_5_runs(client, monkeypatch)
     # Stub query_model so we don't hit real LLM APIs.
     captured_calls: list[dict] = []
 
-    async def fake_query_model(model, prompt, brand_name, *, pro: bool = False, cancel_event=None):
+    async def fake_query_model(model, prompt, brand_name, *, pro: bool = False, brand_type: str = "standard", cancel_event=None):
         captured_calls.append({"model": model, "pro": pro})
         return {
             "response_text": f"sample response mentioning {brand_name}",
@@ -157,3 +157,20 @@ async def test_agency_tracking_run_uses_4_models_and_5_runs(client, monkeypatch)
     assert all(c["pro"] is True for c in captured_calls), (
         f"Expected pro=True on every call, got {[c for c in captured_calls if not c['pro']]}"
     )
+
+
+def test_max_attempts_for_agency_vs_standard():
+    """Agency brands get higher per-call retry budgets than standard brands."""
+    from app.services.llm_service import max_attempts_for
+
+    # Agency budgets are strictly higher than standard for the three rate-limited models.
+    assert max_attempts_for("claude", "agency") > max_attempts_for("claude", "standard")
+    assert max_attempts_for("perplexity", "agency") > max_attempts_for("perplexity", "standard")
+    assert max_attempts_for("gemini", "agency") > max_attempts_for("gemini", "standard")
+    # Specific values (locks in the contract documented in llm_service):
+    assert max_attempts_for("claude", "agency") == 9
+    assert max_attempts_for("perplexity", "agency") == 7
+    assert max_attempts_for("gemini", "agency") == 7
+    # Unknown model falls back to the default for that brand_type.
+    assert max_attempts_for("unknown-model", "agency") == 5
+    assert max_attempts_for("unknown-model", "standard") == 3

@@ -268,7 +268,7 @@ async def run_tracking(
         run_number: int,
     ) -> QueryResult:
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_paid, cancel_event=cancel_evt)
+            result = await query_model(model, prompt_text, brand_name, pro=is_paid, brand_type=brand_type, cancel_event=cancel_evt)
         response_text = result.get("response_text")
         error = result.get("error")
 

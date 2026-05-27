@@ -392,7 +392,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
 
     async def _bounded_query(prompt_id: int, prompt_text: str, model: str, run_number: int):
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_paid, cancel_event=cancel_evt)
+            result = await query_model(model, prompt_text, brand_name, pro=is_paid, brand_type=brand_type, cancel_event=cancel_evt)
         return QueryResult(
             tracking_run_id=run_id,
             prompt_id=prompt_id,
@@ -737,7 +737,7 @@ async def _background_prompt_run(
 
     async def _bounded_query(model: str, run_number: int):
         async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_paid)
+            result = await query_model(model, prompt_text, brand_name, pro=is_paid, brand_type=brand_type)
         return QueryResult(
             tracking_run_id=run_id,
             prompt_id=prompt_id,

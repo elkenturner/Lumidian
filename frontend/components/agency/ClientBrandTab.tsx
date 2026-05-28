@@ -12,10 +12,12 @@ import {
   type BrandProfile,
 } from '@/lib/api';
 import ClientProposalForm from './ClientProposalForm';
+import { DocumentList } from './DocumentList';
 
 interface Props {
   brandId: number | null;
   client?: AgencyClient;
+  clientId: number;
 }
 
 const linesToArray = (s: string): string[] =>
@@ -24,7 +26,7 @@ const linesToArray = (s: string): string[] =>
 const arrayToLines = (xs: string[] | null | undefined): string =>
   Array.isArray(xs) ? xs.join('\n') : '';
 
-export function ClientBrandTab({ brandId, client }: Props) {
+export function ClientBrandTab({ brandId, client, clientId }: Props) {
   const [profile, setProfile] = useState<BrandProfile | null>(null);
   const [brand, setBrand] = useState<BrandDetail | null>(null);
   const [newPrompt, setNewPrompt] = useState('');
@@ -230,6 +232,9 @@ export function ClientBrandTab({ brandId, client }: Props) {
         </div>
       </section>
     </div>
+      <div className="mt-8">
+        <DocumentList clientId={clientId} />
+      </div>
     </div>
   );
 }

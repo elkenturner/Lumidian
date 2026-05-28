@@ -91,9 +91,9 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
                   maxLength={200}
                   required
                   className="w-full px-3 py-2.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] rounded-lg outline-none transition-colors"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--bg-tinted-hover)' }}
                   onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(95,126,166,0.50)'; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--bg-tinted-hover)'; }}
                 />
               </div>
               <div>
@@ -106,9 +106,9 @@ export default function SupportPanel({ panelLeft, onClose }: SupportPanelProps) 
                   required
                   rows={5}
                   className="w-full px-3 py-2.5 text-xs text-[var(--text-primary)] placeholder-[var(--text-faint)] rounded-lg outline-none transition-colors resize-none"
-                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.10)' }}
+                  style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--bg-tinted-hover)' }}
                   onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(95,126,166,0.50)'; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.10)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--bg-tinted-hover)'; }}
                 />
               </div>
               {error && <p className="text-[11px] text-[var(--danger)]">{error}</p>}

@@ -160,7 +160,7 @@ const DRAFT_PLATFORM_ITEMS = [
   { key: 'reddit', label: 'Reddit', color: '#ff4500' },
   { key: 'quora', label: 'Quora', color: '#b92b27' },
   { key: 'medium', label: 'Medium', color: '#00ab6c' },
-  { key: 'wikipedia', label: 'Wikipedia', color: '#94a3b8' },
+  { key: 'wikipedia', label: 'Wikipedia', color: 'var(--text-secondary)' },
   { key: 'linkedin', label: 'LinkedIn', color: '#0a66c2', paidOnly: true },
   { key: 'x', label: 'X', color: '#e7e9ea', paidOnly: true },
 ] as const;
@@ -431,7 +431,7 @@ function MobileHeader({
           background: 'rgba(8,12,20,0.97)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          borderBottom: '1px solid var(--border-faint)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -490,7 +490,7 @@ function MobileHeader({
               width: 32,
               height: 32,
               borderRadius: 8,
-              background: notifOpen ? 'rgba(255,255,255,0.08)' : 'none',
+              background: notifOpen ? 'var(--border-faint)' : 'none',
               border: 'none',
               cursor: 'pointer',
               color: 'var(--text-muted)',
@@ -615,7 +615,7 @@ function BrandSwitcherSheet({
           WebkitBackdropFilter: 'blur(24px)',
           borderTopLeftRadius: 20,
           borderTopRightRadius: 20,
-          border: '1px solid rgba(255,255,255,0.08)',
+          border: '1px solid var(--border-faint)',
           borderBottom: 'none',
           display: 'flex',
           flexDirection: 'column',
@@ -640,7 +640,7 @@ function BrandSwitcherSheet({
         </div>
 
         {/* Brand list */}
-        <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 8, scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+        <div style={{ overflowY: 'auto', flex: 1, paddingBottom: 8, scrollbarWidth: 'thin', scrollbarColor: 'var(--border-faint) transparent' }}>
           {brands.map((brand) => {
             const isActive = brand.id === activeBrandId;
             return (
@@ -706,7 +706,7 @@ function BrandSwitcherSheet({
             gap: 10,
             height: 48,
             padding: '0 16px',
-            borderTop: '1px solid rgba(255,255,255,0.06)',
+            borderTop: '1px solid var(--bg-tinted)',
             color: 'var(--accent-light)',
             fontSize: 13,
             fontWeight: 500,
@@ -843,7 +843,7 @@ function AppShellInner({
             background: 'rgba(8,12,20,0.97)',
             backdropFilter: 'blur(24px)',
             WebkitBackdropFilter: 'blur(24px)',
-            borderTop: '1px solid rgba(255,255,255,0.08)',
+            borderTop: '1px solid var(--border-faint)',
             display: 'flex',
             alignItems: 'stretch',
             justifyContent: 'space-around',

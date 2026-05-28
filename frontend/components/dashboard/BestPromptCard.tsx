@@ -75,8 +75,8 @@ export default function BestPromptCard({ responses, loading }: BestPromptCardPro
       </p>
       {loading ? (
         <div className="space-y-2 flex-1">
-          <div className="h-3 w-full bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />
-          <div className="h-3 w-2/3 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />
+          <div className="h-3 w-full bg-[var(--bg-tinted)] rounded animate-pulse" />
+          <div className="h-3 w-2/3 bg-[var(--bg-tinted)] rounded animate-pulse" />
         </div>
       ) : best ? (
         <>

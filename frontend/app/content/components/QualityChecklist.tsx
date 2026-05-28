@@ -253,10 +253,10 @@ export function QualityChecklist({
     : hardFails >= 2 ? 'text-[var(--danger)]' : 'text-[var(--warning)]';
 
   return (
-    <div className="border border-[rgba(255,255,255,0.10)] rounded-lg overflow-hidden">
+    <div className="border border-[var(--bg-tinted-hover)] rounded-lg overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(95,126,166,0.06)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(95,126,166,0.06)] hover:bg-[var(--bg-tinted)] transition-colors"
       >
         <div className="flex items-center gap-2">
           <span className={`text-xs font-semibold font-mono ${scoreColor}`}>

@@ -68,7 +68,7 @@ export function CompetitiveGapDrawer({
                   className={`px-2 py-0.5 rounded text-[10px] tabular-nums transition-colors ${
                     w === window
                       ? 'bg-[var(--accent)] text-white'
-                      : 'bg-[rgba(255,255,255,0.06)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                      : 'bg-[var(--bg-tinted)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                   }`}
                 >
                   {w}

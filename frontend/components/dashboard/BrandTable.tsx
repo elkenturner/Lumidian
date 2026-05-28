@@ -38,7 +38,7 @@ export default function BrandTable({
           <MessageSquare size={16} className="text-[var(--accent)]" />
           <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Recent Conversations</h3>
           {analytics && (
-            <span className="text-xs text-[var(--text-muted)] bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] px-2 py-0.5 rounded-full">
+            <span className="text-xs text-[var(--text-muted)] bg-[var(--bg-tinted)] border border-[var(--bg-tinted-hover)] px-2 py-0.5 rounded-full">
               {analytics.total_responses_analyzed.toLocaleString()} analyzed
             </span>
           )}
@@ -81,13 +81,13 @@ export default function BrandTable({
           {[1,2,3,4].map(i => (
             <div key={i} className="px-5 py-4 animate-pulse">
               <div className="flex items-center justify-between mb-2">
-                <div className="h-3.5 bg-[rgba(255,255,255,0.06)] rounded w-2/5" />
+                <div className="h-3.5 bg-[var(--bg-tinted)] rounded w-2/5" />
                 <div className="flex gap-2">
-                  <div className="w-16 h-5 bg-[rgba(255,255,255,0.06)] rounded" />
-                  <div className="w-20 h-5 bg-[rgba(255,255,255,0.06)] rounded" />
+                  <div className="w-16 h-5 bg-[var(--bg-tinted)] rounded" />
+                  <div className="w-20 h-5 bg-[var(--bg-tinted)] rounded" />
                 </div>
               </div>
-              <div className="h-3 bg-[rgba(255,255,255,0.06)] rounded w-4/5" />
+              <div className="h-3 bg-[var(--bg-tinted)] rounded w-4/5" />
             </div>
           ))}
         </div>

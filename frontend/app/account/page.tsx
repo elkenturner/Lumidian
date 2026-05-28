@@ -36,9 +36,9 @@ function StatusPill({ status }: { status: string | null }) {
     canceling: { label: 'Canceling',  cls: 'bg-amber-500/15 text-amber-400 border-amber-500/25' },
     past_due:  { label: 'Past due',   cls: 'bg-red-500/15 text-red-400 border-red-500/25' },
     unpaid:    { label: 'Unpaid',     cls: 'bg-red-500/15 text-red-400 border-red-500/25' },
-    canceled:  { label: 'Canceled',   cls: 'bg-[rgba(255,255,255,0.06)] text-[var(--text-muted)] border-[rgba(255,255,255,0.10)]' },
+    canceled:  { label: 'Canceled',   cls: 'bg-[var(--bg-tinted)] text-[var(--text-muted)] border-[var(--bg-tinted-hover)]' },
   };
-  const s = map[status] ?? { label: status, cls: 'bg-[rgba(255,255,255,0.06)] text-[var(--text-muted)] border-[rgba(255,255,255,0.10)]' };
+  const s = map[status] ?? { label: status, cls: 'bg-[var(--bg-tinted)] text-[var(--text-muted)] border-[var(--bg-tinted-hover)]' };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${s.cls}`}>
       {s.label}
@@ -224,14 +224,14 @@ export default function AccountPage() {
                     value={currentPw}
                     onChange={(e) => setCurrentPw(e.target.value)}
                     placeholder="Current password"
-                    className="mobile-input w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[var(--accent)] placeholder-[var(--text-faint)]"
+                    className="mobile-input w-full bg-[rgba(255,255,255,0.04)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[var(--accent)] placeholder-[var(--text-faint)]"
                   />
                   <input
                     type="password"
                     value={newPw}
                     onChange={(e) => setNewPw(e.target.value)}
                     placeholder="New password (min 8 chars)"
-                    className="mobile-input w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[var(--accent)] placeholder-[var(--text-faint)]"
+                    className="mobile-input w-full bg-[rgba(255,255,255,0.04)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] text-xs rounded-lg px-3 py-2 focus:outline-none focus:border-[var(--accent)] placeholder-[var(--text-faint)]"
                   />
                   {pwMsg && (
                     <p className={`text-[11px] ${pwMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>{pwMsg.text}</p>
@@ -305,7 +305,7 @@ export default function AccountPage() {
                   value={deleteInput}
                   onChange={(e) => setDeleteInput(e.target.value)}
                   placeholder="DELETE"
-                  className="mobile-input w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] text-xs rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-[rgba(255,255,255,0.20)] placeholder-[var(--text-faint)]"
+                  className="mobile-input w-full bg-[rgba(255,255,255,0.04)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] text-xs rounded-lg px-3 py-2 mb-2 focus:outline-none focus:border-[rgba(255,255,255,0.20)] placeholder-[var(--text-faint)]"
                 />
                 <div className="flex gap-2">
                   <button

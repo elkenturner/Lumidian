@@ -56,7 +56,7 @@ export default function HelpTooltip({ text, href, linkText = 'Learn more' }: Hel
     >
       <span
         onClick={handleClick}
-        className="w-4 h-4 rounded-full bg-[rgba(255,255,255,0.06)] border border-[rgba(255,255,255,0.10)] text-[var(--text-faint)] text-[10px] font-bold flex items-center justify-center cursor-help select-none"
+        className="w-4 h-4 rounded-full bg-[var(--bg-tinted)] border border-[var(--bg-tinted-hover)] text-[var(--text-faint)] text-[10px] font-bold flex items-center justify-center cursor-help select-none"
       >
         ?
       </span>

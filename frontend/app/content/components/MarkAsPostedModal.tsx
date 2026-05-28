@@ -83,7 +83,7 @@ export function MarkAsPostedModal({
               if (!submitting) onClose();
             }}
             aria-label="Close"
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors shrink-0"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tinted)] transition-colors shrink-0"
           >
             <X size={14} aria-hidden="true" />
           </button>
@@ -105,7 +105,7 @@ export function MarkAsPostedModal({
           <button
             onClick={handleSkip}
             disabled={submitting}
-            className="flex-1 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.08)] rounded-lg px-4 py-2 transition-colors disabled:opacity-50"
+            className="flex-1 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[rgba(255,255,255,0.04)] hover:bg-[var(--border-faint)] border border-[var(--border-faint)] rounded-lg px-4 py-2 transition-colors disabled:opacity-50"
           >
             Skip — post without attaching
           </button>

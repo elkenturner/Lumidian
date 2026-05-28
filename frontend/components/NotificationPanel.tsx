@@ -95,7 +95,7 @@ export default function NotificationPanel({
       </div>
 
       {/* List */}
-      <div className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+      <div className="overflow-y-auto flex-1" style={{ scrollbarWidth: 'thin', scrollbarColor: 'var(--border-faint) transparent' }}>
         {notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 gap-3">
             <div

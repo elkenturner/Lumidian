@@ -10,7 +10,7 @@ const badgeVariants = cva(
         default:
           "border-[rgba(95,126,166,0.30)] bg-[rgba(95,126,166,0.12)] text-[var(--accent-light)]",
         secondary:
-          "border-[rgba(255,255,255,0.10)] bg-[rgba(255,255,255,0.06)] text-[var(--text-muted)]",
+          "border-[var(--bg-tinted-hover)] bg-[var(--bg-tinted)] text-[var(--text-muted)]",
         destructive:
           "border-[rgba(153,27,27,0.30)] bg-[rgba(127,29,29,0.20)] text-[var(--danger-text)]",
         success:

@@ -73,7 +73,7 @@ export default function VerifyEmailPage() {
   if (!email) return null;
 
   return (
-    <div className="relative min-h-screen bg-[#020617] text-[#f8fafc] flex items-center justify-center p-4 md:p-6 overflow-hidden">
+    <div className="relative min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex items-center justify-center p-4 md:p-6 overflow-hidden">
       {/* Background gradient */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -89,20 +89,20 @@ export default function VerifyEmailPage() {
         </div>
 
         {/* Card */}
-        <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-6 md:p-8">
+        <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-2xl p-6 md:p-8">
           {verified ? (
             <>
-              <h1 className="text-2xl font-bold text-[#f8fafc] mb-1">Email verified</h1>
-              <p className="text-sm text-[#94a3b8]">
+              <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Email verified</h1>
+              <p className="text-sm text-[var(--text-secondary)]">
                 Redirecting you to your dashboard...
               </p>
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-bold text-[#f8fafc] mb-1">Check your email</h1>
-              <p className="text-sm text-[#94a3b8] mb-6">
+              <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Check your email</h1>
+              <p className="text-sm text-[var(--text-secondary)] mb-6">
                 We sent an 8-digit code to{' '}
-                <strong className="text-[#f8fafc]">{email}</strong>.
+                <strong className="text-[var(--text-primary)]">{email}</strong>.
                 Enter it below to verify your account.
               </p>
 
@@ -120,7 +120,7 @@ export default function VerifyEmailPage() {
 
               <form onSubmit={handleSubmit} className="flex flex-col gap-5">
                 <div>
-                  <label htmlFor="verification-code" className="block text-sm font-medium text-[#94a3b8] mb-2">
+                  <label htmlFor="verification-code" className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
                     Verification code
                   </label>
                   <input
@@ -132,26 +132,26 @@ export default function VerifyEmailPage() {
                     onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
                     placeholder="00000000"
                     autoFocus
-                    className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 text-3xl md:text-2xl text-center font-mono tracking-[0.3em] text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#5f7ea6] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
+                    className="w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-lg px-3 py-2.5 text-3xl md:text-2xl text-center font-mono tracking-[0.3em] text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={loading || code.length !== 8}
-                  className="w-full flex items-center justify-center gap-2 bg-[#5f7ea6] hover:bg-[#4a6a90] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 transition-colors min-h-[48px]"
+                  className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 transition-colors min-h-[48px]"
                 >
                   {loading && <Loader2 size={15} className="animate-spin" />}
                   {loading ? 'Verifying…' : 'Verify email'}
                 </button>
               </form>
 
-              <p className="text-sm text-[#64748b] text-center mt-5">
+              <p className="text-sm text-[var(--text-muted)] text-center mt-5">
                 Didn&apos;t receive a code?{' '}
                 <button
                   onClick={handleResend}
                   disabled={resending}
-                  className="text-[#5f7ea6] hover:text-[#8ba8cc] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="text-[var(--accent)] hover:text-[#8ba8cc] font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {resending ? 'Sending…' : 'Resend code'}
                 </button>
@@ -163,7 +163,7 @@ export default function VerifyEmailPage() {
         {!verified && (
           <button
             onClick={() => router.push('/register')}
-            className="flex items-center justify-center gap-1.5 mx-auto mt-6 text-sm text-[#64748b] hover:text-[#94a3b8] transition-colors"
+            className="flex items-center justify-center gap-1.5 mx-auto mt-6 text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
           >
             <ArrowLeft size={14} />
             Back to sign up

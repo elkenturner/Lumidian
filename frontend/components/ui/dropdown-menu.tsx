@@ -16,7 +16,7 @@ function DropdownMenuSubTrigger({ className, inset, children, ...props }: React.
   return (
     <DropdownMenuPrimitive.SubTrigger
       className={cn(
-        "flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--text-secondary)] outline-none focus:bg-[rgba(255,255,255,0.06)] data-[state=open]:bg-[rgba(255,255,255,0.06)]",
+        "flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm text-[var(--text-secondary)] outline-none focus:bg-[var(--bg-tinted)] data-[state=open]:bg-[var(--bg-tinted)]",
         inset && "pl-8",
         className
       )}
@@ -62,7 +62,7 @@ function DropdownMenuItem({ className, inset, variant = "default", ...props }: R
   return (
     <DropdownMenuPrimitive.Item
       className={cn(
-        "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors focus:bg-[rgba(255,255,255,0.06)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center gap-2 rounded-md px-2 py-1.5 text-sm outline-none transition-colors focus:bg-[var(--bg-tinted)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         variant === "default" ? "text-[var(--text-secondary)] focus:text-[var(--text-primary)]" : "text-[var(--danger)] focus:text-[var(--danger-text)] focus:bg-[rgba(127,29,29,0.20)]",
         inset && "pl-8",
         className
@@ -76,7 +76,7 @@ function DropdownMenuCheckboxItem({ className, children, checked, ...props }: Re
   return (
     <DropdownMenuPrimitive.CheckboxItem
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm text-[var(--text-secondary)] outline-none transition-colors focus:bg-[rgba(255,255,255,0.06)] focus:text-[var(--text-primary)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm text-[var(--text-secondary)] outline-none transition-colors focus:bg-[var(--bg-tinted)] focus:text-[var(--text-primary)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className
       )}
       checked={checked}
@@ -96,7 +96,7 @@ function DropdownMenuRadioItem({ className, children, ...props }: React.Componen
   return (
     <DropdownMenuPrimitive.RadioItem
       className={cn(
-        "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm text-[var(--text-secondary)] outline-none transition-colors focus:bg-[rgba(255,255,255,0.06)] focus:text-[var(--text-primary)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex cursor-default select-none items-center rounded-md py-1.5 pl-8 pr-2 text-sm text-[var(--text-secondary)] outline-none transition-colors focus:bg-[var(--bg-tinted)] focus:text-[var(--text-primary)] data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className
       )}
       {...props}

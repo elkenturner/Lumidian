@@ -766,12 +766,12 @@ export default function DashboardPage() {
                         Sentiment
                         <HelpTooltip text="How positively AI models describe your brand when they mention it." />
                       </p>
-                      <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] flex items-center justify-center text-[var(--accent)] flex-shrink-0">
+                      <div className="w-8 h-8 rounded-lg bg-[var(--bg-tinted)] flex items-center justify-center text-[var(--accent)] flex-shrink-0">
                         <TrendingUp size={15} />
                       </div>
                     </div>
                     {loadingAnalytics ? (
-                      <div className="h-8 w-16 bg-[rgba(255,255,255,0.06)] rounded animate-pulse mt-1" />
+                      <div className="h-8 w-16 bg-[var(--bg-tinted)] rounded animate-pulse mt-1" />
                     ) : sentData?.has_data && sentHeadline ? (
                       <>
                         <p className="text-2xl font-bold mt-1" style={{ color: sentColor }}>
@@ -805,7 +805,7 @@ export default function DashboardPage() {
                     <button
                       onClick={() => setCompetitorModalOpen(true)}
                       aria-label="Manage competitors"
-                      className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] bg-[rgba(255,255,255,0.06)] hover:bg-[var(--accent-muted)] border border-[rgba(255,255,255,0.08)] rounded-lg px-2.5 py-1.5 transition-colors"
+                      className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] bg-[var(--bg-tinted)] hover:bg-[var(--accent-muted)] border border-[var(--border-faint)] rounded-lg px-2.5 py-1.5 transition-colors"
                     >
                       <Users size={12} />
                       {analytics?.sov.has_competitors ? 'Manage' : 'Add competitors'}
@@ -813,7 +813,7 @@ export default function DashboardPage() {
                   </div>
                   {loadingAnalytics ? (
                     <div className="flex gap-3">
-                      {[1, 2, 3].map(i => <div key={i} className="h-4 flex-1 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
+                      {[1, 2, 3].map(i => <div key={i} className="h-4 flex-1 bg-[var(--bg-tinted)] rounded animate-pulse" />)}
                     </div>
                   ) : !analytics?.sov.has_competitors ? (
                     <p className="text-xs text-[var(--text-faint)]">
@@ -848,7 +848,7 @@ export default function DashboardPage() {
                                 <span className={`text-xs font-medium truncate ${s.is_primary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{s.name}</span>
                                 <span className="text-xs font-semibold tabular-nums ml-2 flex-shrink-0" style={{ color: textColor }}>{pct}%</span>
                               </div>
-                              <div className="h-1.5 rounded-full bg-[rgba(255,255,255,0.06)] overflow-hidden">
+                              <div className="h-1.5 rounded-full bg-[var(--bg-tinted)] overflow-hidden">
                                 <div
                                   className="h-full rounded-full transition-[width] duration-500"
                                   style={{ width: `${pct}%`, background: barColor }}
@@ -881,12 +881,12 @@ export default function DashboardPage() {
                       Avg Position
                       <HelpTooltip text="Position indicates where in the AI response your brand typically appears. Earlier is better." />
                     </p>
-                    <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] flex items-center justify-center text-[var(--accent)]">
+                    <div className="w-8 h-8 rounded-lg bg-[var(--bg-tinted)] flex items-center justify-center text-[var(--accent)]">
                       <Building2 size={15} />
                     </div>
                   </div>
                   {loadingAnalytics ? (
-                    <div className="h-8 w-16 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />
+                    <div className="h-8 w-16 bg-[var(--bg-tinted)] rounded animate-pulse" />
                   ) : analytics?.position.score != null ? (
                     <>
                       <p className="text-3xl font-bold text-[var(--text-primary)]">
@@ -920,7 +920,7 @@ export default function DashboardPage() {
                   </div>
                   {loadingAnalytics ? (
                     <div className="flex items-center justify-center flex-1 py-4">
-                      <div className="w-24 h-24 rounded-full bg-[rgba(255,255,255,0.06)] animate-pulse" />
+                      <div className="w-24 h-24 rounded-full bg-[var(--bg-tinted)] animate-pulse" />
                     </div>
                   ) : analytics && analytics.top_domains.length > 0 ? (
                     <DonutDomains domains={analytics.top_domains.slice(0, 6)} />
@@ -945,7 +945,7 @@ export default function DashboardPage() {
                   </div>
                   {loadingAnalytics ? (
                     <div className="space-y-3">
-                      {[1,2,3,4].map(i => <div key={i} className="h-6 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />)}
+                      {[1,2,3,4].map(i => <div key={i} className="h-6 bg-[var(--bg-tinted)] rounded animate-pulse" />)}
                     </div>
                   ) : (
                     <DashboardModelBreakdown

@@ -8,6 +8,7 @@ import {
   RefreshCw,
   RotateCw,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   getCluster,
   proposeClusterPillar,
@@ -199,11 +200,11 @@ export default function ClusterDetailPage() {
             )}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
+            <Button
+              size="sm"
               onClick={onRegeneratePieces}
               disabled={isActive || regenAction !== null}
-              className="btn btn-primary !py-1.5 text-xs inline-flex items-center gap-1.5"
+              className="gap-1.5"
               title="Reuse the current brief and evidence pack; rewrite all 5 pieces"
             >
               {regenAction === "pieces" ? (
@@ -212,12 +213,13 @@ export default function ClusterDetailPage() {
                 <RefreshCw className="h-3 w-3" />
               )}
               Regenerate pieces
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={onRebuild}
               disabled={isActive || regenAction !== null}
-              className="btn btn-secondary !py-1.5 text-xs inline-flex items-center gap-1.5"
+              className="gap-1.5"
               title="Re-run the brief LLM, rebuild the evidence pack, then rewrite all 5 pieces"
             >
               {regenAction === "rebuild" ? (
@@ -226,7 +228,7 @@ export default function ClusterDetailPage() {
                 <RotateCw className="h-3 w-3" />
               )}
               Rebuild brief &amp; pieces
-            </button>
+            </Button>
           </div>
         </div>
         <div className="shrink-0 text-right">

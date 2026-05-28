@@ -38,7 +38,7 @@ function StatusBadge({ status }: { status: string }) {
     failed:    'bg-red-500/15 text-red-400 border-red-500/30',
   };
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${styles[status] ?? 'bg-[rgba(255,255,255,0.06)] text-[var(--text-secondary)] border-[var(--border-subtle)]'}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border ${styles[status] ?? 'bg-[var(--bg-tinted)] text-[var(--text-secondary)] border-[var(--border-subtle)]'}`}>
       {status}
     </span>
   );
@@ -50,8 +50,8 @@ function TierBadge({ tier }: { tier: string | null }) {
   const cls = tier === 'pro'
     ? 'bg-[var(--accent)]/20 text-[var(--accent-foreground)] border-[var(--accent)]/30'
     : tier === 'starter'
-    ? 'bg-[rgba(255,255,255,0.08)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
-    : 'bg-[rgba(255,255,255,0.04)] text-[var(--text-faint)] border-[rgba(255,255,255,0.06)]';
+    ? 'bg-[var(--border-faint)] text-[var(--text-secondary)] border-[var(--border-subtle)]'
+    : 'bg-[rgba(255,255,255,0.04)] text-[var(--text-faint)] border-[var(--bg-tinted)]';
   return (
     <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium border ${cls}`}>{DISPLAY[tier] ?? tier}</span>
   );
@@ -163,7 +163,7 @@ export default function AdminPage() {
   if (authLoading || loading) {
     return (
       <div className="p-8 max-w-4xl animate-pulse space-y-4">
-        <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-40" />
+        <div className="h-8 bg-[var(--bg-tinted)] rounded w-40" />
         <div className="h-32 card rounded-xl" />
         <div className="h-64 card rounded-xl" />
       </div>

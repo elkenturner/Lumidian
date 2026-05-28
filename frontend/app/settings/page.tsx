@@ -223,7 +223,7 @@ const EditableList = forwardRef<EditableListHandle, {
           type="button"
           onClick={addItem}
           disabled={atItemCap || !hasPendingText}
-          className="px-3 py-2 bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent-muted)] transition-[color,border-color,background-color] duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)] disabled:hover:border-[var(--border-subtle)] disabled:hover:bg-[rgba(255,255,255,0.06)]"
+          className="px-3 py-2 bg-[var(--bg-tinted)] border border-[var(--border-subtle)] rounded-lg text-[var(--text-muted)] hover:text-[var(--accent)] hover:border-[var(--accent)]/40 hover:bg-[var(--accent-muted)] transition-[color,border-color,background-color] duration-150 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-[var(--text-muted)] disabled:hover:border-[var(--border-subtle)] disabled:hover:bg-[var(--bg-tinted)]"
         >
           <Plus size={16} />
         </button>
@@ -279,7 +279,7 @@ function SectionCard({
   return (
     <div className="card" style={{ padding: 20 }}>
       <div className="flex items-start gap-3 mb-4">
-        <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 mt-0.5">
+        <div className="w-8 h-8 rounded-lg bg-[var(--bg-tinted)] border border-[var(--border-subtle)] flex items-center justify-center shrink-0 mt-0.5">
           <Icon size={15} className="text-[var(--accent)]" />
         </div>
         <div>
@@ -1273,8 +1273,8 @@ export default function SettingsPage() {
     return (
       <div className="p-4 sm:p-8 max-w-7xl">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-[rgba(255,255,255,0.06)] rounded w-32" />
-          <div className="h-10 bg-[rgba(255,255,255,0.06)] rounded w-64" />
+          <div className="h-8 bg-[var(--bg-tinted)] rounded w-32" />
+          <div className="h-10 bg-[var(--bg-tinted)] rounded w-64" />
           <div className="h-48 card rounded-xl" />
         </div>
       </div>
@@ -1416,7 +1416,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleSuggestPrompts}
                 disabled={loadingSuggestions}
-                className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[var(--accent-muted)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--accent)] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 text-xs bg-[var(--bg-tinted)] hover:bg-[var(--accent-muted)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-[var(--accent)] rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
               >
                 {loadingSuggestions ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
                 Suggest
@@ -1449,7 +1449,7 @@ export default function SettingsPage() {
                 {brand.prompts.map((prompt: Prompt) => (
                   <div
                     key={prompt.id}
-                    className="flex items-start gap-3 bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] rounded-lg px-4 py-3 group hover:border-[var(--border-default)] transition-colors"
+                    className="flex items-start gap-3 bg-[var(--bg-tinted)] border border-[var(--border-subtle)] rounded-lg px-4 py-3 group hover:border-[var(--border-default)] transition-colors"
                   >
                     <ChevronRight size={14} className="text-[var(--accent)] flex-shrink-0 mt-0.5" />
                     <span className="text-sm text-[var(--text-secondary)] flex-1 leading-relaxed">{prompt.text}</span>
@@ -1495,7 +1495,7 @@ export default function SettingsPage() {
                     No suggestions available. Try adding more brand profile info.
                   </div>
                 ) : (
-                  <div className="divide-y divide-[rgba(255,255,255,0.06)] max-h-64 overflow-y-auto rounded-lg border border-[var(--border-subtle)]">
+                  <div className="divide-y divide-[var(--bg-tinted)] max-h-64 overflow-y-auto rounded-lg border border-[var(--border-subtle)]">
                     {suggestions.map((s) => (
                       <button
                         key={s}
@@ -1543,7 +1543,7 @@ export default function SettingsPage() {
                 {competitors.map((comp) => (
                   <div
                     key={comp.id}
-                    className="flex items-center gap-3 bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] rounded-lg px-4 py-3 group hover:border-[var(--border-default)] transition-colors"
+                    className="flex items-center gap-3 bg-[var(--bg-tinted)] border border-[var(--border-subtle)] rounded-lg px-4 py-3 group hover:border-[var(--border-default)] transition-colors"
                   >
                     <ChevronRight size={14} className="text-[var(--text-faint)] flex-shrink-0" />
                     <span className="text-sm text-[var(--text-secondary)] flex-1">{comp.name}</span>
@@ -1566,7 +1566,7 @@ export default function SettingsPage() {
           </div>
 
           {/* Delete brand — only on General tab */}
-          <div className="mt-8 pt-5 border-t border-[rgba(255,255,255,0.06)]">
+          <div className="mt-8 pt-5 border-t border-[var(--bg-tinted)]">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-[var(--text-secondary)]">Delete brand</p>
@@ -1858,7 +1858,7 @@ export default function SettingsPage() {
                 <p className="text-xs text-[var(--text-faint)] mt-0.5">Invite someone above to collaborate</p>
               </div>
             ) : (
-              <div className="divide-y divide-[rgba(255,255,255,0.06)]">
+              <div className="divide-y divide-[var(--bg-tinted)]">
                 {teamMembers.map((m) => (
                   <div key={m.id} className="flex items-center justify-between py-3">
                     <div>

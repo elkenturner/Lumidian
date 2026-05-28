@@ -64,7 +64,7 @@ const NavLink = memo(function NavLink({
         ...(isActive ? { background: 'rgba(95,126,166,0.12)' } : {}),
       }}
       onMouseEnter={(e) => {
-        if (!isActive) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
+        if (!isActive) (e.currentTarget as HTMLElement).style.background = 'var(--bg-tinted)';
       }}
       onMouseLeave={(e) => {
         if (!isActive) (e.currentTarget as HTMLElement).style.background = 'transparent';
@@ -162,7 +162,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
             display: 'flex',
             justifyContent: expanded ? 'flex-start' : 'center',
             transition: 'padding 0.22s ease',
-            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            borderBottom: '1px solid var(--bg-tinted)',
           }}
         >
           <Link href="/dashboard" className="flex items-center gap-3">
@@ -181,7 +181,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
             className="flex-shrink-0 relative"
             style={{
               padding: expanded ? '12px 14px' : '12px 10px',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              borderBottom: '1px solid var(--bg-tinted)',
             }}
           >
             <button
@@ -240,12 +240,12 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 }}
               >
                 {/* Header */}
-                <div className="px-3 pt-2.5 pb-1.5 border-b border-[rgba(255,255,255,0.06)]">
+                <div className="px-3 pt-2.5 pb-1.5 border-b border-[var(--bg-tinted)]">
                   <p className="text-[10px] font-semibold text-[var(--text-faint)] uppercase tracking-wider">Your brands</p>
                 </div>
 
                 {/* Brand list */}
-                <div className="py-1" style={{ maxHeight: 240, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}>
+                <div className="py-1" style={{ maxHeight: 240, overflowY: 'auto', scrollbarWidth: 'thin', scrollbarColor: 'var(--border-faint) transparent' }}>
                   {brands.map((brand) => {
                     const isActive = brand.id === activeBrand?.id;
                     return (
@@ -263,8 +263,8 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                           size={24}
                           className="rounded-md"
                           style={{
-                            background: isActive ? 'rgba(95,126,166,0.25)' : 'rgba(255,255,255,0.06)',
-                            border: `1px solid ${isActive ? 'rgba(95,126,166,0.40)' : 'rgba(255,255,255,0.08)'}`,
+                            background: isActive ? 'rgba(95,126,166,0.25)' : 'var(--bg-tinted)',
+                            border: `1px solid ${isActive ? 'rgba(95,126,166,0.40)' : 'var(--border-faint)'}`,
                             padding: 3,
                           }}
                           textClassName="text-[10px] font-bold"
@@ -295,7 +295,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                 </div>
 
                 {/* Add brand link */}
-                <div className="border-t border-[rgba(255,255,255,0.06)] p-1">
+                <div className="border-t border-[var(--bg-tinted)] p-1">
                   <Link
                     href="/settings/brands/new"
                     onClick={() => setBrandOpen(false)}
@@ -366,7 +366,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
             style={{
               padding: expanded ? '16px 10px' : '16px 8px',
               transition: 'padding 0.22s ease',
-              borderTop: '1px solid rgba(255,255,255,0.06)',
+              borderTop: '1px solid var(--bg-tinted)',
             }}
           >
             {expanded ? (

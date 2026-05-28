@@ -257,7 +257,7 @@ export function ManagePromptsModal({
               <select
                 value={scopeValue}
                 onChange={(e) => setScopeValue(e.target.value as typeof scopeValue)}
-                className="bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-[var(--accent)]"
+                className="bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-[var(--accent)]"
               >
                 <option value="local">Local — city/region</option>
                 <option value="national">National — single country</option>
@@ -269,7 +269,7 @@ export function ManagePromptsModal({
                 value={geographyValue}
                 onChange={(e) => setGeographyValue(e.target.value)}
                 placeholder={scopeValue === 'local' ? 'e.g. Portland, OR' : scopeValue === 'national' ? 'e.g. United States' : 'optional'}
-                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-md px-2 py-1.5 text-xs placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)]"
+                className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-md px-2 py-1.5 text-xs placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)]"
               />
               <button
                 onClick={confirmScopeAndSuggest}
@@ -321,7 +321,7 @@ export function ManagePromptsModal({
               onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
               placeholder={`e.g. What is the best ${brandName || 'product'} alternative?`}
               disabled={atLimit || locked}
-              className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-40"
+              className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-40"
             />
             <button
               onClick={handleAdd}
@@ -335,7 +335,7 @@ export function ManagePromptsModal({
           <button
             onClick={handleSuggest}
             disabled={suggesting || scopeStep === 'inferring' || locked}
-            className="w-full flex items-center justify-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(255,255,255,0.14)] rounded-lg py-2 transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] border border-[var(--border-faint)] hover:border-[rgba(255,255,255,0.14)] rounded-lg py-2 transition-colors"
           >
             {suggesting || scopeStep === 'inferring' ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
             {scopeStep === 'inferring'

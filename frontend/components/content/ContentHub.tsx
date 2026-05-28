@@ -334,13 +334,13 @@ function DraftCard({
             value={editTitle}
             onChange={(e) => setEditTitle(e.target.value)}
             placeholder="Title (optional)"
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
+            className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
           />
           <textarea
             value={editContent}
             onChange={(e) => setEditContent(e.target.value)}
             rows={8}
-            className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none font-mono"
+            className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none font-mono"
           />
           <div className="flex gap-2">
             <button
@@ -373,7 +373,7 @@ function DraftCard({
           )}
           {/* Preview / Raw toggle */}
           <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
+            <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[var(--border-faint)] rounded-md p-0.5">
               <button
                 onClick={() => setPreviewMode(false)}
                 className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${!previewMode ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
@@ -387,14 +387,14 @@ function DraftCard({
           </div>
           {previewMode ? (
             <div
-              className="text-sm text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3"
-              style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+              className="text-sm text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.04)] border border-[var(--bg-tinted)] rounded-lg p-3"
+              style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--bg-tinted-hover) transparent' }}
               dangerouslySetInnerHTML={{ __html: `<p style="margin:0">${renderPreviewHtml(draft.content_text)}</p>` }}
             />
           ) : (
             <div
               className="text-sm text-[var(--text-muted)] leading-relaxed overflow-y-auto"
-              style={{ maxHeight: '9rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+              style={{ maxHeight: '9rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--bg-tinted-hover) transparent' }}
             >
               {draft.content_text}
             </div>
@@ -412,7 +412,7 @@ function DraftCard({
         <div className="flex items-center gap-2 pt-1 flex-wrap">
           <button
             onClick={() => setEditing(true)}
-            className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 transition-colors"
+            className="flex items-center gap-1.5 text-xs bg-[var(--bg-tinted)] hover:bg-[var(--bg-tinted-hover)] border border-[var(--bg-tinted-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 transition-colors"
           >
             <Edit2 size={11} />
             Edit
@@ -422,7 +422,7 @@ function DraftCard({
             className={`flex items-center gap-1.5 text-xs rounded-lg px-3 py-1.5 transition-colors border ${
               copied
                 ? 'bg-[#064e3b]/20 border-[#065f46]/25 text-[var(--success)]'
-                : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.10)]'
+                : 'bg-[var(--bg-tinted)] border-[var(--bg-tinted-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tinted-hover)]'
             }`}
           >
             {copied ? <Check size={11} /> : <Copy size={11} />}
@@ -663,7 +663,7 @@ function WikipediaDraftCard({
 
         {/* Where to insert */}
         {insertLocation && (
-          <div className="bg-[rgba(255,255,255,0.06)] border border-[var(--border-subtle)] rounded-lg px-3 py-2.5">
+          <div className="bg-[var(--bg-tinted)] border border-[var(--border-subtle)] rounded-lg px-3 py-2.5">
             <p className="text-xs text-[var(--text-muted)] uppercase tracking-wide mb-1 font-medium">Where to insert</p>
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed">{insertLocation}</p>
           </div>
@@ -677,7 +677,7 @@ function WikipediaDraftCard({
               value={plainText}
               onChange={(e) => handlePlainChange(e.target.value)}
               rows={7}
-              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none leading-relaxed font-sans"
+              className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none leading-relaxed font-sans"
               placeholder="Edit the plain text. Wiki formatting and citations are applied automatically."
             />
             <p className="text-[10px] text-[var(--text-faint)]">
@@ -704,7 +704,7 @@ function WikipediaDraftCard({
           <div>
             {/* Raw / Preview toggle */}
             <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.08)] rounded-md p-0.5">
+              <div className="flex items-center gap-1 bg-[rgba(255,255,255,0.04)] border border-[var(--border-faint)] rounded-md p-0.5">
                 <button
                   onClick={() => setViewMode('preview')}
                   className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${viewMode === 'preview' ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]' : 'text-[var(--text-faint)] hover:text-[var(--text-muted)]'}`}
@@ -719,15 +719,15 @@ function WikipediaDraftCard({
 
             {viewMode === 'raw' ? (
               <pre
-                className="text-xs text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.03)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3 whitespace-pre-wrap font-mono"
-                style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+                className="text-xs text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.03)] border border-[var(--bg-tinted)] rounded-lg p-3 whitespace-pre-wrap font-mono"
+                style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--bg-tinted-hover) transparent' }}
               >
                 {wikiFormat}
               </pre>
             ) : (
               <div
-                className="text-sm text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] rounded-lg p-3"
-                style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.10) transparent' }}
+                className="text-sm text-[var(--text-secondary)] leading-relaxed overflow-y-auto bg-[rgba(255,255,255,0.04)] border border-[var(--bg-tinted)] rounded-lg p-3"
+                style={{ maxHeight: '12rem', scrollbarWidth: 'thin', scrollbarColor: 'var(--bg-tinted-hover) transparent' }}
                 dangerouslySetInnerHTML={{ __html: `<p style="margin:0">${renderPreviewHtml(plainText)}</p>` }}
               />
             )}
@@ -755,7 +755,7 @@ function WikipediaDraftCard({
             </button>
             <button
               onClick={() => setEditing(true)}
-              className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 transition-colors"
+              className="flex items-center gap-1.5 text-xs bg-[var(--bg-tinted)] hover:bg-[var(--bg-tinted-hover)] border border-[var(--bg-tinted-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 transition-colors"
             >
               <Edit2 size={11} />
               Edit
@@ -857,7 +857,7 @@ function QuoraQuestionPicker({
         <button
           key={q.url}
           onClick={() => onSelect(q)}
-          className="w-full text-left flex items-start gap-2.5 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(95,126,166,0.08)] border border-[rgba(255,255,255,0.08)] hover:border-[rgba(95,126,166,0.25)] rounded-lg px-3 py-2.5 transition-colors group"
+          className="w-full text-left flex items-start gap-2.5 bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(95,126,166,0.08)] border border-[var(--border-faint)] hover:border-[rgba(95,126,166,0.25)] rounded-lg px-3 py-2.5 transition-colors group"
         >
           <span className="text-[var(--accent)] text-xs mt-0.5 flex-shrink-0">Q</span>
           <div className="flex-1 min-w-0">
@@ -985,7 +985,7 @@ function RequestDraftModal({
                     <button
                       key={p}
                       disabled
-                      className="py-2 rounded-lg text-xs font-medium capitalize transition-colors border bg-[rgba(255,255,255,0.03)] border-[rgba(255,255,255,0.06)] text-[var(--text-faint)] opacity-50 cursor-not-allowed flex items-center justify-center gap-1.5"
+                      className="py-2 rounded-lg text-xs font-medium capitalize transition-colors border bg-[rgba(255,255,255,0.03)] border-[var(--bg-tinted)] text-[var(--text-faint)] opacity-50 cursor-not-allowed flex items-center justify-center gap-1.5"
                     >
                       <PlatformIcon platform={p} size={12} color="var(--text-faint)" />
                       {label}
@@ -1001,7 +1001,7 @@ function RequestDraftModal({
                     className={`py-2 rounded-lg text-xs font-medium capitalize transition-colors border flex items-center justify-center gap-1.5 ${
                       platform === p
                         ? 'bg-[var(--accent)]/20 border-[var(--accent)]/50 text-[var(--accent)]'
-                        : 'bg-[rgba(255,255,255,0.06)] border-[rgba(255,255,255,0.10)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                        : 'bg-[var(--bg-tinted)] border-[var(--bg-tinted-hover)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
                     }`}
                   >
                     <PlatformIcon platform={p} size={12} color={platform === p ? 'var(--accent)' : 'var(--text-muted)'} />
@@ -1073,7 +1073,7 @@ function RequestDraftModal({
               <select
                 value={promptId}
                 onChange={(e) => setPromptId(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full appearance-none bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
+                className="w-full appearance-none bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-lg pl-3 pr-8 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
               >
                 <option value="">— Select tracked prompt —</option>
                 {prompts.map((p) => (
@@ -1112,7 +1112,7 @@ function RequestDraftModal({
               onChange={(e) => setCustomTopic(e.target.value)}
               maxLength={500}
               placeholder="e.g. Why Rainbow Study matters for oncologists"
-              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
+              className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
             />
           </div>
 
@@ -1127,7 +1127,7 @@ function RequestDraftModal({
               rows={2}
               maxLength={1000}
               placeholder="Focus on clinical data, write for a non-technical audience…"
-              className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
+              className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm placeholder:text-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
             />
           </div>
 
@@ -1363,7 +1363,7 @@ function ScheduledCard({
 
       {/* Expandable full draft */}
       {expanded && (
-        <div className="bg-[rgba(95,126,166,0.06)] border border-[rgba(255,255,255,0.10)] rounded-lg p-3 relative">
+        <div className="bg-[rgba(95,126,166,0.06)] border border-[var(--bg-tinted-hover)] rounded-lg p-3 relative">
           <pre className="text-xs text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed font-mono pr-14">
             {draft.content_text}
           </pre>
@@ -1382,7 +1382,7 @@ function ScheduledCard({
         <div className="border border-[var(--border-subtle)] rounded-lg overflow-hidden">
           <button
             onClick={() => setGuideOpen(!guideOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(95,126,166,0.06)] hover:bg-[rgba(255,255,255,0.06)] text-left transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 bg-[rgba(95,126,166,0.06)] hover:bg-[var(--bg-tinted)] text-left transition-colors"
           >
             <span className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] font-medium">
               <BookOpen size={11} />
@@ -1412,7 +1412,7 @@ function ScheduledCard({
       <div className="flex items-center gap-2 pt-1 flex-wrap">
         <button
           onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1.5 text-xs bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 transition-colors"
+          className="flex items-center gap-1.5 text-xs bg-[var(--bg-tinted)] hover:bg-[var(--bg-tinted-hover)] border border-[var(--bg-tinted-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-1.5 transition-colors"
         >
           <FileText size={11} />
           {expanded ? 'Hide Draft' : 'View Draft'}
@@ -2203,7 +2203,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
             label: 'Medium',
             subtitle: 'Long-form articles',
             iconKey: 'medium',
-            color: '#94a3b8',
+            color: 'var(--text-secondary)',
             colorMuted: 'rgba(148,163,184,0.10)',
             colorBorder: 'rgba(148,163,184,0.18)',
             gradient: 'linear-gradient(135deg, rgba(148,163,184,0.06) 0%, rgba(148,163,184,0.01) 100%)',
@@ -2221,7 +2221,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
             label: 'Wikipedia',
             subtitle: 'Article edits — handle with care',
             iconKey: 'wikipedia',
-            color: '#64748b',
+            color: 'var(--text-muted)',
             colorMuted: 'rgba(100,116,139,0.10)',
             colorBorder: 'rgba(100,116,139,0.20)',
             gradient: 'linear-gradient(135deg, rgba(100,116,139,0.06) 0%, rgba(100,116,139,0.01) 100%)',
@@ -2247,7 +2247,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
             <div className="relative w-full max-w-xl max-h-[88vh] flex flex-col bg-[rgba(8,12,20,0.98)] border border-[var(--border-subtle)] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.70),0_0_0_1px_rgba(95,126,166,0.08)] overflow-hidden">
 
               {/* Header with platform-colored accent line */}
-              <div className="shrink-0" style={{ borderBottom: `1px solid rgba(255,255,255,0.06)` }}>
+              <div className="shrink-0" style={{ borderBottom: `1px solid var(--bg-tinted)` }}>
                 <div className="h-[2px] w-full opacity-60" style={{ background: `linear-gradient(90deg, transparent 0%, ${p.color} 50%, transparent 100%)` }} />
                 <div className="flex items-center justify-between px-6 pt-4 pb-3">
                   <div className="flex items-center gap-2.5">
@@ -2262,7 +2262,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
                   <button
                     onClick={() => setPostingGuideOpen(false)}
                     aria-label="Close"
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] transition-[color,background-color]"
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tinted)] transition-[color,background-color]"
                   >
                     <X size={14} />
                   </button>
@@ -2270,7 +2270,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
 
                 {/* Platform tabs */}
                 <div className="px-6 pb-3">
-                  <div className="flex gap-1 p-1 bg-[rgba(255,255,255,0.025)] border border-[rgba(255,255,255,0.06)] rounded-xl">
+                  <div className="flex gap-1 p-1 bg-[rgba(255,255,255,0.025)] border border-[var(--bg-tinted)] rounded-xl">
                     {(['reddit', 'quora', 'medium', 'wikipedia'] as const).map((key) => {
                       const active = postingPlatform === key;
                       const pl = PLATFORMS[key];
@@ -2448,7 +2448,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
           {/* Posting Guide button */}
           <button
             onClick={() => setPostingGuideOpen(true)}
-            className="flex items-center gap-1.5 text-sm bg-[rgba(255,255,255,0.06)] hover:bg-[rgba(255,255,255,0.10)] border border-[rgba(255,255,255,0.10)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-2 transition-[color,background-color] duration-150"
+            className="flex items-center gap-1.5 text-sm bg-[var(--bg-tinted)] hover:bg-[var(--bg-tinted-hover)] border border-[var(--bg-tinted-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg px-3 py-2 transition-[color,background-color] duration-150"
           >
             <BookOpen size={14} />
             Posting Guide
@@ -2499,7 +2499,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                       activePrimaryTab === tab.key
                         ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]'
-                        : 'bg-[rgba(255,255,255,0.08)] text-[var(--text-faint)]'
+                        : 'bg-[var(--border-faint)] text-[var(--text-faint)]'
                     }`}>
                       {opportunities.length}
                     </span>
@@ -2508,7 +2508,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                       activePrimaryTab === tab.key
                         ? 'bg-[rgba(95,126,166,0.25)] text-[var(--accent-foreground)]'
-                        : 'bg-[rgba(255,255,255,0.08)] text-[var(--text-faint)]'
+                        : 'bg-[var(--border-faint)] text-[var(--text-faint)]'
                     }`}>
                       {clusterList.length}
                     </span>
@@ -2736,7 +2736,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
                               {count}/{cap}
                             </span>
                           </div>
-                          <div className="h-1 bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+                          <div className="h-1 bg-[var(--bg-tinted)] rounded-full overflow-hidden">
                             <div
                               className="h-full rounded-full transition-[width] duration-500"
                               style={{ width: `${Math.min(pct * 100, 100)}%`, backgroundColor: barColor }}
@@ -2762,7 +2762,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
                   </div>
                 )}
                 {draftStatus?.last_scan_at && (
-                  <div className="border-t border-[rgba(255,255,255,0.06)] pt-2.5">
+                  <div className="border-t border-[var(--bg-tinted)] pt-2.5">
                     <p className="text-[11px] text-[var(--text-faint)] text-center">
                       Last opportunity scan: {relativeTime(draftStatus.last_scan_at)}
                     </p>
@@ -2778,10 +2778,10 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
                 {([
                   { key: 'reddit', color: '#ff4500', paidOnly: false },
                   { key: 'quora', color: '#b92b27', paidOnly: false },
-                  { key: 'medium', color: '#94a3b8', paidOnly: false },
-                  { key: 'wikipedia', color: '#64748b', paidOnly: false },
+                  { key: 'medium', color: 'var(--text-secondary)', paidOnly: false },
+                  { key: 'wikipedia', color: 'var(--text-muted)', paidOnly: false },
                   { key: 'linkedin', color: '#0a66c2', paidOnly: true },
-                  { key: 'x', color: '#94a3b8', paidOnly: true },
+                  { key: 'x', color: 'var(--text-secondary)', paidOnly: true },
                 ] as const).filter(({ key }) => {
                   if (activePrimaryTab === 'opportunities') return key !== 'medium' && key !== 'wikipedia';
                   return true;
@@ -2810,7 +2810,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
                           className="w-6 h-6 rounded-md flex items-center justify-center transition-[background-color,border-color] duration-200"
                           style={{
                             background: enabled && !isLocked ? `${color}15` : 'rgba(255,255,255,0.04)',
-                            border: `1px solid ${enabled && !isLocked ? `${color}30` : 'rgba(255,255,255,0.06)'}`,
+                            border: `1px solid ${enabled && !isLocked ? `${color}30` : 'var(--bg-tinted)'}`,
                           }}
                         >
                           <PlatformIcon platform={key} size={14} color={enabled && !isLocked ? color : 'var(--text-faint)'} />
@@ -2826,7 +2826,7 @@ export function ContentHub({ initialBrandId }: ContentHubProps = {}) {
                       <div
                         className="relative w-8 h-[18px] rounded-full transition-[background-color,box-shadow] duration-200 shrink-0"
                         style={{
-                          background: enabled && !isLocked ? 'var(--accent)' : 'rgba(255,255,255,0.10)',
+                          background: enabled && !isLocked ? 'var(--accent)' : 'var(--bg-tinted-hover)',
                           boxShadow: enabled && !isLocked ? '0 0 8px rgba(95,126,166,0.3)' : 'none',
                         }}
                       >

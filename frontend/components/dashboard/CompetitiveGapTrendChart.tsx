@@ -62,7 +62,7 @@ export function CompetitiveGapTrendChart({ data }: Props) {
     <div className="w-full" style={{ height: 240 }}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+          <CartesianGrid strokeDasharray="3 3" stroke="var(--bg-tinted)" />
           <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-faint)' }} />
           <YAxis
             unit="%"
@@ -72,7 +72,7 @@ export function CompetitiveGapTrendChart({ data }: Props) {
           <Tooltip
             contentStyle={{
               background: 'var(--bg-elevated)',
-              border: '1px solid rgba(255,255,255,0.08)',
+              border: '1px solid var(--border-faint)',
               borderRadius: 6,
               fontSize: 11,
             }}

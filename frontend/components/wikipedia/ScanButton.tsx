@@ -66,7 +66,7 @@ export function ScanButton({ brandId, onScanCompleted }: Props) {
         type="button"
         onClick={trigger}
         disabled={isRunning}
-        className="group inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(255,255,255,0.04)] px-4 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-strong)] hover:bg-[rgba(255,255,255,0.08)] disabled:cursor-wait disabled:opacity-60 active:scale-[0.98] [transition:transform_160ms_cubic-bezier(0.23,1,0.32,1),background-color_0.15s_ease,border-color_0.15s_ease]"
+        className="group inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(255,255,255,0.04)] px-4 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--border-faint)] disabled:cursor-wait disabled:opacity-60 active:scale-[0.98] [transition:transform_160ms_cubic-bezier(0.23,1,0.32,1),background-color_0.15s_ease,border-color_0.15s_ease]"
       >
         {isRunning ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-foreground)]" />

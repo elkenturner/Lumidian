@@ -1,0 +1,3 @@
+Hardcoded color literals: 914
+Design token usages:      4009
+Slippage:                 18.6%

@@ -64,7 +64,7 @@ export function AuditHeader({ audit, brandUrl, inFlight, onRunNewAudit, onCancel
           {brandUrl ? (
             new URL(brandUrl).host
           ) : (
-            <span className="inline-block h-5 w-48 rounded animate-pulse" style={{ background: 'rgba(255,255,255,0.06)' }} />
+            <span className="inline-block h-5 w-48 rounded animate-pulse" style={{ background: 'var(--bg-tinted)' }} />
           )}
         </h1>
         <p className="text-xs text-[var(--text-faint)] mt-2 tabular-nums flex flex-wrap items-center gap-x-2 gap-y-1">

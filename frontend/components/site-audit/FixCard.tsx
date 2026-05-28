@@ -458,7 +458,7 @@ function Shimmer({ width }: { width: string }) {
   return (
     <div
       className="h-3 rounded animate-pulse"
-      style={{ width, background: 'rgba(255,255,255,0.06)' }}
+      style={{ width, background: 'var(--bg-tinted)' }}
     />
   );
 }

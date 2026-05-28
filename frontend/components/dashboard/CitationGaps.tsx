@@ -44,7 +44,7 @@ export default function CitationGaps({ gaps, brandId }: CitationGapsProps) {
   }
 
   return (
-    <div className="divide-y divide-[rgba(255,255,255,0.06)]">
+    <div className="divide-y divide-[var(--bg-tinted)]">
       {gaps.map((g, idx) => {
         const platform = g.platform;
         if (!platform) return null;
@@ -82,7 +82,7 @@ export default function CitationGaps({ gaps, brandId }: CitationGapsProps) {
               href={`/content/${brandId}?platform=${encodeURIComponent(platform)}`}
               className={`text-[10px] font-medium px-2.5 py-1.5 rounded-md whitespace-nowrap transition-colors ${
                 isWiki
-                  ? 'bg-[rgba(255,255,255,0.06)] text-[var(--text-primary)] hover:bg-[rgba(255,255,255,0.10)]'
+                  ? 'bg-[var(--bg-tinted)] text-[var(--text-primary)] hover:bg-[var(--bg-tinted-hover)]'
                   : 'bg-[var(--accent)] text-white hover:opacity-90'
               }`}
             >

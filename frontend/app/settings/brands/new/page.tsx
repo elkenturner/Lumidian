@@ -247,7 +247,7 @@ export default function NewBrandPage() {
       </div>
 
       {/* Card */}
-      <div className="card relative w-full max-w-md rounded-2xl p-8 shadow-[0_8px_40px_rgba(0,0,0,0.40),inset_0_1px_0_rgba(255,255,255,0.06)]">
+      <div className="card relative w-full max-w-md rounded-2xl p-8 shadow-[0_8px_40px_rgba(0,0,0,0.40),inset_0_1px_0_var(--bg-tinted)]">
         {error && (
           <div className="bg-[rgba(127,29,29,0.20)] border border-[rgba(153,27,27,0.30)] rounded-lg px-4 py-3 mb-5">
             <p className="text-sm text-[var(--danger)]">{error}</p>
@@ -272,7 +272,7 @@ export default function NewBrandPage() {
                     onClick={() => locked ? router.push('/settings/billing') : handleSelectType('starter')}
                     className={`w-full text-left rounded-xl p-4 border transition-[border-color,background-color] cursor-pointer ${
                       locked
-                        ? 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--accent-muted)] hover:bg-[rgba(255,255,255,0.05)]'
+                        ? 'border-[var(--border-faint)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--accent-muted)] hover:bg-[rgba(255,255,255,0.05)]'
                         : 'border-[var(--accent-muted)] bg-[var(--accent-muted)] hover:border-[var(--accent)] hover:bg-[var(--accent-muted)]'
                     }`}
                   >
@@ -314,7 +314,7 @@ export default function NewBrandPage() {
                     onClick={() => locked ? router.push('/settings/billing') : handleSelectType('pro')}
                     className={`w-full text-left rounded-xl p-4 border transition-[border-color,background-color] cursor-pointer ${
                       locked
-                        ? 'border-[rgba(255,255,255,0.08)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--color-perplexity)]/28 hover:bg-[rgba(255,255,255,0.05)]'
+                        ? 'border-[var(--border-faint)] bg-[rgba(255,255,255,0.03)] hover:border-[var(--color-perplexity)]/28 hover:bg-[rgba(255,255,255,0.05)]'
                         : 'border-[var(--color-perplexity)]/28 bg-[var(--color-perplexity)]/6 hover:border-[var(--accent)] hover:bg-[var(--color-perplexity)]/12'
                     }`}
                   >
@@ -389,7 +389,7 @@ export default function NewBrandPage() {
                     disabled={locked}
                     className={`w-full text-left rounded-xl p-4 border transition-[border-color,background-color] ${
                       locked
-                        ? 'border-[rgba(255,255,255,0.06)] bg-[rgba(255,255,255,0.02)] opacity-50 cursor-not-allowed'
+                        ? 'border-[var(--bg-tinted)] bg-[rgba(255,255,255,0.02)] opacity-50 cursor-not-allowed'
                         : 'border-[var(--warning)]/22 bg-[var(--warning)]/4 hover:border-[var(--warning)] hover:bg-[var(--warning)]/10 cursor-pointer'
                     }`}
                   >

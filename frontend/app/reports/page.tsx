@@ -426,7 +426,7 @@ export default function ReportsPage() {
           )}
 
           {/* Prompt visibility list */}
-          <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+          <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_var(--bg-tinted)]">
             <div className="px-5 py-3.5 border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)] flex items-center justify-between">
               <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Prompt Visibility</h3>
               {!loading && (promptGroups.length + untrackedPrompts.length) > 0 && (
@@ -437,15 +437,15 @@ export default function ReportsPage() {
             </div>
 
             {loading ? (
-              <div className="divide-y divide-[rgba(255,255,255,0.06)]">
+              <div className="divide-y divide-[var(--bg-tinted)]">
                 {[1, 2, 3, 4].map(i => (
                   <div key={i} className="px-5 py-5 animate-pulse">
                     <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="h-4 bg-[rgba(255,255,255,0.06)] rounded flex-1" style={{ width: `${55 + (i * 11) % 30}%` }} />
-                      <div className="h-5 w-10 bg-[rgba(255,255,255,0.06)] rounded flex-shrink-0" />
+                      <div className="h-4 bg-[var(--bg-tinted)] rounded flex-1" style={{ width: `${55 + (i * 11) % 30}%` }} />
+                      <div className="h-5 w-10 bg-[var(--bg-tinted)] rounded flex-shrink-0" />
                     </div>
                     <div className="flex gap-2">
-                      {[1, 2, 3, 4].map(j => <div key={j} className="h-7 w-24 bg-[rgba(255,255,255,0.06)] rounded-lg" />)}
+                      {[1, 2, 3, 4].map(j => <div key={j} className="h-7 w-24 bg-[var(--bg-tinted)] rounded-lg" />)}
                     </div>
                   </div>
                 ))}
@@ -459,7 +459,7 @@ export default function ReportsPage() {
                 <p className="text-sm text-[var(--text-faint)]">Run a report from the Dashboard to see prompt visibility.</p>
               </div>
             ) : (
-              <div className="divide-y divide-[rgba(255,255,255,0.06)]">
+              <div className="divide-y divide-[var(--bg-tinted)]">
                 {promptGroups.map((g) => {
                   const overallPct = g.total > 0 ? Math.round((g.mentioned / g.total) * 100) : 0;
                   const overallColor = overallPct >= 60 ? 'var(--success)' : overallPct >= 30 ? 'var(--warning)' : 'var(--danger)';
@@ -522,7 +522,7 @@ export default function ReportsPage() {
                                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[var(--border-subtle)] bg-[rgba(255,255,255,0.04)]"
                               >
                                 <span className="text-xs font-semibold" style={{ color: pct === null ? 'var(--text-faint)' : cfg.text }}>{cfg.label}</span>
-                                <span className="text-[rgba(255,255,255,0.10)]">·</span>
+                                <span className="text-[var(--bg-tinted-hover)]">·</span>
                                 <span className="text-xs font-bold tabular-nums font-mono" style={{ color: mentionColor }}>{pct !== null ? `${pct}%` : '—'}</span>
                               </div>
                             );
@@ -553,7 +553,7 @@ export default function ReportsPage() {
 
                       {/* Expanded: individual query responses */}
                       {isExpanded && (
-                        <div className="border-t border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)] divide-y divide-[rgba(255,255,255,0.06)]">
+                        <div className="border-t border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)] divide-y divide-[var(--bg-tinted)]">
                           {g.responses.map((r) => {
                             const cfg = getModelCfg(r.model);
                             return (
@@ -623,7 +623,7 @@ export default function ReportsPage() {
             </div>
           )}
           {competitorAnalysis && competitorAnalysis.has_data && (
-            <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl overflow-hidden shadow-[0_4px_24px_rgba(0,0,0,0.30),inset_0_1px_0_var(--bg-tinted)]">
               <div className="px-5 py-3.5 border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)] flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-[var(--text-primary)]">Competitor Share of Voice</h3>
@@ -658,7 +658,7 @@ export default function ReportsPage() {
               <div className="overflow-x-auto scroll-hint-right">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-[rgba(255,255,255,0.06)]">
+                    <tr className="border-b border-[var(--bg-tinted)]">
                       <th className="text-left px-5 py-2.5 text-[var(--text-muted)] font-medium w-1/2">Prompt</th>
                       <th className="text-center px-3 py-2.5 text-[var(--accent)] font-medium whitespace-nowrap">
                         {selectedBrand?.name ?? 'Your Brand'}
@@ -670,7 +670,7 @@ export default function ReportsPage() {
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[rgba(255,255,255,0.06)]">
+                  <tbody className="divide-y divide-[var(--bg-tinted)]">
                     {competitorAnalysis.prompts.map((row) => {
                       const brandRate = competitorModelFilter === 'all'
                         ? row.brand_rate
@@ -723,8 +723,8 @@ export default function ReportsPage() {
           )}
               {loading && (
                 <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-6 animate-pulse">
-                  <div className="h-5 bg-[rgba(255,255,255,0.06)] rounded w-48 mb-4" />
-                  <div className="h-32 bg-[rgba(255,255,255,0.06)] rounded-lg" />
+                  <div className="h-5 bg-[var(--bg-tinted)] rounded w-48 mb-4" />
+                  <div className="h-32 bg-[var(--bg-tinted)] rounded-lg" />
                 </div>
               )}
               </motion.div>

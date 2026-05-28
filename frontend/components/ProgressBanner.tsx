@@ -27,7 +27,7 @@ const ProgressBanner = memo(function ProgressBanner({ title, subtitle, items }: 
   }, [items.length]);
 
   return (
-    <div className="mb-6 relative overflow-hidden rounded-xl border border-[rgba(95,126,166,0.3)] animate-[glow-pulse_2s_ease-in-out_infinite]"
+    <div className="mb-6 relative overflow-hidden rounded-xl border border-[rgba(95,126,166,0.3)] animate-[glowPulse_2s_ease-in-out_infinite]"
       style={{ background: 'radial-gradient(ellipse at 30% 50%, rgba(95,126,166,0.10) 0%, rgba(95,126,166,0.03) 70%, transparent 100%)' }}
     >
       <div className="px-5 py-4 flex items-center gap-4">

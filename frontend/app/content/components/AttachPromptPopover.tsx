@@ -108,7 +108,7 @@ export function AttachPromptPopover({
           <button
             onClick={onClose}
             aria-label="Close"
-            className="w-6 h-6 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[rgba(255,255,255,0.06)] transition-colors"
+            className="w-6 h-6 rounded-lg flex items-center justify-center text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-tinted)] transition-colors"
           >
             <X size={12} aria-hidden="true" />
           </button>
@@ -131,7 +131,7 @@ export function AttachPromptPopover({
                       <button
                         onClick={() => handlePick(s.prompt_id)}
                         disabled={attaching !== null}
-                        className="w-full flex items-start gap-2 text-left px-3 py-2 rounded-lg border border-[rgba(255,255,255,0.06)] hover:border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.04)] transition-[border-color,background-color] duration-[120ms] ease-out disabled:opacity-50"
+                        className="w-full flex items-start gap-2 text-left px-3 py-2 rounded-lg border border-[var(--bg-tinted)] hover:border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.02)] hover:bg-[rgba(255,255,255,0.04)] transition-[border-color,background-color] duration-[120ms] ease-out disabled:opacity-50"
                       >
                         <span
                           className="mt-0.5 text-[10px] px-1.5 py-0.5 rounded-full border shrink-0"

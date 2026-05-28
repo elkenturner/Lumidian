@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, Copy, Loader2, Maximize2, RefreshCw, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
 import { regenerateClusterPiece, type ContentDraft } from "@/lib/api";
 import { CitationsSubpanel } from "./CitationsSubpanel";
@@ -149,19 +150,21 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
           <div className="flex items-center gap-1">
             {draft && (
               <>
-                <button
-                  type="button"
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setExpanded(true)}
-                  className="btn btn-ghost !py-1 !px-2 text-xs"
+                  className="!px-2"
                   title="View full draft"
                 >
                   <Maximize2 className="h-3 w-3" />
                   View
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={copy}
-                  className="btn btn-ghost !py-1 !px-2 text-xs"
+                  className="!px-2"
                   title="Copy text"
                 >
                   {copied ? (
@@ -175,15 +178,16 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                       Copy
                     </>
                   )}
-                </button>
+                </Button>
               </>
             )}
           </div>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={regenerate}
             disabled={regenerating}
-            className="btn btn-ghost !py-1 !px-2 text-xs"
+            className="!px-2"
           >
             {regenerating ? (
               <Loader2 className="h-3 w-3 animate-spin" />
@@ -191,7 +195,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               <RefreshCw className="h-3 w-3" />
             )}
             {regenerating ? "Regenerating…" : "Regenerate"}
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -209,14 +213,15 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 <PlatformBadge platform={platform} />
                 <PieceStatusChip status={draft.status} delta={draft.attribution_delta} />
               </div>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => setExpanded(false)}
-                className="btn btn-ghost !py-1 !px-1.5"
+                className="!px-1.5"
                 aria-label="Close"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
 
             {draft.title && (
@@ -245,7 +250,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
             </div>
 
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
-              <button type="button" onClick={copy} className="btn btn-secondary !py-1.5 text-xs">
+              <Button variant="outline" size="sm" onClick={copy}>
                 {copied ? (
                   <>
                     <Check className="h-3.5 w-3.5 text-[#4ade80]" />
@@ -257,12 +262,12 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                     Copy text
                   </>
                 )}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={regenerate}
                 disabled={regenerating}
-                className="btn btn-secondary !py-1.5 text-xs"
               >
                 {regenerating ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -270,7 +275,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                   <RefreshCw className="h-3.5 w-3.5" />
                 )}
                 {regenerating ? "Regenerating…" : "Regenerate"}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

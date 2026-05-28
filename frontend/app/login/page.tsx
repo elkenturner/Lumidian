@@ -93,7 +93,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#020617] text-[#f8fafc] flex items-center justify-center p-4 md:p-6 overflow-hidden">
+    <div className="relative min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex items-center justify-center p-4 md:p-6 overflow-hidden">
       {/* Background gradient */}
       <div
         className="absolute inset-0 pointer-events-none"
@@ -110,12 +110,12 @@ export default function LoginPage() {
 
         {/* 2FA challenge card */}
         {challengeToken && (
-          <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-6 md:p-8">
+          <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-2xl p-6 md:p-8">
             <div className="flex items-center gap-2.5 mb-2">
-              <ShieldCheck size={20} className="text-[#5f7ea6]" />
-              <h1 className="text-xl font-bold text-[#f8fafc]">Two-factor authentication</h1>
+              <ShieldCheck size={20} className="text-[var(--accent)]" />
+              <h1 className="text-xl font-bold text-[var(--text-primary)]">Two-factor authentication</h1>
             </div>
-            <p className="text-sm text-[#94a3b8] mb-6">
+            <p className="text-sm text-[var(--text-secondary)] mb-6">
               Enter the 6-digit code from your authenticator app.
             </p>
 
@@ -127,7 +127,7 @@ export default function LoginPage() {
 
             <form onSubmit={handleTotpSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-sm font-medium text-[#94a3b8] mb-1.5">Authenticator code</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Authenticator code</label>
                 <input
                   type="text"
                   inputMode="numeric"
@@ -138,13 +138,13 @@ export default function LoginPage() {
                   autoFocus
                   autoComplete="one-time-code"
                   placeholder="000000"
-                  className="w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-2.5 text-3xl md:text-2xl text-center font-mono tracking-[0.3em] text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#5f7ea6] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
+                  className="w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-lg px-3 py-2.5 text-3xl md:text-2xl text-center font-mono tracking-[0.3em] text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
                 />
               </div>
               <button
                 type="submit"
                 disabled={loading || totpCode.length !== 6}
-                className="w-full flex items-center justify-center gap-2 bg-[#5f7ea6] hover:bg-[#4a6a90] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 transition-colors min-h-[48px]"
+                className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 transition-colors min-h-[48px]"
               >
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Verifying…' : 'Verify'}
@@ -154,7 +154,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => { setChallengeToken(null); setTotpCode(''); setError(''); }}
-              className="mt-4 block w-full text-center text-sm text-[#64748b] hover:text-[#94a3b8] transition-colors"
+              className="mt-4 block w-full text-center text-sm text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
             >
               ← Back to sign in
             </button>
@@ -163,9 +163,9 @@ export default function LoginPage() {
 
         {/* Main login card */}
         {!challengeToken && (
-          <div className="bg-[#0f172a] border border-[rgba(51,65,85,0.5)] rounded-2xl p-6 md:p-8">
-            <h1 className="text-2xl font-bold text-[#f8fafc] mb-1">Welcome back</h1>
-            <p className="text-sm text-[#94a3b8] mb-6">Sign in to your account</p>
+          <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-2xl p-6 md:p-8">
+            <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Welcome back</h1>
+            <p className="text-sm text-[var(--text-secondary)] mb-6">Sign in to your account</p>
 
             {error && (
               <div className="bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.3)] rounded-lg px-3.5 py-2.5 mb-5">
@@ -175,18 +175,18 @@ export default function LoginPage() {
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
-                <label className="block text-sm font-medium text-[#94a3b8] mb-1.5">Email</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Email</label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   placeholder="you@example.com"
-                  className="mobile-input w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#5f7ea6] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
+                  className="mobile-input w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-lg px-3 py-3 md:py-2.5 text-base md:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-[#94a3b8] mb-1.5">Password</label>
+                <label className="block text-sm font-medium text-[var(--text-secondary)] mb-1.5">Password</label>
                 <div className="relative">
                   <input
                     type={showPassword ? 'text' : 'password'}
@@ -194,13 +194,13 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     placeholder="Enter your password"
-                    className="mobile-input w-full bg-[#1e293b] border border-[rgba(51,65,85,0.5)] rounded-lg px-3 py-3 md:py-2.5 pr-10 text-base md:text-sm text-[#f8fafc] placeholder-[#64748b] outline-none focus:border-[#5f7ea6] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
+                    className="mobile-input w-full bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-lg px-3 py-3 md:py-2.5 pr-10 text-base md:text-sm text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[rgba(95,126,166,0.2)] transition-[border-color,box-shadow]"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-[#94a3b8] transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -208,7 +208,7 @@ export default function LoginPage() {
               </div>
 
               <div className="text-right -mt-1">
-                <Link href="/forgot-password" className="text-xs text-[#64748b] hover:text-[#5f7ea6] transition-colors">
+                <Link href="/forgot-password" className="text-xs text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors">
                   Forgot password?
                 </Link>
               </div>
@@ -216,7 +216,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex items-center justify-center gap-2 bg-[#5f7ea6] hover:bg-[#4a6a90] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 mt-1 transition-colors min-h-[48px]"
+                className="w-full flex items-center justify-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-full py-3 md:py-2.5 px-5 mt-1 transition-colors min-h-[48px]"
               >
                 {loading && <Loader2 size={15} className="animate-spin" />}
                 {loading ? 'Signing in…' : 'Sign in'}
@@ -227,10 +227,10 @@ export default function LoginPage() {
             {/* Divider */}
             <div className="relative my-5">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-[rgba(51,65,85,0.5)]" />
+                <div className="w-full border-t border-[var(--border-subtle)]" />
               </div>
               <div className="relative flex justify-center">
-                <span className="bg-[#0f172a] px-3 text-xs text-[#64748b]">or</span>
+                <span className="bg-[var(--bg-raised)] px-3 text-xs text-[var(--text-muted)]">or</span>
               </div>
             </div>
 
@@ -239,7 +239,7 @@ export default function LoginPage() {
               type="button"
               onClick={handleGoogleClick}
               disabled={googleLoading}
-              className="w-full flex items-center justify-center gap-2.5 bg-[#1e293b] border border-[rgba(51,65,85,0.5)] hover:border-[rgba(71,85,105,0.5)] disabled:opacity-50 disabled:cursor-not-allowed text-[#f8fafc] font-medium rounded-full py-2.5 px-5 transition-colors"
+              className="w-full flex items-center justify-center gap-2.5 bg-[var(--bg-card)] border border-[var(--border-subtle)] hover:border-[var(--border-default)] disabled:opacity-50 disabled:cursor-not-allowed text-[var(--text-primary)] font-medium rounded-full py-2.5 px-5 transition-colors"
             >
               {googleLoading ? (
                 <Loader2 size={16} className="animate-spin" />
@@ -257,9 +257,9 @@ export default function LoginPage() {
         )}
 
         {!challengeToken && (
-          <p className="text-center text-sm text-[#94a3b8] mt-6">
+          <p className="text-center text-sm text-[var(--text-secondary)] mt-6">
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-[#5f7ea6] hover:text-[#8ba8cc] font-semibold transition-colors">
+            <Link href="/register" className="text-[var(--accent)] hover:text-[#8ba8cc] font-semibold transition-colors">
               Create one
             </Link>
           </p>

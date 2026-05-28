@@ -436,14 +436,14 @@ export default function BillingPage() {
                       ))}
                     </ul>
                     {isCurrent ? (
-                      <button disabled className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-faint)] rounded-lg py-2 text-sm font-medium">
+                      <button disabled className="w-full bg-[rgba(255,255,255,0.04)] border border-[var(--bg-tinted-hover)] text-[var(--text-faint)] rounded-lg py-2 text-sm font-medium">
                         Current plan
                       </button>
                     ) : status?.pending_tier === tier && status.pending_tier_effective_at ? (
                       <button
                         disabled
                         aria-label={`Downgrade to ${displayName} scheduled for ${pendingDate!.toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' })}`}
-                        className="w-full bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.10)] text-[var(--text-faint)] rounded-lg py-2 text-sm font-medium cursor-not-allowed"
+                        className="w-full bg-[rgba(255,255,255,0.04)] border border-[var(--bg-tinted-hover)] text-[var(--text-faint)] rounded-lg py-2 text-sm font-medium cursor-not-allowed"
                       >
                         Scheduled for {pendingDate!.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                       </button>
@@ -454,7 +454,7 @@ export default function BillingPage() {
                         className={`w-full flex items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium transition-colors ${
                           isUpgrade
                             ? 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-white'
-                            : 'bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.10)] text-[var(--text-secondary)]'
+                            : 'bg-[rgba(255,255,255,0.05)] hover:bg-[var(--border-faint)] border border-[var(--bg-tinted-hover)] text-[var(--text-secondary)]'
                         } disabled:opacity-50`}
                       >
                         {upgrading === tier ? <Loader2 size={13} className="animate-spin" /> : null}

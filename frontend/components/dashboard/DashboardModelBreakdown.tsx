@@ -32,7 +32,7 @@ export default function DashboardModelBreakdown({ models, deltas, isPitchBrand }
                 {pct}% <span className="text-[var(--text-faint)]">({m.mention_count}/{m.total})</span>
               </span>
             </div>
-            <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
+            <div className="h-1.5 w-full bg-[var(--bg-tinted)] rounded-full overflow-hidden">
               <div className="h-full rounded-full transition-[width] duration-500" style={{ width: barWidth, background: barColor }} />
             </div>
           </div>
@@ -49,8 +49,8 @@ export default function DashboardModelBreakdown({ models, deltas, isPitchBrand }
               Unlock with paid plan →
             </a>
           </div>
-          <div className="h-1.5 w-full bg-[rgba(255,255,255,0.06)] rounded-full overflow-hidden">
-            <div className="h-full w-full rounded-full bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.08)_0_4px,transparent_4px_8px)]" />
+          <div className="h-1.5 w-full bg-[var(--bg-tinted)] rounded-full overflow-hidden">
+            <div className="h-full w-full rounded-full bg-[repeating-linear-gradient(45deg,var(--border-faint)_0_4px,transparent_4px_8px)]" />
           </div>
         </div>
       )}

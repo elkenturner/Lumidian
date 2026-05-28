@@ -240,7 +240,7 @@ export default function TrackerPage() {
                 <div className="flex gap-2 mt-auto">
                   <Link
                     href={`/tracker/${brand.id}`}
-                    className="flex items-center justify-center gap-1.5 flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.10)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 text-xs font-medium transition-[color,background-color]"
+                    className="flex items-center justify-center gap-1.5 flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[var(--border-faint)] border border-[var(--bg-tinted-hover)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 text-xs font-medium transition-[color,background-color]"
                   >
                     <Settings size={12} />
                     Settings
@@ -295,7 +295,7 @@ export default function TrackerPage() {
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="e.g. Acme Corp"
                   disabled={creating}
-                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] disabled:opacity-50"
+                  className="w-full bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] disabled:opacity-50"
                 />
               </div>
 
@@ -320,7 +320,7 @@ export default function TrackerPage() {
                         'text-xs font-semibold px-1.5 py-0.5 rounded',
                         formTier === tier.value
                           ? 'bg-[var(--accent)]/20 text-[var(--accent-foreground)]'
-                          : 'bg-[rgba(255,255,255,0.08)] text-[var(--text-muted)]'
+                          : 'bg-[var(--border-faint)] text-[var(--text-muted)]'
                       )}>
                         {tier.label}
                       </span>
@@ -345,7 +345,7 @@ export default function TrackerPage() {
                     onKeyDown={(e) => e.key === 'Enter' && addPrompt()}
                     placeholder="e.g. What is the best CRM software?"
                     disabled={creating}
-                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[rgba(255,255,255,0.10)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] disabled:opacity-50"
+                    className="flex-1 bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 placeholder:text-[var(--text-faint)] disabled:opacity-50"
                   />
                   <button
                     onClick={addPrompt}
@@ -391,7 +391,7 @@ export default function TrackerPage() {
                 <button
                   onClick={() => !creating && setShowModal(false)}
                   disabled={creating}
-                  className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[rgba(255,255,255,0.08)] border border-[rgba(255,255,255,0.10)] text-[var(--text-muted)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+                  className="flex-1 bg-[rgba(255,255,255,0.05)] hover:bg-[var(--border-faint)] border border-[var(--bg-tinted-hover)] text-[var(--text-muted)] rounded-lg px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   Cancel
                 </button>

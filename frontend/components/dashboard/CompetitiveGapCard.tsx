@@ -40,9 +40,9 @@ export function CompetitiveGapCard({
   if (loading) {
     return (
       <div className="card p-5 flex flex-col gap-3">
-        <div className="h-4 w-32 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />
-        <div className="h-10 w-24 bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />
-        <div className="h-12 w-full bg-[rgba(255,255,255,0.06)] rounded animate-pulse" />
+        <div className="h-4 w-32 bg-[var(--bg-tinted)] rounded animate-pulse" />
+        <div className="h-10 w-24 bg-[var(--bg-tinted)] rounded animate-pulse" />
+        <div className="h-12 w-full bg-[var(--bg-tinted)] rounded animate-pulse" />
       </div>
     );
   }
@@ -63,7 +63,7 @@ export function CompetitiveGapCard({
           </p>
           <button
             onClick={onAddCompetitorsClick}
-            className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] bg-[rgba(255,255,255,0.06)] hover:bg-[var(--accent-muted)] border border-[rgba(255,255,255,0.08)] rounded-lg px-2.5 py-1.5 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] bg-[var(--bg-tinted)] hover:bg-[var(--accent-muted)] border border-[var(--border-faint)] rounded-lg px-2.5 py-1.5 transition-colors"
           >
             <Users size={12} />
             Add competitors
@@ -204,7 +204,7 @@ function CardHeader({
             className={`px-2 py-0.5 rounded text-[10px] tabular-nums transition-colors ${
               w === window
                 ? 'bg-[var(--accent)] text-white'
-                : 'bg-[rgba(255,255,255,0.06)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
+                : 'bg-[var(--bg-tinted)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
             }`}
           >
             {w}

@@ -698,8 +698,16 @@ export default function DashboardPage() {
 
           <MethodologyCallout visible={!isFirstRun && score !== null} />
 
+          {/* Mobile: single page-level loader on first analytics load
+              (prevents the 7+ skeleton blocks pulsing simultaneously) */}
+          {!isFirstRun && isMobile && loadingAnalytics && !analytics && (
+            <div className="card flex items-center justify-center py-16">
+              <Loader2 size={20} className="animate-spin text-[var(--accent)]" />
+            </div>
+          )}
+
           {/* Overview */}
-          {!isFirstRun && (
+          {!isFirstRun && !(isMobile && loadingAnalytics && !analytics) && (
           <>
               {/* Brand profile completeness notification */}
               {brandProfile && brandProfile.completion_pct < 100 && (

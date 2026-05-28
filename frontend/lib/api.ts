@@ -1055,7 +1055,6 @@ export interface AgencyClient {
   status: 'onboarding' | 'active' | 'paused' | 'churned';
   retainer_amount_usd: number | null;
   retainer_started_at: string | null;
-  peec_dashboard_url: string | null;
   primary_contact_name: string | null;
   primary_contact_email: string | null;
   brand_id: number | null;
@@ -1069,7 +1068,6 @@ export interface AgencyClientCreate {
   name: string;
   status?: string;
   retainer_amount_usd?: number;
-  peec_dashboard_url?: string;
   primary_contact_name?: string;
   primary_contact_email?: string;
 }
@@ -2047,49 +2045,12 @@ export const siteAudit = {
     api.get(`/site-audit/audit/${auditId}/pdf`, { responseType: 'blob' }).then(r => r.data as Blob),
 }
 
-// ── Agency tasks (sub-project B, 2026-05-12) ─────────────────────────────────
-
-export type TaskStatus = 'open' | 'in_progress' | 'done';
-
-export interface AgencyTask {
-  id: number;
-  agency_client_id: number;
-  title: string;
-  description: string | null;
-  status: TaskStatus;
-  assigned_to_user_id: number | null;
-  assigned_to_name: string | null;
-  due_at: string | null;
-  created_by_user_id: number | null;
-  created_at: string;
-  updated_at: string | null;
-  completed_at: string | null;
-}
+// ── Agency staff (sub-project B, 2026-05-12) ─────────────────────────────────
 
 export interface AgencyStaffMember {
   id: number;
   name: string | null;
   email: string;
-}
-
-export interface MyQueueDraft {
-  draft_id: number;
-  title: string | null;
-  platform: string;
-  status: string;
-  client_id: number;
-  client_name: string;
-  created_at: string;
-}
-
-export interface MyQueueResponse {
-  drafts: MyQueueDraft[];
-  tasks: AgencyTask[];
-}
-
-export async function agencyMyQueue(): Promise<MyQueueResponse> {
-  const res = await api.get<MyQueueResponse>('/agency/my-queue');
-  return res.data;
 }
 
 export async function agencyStaff(): Promise<AgencyStaffMember[]> {
@@ -2115,11 +2076,6 @@ export interface AgencyDocument {
   generated_by_name: string | null;
   generated_at: string;
   updated_at: string | null;
-}
-
-export interface AgencyDocumentWithClient extends AgencyDocument {
-  client_id: number;
-  client_name: string;
 }
 
 export async function agencyListDocumentTemplates(): Promise<DocumentTemplate[]> {
@@ -2159,13 +2115,6 @@ export async function agencyUpdateDocument(documentId: number, bodyMarkdown: str
 
 export async function agencyDeleteDocument(documentId: number): Promise<void> {
   await api.delete(`/agency/documents/${documentId}`);
-}
-
-export async function agencyRecentDocuments(limit = 20, kind?: string): Promise<AgencyDocumentWithClient[]> {
-  const params: Record<string, string | number> = { limit };
-  if (kind) params.kind = kind;
-  const res = await api.get<AgencyDocumentWithClient[]>('/agency/documents/recent', { params });
-  return res.data;
 }
 
 export async function agencyDownloadDocumentPdf(documentId: number): Promise<Blob> {
@@ -2655,4 +2604,53 @@ export async function agencySetClientProposal(
 ): Promise<any> {
   const { data } = await api.patch(`/agency/clients/${clientId}/proposal`, body);
   return data;
+}
+
+// ── Agency milestones (2026-05-26 playbook redesign) ─────────────────────────
+
+export type MilestoneKind =
+  | 'kickoff'
+  | 'sow'
+  | 'initial_audit'
+  | 'strategy_locked'
+  | 'wikipedia_plan'
+  | 'site_plan';
+
+export type MilestoneStatus = 'not_started' | 'in_progress' | 'done' | 'skipped';
+
+export interface AgencyClientMilestone {
+  id: number;
+  agency_client_id: number;
+  kind: MilestoneKind;
+  status: MilestoneStatus;
+  started_at: string | null;
+  target_at: string | null;
+  completed_at: string | null;
+  completed_by: number | null;
+  completed_by_name: string | null;
+  notes: string | null;
+}
+
+export interface AgencyClientMilestoneUpdate {
+  status?: MilestoneStatus;
+  started_at?: string | null;
+  target_at?: string | null;
+  notes?: string | null;
+}
+
+export async function agencyListMilestones(clientId: number): Promise<AgencyClientMilestone[]> {
+  const res = await api.get<AgencyClientMilestone[]>(`/agency/clients/${clientId}/milestones`);
+  return res.data;
+}
+
+export async function agencyUpdateMilestone(
+  clientId: number,
+  kind: MilestoneKind,
+  body: AgencyClientMilestoneUpdate,
+): Promise<AgencyClientMilestone> {
+  const res = await api.patch<AgencyClientMilestone>(
+    `/agency/clients/${clientId}/milestones/${kind}`,
+    body,
+  );
+  return res.data;
 }

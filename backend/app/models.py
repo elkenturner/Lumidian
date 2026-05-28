@@ -775,7 +775,6 @@ class AgencyClient(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="onboarding")
     retainer_amount_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)
     retainer_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    peec_dashboard_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     primary_contact_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     primary_contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     current_proposal_doc_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -817,6 +816,27 @@ class AgencyClientAssignment(Base):
     __table_args__ = (
         UniqueConstraint("agency_client_id", "staff_user_id", name="uq_client_staff_assignment"),
     )
+
+
+class AgencyClientMilestone(Base):
+    __tablename__ = "agency_client_milestones"
+    __table_args__ = (
+        UniqueConstraint("agency_client_id", "kind", name="uq_agency_client_milestones_client_kind"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    agency_client_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("agency_clients.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="not_started")
+    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    target_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    completed_by: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class ClientReviewLink(Base):

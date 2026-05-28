@@ -5,7 +5,9 @@ from app.services.document_engine import (
     audit_initial,  # noqa: F401
     kickoff_checklist,  # noqa: F401
     monthly_report,  # noqa: F401
+    site_plan,  # noqa: F401
     sow,  # noqa: F401
+    wikipedia_plan,  # noqa: F401
 )
 from app.services.document_engine.generator import generate_document
 from app.services.document_engine.registry import (

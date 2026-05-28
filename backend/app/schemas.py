@@ -921,7 +921,6 @@ class AgencyClientCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     status: str | None = None
     retainer_amount_usd: int | None = None
-    peec_dashboard_url: str | None = None
     primary_contact_name: str | None = None
     primary_contact_email: str | None = None
 
@@ -931,7 +930,6 @@ class AgencyClientUpdate(BaseModel):
     status: str | None = None
     retainer_amount_usd: int | None = None
     retainer_started_at: datetime | None = None
-    peec_dashboard_url: str | None = None
     primary_contact_name: str | None = None
     primary_contact_email: str | None = None
 
@@ -961,7 +959,6 @@ class AgencyClientOut(BaseModel):
     status: str
     retainer_amount_usd: int | None = None
     retainer_started_at: datetime | None = None
-    peec_dashboard_url: str | None = None
     primary_contact_name: str | None = None
     primary_contact_email: str | None = None
     brand_id: int | None = None
@@ -973,26 +970,37 @@ class AgencyClientOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class DraftAssignIn(BaseModel):
-    assigned_to_user_id: int | None  # null to unassign
+MILESTONE_KINDS = (
+    "kickoff",
+    "sow",
+    "initial_audit",
+    "strategy_locked",
+    "wikipedia_plan",
+    "site_plan",
+)
+MILESTONE_STATUSES = ("not_started", "in_progress", "done", "skipped")
 
 
-class TodayDraftOut(BaseModel):
-    draft_id: int
-    title: str | None
-    platform: str
-    client_id: int
-    client_name: str
-    assigned_to_user_id: int | None
-    created_at: datetime
+class AgencyClientMilestoneOut(BaseModel):
+    id: int
+    agency_client_id: int
+    kind: str
+    status: str
+    started_at: datetime | None = None
+    target_at: datetime | None = None
+    completed_at: datetime | None = None
+    completed_by: int | None = None
+    completed_by_name: str | None = None
+    notes: str | None = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
-class TodayOut(BaseModel):
-    drafts_to_review: list[TodayDraftOut]
-    drafts_to_review_count: int
-    active_clients: int
-    awaiting_client: list[TodayDraftOut] = []
-    approved: list[TodayDraftOut] = []
+class AgencyClientMilestoneUpdate(BaseModel):
+    status: str | None = None
+    started_at: datetime | None = None
+    target_at: datetime | None = None
+    notes: str | None = None
 
 
 # ── Agency portal shell (2026-05-11) ─────────────────────────────────────────
@@ -1155,79 +1163,12 @@ class ActivityEventOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
-class ActivityEventWithClientOut(ActivityEventOut):
-    client_id: int
-    client_name: str
-
-
 class NoteCreate(BaseModel):
     body: str = Field(min_length=1, max_length=10000)
 
 
 class NoteUpdate(BaseModel):
     body: str = Field(min_length=1, max_length=10000)
-
-
-# ── Agency tasks (sub-project B, 2026-05-12) ─────────────────────────────────
-
-
-_TASK_STATUSES = {"open", "in_progress", "done"}
-
-
-class AgencyTaskCreate(BaseModel):
-    title: str = Field(min_length=1, max_length=255)
-    description: str | None = None
-    due_at: datetime | None = None
-    assigned_to_user_id: int | None = None
-
-
-class AgencyTaskUpdate(BaseModel):
-    title: str | None = Field(default=None, min_length=1, max_length=255)
-    description: str | None = None
-    status: str | None = None
-    due_at: datetime | None = None
-    assigned_to_user_id: int | None = None
-
-    @field_validator("status")
-    @classmethod
-    def validate_status(cls, v: str | None) -> str | None:
-        if v is None:
-            return v
-        if v not in _TASK_STATUSES:
-            raise ValueError(f"status must be one of {sorted(_TASK_STATUSES)}")
-        return v
-
-
-class AgencyTaskOut(BaseModel):
-    id: int
-    agency_client_id: int
-    title: str
-    description: str | None
-    status: str
-    assigned_to_user_id: int | None
-    assigned_to_name: str | None
-    due_at: datetime | None
-    created_by_user_id: int | None
-    created_at: datetime
-    updated_at: datetime | None
-    completed_at: datetime | None
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class MyQueueDraft(BaseModel):
-    draft_id: int
-    title: str | None
-    platform: str
-    status: str
-    client_id: int
-    client_name: str
-    created_at: datetime
-
-
-class MyQueueOut(BaseModel):
-    drafts: list[MyQueueDraft]
-    tasks: list[AgencyTaskOut]
 
 
 class AgencyStaffOut(BaseModel):
@@ -1268,11 +1209,6 @@ class DocumentOut(BaseModel):
     updated_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)
-
-
-class DocumentWithClientOut(DocumentOut):
-    client_id: int
-    client_name: str
 
 
 class DocumentGenerateIn(BaseModel):

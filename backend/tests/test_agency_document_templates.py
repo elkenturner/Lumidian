@@ -12,10 +12,12 @@ from app.models import (
     Brand,
     BrandProfile,
     User,
+    WebsiteAudit,
+    WebsiteAuditRecommendation,
     WikipediaCandidate,
     WikipediaScan,
 )
-from app.services.document_engine import wikipedia_plan  # noqa: F401 — import registers
+from app.services.document_engine import wikipedia_plan, site_plan  # noqa: F401 — import registers
 from app.services.document_engine.registry import get_template
 from tests.conftest import register_and_login
 
@@ -123,3 +125,77 @@ async def test_wikipedia_plan_fetch_data_no_scan(seeded_agency_client_with_brand
         data = await template.fetch_data(db, client_obj)
     assert data["scan"] is None
     assert data["candidates"] == []
+
+
+# ── site_plan fixtures ────────────────────────────────────────────────────────
+
+@pytest.fixture
+async def seeded_brand_with_site_audit(seeded_agency_client_with_brand) -> tuple[int, int]:
+    cid, bid = seeded_agency_client_with_brand
+    async with AsyncSessionLocal() as db:
+        audit = WebsiteAudit(
+            brand_id=bid,
+            status="completed",
+            triggered_by="user",
+            started_at=datetime.utcnow() - timedelta(hours=2),
+            completed_at=datetime.utcnow() - timedelta(hours=1),
+            total_pages=42,
+            overall_score=58,
+            bot_access_score=80,
+            content_score=55,
+            schema_score=40,
+            technical_score=60,
+            render_mode="server",
+            llms_txt_present=False,
+            llms_txt_valid=False,
+        )
+        db.add(audit)
+        await db.flush()
+        for i in range(3):
+            rec = WebsiteAuditRecommendation(
+                audit_id=audit.id,
+                priority="high",
+                priority_score=90 - i * 10,
+                effort="low",
+                category="schema",
+                title=f"Fix {i}",
+                body=f"Body of fix {i}",
+                expected_impact="medium",
+                llm_generated=True,
+            )
+            db.add(rec)
+        await db.commit()
+    return cid, bid
+
+
+# ── site_plan tests ───────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_site_plan_registered():
+    assert get_template("site_plan") is not None
+
+
+@pytest.mark.asyncio
+async def test_site_plan_fetch_data_with_audit(seeded_brand_with_site_audit):
+    client_id, _brand_id = seeded_brand_with_site_audit
+    async with AsyncSessionLocal() as db:
+        client = await db.get(AgencyClient, client_id)
+        template = get_template("site_plan")
+        data = await template.fetch_data(db, client)
+    assert data["audit"] is not None
+    assert data["audit"]["overall_score"] is not None
+    assert len(data["top_fixes"]) >= 1
+    # No code blocks / paste-ready artifacts — those stay internal.
+    for fix in data["top_fixes"]:
+        assert "artifact" not in fix
+
+
+@pytest.mark.asyncio
+async def test_site_plan_fetch_data_no_audit(seeded_agency_client_with_brand):
+    client_id, _brand_id = seeded_agency_client_with_brand
+    async with AsyncSessionLocal() as db:
+        client = await db.get(AgencyClient, client_id)
+        template = get_template("site_plan")
+        data = await template.fetch_data(db, client)
+    assert data["audit"] is None
+    assert data["top_fixes"] == []

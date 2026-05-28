@@ -508,6 +508,8 @@ async def run_migrations():
             UNIQUE(agency_client_id, kind)
         )""",
         "CREATE INDEX IF NOT EXISTS idx_agency_client_milestones_client ON agency_client_milestones(agency_client_id)",
+        # 2026-05-27: Drop Peec column — tracking is in-house now
+        "ALTER TABLE agency_clients DROP COLUMN peec_dashboard_url",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:

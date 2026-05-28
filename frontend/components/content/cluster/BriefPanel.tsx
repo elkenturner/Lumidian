@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { editClusterBrief, type ContentBrief } from "@/lib/api";
 import { BriefVersionHistory } from "./BriefVersionHistory";
 
@@ -141,13 +142,13 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
               )}
               <Field label="Narrative spine">{brief.narrative_spine || <Empty />}</Field>
               {brief.tone_notes && <Field label="Tone notes">{brief.tone_notes}</Field>}
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setEditing(true)}
-                className="btn btn-secondary !py-1.5 text-xs"
               >
                 Edit brief
-              </button>
+              </Button>
             </>
           ) : (
             <>
@@ -196,21 +197,20 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
                 />
               </Field>
               <div className="flex gap-2">
-                <button
-                  type="button"
+                <Button
+                  size="sm"
                   onClick={save}
                   disabled={saving}
-                  className="btn btn-primary !py-1.5 text-xs"
                 >
                   {saving ? "Saving…" : "Save"}
-                </button>
-                <button
-                  type="button"
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => setEditing(false)}
-                  className="btn btn-secondary !py-1.5 text-xs"
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </>
           )}

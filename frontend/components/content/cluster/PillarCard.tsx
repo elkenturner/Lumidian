@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Check, ExternalLink, Sparkles } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   acceptClusterPillar,
   rejectClusterPillar,
@@ -92,22 +93,21 @@ export function PillarCard({ brandId, cluster, candidate, onClusterUpdated }: Pr
         </div>
       </div>
       <div className="flex gap-2">
-        <button
-          type="button"
+        <Button
+          size="sm"
           onClick={accept}
           disabled={busy}
-          className="btn btn-primary !py-1.5 text-xs"
         >
           Accept pillar
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
           onClick={reject}
           disabled={busy}
-          className="btn btn-secondary !py-1.5 text-xs"
         >
           Reject
-        </button>
+        </Button>
       </div>
     </div>
   );

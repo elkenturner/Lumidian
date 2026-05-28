@@ -1,5 +1,6 @@
-// frontend/lib/motion.ts
-import { useEffect, useRef, useState } from 'react';
+// frontend/lib/motion.tsx
+import { useEffect, useRef, useState, type RefObject } from 'react';
+import type { ReactNode } from 'react';
 import { type Variants, useReducedMotion } from 'framer-motion';
 
 // ── Custom easing curves (Emil Kowalski) ─────────────────────────────────────
@@ -139,4 +140,94 @@ export function getReducedMotionVariants(variants: Variants): Variants {
     }
   }
   return reduced;
+}
+
+// ── In-view observer ─────────────────────────────────────────────────────────
+
+export function useInView(threshold = 0.1, rootMargin = '50px'): {
+  ref: RefObject<HTMLDivElement>;
+  inView: boolean;
+} {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    // If element is already visible on mount (above the fold), mark in-view immediately
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight * 0.85) {
+      setInView(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true);
+          observer.disconnect();
+        }
+      },
+      { threshold, rootMargin },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [threshold, rootMargin]);
+
+  return { ref, inView };
+}
+
+// ── FadeUp / ScaleIn wrappers (CSS-driven, no framer-motion dep) ─────────────
+
+const EASE_OUT_CSS = 'cubic-bezier(0.23, 1, 0.32, 1)';
+
+export function FadeUp({
+  children,
+  delay = 0,
+  className = '',
+}: {
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const { ref, inView } = useInView();
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: inView ? 1 : 0,
+        transform: inView ? 'translateY(0)' : 'translateY(10px)',
+        transition: `opacity 0.35s ${EASE_OUT_CSS} ${delay}ms, transform 0.35s ${EASE_OUT_CSS} ${delay}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function ScaleIn({
+  children,
+  delay = 0,
+  className = '',
+}: {
+  children: ReactNode;
+  delay?: number;
+  className?: string;
+}) {
+  const { ref, inView } = useInView();
+  return (
+    <div
+      ref={ref}
+      className={className}
+      style={{
+        opacity: inView ? 1 : 0,
+        transform: inView ? 'scale(1)' : 'scale(0.97)',
+        transition: `opacity 0.4s ${EASE_OUT_CSS} ${delay}ms, transform 0.4s ${EASE_OUT_CSS} ${delay}ms`,
+      }}
+    >
+      {children}
+    </div>
+  );
 }

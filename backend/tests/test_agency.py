@@ -86,19 +86,6 @@ async def test_delete_client_marks_churned(client):
 
 
 @pytest.mark.asyncio
-async def test_today_returns_empty_when_no_drafts(client):
-    await _make_agency_user(client)
-    resp = await client.get("/api/agency/today")
-    assert resp.status_code == 200
-    body = resp.json()
-    assert body["drafts_to_review"] == []
-    assert body["drafts_to_review_count"] == 0
-    assert body["active_clients"] == 0
-    assert body["awaiting_client"] == []
-    assert body["approved"] == []
-
-
-@pytest.mark.asyncio
 async def test_get_review_link_returns_none_when_none_exists(client):
     await _make_agency_user(client)
     create = await client.post("/api/agency/clients", json={"name": "RL One"})

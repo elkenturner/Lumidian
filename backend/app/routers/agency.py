@@ -14,10 +14,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import ensure_client_access, require_admin, require_agency_staff, require_client_access
-from app.models import AgencyClient, AgencyClientAssignment, AgencyClientMilestone, AgencyStaff, AgencyTask, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, ContentPost, Prompt, User
+from app.models import AgencyClient, AgencyClientAssignment, AgencyClientMilestone, AgencyStaff, Brand, ClientActivityEvent, ClientDocument, ClientReviewLink, ContentDraft, ContentPost, Prompt, User
 from app.schemas import (
     ActivityEventOut,
-    ActivityEventWithClientOut,
     AgencyClientCreate,
     AgencyClientMilestoneOut,
     AgencyClientMilestoneUpdate,
@@ -25,29 +24,20 @@ from app.schemas import (
     AgencyClientUpdate,
     AgencyDraftGenerateIn,
     AgencyStaffOut,
-    AgencyTaskCreate,
     ClientProposalUpdateIn,
     ClientStaffAssignmentOut,
-    AgencyTaskOut,
-    AgencyTaskUpdate,
     DocumentGenerateIn,
     DocumentOut,
     DocumentTemplateOut,
     DocumentUpdateIn,
-    DocumentWithClientOut,
-    DraftAssignIn,
     DraftOut,
     DraftStatusUpdateIn,
     MarkPostedIn,
     MILESTONE_KINDS,
     MILESTONE_STATUSES,
-    MyQueueDraft,
-    MyQueueOut,
     NoteCreate,
     NoteUpdate,
     ReviewLinkOut,
-    TodayDraftOut,
-    TodayOut,
 )
 from app.services.document_engine import generate_document, get_template, list_templates
 from app.services.agency_activity import (
@@ -55,9 +45,6 @@ from app.services.agency_activity import (
     EVENT_DRAFT_GENERATED_BY_STAFF,
     EVENT_DRAFT_MARKED_POSTED,
     EVENT_NOTE,
-    EVENT_TASK_ASSIGNED,
-    EVENT_TASK_COMPLETED,
-    EVENT_TASK_CREATED,
 )
 from app.services.drafting_service import generate_gap_draft, ALL_DRAFT_PLATFORMS
 
@@ -258,106 +245,6 @@ async def delete_client(
     if client is None:
         raise HTTPException(status_code=404, detail="Client not found")
     client.status = "churned"
-    await db.commit()
-
-
-@router.get("/today", response_model=TodayOut)
-async def get_today(
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
-):
-    accessible = await _accessible_client_ids(db, user)
-    if accessible is not None and not accessible:
-        return TodayOut(
-            drafts_to_review=[],
-            drafts_to_review_count=0,
-            active_clients=0,
-            awaiting_client=[],
-            approved=[],
-        )
-
-    def _scoped(stmt):
-        return stmt.where(AgencyClient.id.in_(accessible)) if accessible is not None else stmt
-
-    awaiting_staff_q = await db.execute(
-        _scoped(
-            select(ContentDraft, Brand, AgencyClient)
-            .join(Brand, Brand.id == ContentDraft.brand_id)
-            .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
-            .where(ContentDraft.status.in_(("draft", "changes_requested")))
-        )
-        .order_by(ContentDraft.created_at.asc())
-        .limit(50)
-    )
-    awaiting_client_q = await db.execute(
-        _scoped(
-            select(ContentDraft, Brand, AgencyClient)
-            .join(Brand, Brand.id == ContentDraft.brand_id)
-            .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
-            .where(ContentDraft.status == "awaiting_client")
-        )
-        .order_by(ContentDraft.created_at.asc())
-        .limit(50)
-    )
-    approved_q = await db.execute(
-        _scoped(
-            select(ContentDraft, Brand, AgencyClient)
-            .join(Brand, Brand.id == ContentDraft.brand_id)
-            .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
-            .where(ContentDraft.status == "approved")
-        )
-        .order_by(ContentDraft.created_at.asc())
-        .limit(50)
-    )
-
-    def _to_out(rows):
-        return [
-            TodayDraftOut(
-                draft_id=draft.id,
-                title=getattr(draft, "title", None),
-                platform=draft.platform,
-                client_id=ac.id,
-                client_name=ac.name,
-                assigned_to_user_id=draft.assigned_to_user_id,
-                created_at=draft.created_at,
-            )
-            for draft, _b, ac in rows
-        ]
-
-    awaiting_staff = _to_out(awaiting_staff_q.all())
-    awaiting_client = _to_out(awaiting_client_q.all())
-    approved = _to_out(approved_q.all())
-
-    active_clients_stmt = select(func.count(AgencyClient.id)).where(AgencyClient.status == "active")
-    if accessible is not None:
-        active_clients_stmt = active_clients_stmt.where(AgencyClient.id.in_(accessible))
-    active_clients_q = await db.execute(active_clients_stmt)
-    active_clients = active_clients_q.scalar_one() or 0
-
-    return TodayOut(
-        drafts_to_review=awaiting_staff,
-        drafts_to_review_count=len(awaiting_staff),
-        active_clients=active_clients,
-        awaiting_client=awaiting_client,
-        approved=approved,
-    )
-
-
-@router.patch("/drafts/{draft_id}/assign", status_code=http_status.HTTP_204_NO_CONTENT)
-async def assign_draft(
-    draft_id: int,
-    body: DraftAssignIn,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
-):
-    draft = await db.get(ContentDraft, draft_id)
-    if draft is None:
-        raise HTTPException(status_code=404, detail="Draft not found")
-    brand = await db.get(Brand, draft.brand_id)
-    if brand is None or brand.agency_client_id is None:
-        raise HTTPException(status_code=404, detail="Draft has no agency client")
-    await ensure_client_access(db, user, brand.agency_client_id)
-    draft.assigned_to_user_id = body.assigned_to_user_id
     await db.commit()
 
 
@@ -569,233 +456,6 @@ async def delete_note(
     await db.commit()
 
 
-@router.get("/activity/recent", response_model=list[ActivityEventWithClientOut])
-async def list_recent_activity(
-    limit: int = 10,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
-):
-    from datetime import timedelta
-
-    accessible = await _accessible_client_ids(db, user)
-    if accessible is not None and not accessible:
-        return []
-    limit = max(1, min(limit, 50))
-    cutoff = datetime.utcnow() - timedelta(days=7)
-    stmt = (
-        select(ClientActivityEvent, AgencyClient)
-        .join(AgencyClient, AgencyClient.id == ClientActivityEvent.agency_client_id)
-        .where(ClientActivityEvent.created_at >= cutoff)
-        .order_by(ClientActivityEvent.id.desc())
-        .limit(limit)
-    )
-    if accessible is not None:
-        stmt = stmt.where(ClientActivityEvent.agency_client_id.in_(accessible))
-    rows = (await db.execute(stmt)).all()
-    results: list[ActivityEventWithClientOut] = []
-    for event, ac in rows:
-        base = await _event_to_out(db, event)
-        results.append(
-            ActivityEventWithClientOut(
-                **base.model_dump(),
-                client_id=ac.id,
-                client_name=ac.name,
-            )
-        )
-    return results
-
-
-# ── Task helpers ──────────────────────────────────────────────────────────────
-
-async def _task_to_out(db: AsyncSession, task: AgencyTask) -> AgencyTaskOut:
-    assignee_name: str | None = None
-    if task.assigned_to_user_id is not None:
-        u = await db.get(User, task.assigned_to_user_id)
-        assignee_name = (u.name or u.email) if u else None
-    return AgencyTaskOut(
-        id=task.id,
-        agency_client_id=task.agency_client_id,
-        title=task.title,
-        description=task.description,
-        status=task.status,
-        assigned_to_user_id=task.assigned_to_user_id,
-        assigned_to_name=assignee_name,
-        due_at=task.due_at,
-        created_by_user_id=task.created_by_user_id,
-        created_at=task.created_at,
-        updated_at=task.updated_at,
-        completed_at=task.completed_at,
-    )
-
-
-# ── Task endpoints ────────────────────────────────────────────────────────────
-
-@router.get("/clients/{client_id}/tasks", response_model=list[AgencyTaskOut])
-async def list_client_tasks(
-    client_id: int,
-    status: str | None = None,
-    assigned_to: int | None = None,
-    db: AsyncSession = Depends(get_db),
-    _user: User = Depends(require_client_access),
-):
-    client = await db.get(AgencyClient, client_id)
-    if client is None:
-        raise HTTPException(status_code=404, detail="Client not found")
-    stmt = select(AgencyTask).where(AgencyTask.agency_client_id == client_id)
-    if status:
-        stmt = stmt.where(AgencyTask.status == status)
-    if assigned_to is not None:
-        stmt = stmt.where(AgencyTask.assigned_to_user_id == assigned_to)
-    stmt = stmt.order_by(AgencyTask.due_at.asc().nulls_last(), AgencyTask.created_at.asc())
-    rows = (await db.execute(stmt)).scalars().all()
-    return [await _task_to_out(db, t) for t in rows]
-
-
-@router.post("/clients/{client_id}/tasks", response_model=AgencyTaskOut, status_code=http_status.HTTP_201_CREATED)
-async def create_task(
-    client_id: int,
-    body: AgencyTaskCreate,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_client_access),
-):
-    client = await db.get(AgencyClient, client_id)
-    if client is None:
-        raise HTTPException(status_code=404, detail="Client not found")
-    task = AgencyTask(
-        agency_client_id=client_id,
-        title=body.title.strip(),
-        description=body.description,
-        status="open",
-        assigned_to_user_id=body.assigned_to_user_id,
-        due_at=body.due_at,
-        created_by_user_id=user.id,
-    )
-    db.add(task)
-    await db.flush()
-    await emit_event(
-        db,
-        agency_client_id=client_id,
-        event_type=EVENT_TASK_CREATED,
-        body=f"Created task '{task.title}'",
-        actor_user_id=user.id,
-        payload={"task_id": task.id},
-    )
-    await db.commit()
-    await db.refresh(task)
-    return await _task_to_out(db, task)
-
-
-@router.patch("/tasks/{task_id}", response_model=AgencyTaskOut)
-async def update_task(
-    task_id: int,
-    body: AgencyTaskUpdate,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
-):
-    task = await db.get(AgencyTask, task_id)
-    if task is None:
-        raise HTTPException(status_code=404, detail="Task not found")
-    await ensure_client_access(db, user, task.agency_client_id)
-    prev_assignee = task.assigned_to_user_id
-    prev_status = task.status
-    data = body.model_dump(exclude_unset=True)
-    for field, value in data.items():
-        setattr(task, field, value)
-    if "status" in data:
-        if data["status"] == "done" and task.completed_at is None:
-            task.completed_at = datetime.utcnow()
-        elif data["status"] != "done":
-            task.completed_at = None
-    task.updated_at = datetime.utcnow()
-
-    if "assigned_to_user_id" in data and data["assigned_to_user_id"] != prev_assignee:
-        new_assignee_name: str | None = None
-        if task.assigned_to_user_id is not None:
-            u = await db.get(User, task.assigned_to_user_id)
-            new_assignee_name = (u.name or u.email) if u else None
-        await emit_event(
-            db,
-            agency_client_id=task.agency_client_id,
-            event_type=EVENT_TASK_ASSIGNED,
-            body=f"Assigned task '{task.title}' to {new_assignee_name or 'unassigned'}",
-            actor_user_id=user.id,
-            payload={"task_id": task.id, "prev_assignee_id": prev_assignee, "next_assignee_id": task.assigned_to_user_id},
-        )
-    if "status" in data and data["status"] == "done" and prev_status != "done":
-        await emit_event(
-            db,
-            agency_client_id=task.agency_client_id,
-            event_type=EVENT_TASK_COMPLETED,
-            body=f"Completed task '{task.title}'",
-            actor_user_id=user.id,
-            payload={"task_id": task.id},
-        )
-
-    await db.commit()
-    await db.refresh(task)
-    return await _task_to_out(db, task)
-
-
-@router.delete("/tasks/{task_id}", status_code=http_status.HTTP_204_NO_CONTENT)
-async def delete_task(
-    task_id: int,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
-):
-    task = await db.get(AgencyTask, task_id)
-    if task is None:
-        raise HTTPException(status_code=404, detail="Task not found")
-    await ensure_client_access(db, user, task.agency_client_id)
-    await db.delete(task)
-    await db.commit()
-
-
-_ACTIONABLE_DRAFT_STATUSES = ("draft", "changes_requested", "approved")
-
-
-@router.get("/my-queue", response_model=MyQueueOut)
-async def my_queue(
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
-):
-    drafts_q = await db.execute(
-        select(ContentDraft, Brand, AgencyClient)
-        .join(Brand, Brand.id == ContentDraft.brand_id)
-        .join(AgencyClient, AgencyClient.id == Brand.agency_client_id)
-        .where(
-            ContentDraft.assigned_to_user_id == user.id,
-            ContentDraft.status.in_(_ACTIONABLE_DRAFT_STATUSES),
-        )
-        .order_by(ContentDraft.created_at.asc())
-        .limit(100)
-    )
-    drafts = [
-        MyQueueDraft(
-            draft_id=d.id,
-            title=getattr(d, "title", None),
-            platform=d.platform,
-            status=d.status,
-            client_id=ac.id,
-            client_name=ac.name,
-            created_at=d.created_at,
-        )
-        for d, _b, ac in drafts_q.all()
-    ]
-
-    tasks_q = await db.execute(
-        select(AgencyTask)
-        .where(
-            AgencyTask.assigned_to_user_id == user.id,
-            AgencyTask.status != "done",
-        )
-        .order_by(AgencyTask.due_at.asc().nulls_last(), AgencyTask.created_at.asc())
-        .limit(100)
-    )
-    tasks = [await _task_to_out(db, t) for t in tasks_q.scalars().all()]
-
-    return MyQueueOut(drafts=drafts, tasks=tasks)
-
-
 @router.get("/staff", response_model=list[AgencyStaffOut])
 async def list_staff(
     db: AsyncSession = Depends(get_db),
@@ -934,41 +594,6 @@ async def list_client_documents(
     stmt = stmt.order_by(ClientDocument.generated_at.desc())
     rows = (await db.execute(stmt)).scalars().all()
     return [await _doc_to_out(db, d) for d in rows]
-
-
-@router.get("/documents/recent", response_model=list[DocumentWithClientOut])
-async def list_recent_documents(
-    limit: int = 20,
-    kind: str | None = None,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
-):
-    accessible = await _accessible_client_ids(db, user)
-    if accessible is not None and not accessible:
-        return []
-    limit = max(1, min(limit, 100))
-    stmt = (
-        select(ClientDocument, AgencyClient)
-        .join(AgencyClient, AgencyClient.id == ClientDocument.agency_client_id)
-        .order_by(ClientDocument.generated_at.desc())
-        .limit(limit)
-    )
-    if kind:
-        stmt = stmt.where(ClientDocument.kind == kind)
-    if accessible is not None:
-        stmt = stmt.where(ClientDocument.agency_client_id.in_(accessible))
-    rows = (await db.execute(stmt)).all()
-    results: list[DocumentWithClientOut] = []
-    for doc, ac in rows:
-        base = await _doc_to_out(db, doc)
-        results.append(
-            DocumentWithClientOut(
-                **base.model_dump(),
-                client_id=ac.id,
-                client_name=ac.name,
-            )
-        )
-    return results
 
 
 @router.get("/documents/{document_id}", response_model=DocumentOut)

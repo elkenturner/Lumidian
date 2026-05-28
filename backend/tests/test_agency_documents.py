@@ -30,12 +30,20 @@ async def _create_client_via_api(client, name: str = "DocCo") -> tuple[int, int]
 
 
 @pytest.mark.asyncio
-async def test_list_templates_returns_four(client):
+async def test_list_templates_returns_all(client):
     await _make_agency_user(client)
     resp = await client.get("/api/agency/document-templates")
     assert resp.status_code == 200
     kinds = {t["kind"] for t in resp.json()}
-    assert kinds == {"agency_weekly_report", "audit_initial", "sow", "monthly_report", "kickoff_checklist"}
+    assert kinds == {
+        "agency_weekly_report",
+        "audit_initial",
+        "sow",
+        "monthly_report",
+        "kickoff_checklist",
+        "wikipedia_plan",
+        "site_plan",
+    }
 
 
 @pytest.mark.asyncio
@@ -120,21 +128,6 @@ async def test_delete_document(client, db_session):
     assert resp.status_code == 204
     refreshed = await db_session.get(ClientDocument, did)
     assert refreshed is None
-
-
-@pytest.mark.asyncio
-async def test_recent_documents_returns_with_client_name(client):
-    await _make_agency_user(client)
-    cid, _ = await _create_client_via_api(client, name="RecentDocCo")
-    with patch(
-        "app.services.document_engine.generator.call_claude",
-        new=AsyncMock(return_value="# R"),
-    ):
-        await client.post(f"/api/agency/clients/{cid}/documents", json={"kind": "monthly_report"})
-    resp = await client.get("/api/agency/documents/recent")
-    assert resp.status_code == 200
-    docs = resp.json()
-    assert any(d["client_name"] == "RecentDocCo" for d in docs)
 
 
 @pytest.mark.asyncio

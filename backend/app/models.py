@@ -775,7 +775,6 @@ class AgencyClient(Base):
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="onboarding")
     retainer_amount_usd: Mapped[int | None] = mapped_column(Integer, nullable=True)
     retainer_started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    peec_dashboard_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
     primary_contact_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     primary_contact_email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     current_proposal_doc_url: Mapped[str | None] = mapped_column(String(500), nullable=True)

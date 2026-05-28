@@ -921,7 +921,6 @@ class AgencyClientCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     status: str | None = None
     retainer_amount_usd: int | None = None
-    peec_dashboard_url: str | None = None
     primary_contact_name: str | None = None
     primary_contact_email: str | None = None
 
@@ -931,7 +930,6 @@ class AgencyClientUpdate(BaseModel):
     status: str | None = None
     retainer_amount_usd: int | None = None
     retainer_started_at: datetime | None = None
-    peec_dashboard_url: str | None = None
     primary_contact_name: str | None = None
     primary_contact_email: str | None = None
 
@@ -961,7 +959,6 @@ class AgencyClientOut(BaseModel):
     status: str
     retainer_amount_usd: int | None = None
     retainer_started_at: datetime | None = None
-    peec_dashboard_url: str | None = None
     primary_contact_name: str | None = None
     primary_contact_email: str | None = None
     brand_id: int | None = None

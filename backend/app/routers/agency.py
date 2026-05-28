@@ -100,7 +100,6 @@ async def _client_to_out(db: AsyncSession, client: AgencyClient) -> AgencyClient
         status=client.status,
         retainer_amount_usd=client.retainer_amount_usd,
         retainer_started_at=client.retainer_started_at,
-        peec_dashboard_url=client.peec_dashboard_url,
         primary_contact_name=client.primary_contact_name,
         primary_contact_email=client.primary_contact_email,
         brand_id=brand_id,
@@ -177,7 +176,6 @@ async def create_client(
         slug=slug,
         status=body.status or "onboarding",
         retainer_amount_usd=body.retainer_amount_usd,
-        peec_dashboard_url=body.peec_dashboard_url,
         primary_contact_name=body.primary_contact_name,
         primary_contact_email=body.primary_contact_email,
     )

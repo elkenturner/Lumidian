@@ -21,44 +21,14 @@ import {
 } from 'lucide-react';
 import LumidianLogo from '@/components/LumidianLogo';
 import { TIER_DISPLAY_NAMES, TIER_PRICES } from '@/lib/tiers';
+import { useInView, FadeUp, ScaleIn } from '@/lib/motion';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ANIMATION HOOKS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Design system easing — matches --ease-out in globals.css
-const EASE_OUT = 'cubic-bezier(0.23, 1, 0.32, 1)';
-
-function useInView(threshold = 0.1, rootMargin = '50px') {
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const rect = el.getBoundingClientRect();
-    if (rect.top < window.innerHeight * 0.85) {
-      setInView(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          observer.disconnect();
-        }
-      },
-      { threshold, rootMargin }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [threshold, rootMargin]);
-
-  return { ref, inView };
-}
-
+// Local useCountUp — returns { ref, value: number } shape used by DashboardMockup.
+// The canonical useCountUp in lib/motion returns a plain string; signatures differ.
 function useCountUp(target: number, duration = 1200) {
   const [value, setValue] = useState(0);
   const triggered = useRef(false);
@@ -80,56 +50,6 @@ function useCountUp(target: number, duration = 1200) {
   }, [inView, target, duration]);
 
   return { ref, value };
-}
-
-function FadeUp({
-  children,
-  delay = 0,
-  className = '',
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  className?: string;
-}) {
-  const { ref, inView } = useInView();
-  return (
-    <div
-      ref={ref}
-      className={className}
-      style={{
-        opacity: inView ? 1 : 0,
-        transform: inView ? 'translateY(0)' : 'translateY(10px)',
-        transition: `opacity 0.35s ${EASE_OUT} ${delay}ms, transform 0.35s ${EASE_OUT} ${delay}ms`,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function ScaleIn({
-  children,
-  delay = 0,
-  className = '',
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  className?: string;
-}) {
-  const { ref, inView } = useInView();
-  return (
-    <div
-      ref={ref}
-      className={className}
-      style={{
-        opacity: inView ? 1 : 0,
-        transform: inView ? 'scale(1)' : 'scale(0.97)',
-        transition: `opacity 0.4s ${EASE_OUT} ${delay}ms, transform 0.4s ${EASE_OUT} ${delay}ms`,
-      }}
-    >
-      {children}
-    </div>
-  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

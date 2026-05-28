@@ -68,7 +68,6 @@ export default function AgencyClientsPage() {
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Retainer</th>
                 <th className="px-4 py-3">Drafts pending</th>
-                <th className="px-4 py-3">Peec</th>
               </tr>
             </thead>
             <tbody>
@@ -95,20 +94,6 @@ export default function AgencyClientsPage() {
                     {c.retainer_amount_usd ? `$${c.retainer_amount_usd}/mo` : '—'}
                   </td>
                   <td className="px-4 py-3">{c.drafts_pending}</td>
-                  <td className="px-4 py-3">
-                    {c.peec_dashboard_url ? (
-                      <a
-                        href={c.peec_dashboard_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-xs underline"
-                      >
-                        Open
-                      </a>
-                    ) : (
-                      <span className="text-xs text-[var(--text-muted)]">—</span>
-                    )}
-                  </td>
                 </tr>
               ))}
             </tbody>

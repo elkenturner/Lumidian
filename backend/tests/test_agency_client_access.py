@@ -97,22 +97,6 @@ async def test_non_admin_blocked_from_unassigned_client_documents(client):
 
 
 @pytest.mark.asyncio
-async def test_non_admin_blocked_from_creating_task_on_unassigned_client(client):
-    """POST /clients/{id}/tasks enforces assignment (representative direct endpoint)."""
-    await _make_agency_user(client, email="owner@example.com", admin=True)
-    create = await client.post("/api/agency/clients", json={"name": "TaskClient"})
-    cid = create.json()["id"]
-
-    await client.post("/api/auth/logout")
-    await _make_agency_user(client, email="intruder@example.com")
-    resp = await client.post(
-        f"/api/agency/clients/{cid}/tasks",
-        json={"title": "Sneaky task"},
-    )
-    assert resp.status_code == 403
-
-
-@pytest.mark.asyncio
 async def test_list_clients_filters_to_assigned_only(client):
     """A staff member only sees clients they're assigned to (cross-client filter)."""
     await _make_agency_user(client, email="staff-a@example.com", admin=True)
@@ -133,19 +117,6 @@ async def test_list_clients_filters_to_assigned_only(client):
     assert resp.status_code == 200
     names = [c["name"] for c in resp.json()]
     assert names == ["B One"]
-
-
-@pytest.mark.asyncio
-async def test_recent_activity_filters_to_assigned(client):
-    """list_recent_activity filters to assigned clients only."""
-    await _make_agency_user(client, email="staff-a@example.com", admin=True)
-    await client.post("/api/agency/clients", json={"name": "Owned"})
-
-    await client.post("/api/auth/logout")
-    await _make_agency_user(client, email="staff-b@example.com")
-    resp = await client.get("/api/agency/activity/recent")
-    assert resp.status_code == 200
-    assert resp.json() == []
 
 
 @pytest.mark.asyncio

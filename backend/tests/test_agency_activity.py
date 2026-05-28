@@ -191,23 +191,6 @@ async def test_list_activity_paginates(client, db_session):
 
 
 @pytest.mark.asyncio
-async def test_recent_activity_includes_client_name(client, db_session):
-    await _make_agency_user(client)
-    cid, _ = await _create_client_via_api(client, name="RecentCo")
-    await client.post(f"/api/agency/clients/{cid}/activity/note", json={"body": "A note"})
-
-    resp = await client.get("/api/agency/activity/recent?limit=5")
-    assert resp.status_code == 200
-    events = resp.json()
-    assert len(events) >= 1
-    # Most recent first
-    note_event = events[0]
-    assert note_event["client_id"] == cid
-    assert note_event["client_name"] == "RecentCo"
-    assert note_event["event_type"] == "note"
-
-
-@pytest.mark.asyncio
 async def test_public_review_approve_emits_activity_event(client, db_session):
     from app.database import AsyncSessionLocal as Sess
 

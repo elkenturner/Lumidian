@@ -24,7 +24,7 @@ function formatGap(pp: number | null): string {
 
 function gapColor(pp: number | null): string {
   if (pp === null || pp === 0) return 'var(--text-faint)';
-  return pp > 0 ? 'var(--success)' : 'var(--danger)';
+  return pp > 0 ? 'var(--success-text)' : 'var(--danger-text)';
 }
 
 function slopeColor(trend: { gap_pp: number }[]): string {

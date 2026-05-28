@@ -27,13 +27,10 @@ export default function StatsGrid({ totalPrompts, daysSinceFirst, publishedCount
     label: string;
     value: string | number;
     icon: React.ElementType;
-    accent: string;
-    iconBg: string;
-    borderTop: string;
   }> = [
-    { label: 'Prompts Tracked',   value: totalPrompts || '\u2014',   icon: MessageSquare, accent: 'var(--color-gemini)', iconBg: 'var(--color-gemini-muted)',  borderTop: 'var(--color-gemini)' },
-    { label: 'Days Tracking',     value: daysSinceFirst != null ? daysSinceFirst : '\u2014', icon: TrendingUp, accent: 'var(--warning-text)', iconBg: 'var(--warning-muted)', borderTop: 'var(--warning)' },
-    { label: 'Content Published', value: publishedCount || '\u2014', icon: CheckCircle2, accent: 'var(--success-text)', iconBg: 'var(--success-muted)', borderTop: 'var(--success)' },
+    { label: 'Prompts Tracked',   value: totalPrompts || '\u2014',                            icon: MessageSquare },
+    { label: 'Days Tracking',     value: daysSinceFirst != null ? daysSinceFirst : '\u2014',  icon: TrendingUp },
+    { label: 'Content Published', value: publishedCount || '\u2014',                          icon: CheckCircle2 },
   ];
 
   return (
@@ -43,18 +40,14 @@ export default function StatsGrid({ totalPrompts, daysSinceFirst, publishedCount
       animate="visible"
       className={isMobile ? 'snap-scroll-x gap-3 mb-4 -mx-4 px-4' : 'grid grid-cols-3 gap-3 mb-4'}
     >
-      {items.map(({ label, value, icon: Icon, accent, iconBg, borderTop }) => (
+      {items.map(({ label, value, icon: Icon }) => (
         <motion.div
           key={label}
           variants={staggerChild}
-          className={`card-hover bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-xl px-4 py-4 flex items-center gap-3 ${isMobile ? 'min-w-[170px]' : ''}`}
-          style={{ borderTopColor: borderTop, borderTopWidth: 2 }}
+          className={`card card-hover px-4 py-4 flex items-center gap-3 ${isMobile ? 'min-w-[170px]' : ''}`}
         >
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0"
-            style={{ background: iconBg, border: `1px solid ${accent}33` }}
-          >
-            <Icon size={15} style={{ color: accent }} />
+          <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-[var(--bg-tinted)] border border-[var(--border-faint)] text-[var(--text-muted)]">
+            <Icon size={15} />
           </div>
           <div className="min-w-0">
             <p className="text-xl font-bold text-[var(--text-primary)] leading-tight tabular-nums">

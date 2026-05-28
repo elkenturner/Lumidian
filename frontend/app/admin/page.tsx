@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   Users, Activity, BarChart2, Zap, Loader2, RefreshCw,
   Shield, Clock, PauseCircle, PlayCircle, Trash2, FileText, ChevronDown, ChevronUp,
+  AlertCircle,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { logError } from '@/lib/utils/errors';
@@ -15,6 +16,7 @@ import {
   AdminUser, AdminRun, AdminStats,
 } from '@/lib/api';
 import { AppToast, ToastData } from '@/components/AppToast';
+import { EmptyState } from '@/components/ui/empty-state';
 
 function StatCard({ label, value, icon: Icon }: { label: string; value: number | string; icon: React.ElementType }) {
   return (
@@ -173,10 +175,20 @@ export default function AdminPage() {
   if (error) {
     return (
       <div className="min-h-screen bg-[var(--bg-base)] flex items-center justify-center px-4">
-        <div className="bg-[#7f1d1d]/20 border border-[#991b1b]/30 rounded-xl p-6 text-center max-w-sm">
-          <Shield size={32} className="text-[var(--danger)] mx-auto mb-3" />
-          <p className="text-[var(--danger)] text-sm">{error}</p>
-        </div>
+        <EmptyState
+          icon={<AlertCircle size={24} />}
+          title="Couldn't load admin data"
+          body={error}
+          action={
+            <button
+              onClick={load}
+              className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--text-on-accent)] rounded-lg px-4 py-2 text-sm font-semibold transition-colors"
+            >
+              <RefreshCw size={14} />
+              Retry
+            </button>
+          }
+        />
       </div>
     );
   }

@@ -57,6 +57,7 @@ import { ManagePromptsModal } from '@/components/ManagePromptsModal';
 import { CompetitorModal } from '@/components/CompetitorModal';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Callout } from '@/components/ui/callout';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBrand } from '@/contexts/BrandContext';
 import { format } from 'date-fns';
@@ -697,24 +698,31 @@ export default function DashboardPage() {
 
           <MethodologyCallout visible={!isFirstRun && score !== null} />
 
+          {/* Mobile: single page-level loader on first analytics load
+              (prevents the 7+ skeleton blocks pulsing simultaneously) */}
+          {!isFirstRun && isMobile && loadingAnalytics && !analytics && (
+            <div className="card flex items-center justify-center py-16">
+              <Loader2 size={20} className="animate-spin text-[var(--accent)]" />
+            </div>
+          )}
+
           {/* Overview */}
-          {!isFirstRun && (
+          {!isFirstRun && !(isMobile && loadingAnalytics && !analytics) && (
           <>
               {/* Brand profile completeness notification */}
               {brandProfile && brandProfile.completion_pct < 100 && (
-                <div
-                  className="mb-4 flex items-center justify-between px-4 py-2 bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-lg"
-                >
-                  <p className="text-xs text-[var(--text-muted)]">
-                    Complete your brand profile to improve draft quality
-                  </p>
-                  <Link
-                    href="/settings?tab=profile"
-                    className="text-xs text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors font-medium whitespace-nowrap ml-4"
-                  >
-                    Complete profile &rarr;
-                  </Link>
-                </div>
+                <Callout
+                  variant="inline"
+                  body="Complete your brand profile to improve draft quality"
+                  action={
+                    <Link
+                      href="/settings?tab=profile"
+                      className="text-xs text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors font-medium whitespace-nowrap"
+                    >
+                      Complete profile &rarr;
+                    </Link>
+                  }
+                />
               )}
 
               {/* Quick stats row */}

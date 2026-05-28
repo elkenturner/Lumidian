@@ -1408,8 +1408,31 @@ export default function SettingsPage() {
                   {(() => {
                     const limit = brand.prompt_limit ?? (user?.prompt_limit ?? 25);
                     const isUnlimited = limit >= 99999;
-                    const color = isUnlimited ? 'var(--text-muted)' : brand.prompts.length >= limit ? 'var(--danger)' : brand.prompts.length >= limit * 0.8 ? 'var(--warning)' : 'var(--text-muted)';
-                    return <span style={{ color }}>{brand.prompts.length}{isUnlimited ? '' : `/${limit}`} prompts</span>;
+                    const atLimit = !isUnlimited && brand.prompts.length >= limit;
+                    const approachingLimit = !isUnlimited && !atLimit && brand.prompts.length >= limit * 0.8;
+                    const color = atLimit
+                      ? 'var(--warning-text)'
+                      : approachingLimit
+                      ? 'var(--warning-text)'
+                      : 'var(--text-muted)';
+                    return (
+                      <>
+                        <span style={{ color }}>
+                          {brand.prompts.length}{isUnlimited ? '' : `/${limit}`} prompts
+                        </span>
+                        {atLimit && (
+                          <>
+                            <span className="mx-1.5 text-[var(--text-faint)]">·</span>
+                            <Link
+                              href="/settings/billing"
+                              className="text-[var(--accent-light)] hover:text-[var(--text-primary)] transition-colors font-medium"
+                            >
+                              Upgrade for more →
+                            </Link>
+                          </>
+                        )}
+                      </>
+                    );
                   })()}
                 </p>
               </div>

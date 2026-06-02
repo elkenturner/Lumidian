@@ -76,6 +76,13 @@ from datetime import UTC
 from app import state as _state
 
 
+# Outer ceiling on a single cluster's full pipeline (brief + evidence + writers).
+# Defense in depth — the per-piece timeout already protects asyncio.gather, but
+# this prevents pre-writer phases (brief LLM, Serper) from indefinitely
+# stalling the per-brand for-loop. Sized well above PIECE_TIMEOUT_SECONDS × 5.
+CLUSTER_TIMEOUT_SECONDS = 900.0
+
+
 async def _bg_generate_drafts(brand_id: int, max_gaps: int, source: str) -> None:
     """Background coroutine: regenerate clusters per prompt for this brand.
 
@@ -84,6 +91,7 @@ async def _bg_generate_drafts(brand_id: int, max_gaps: int, source: str) -> None
     arg now bounds the number of prompts processed (was: top gaps to draft).
     The legacy ``auto_draft_top_gaps`` path is bypassed.
     """
+    import asyncio
     from sqlalchemy import select
     from app.database import AsyncSessionLocal
     from app.models import Brand, Prompt, User
@@ -107,7 +115,16 @@ async def _bg_generate_drafts(brand_id: int, max_gaps: int, source: str) -> None
             for prompt in prompts[:max_gaps]:
                 try:
                     cluster = await get_or_create_cluster(db, brand_id=brand_id, prompt_id=prompt.id)
-                    await regenerate_cluster(db, cluster_id=cluster.id, tier=tier)
+                    await asyncio.wait_for(
+                        regenerate_cluster(db, cluster_id=cluster.id, tier=tier),
+                        timeout=CLUSTER_TIMEOUT_SECONDS,
+                    )
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "_bg_generate_drafts: cluster regen exceeded %ss for prompt %d (brand %d) — advancing",
+                        CLUSTER_TIMEOUT_SECONDS, prompt.id, brand_id,
+                    )
+                    continue
                 except Exception:
                     logger.exception(
                         "_bg_generate_drafts: cluster regen failed for prompt %d (brand %d)",

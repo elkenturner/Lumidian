@@ -620,20 +620,26 @@ async def run_migrations():
         await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_content_clusters_brand_id ON content_clusters (brand_id)"))
 
         # Add cluster_id column to content_drafts (idempotent: PRAGMA check)
+        # The clean-slate DELETE below MUST run only once — guard it with the
+        # same column-add condition. On the first migration after introducing
+        # clusters we wipe pre-cluster orphan drafts; subsequent restarts must
+        # not touch existing drafts or every redeploy nukes cluster pieces.
         result = await conn.execute(text("PRAGMA table_info(content_drafts)"))
         cols = {row[1] for row in result.fetchall()}
         if "cluster_id" not in cols:
             await conn.execute(text("ALTER TABLE content_drafts ADD COLUMN cluster_id INTEGER REFERENCES content_clusters(id) ON DELETE SET NULL"))
             await conn.execute(text("CREATE INDEX IF NOT EXISTS idx_content_drafts_cluster_id ON content_drafts (cluster_id)"))
 
-        # Clean-slate: delete all unposted ContentDraft rows.
-        # Drafts referenced by ContentPost or DraftAttribution are retained with cluster_id NULL.
-        await conn.execute(text("""
-            DELETE FROM content_drafts
-            WHERE id NOT IN (SELECT draft_id FROM content_posts)
-              AND id NOT IN (SELECT draft_id FROM draft_attributions)
-        """))
-        logger.info("Migration applied: content clusters tables, cluster_id column, clean-slate draft delete")
+            # One-time clean-slate: drafts referenced by ContentPost or
+            # DraftAttribution are retained.
+            await conn.execute(text("""
+                DELETE FROM content_drafts
+                WHERE id NOT IN (SELECT draft_id FROM content_posts)
+                  AND id NOT IN (SELECT draft_id FROM draft_attributions)
+            """))
+            logger.info("Migration applied: content clusters tables, cluster_id column, one-time clean-slate draft delete")
+        else:
+            logger.debug("Migration: cluster_id column already present, skipping clean-slate")
 
     # --- Migration: wikipedia surface (2026-05-19) ---
     async with engine.begin() as conn:

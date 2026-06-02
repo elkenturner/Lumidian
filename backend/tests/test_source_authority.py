@@ -45,3 +45,14 @@ def test_t1_covers_major_categories():
     assert wire & T1_DOMAINS
     assert science & T1_DOMAINS
     assert policy & T1_DOMAINS
+
+
+def test_t1_includes_major_academic_medical_centers():
+    # Healthcare prompts need cancer-center authority alongside .gov/peer review.
+    medical = {
+        "mayoclinic.org", "clevelandclinic.org", "hopkinsmedicine.org",
+        "mskcc.org",
+    }
+    assert medical <= T1_DOMAINS
+    for d in medical:
+        assert classify_domain(d) == "T1"

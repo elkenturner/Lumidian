@@ -87,8 +87,12 @@ async def fetch_and_dedupe(queries: list[str]) -> list[dict[str, Any]]:
 from app.services.source_authority import classify_domain  # noqa: E402
 
 PACK_CAP = 10
-MIN_T1 = 2
-MIN_T1_PLUS_T2 = 4
+# Authority floor for the cluster pack. Lowered from (2, 4) — the strict floor
+# was rejecting prompts where Serper returned a single solid authoritative
+# result (SEC.gov, NIH.gov, etc.) plus several T2 trade-press hits, which was
+# enough to ground the brief.
+MIN_T1 = 1
+MIN_T1_PLUS_T2 = 3
 
 _TIER_ORDER = {"T1": 0, "T2": 1, "T3": 2}
 

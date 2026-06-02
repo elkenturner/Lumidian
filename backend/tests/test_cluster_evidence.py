@@ -95,9 +95,20 @@ def test_gate_passes_with_two_t1():
     gate_pack(pack)  # should not raise
 
 
-def test_gate_fails_with_one_t1():
+def test_gate_passes_with_one_t1_and_two_t2():
+    # Threshold is MIN_T1=1, MIN_T1_PLUS_T2=3 — a single authoritative source
+    # plus solid trade press is enough to ground the brief.
     pack = [
         _src("https://reuters.com/a") | {"tier": "T1", "domain": "reuters.com"},
+        _src("https://techcrunch.com/c") | {"tier": "T2", "domain": "techcrunch.com"},
+        _src("https://forbes.com/d") | {"tier": "T2", "domain": "forbes.com"},
+        _src("https://randomblog.example.com/e") | {"tier": "T3", "domain": "randomblog.example.com"},
+    ]
+    gate_pack(pack)  # should not raise
+
+
+def test_gate_fails_with_zero_t1():
+    pack = [
         _src("https://techcrunch.com/c") | {"tier": "T2", "domain": "techcrunch.com"},
         _src("https://forbes.com/d") | {"tier": "T2", "domain": "forbes.com"},
         _src("https://axios.com/e") | {"tier": "T2", "domain": "axios.com"},
@@ -107,11 +118,12 @@ def test_gate_fails_with_one_t1():
     assert "T1" in str(exc.value)
 
 
-def test_gate_fails_when_t1_plus_t2_under_4():
+def test_gate_fails_when_t1_plus_t2_under_threshold():
+    # 1 T1 + 1 T2 = 2 < MIN_T1_PLUS_T2 (3) — fails on authority floor.
     pack = [
         _src("https://reuters.com/a") | {"tier": "T1", "domain": "reuters.com"},
-        _src("https://nytimes.com/b") | {"tier": "T1", "domain": "nytimes.com"},
         _src("https://techcrunch.com/c") | {"tier": "T2", "domain": "techcrunch.com"},
+        _src("https://randomblog.example.com/d") | {"tier": "T3", "domain": "randomblog.example.com"},
     ]
     with pytest.raises(PackGateError):
         gate_pack(pack)

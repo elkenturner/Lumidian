@@ -5,6 +5,11 @@ from __future__ import annotations
 
 import os
 
+# Cap a single Claude HTTP call. Without this the Anthropic SDK default is
+# ~10 min, which lets a stuck request freeze the cluster orchestrator (see
+# regression in services/clustering_service.py and routers/content.py).
+CLAUDE_HTTP_TIMEOUT_SECONDS = 120.0
+
 
 async def call_claude(
     prompt: str,
@@ -18,7 +23,7 @@ async def call_claude(
             "Add your key in Settings to enable draft generation."
         )
     import anthropic
-    client = anthropic.AsyncAnthropic(api_key=api_key)
+    client = anthropic.AsyncAnthropic(api_key=api_key, timeout=CLAUDE_HTTP_TIMEOUT_SECONDS)
     response = await client.messages.create(
         model=model,
         max_tokens=max_tokens,

@@ -22,6 +22,10 @@ T1_DOMAINS: set[str] = {
     # Peer-reviewed / scientific
     "nature.com", "science.org", "thelancet.com", "nejm.org", "pnas.org",
     "cell.com", "jamanetwork.com", "bmj.com", "arxiv.org",
+    # Major academic medical centers (treated as primary medical authority)
+    "mayoclinic.org", "clevelandclinic.org", "hopkinsmedicine.org",
+    "mskcc.org", "dana-farber.org", "stanfordhealthcare.org", "uclahealth.org",
+    "mountsinai.org",
     # Top-tier business / policy
     "hbr.org", "mckinsey.com", "brookings.edu", "rand.org", "cfr.org",
     "imf.org", "worldbank.org", "oecd.org", "pewresearch.org", "nber.org",

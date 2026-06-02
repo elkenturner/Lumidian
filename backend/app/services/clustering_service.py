@@ -35,6 +35,11 @@ logger = logging.getLogger(__name__)
 
 CLUSTER_PLATFORMS: tuple[str, ...] = ("linkedin", "medium", "reddit", "quora", "x")
 
+# Hard ceiling on a single platform's writer pipeline. asyncio.gather waits for
+# every leg, so without this any one hung Claude call freezes the entire batch
+# (see SpotitEarly halt-at-prompt-#42 regression).
+PIECE_TIMEOUT_SECONDS = 180.0
+
 # Platforms that get a soft "further reading" reference to the cluster's
 # Medium piece (or own-site pillar). Asymmetric — Medium/Wikipedia get nothing.
 _APPENDS_PILLAR_REF = {
@@ -304,13 +309,16 @@ async def regenerate_cluster(
     async def _gen(platform: str):
         ctx = _build_brief_context(brief, sibling_platforms=[])
         try:
-            title, body, q, citations = await _generate_piece_text(
-                db, brand_id=cluster.brand_id, brand_name=brand_row.name,
-                prompt_id=cluster.prompt_id, platform=platform,
-                prompt_text=prompt_row.text, visibility_pct=visibility_pct,
-                profile_context=profile_context,
-                response_analysis=response_analysis,
-                brief_context=ctx, tier=tier,
+            title, body, q, citations = await asyncio.wait_for(
+                _generate_piece_text(
+                    db, brand_id=cluster.brand_id, brand_name=brand_row.name,
+                    prompt_id=cluster.prompt_id, platform=platform,
+                    prompt_text=prompt_row.text, visibility_pct=visibility_pct,
+                    profile_context=profile_context,
+                    response_analysis=response_analysis,
+                    brief_context=ctx, tier=tier,
+                ),
+                timeout=PIECE_TIMEOUT_SECONDS,
             )
             # L3 critic on Pro tier only
             if tier == "pro" and citations:
@@ -325,6 +333,9 @@ async def regenerate_cluster(
                 text=body, platform=platform, pillar_url=pillar,
             )
             return ("ok", platform, title, body, q, citations)
+        except asyncio.TimeoutError:
+            logger.warning("Piece %s timed out after %ss", platform, PIECE_TIMEOUT_SECONDS)
+            return ("fail", platform, f"timeout after {PIECE_TIMEOUT_SECONDS:.0f}s")
         except Exception as exc:
             logger.exception("Piece %s failed: %s", platform, exc)
             return ("fail", platform, str(exc))

@@ -142,14 +142,39 @@ def _domain_authority_score(url: str) -> float:
     return 0.0
 
 
+class SerperRateLimitError(Exception):
+    """Raised when Serper trips its undocumented rate limit.
+
+    Serper returns HTTP 400 with body 'Query not allowed. Contact support.'
+    under burst load instead of a 429. We surface it as a distinct exception
+    so callers can decide whether to retry, fall back, or fail the gate with
+    a clearer message than a silent empty result.
+    """
+
+
+def _is_serper_rate_limit(resp: object, body_text: str | None = None) -> bool:
+    """True if a Serper response looks like the 'Query not allowed' throttle."""
+    status = getattr(resp, "status_code", None)
+    if status == 429:
+        return True
+    if status == 400 and body_text and "query not allowed" in body_text.lower():
+        return True
+    return False
+
+
+SERPER_RETRY_DELAYS = (1.0, 2.0, 4.0)  # exponential backoff between attempts
+
+
 async def _serper_search(query: str, num: int = 10) -> list[dict]:
     """
     General-web Serper search (not site-scoped). Returns a list of dicts each
     containing at minimum ``link`` (or ``url``), ``title``, ``snippet`` and
     optionally ``date``. Isolated as its own function so tests can mock it.
 
-    The existing ``serper_search_service.search_site`` is site-scoped and sync;
-    we issue our own httpx call here for an unrestricted query.
+    Retries up to ``len(SERPER_RETRY_DELAYS)`` times on the 'Query not allowed'
+    rate-limit signal; non-rate-limit errors are returned as an empty list
+    after a single attempt (preserving the prior swallow-and-continue behavior
+    for genuine no-results / transient outages).
     """
     import asyncio
     import os
@@ -162,24 +187,48 @@ async def _serper_search(query: str, num: int = 10) -> list[dict]:
 
     from app.services.serper_search_service import SERPER_SEMAPHORE
 
-    try:
-        async with SERPER_SEMAPHORE:
-            async with httpx.AsyncClient(timeout=8.0) as client:
-                resp = await client.post(
-                    "https://google.serper.dev/search",
-                    headers={
-                        "X-API-KEY": api_key,
-                        "Content-Type": "application/json",
-                    },
-                    json={"q": query, "num": num},
+    last_rate_limit: Exception | None = None
+    for attempt in range(len(SERPER_RETRY_DELAYS) + 1):
+        try:
+            async with SERPER_SEMAPHORE:
+                async with httpx.AsyncClient(timeout=8.0) as client:
+                    resp = await client.post(
+                        "https://google.serper.dev/search",
+                        headers={
+                            "X-API-KEY": api_key,
+                            "Content-Type": "application/json",
+                        },
+                        json={"q": query, "num": num},
+                    )
+            if _is_serper_rate_limit(resp, body_text=resp.text):
+                last_rate_limit = SerperRateLimitError(
+                    f"Serper rate-limited (HTTP {resp.status_code}) on attempt {attempt + 1}"
                 )
-                resp.raise_for_status()
-                data = resp.json()
-    except Exception as exc:
-        logger.warning("Serper search failed for %r: %s", query, exc)
-        return []
+                if attempt < len(SERPER_RETRY_DELAYS):
+                    delay = SERPER_RETRY_DELAYS[attempt]
+                    logger.warning(
+                        "Serper rate-limited for %r, retrying in %.1fs (attempt %d/%d)",
+                        query, delay, attempt + 1, len(SERPER_RETRY_DELAYS) + 1,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+                logger.warning(
+                    "Serper rate-limited for %r after %d attempts — returning empty",
+                    query, attempt + 1,
+                )
+                return []
+            resp.raise_for_status()
+            data = resp.json()
+            return data.get("organic", []) or []
+        except SerperRateLimitError:
+            raise  # already handled in the rate-limit branch
+        except Exception as exc:
+            logger.warning("Serper search failed for %r: %s", query, exc)
+            return []
 
-    return data.get("organic", []) or []
+    if last_rate_limit is not None:
+        logger.warning("Serper exhausted retries for %r: %s", query, last_rate_limit)
+    return []
 
 
 async def select_web_sources(query: str, limit: int = WEB_RESULT_LIMIT) -> list[EvidenceSource]:

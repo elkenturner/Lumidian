@@ -724,6 +724,19 @@ async def run_migrations():
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_prospect_audits_created_at ON prospect_audits(created_at)"))
         logger.info("Migration applied: prospect_audits table + indexes")
 
+    # --- Migration: query_results.citations (2026-06-02) ---
+    # Perplexity returns citations as a top-level `citations` array; Gemini
+    # returns them in `groundingMetadata.groundingChunks`. Neither is embedded
+    # in response_text, so the URL-from-text extractor in
+    # services/site_audit/citations.py was silently dropping them. Capture
+    # them in this column so the cluster evidence pipeline can use them.
+    async with engine.begin() as conn:
+        result = await conn.execute(text("PRAGMA table_info(query_results)"))
+        cols = {row[1] for row in result.fetchall()}
+        if "citations" not in cols:
+            await conn.execute(text("ALTER TABLE query_results ADD COLUMN citations JSON"))
+            logger.info("Migration applied: query_results.citations column")
+
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):
     """Mark tracking runs stuck in pending/running for > max_age_minutes as failed.

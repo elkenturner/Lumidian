@@ -109,9 +109,30 @@ async def extract_for_run(tracking_run_id: int) -> int:
         )).scalars().all()
 
         for qr in qrs:
-            if not qr.response_text:
-                continue
-            urls = extract_urls(qr.response_text)
+            # Combine URLs from response_text (ChatGPT/Claude inline links)
+            # AND from structured citations (Perplexity citations array,
+            # Gemini grounding_metadata). The latter is the only source for
+            # Perp/Gemini, which don't embed URLs in response_text.
+            urls: list[str] = []
+            seen: set[str] = set()
+            if qr.response_text:
+                for u in extract_urls(qr.response_text):
+                    if u not in seen:
+                        seen.add(u)
+                        urls.append(u)
+            structured = qr.citations or []
+            for item in structured:
+                u = item.get("url") if isinstance(item, dict) else None
+                if not u:
+                    continue
+                try:
+                    u = normalise_url(u)
+                except ValueError:
+                    continue
+                if u in seen:
+                    continue
+                seen.add(u)
+                urls.append(u)
             for url in urls:
                 cls = classify_url(url, own, competitors_by_domain)
                 row = CitationSource(

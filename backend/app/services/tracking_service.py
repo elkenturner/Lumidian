@@ -289,6 +289,7 @@ async def run_tracking(
             mentioned=mentioned,
             latency_ms=result.get("latency_ms"),
             error=error,
+            citations=result.get("citations"),
         )
 
     tasks = [

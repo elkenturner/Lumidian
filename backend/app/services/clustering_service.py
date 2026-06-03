@@ -259,10 +259,19 @@ async def regenerate_cluster(
         brief = head
 
     # --- EVIDENCE PACK PHASE ---
-    from app.services.cluster_evidence import build_cluster_pack, PackGateError
+    from app.services.cluster_evidence import (
+        build_cluster_pack,
+        build_cluster_pack_from_brand_authority,
+        PackGateError,
+    )
     prompt_row = (await db.execute(
         select(Prompt).where(Prompt.id == cluster.prompt_id)
     )).scalar_one()
+
+    # Tracks whether we fell through to the brand-as-authority soft-fail; sets
+    # the final cluster status to "ready_low_evidence" instead of "ready" so
+    # the UI can flag these pieces for extra review.
+    low_evidence = False
 
     if rebuild_brief or brief.evidence_pack_id is None:
         try:
@@ -273,13 +282,35 @@ async def regenerate_cluster(
             brief.evidence_pack_id = pack.id
             await db.commit()
         except PackGateError as exc:
-            cluster.status = "briefing_failed"
-            cluster.failure_reason = str(exc)
+            # Citations + Serper both failed authority gate. For niche
+            # commercial prompts (no neutral third-party authority exists),
+            # fall back to brand-as-authority: use the brand's own profile +
+            # crawled site pages. The claim-verifier critic in _gen keeps
+            # fabrication in check.
+            logger.info(
+                "cluster %d: external authority gate failed (%s) — trying brand-as-authority",
+                cluster.id, exc,
+            )
+            pack = await build_cluster_pack_from_brand_authority(
+                db, cluster=cluster, version=brief.version,
+            )
+            if pack is None:
+                # Even brand-authority pack is empty (no profile, no crawl) —
+                # genuinely nothing to ground the writer with.
+                cluster.status = "briefing_failed"
+                cluster.failure_reason = str(exc)
+                await db.commit()
+                return cluster
+            brief.evidence_pack_id = pack.id
+            low_evidence = True
             await db.commit()
-            return cluster
     else:
         from app.models import ContentEvidencePack as PackModel
         pack = await db.get(PackModel, brief.evidence_pack_id)
+        # Existing pack from a prior run: detect brand-authority pack so we
+        # preserve the low-evidence status on regen-without-rebuild-brief.
+        if pack is not None and pack.sources and pack.sources[0].get("tier") == "brand":
+            low_evidence = True
 
     # --- GENERATION PHASE ---
     cluster.status = "generating"
@@ -327,6 +358,16 @@ async def regenerate_cluster(
                     text=body,
                     pack_sources=(pack.sources if pack else []),
                 )
+            # Claim verifier — strips factual claims not supported by the pack.
+            # Runs on every paid tier so the brand-as-authority soft-fail path
+            # can't ship fabricated stats. Failures here leave the body
+            # unchanged (the verifier is best-effort, not a hard gate).
+            if tier in ("basic", "starter", "pro"):
+                from app.services.drafting.claim_verifier import verify_claims
+                body = await verify_claims(
+                    draft_text=body,
+                    sources=(pack.sources if pack else []),
+                )
             # Asymmetric pillar reference
             pillar = cluster.pillar_url if cluster.pillar_mode == "attached" else None
             body = append_pillar_reference(
@@ -373,7 +414,14 @@ async def regenerate_cluster(
             db, draft=draft, citations=citations, query=prompt_row.text,
         )
 
-    cluster.status = "generation_partial" if any_failed else "ready"
+    if any_failed:
+        cluster.status = "generation_partial"
+    elif low_evidence:
+        # Pieces were written from a brand-as-authority pack — flag for review
+        # so the user knows the content lacks external corroboration.
+        cluster.status = "ready_low_evidence"
+    else:
+        cluster.status = "ready"
     cluster.last_generated_at = datetime.now(UTC)
     cluster.version += 1
     cluster.last_brief_id = brief.id  # promote brief (even on partial — brief succeeded)

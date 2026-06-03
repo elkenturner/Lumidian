@@ -56,3 +56,9 @@ def test_t1_includes_major_academic_medical_centers():
     assert medical <= T1_DOMAINS
     for d in medical:
         assert classify_domain(d) == "T1"
+
+
+def test_t1_includes_wikipedia_as_encyclopedic_authority():
+    # Wikipedia is the dominant citation source for web-grounded LLMs and is
+    # broadly accepted as authoritative for general knowledge.
+    assert classify_domain("wikipedia.org") == "T1"

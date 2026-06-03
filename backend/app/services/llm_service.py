@@ -149,6 +149,7 @@ def _build_result(
     brand_name: str,
     latency_ms: int,
     error: str | None = None,
+    citations: list[dict] | None = None,
 ) -> dict:
     mentioned = _mentioned(brand_name, response_text) if response_text else False
     return {
@@ -156,7 +157,78 @@ def _build_result(
         "mentioned": mentioned,
         "latency_ms": latency_ms,
         "error": error,
+        # Web-grounded structured citations (Perplexity/Gemini). None for models
+        # that don't expose them; the cluster evidence pipeline treats absence
+        # as "no citations to mine for this query result".
+        "citations": citations,
     }
+
+
+def _extract_perplexity_citations(response) -> list[dict] | None:
+    """Pull Perplexity's `citations` array off a chat-completion response.
+
+    Perplexity surfaces citations as a top-level extra field on the response.
+    The OpenAI SDK stashes provider extras on `model_extra`/`__pydantic_extra__`,
+    and the raw URL list shows up there. Returns None if nothing usable.
+    """
+    raw_urls: list[str] | None = None
+    for attr in ("citations", "model_extra"):
+        try:
+            val = getattr(response, attr, None)
+            if attr == "citations":
+                if isinstance(val, list):
+                    raw_urls = val
+                    break
+            elif isinstance(val, dict):
+                if isinstance(val.get("citations"), list):
+                    raw_urls = val["citations"]
+                    break
+        except Exception:
+            continue
+    if not raw_urls:
+        return None
+    out: list[dict] = []
+    seen: set[str] = set()
+    for item in raw_urls:
+        url = item if isinstance(item, str) else (item.get("url") if isinstance(item, dict) else None)
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        title = item.get("title") if isinstance(item, dict) else None
+        out.append({"url": url, "title": title})
+    return out or None
+
+
+def _extract_gemini_citations(response) -> list[dict] | None:
+    """Pull Gemini grounding URIs off a generate_content response.
+
+    Citations live at response.candidates[0].grounding_metadata.grounding_chunks,
+    each chunk has `.web.uri` and `.web.title`. Older SDK responses don't have
+    grounding_metadata at all when google_search fell back to plain config —
+    handle that silently.
+    """
+    try:
+        candidates = getattr(response, "candidates", None) or []
+        if not candidates:
+            return None
+        meta = getattr(candidates[0], "grounding_metadata", None)
+        if meta is None:
+            return None
+        chunks = getattr(meta, "grounding_chunks", None) or []
+    except Exception:
+        return None
+    out: list[dict] = []
+    seen: set[str] = set()
+    for ch in chunks:
+        web = getattr(ch, "web", None)
+        if web is None:
+            continue
+        url = getattr(web, "uri", None)
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        out.append({"url": url, "title": getattr(web, "title", None)})
+    return out or None
 
 
 # ── Citation stripping (used by search-model responses) ──────────────────────
@@ -383,7 +455,8 @@ async def _query_perplexity(prompt: str, brand_name: str, model_version: str = "
                 None, brand_name, latency_ms,
                 error="Empty response from Perplexity API",
             )
-        return _build_result(text, brand_name, latency_ms)
+        citations = _extract_perplexity_citations(response)
+        return _build_result(text, brand_name, latency_ms, citations=citations)
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.error("[perplexity] API error for prompt %r: %s", prompt[:100], exc)
@@ -478,7 +551,8 @@ async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemi
                 error=f"Empty response from Gemini API (finish_reason={finish_reason})",
             )
         logger.debug("[gemini] response preview: %r", text[:200])
-        return _build_result(text, brand_name, latency_ms)
+        citations = _extract_gemini_citations(response)
+        return _build_result(text, brand_name, latency_ms, citations=citations)
     except asyncio.TimeoutError:
         latency_ms = int((time.monotonic() - start) * 1000)
         logger.error("[gemini] Request timed out after %.0fs for prompt %r", timeout, prompt[:100])

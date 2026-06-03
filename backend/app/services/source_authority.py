@@ -32,6 +32,10 @@ T1_DOMAINS: set[str] = {
     "iea.org",
     # Standards bodies
     "w3.org", "ietf.org", "iso.org",
+    # Encyclopedic / reference (Wikipedia is a primary citation source for AI
+    # models and is broadly accepted as authoritative for general knowledge;
+    # britannica is its smaller curated counterpart)
+    "wikipedia.org", "britannica.com",
 }
 
 T2_DOMAINS: set[str] = {

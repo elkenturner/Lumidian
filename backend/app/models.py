@@ -215,6 +215,10 @@ class QueryResult(Base):
     sentiment: Mapped[str | None] = mapped_column(String(20), nullable=True)  # positive | neutral | negative
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Structured citations from web-grounded models (Perplexity citations array,
+    # Gemini grounding_metadata). Each entry is `{"url": str, "title": str|None}`.
+    # Used by the cluster evidence pipeline as a high-quality source pool.
+    citations: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     tracking_run: Mapped["TrackingRun"] = relationship("TrackingRun", back_populates="query_results")

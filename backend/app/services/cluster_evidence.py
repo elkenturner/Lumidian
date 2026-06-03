@@ -146,26 +146,14 @@ from app.models import (  # noqa: E402
 )
 
 
-async def build_cluster_pack(
+async def _persist_pack(
     db: AsyncSession,
     *,
     cluster: ContentCluster,
-    prompt_text: str,
-    key_claims: list[str],
+    pack_sources: list[dict],
     version: int,
 ) -> ContentEvidencePack:
-    """Build, tier, gate, and persist a cluster-level evidence pack.
-
-    Raises PackGateError if authority gates fail. On failure, nothing is
-    persisted; caller should set cluster.status = 'briefing_failed' with
-    failure_reason = str(exc).
-    """
-    queries = expand_queries(prompt_text=prompt_text, key_claims=key_claims)
-    raw = await fetch_and_dedupe(queries)
-    ranked = rank_and_tier(raw)
-    pack_sources = ranked[:PACK_CAP]
-    gate_pack(pack_sources)  # raises on failure — nothing persisted yet
-
+    """Persist the gated pack + per-source rows. Shared by all pack builders."""
     pack = ContentEvidencePack(
         cluster_id=cluster.id,
         version=version,
@@ -175,8 +163,7 @@ async def build_cluster_pack(
         total_t3=sum(1 for s in pack_sources if s["tier"] == "T3"),
     )
     db.add(pack)
-    await db.flush()  # get pack.id before referencing it in source rows
-
+    await db.flush()
     for s in pack_sources:
         db.add(ContentClusterSource(
             cluster_id=cluster.id,
@@ -190,3 +177,166 @@ async def build_cluster_pack(
     await db.commit()
     await db.refresh(pack)
     return pack
+
+
+async def _load_cluster_citations(
+    db: AsyncSession,
+    *,
+    brand_id: int,
+    prompt_id: int,
+    limit_runs: int = 5,
+) -> list[dict]:
+    """Pull third-party citations the tracking runs already extracted.
+
+    These are URLs that real AI assistants (ChatGPT, Claude, Perplexity, Gemini)
+    cited when answering this exact prompt — pre-filtered by the LLMs themselves,
+    so they tend to be higher-authority than raw Google results. We pull from
+    the most recent `limit_runs` completed runs and dedup by URL. Returns dicts
+    in the same shape that `rank_and_tier` expects.
+    """
+    from sqlalchemy import select
+    from app.models import CitationSource, TrackingRun
+
+    recent_run_ids = (await db.execute(
+        select(TrackingRun.id)
+        .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+        .order_by(TrackingRun.id.desc())
+        .limit(limit_runs)
+    )).scalars().all()
+    if not recent_run_ids:
+        return []
+    rows = (await db.execute(
+        select(CitationSource.url, CitationSource.domain)
+        .where(
+            CitationSource.brand_id == brand_id,
+            CitationSource.prompt_id == prompt_id,
+            CitationSource.kind == "third_party",
+            CitationSource.tracking_run_id.in_(list(recent_run_ids)),
+        )
+    )).all()
+    seen: set[str] = set()
+    out: list[dict] = []
+    for url, _domain in rows:
+        if url in seen:
+            continue
+        seen.add(url)
+        # No snippet (we only stored URL+domain). Title is a placeholder so the
+        # writer can reference the source by name in citations.
+        out.append({"url": url, "title": "(cited by AI for this prompt)", "snippet": ""})
+    return out
+
+
+async def build_cluster_pack(
+    db: AsyncSession,
+    *,
+    cluster: ContentCluster,
+    prompt_text: str,
+    key_claims: list[str],
+    version: int,
+) -> ContentEvidencePack:
+    """Build, tier, gate, and persist a cluster-level evidence pack.
+
+    Fallback chain (each step persists + returns on success, otherwise falls
+    through to the next):
+
+      1. Citations from the tracking runs (third_party only). High-precision
+         because LLMs already filtered them for relevance/credibility.
+      2. Live Serper web search across the prompt + key_claims.
+
+    Raises PackGateError if neither path clears the authority gate. On failure
+    nothing is persisted; the caller should set cluster.status='briefing_failed'
+    with failure_reason=str(exc) and the soft-fail handler (in regenerate_cluster)
+    decides whether to fall back to a brand-as-authority pack.
+    """
+    # 1. Try citations first
+    raw_citations = await _load_cluster_citations(
+        db, brand_id=cluster.brand_id, prompt_id=cluster.prompt_id,
+    )
+    if raw_citations:
+        ranked = rank_and_tier(raw_citations)
+        pack_sources = ranked[:PACK_CAP]
+        try:
+            gate_pack(pack_sources)
+            return await _persist_pack(
+                db, cluster=cluster, pack_sources=pack_sources, version=version,
+            )
+        except PackGateError as exc:
+            logger.info(
+                "cluster %d: citations pack failed gate (%s) — falling through to Serper",
+                cluster.id, exc,
+            )
+
+    # 2. Live Serper search
+    queries = expand_queries(prompt_text=prompt_text, key_claims=key_claims)
+    raw = await fetch_and_dedupe(queries)
+    ranked = rank_and_tier(raw)
+    pack_sources = ranked[:PACK_CAP]
+    gate_pack(pack_sources)  # raises on failure — nothing persisted yet
+    return await _persist_pack(
+        db, cluster=cluster, pack_sources=pack_sources, version=version,
+    )
+
+
+async def build_cluster_pack_from_brand_authority(
+    db: AsyncSession,
+    *,
+    cluster: ContentCluster,
+    version: int,
+) -> ContentEvidencePack | None:
+    """Soft-fail pack: synthesize sources from BrandProfile + crawled site pages.
+
+    Used when both citations and Serper packs fail the authority gate — typically
+    for niche commercial discovery questions where no external authority exists
+    ("which advisor is best for X biotech?"). The brand IS the authoritative
+    source for claims about itself.
+
+    Returns None if the brand has no profile AND no crawled pages — in that case
+    even soft-fail can't ground the writer.
+
+    Persists with `tier="brand"` for each row (a synthetic tier outside T1/T2/T3
+    so the pack is clearly distinct from the gated path in UI + analytics).
+    """
+    from sqlalchemy import select, desc
+    from app.models import BrandProfile, WebsiteAudit, WebsiteAuditPage
+
+    sources: list[dict] = []
+
+    # Brand profile entry — synthesized "source" that the writer can cite.
+    profile = (await db.execute(
+        select(BrandProfile).where(BrandProfile.brand_id == cluster.brand_id)
+    )).scalar_one_or_none()
+    if profile and (profile.company_description or profile.key_stats):
+        sources.append({
+            "url": "internal://brand-profile",
+            "domain": "brand-profile",
+            "tier": "brand",
+            "title": "Brand profile (first-party)",
+        })
+
+    # Most recent completed audit's top pages — the brand's own crawled site.
+    audit = (await db.execute(
+        select(WebsiteAudit)
+        .where(WebsiteAudit.brand_id == cluster.brand_id, WebsiteAudit.status == "completed")
+        .order_by(desc(WebsiteAudit.id))
+        .limit(1)
+    )).scalar_one_or_none()
+    if audit is not None:
+        pages = (await db.execute(
+            select(WebsiteAuditPage)
+            .where(WebsiteAuditPage.audit_id == audit.id)
+            .limit(8)
+        )).scalars().all()
+        for p in pages:
+            sources.append({
+                "url": p.url,
+                "domain": (p.url.split("/")[2] if "://" in p.url else p.url)[:255],
+                "tier": "brand",
+                "title": (p.title or p.url)[:200],
+            })
+
+    if not sources:
+        return None
+
+    return await _persist_pack(
+        db, cluster=cluster, pack_sources=sources, version=version,
+    )

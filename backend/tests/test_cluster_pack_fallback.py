@@ -142,6 +142,36 @@ async def test_brand_authority_pack_when_profile_present():
 
 
 @pytest.mark.asyncio
+async def test_persist_pack_is_idempotent_across_regenerations():
+    """ContentClusterSource has UNIQUE(cluster_id, url) — without clearing the
+    old rows on regen, the second build_cluster_pack would crash on integrity.
+    """
+    from app.services.cluster_evidence import build_cluster_pack
+    from app.models import ContentClusterSource as CCS, ContentEvidencePack
+    brand_id, prompt_id, run_id, cluster_id = await _seed_brand_with_run("pack-idempo")
+    fake_serper = AsyncMock(return_value=[
+        {"url": "https://reuters.com/x", "title": "R", "snippet": "..."},
+        {"url": "https://nytimes.com/y", "title": "N", "snippet": "..."},
+        {"url": "https://techcrunch.com/z", "title": "T", "snippet": "..."},
+    ])
+    with patch("app.services.cluster_evidence.fetch_and_dedupe", new=fake_serper):
+        async with AsyncSessionLocal() as db:
+            cluster = await db.get(ContentCluster, cluster_id)
+            await build_cluster_pack(db, cluster=cluster, prompt_text="q",
+                                     key_claims=[], version=1)
+        # Second regen — same URL set — should succeed, not raise IntegrityError.
+        async with AsyncSessionLocal() as db:
+            cluster = await db.get(ContentCluster, cluster_id)
+            await build_cluster_pack(db, cluster=cluster, prompt_text="q",
+                                     key_claims=[], version=2)
+    async with AsyncSessionLocal() as db:
+        sources = (await db.execute(
+            select(CCS).where(CCS.cluster_id == cluster_id)
+        )).scalars().all()
+        assert len(sources) == 3  # cleared + reinserted, not stacked
+
+
+@pytest.mark.asyncio
 async def test_brand_authority_pack_returns_none_when_profile_and_audit_missing():
     """Genuinely nothing to ground with — return None so caller hard-fails."""
     from app.services.cluster_evidence import build_cluster_pack_from_brand_authority

@@ -153,7 +153,19 @@ async def _persist_pack(
     pack_sources: list[dict],
     version: int,
 ) -> ContentEvidencePack:
-    """Persist the gated pack + per-source rows. Shared by all pack builders."""
+    """Persist the gated pack + per-source rows. Shared by all pack builders.
+
+    Idempotent: deletes any existing ContentClusterSource rows for this cluster
+    before inserting the new ones. ContentClusterSource has a UNIQUE constraint
+    on (cluster_id, url), so without this regen would fail with an integrity
+    error any time a URL appears in both the previous and the new pack.
+    """
+    from sqlalchemy import delete
+    await db.execute(
+        delete(ContentClusterSource).where(ContentClusterSource.cluster_id == cluster.id)
+    )
+    await db.flush()
+
     pack = ContentEvidencePack(
         cluster_id=cluster.id,
         version=version,

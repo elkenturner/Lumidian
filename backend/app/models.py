@@ -32,6 +32,7 @@ class RunTypeEnum(str, enum.Enum):
 class ScheduleSlotEnum(str, enum.Enum):
     morning = "morning"
     evening = "evening"
+    weekly = "weekly"  # agency weekly sweep (scheduler._run_agency_brand_and_report)
 
 
 class ModelEnum(str, enum.Enum):

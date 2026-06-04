@@ -277,23 +277,21 @@ TARGET LENGTH: {word_min} to {word_max} words
 PLATFORM RULES (follow all of these):
 {rules_text}
 
-UNIVERSAL STYLE RULES (absolute — no exceptions):
-  - NEVER use em dashes (—) or en dashes used as separators. Replace with commas, colons, or rewrite the sentence.
-  - NEVER use these words or phrases: "delve", "dive into", "unpack" (as a verb), "it's worth noting", "the bottom line", "at the end of the day"
-  - NEVER use hedging language of any kind ("may", "might", "could potentially", "perhaps", "it seems")
-  - Vary sentence length — mix short punchy sentences with longer analytical ones
-  - Use contractions naturally (it's, we're, you'll, don't)
-  - Only reference facts and statistics that appear in the Brand Profile or Evidence Sources above — never invent data
-  - Mention {brand_name} only if it fits naturally in the context — never force it
-  - Content must read as written by a knowledgeable human expert, not by an AI
-  - Do not include meta-commentary about what the content does ("This post addresses...", "This answer explains...")
+WRITING RULES (evidence-backed — these drive whether AI engines cite the content):
+  - Lead with the answer: the first sentence directly answers the target query — no preamble, no scene-setting.
+  - Back every factual claim with the Brand Profile or Evidence Sources above — never invent data, never approximate a statistic.
+  - Prefer concrete specifics (exact numbers, names, dates) over vague claims, and place key statistics where they stand out — concrete, well-sourced claims are what get cited.
+  - No hedging language ("may", "might", "could potentially", "perhaps", "it seems").
+  - Mention {brand_name} only where it fits as a concrete fact in context — never forced, never promotional.
+  - Write in a genuine human voice: vary sentence length, and avoid AI clichés (no "delve", "tapestry", em dashes, "in conclusion", "it's not just X — it's Y"). Drafts that read as AI-written are automatically rejected, so this is not optional.
+  - No meta-commentary about the content itself ("This post addresses...", "This answer explains...").
 
 QUERY MIRRORING RULES (critical for AI retrieval — these are checked):
   - The FIRST SENTENCE of the content body must directly address, answer, or engage with the target query using its specific subject matter — not with generic background. If the query is "Can cancer be detected through breath analysis?", the first sentence must talk specifically about breath analysis and cancer detection — NOT start with "Cancer affects millions of people worldwide."
   - The title or opening sentence must contain the core topic of the query using its exact words or a close restatement
   - Key noun phrases from the query must appear naturally in the body throughout
   - The content must read as a direct, authoritative answer to someone who typed that exact query — not as a general brand article
-  - Do not substitute query terms with synonyms only — use the actual words from the query
+  - Use the query's key terms naturally where they genuinely fit — but do NOT repeat them mechanically or pack them in. Keyword stuffing is penalized; relevance comes from actually answering the question, not from term frequency.
 
 INSTRUCTIONS:
 1. Identify what specific angle or information is MISSING from the current AI responses above.

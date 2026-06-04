@@ -13,7 +13,7 @@ PLATFORM_SPECS: dict[str, dict] = {
         "rules": [
             "Write as a genuine community member, not a marketer — conversational and first-person where natural",
             "NO formal headers, NO markdown formatting (no ##, no bold headers) — at most 1 to 2 bullet points maximum, only if a short list genuinely helps",
-            "CRITICAL: Do NOT pose a question and then answer it yourself. You are writing a comment or contribution to an existing discussion — not a standalone Q&A post. Write as if you are directly responding to something, sharing a perspective, or contributing a genuine insight.",
+            "A clear problem-then-direct-solution or question-then-answer structure is good — the Reddit content AI engines actually cite is overwhelmingly direct answers to specific questions. Keep it conversational (a person sharing what worked), not an essay, but do not avoid directly answering a question.",
             "Add genuine value — answer a question, share a personal experience, contribute a real insight",
             "Mention the brand only if it fits naturally into the conversation; never force it",
             "No promotional language, no calls to action, no links unless absolutely essential",
@@ -58,9 +58,8 @@ PLATFORM_SPECS: dict[str, dict] = {
         "word_range": (800, 2000),
         "tone": "thought leadership, editorial, analytical — structured like a quality article with a clear arc",
         "rules": [
-            "Open with a strong hook in the first 1-2 sentences — a surprising fact, a provocative question, or a bold statement that earns the reader's attention",
-            "Structure the article clearly with flowing prose sections: hook → context/problem → main argument → strong conclusion. Separate sections with a blank line — do NOT use ## markdown headers",
-            "NO ## headings, NO markdown headers of any kind — write in editorial prose that flows naturally from one idea to the next",
+            "Open by directly answering the core question in the first 1-2 sentences (a concrete fact or claim) — AI engines cite content that answers fast, not slow-building hooks",
+            "Structure with clear H2/H3 headings (## and ###). Each section is a self-contained ~120-180 word answer block that AI engines can extract and cite on its own — so lead each section with its key claim, then support it. Do not write one long undifferentiated prose flow.",
             "The brand name MUST appear at least once in the article. Find a natural, earned place for it: a concrete claim, an example of the approach in action, a specific data point, or a direct mention of a capability. The brand name must appear in the body text.",
             "Where the Brand Profile includes peer-reviewed publications, cite them naturally in the body (e.g. 'A study published in...' or 'Research from...')",
             "Include concrete data, examples, or evidence to support every major claim — never make unsupported assertions",

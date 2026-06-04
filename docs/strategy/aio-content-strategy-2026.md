@@ -10,6 +10,18 @@
 
 ---
 
+## ⚠️ Read first — citation ≠ mention (the proxy this doc rests on)
+
+Lumidian's visibility score measures **mentions**: `brand_name in response_text` (CLAUDE.md, "Mention Detection"). But Layer A's evidence is overwhelmingly **citation** data — which *URLs* a model displayed (`CitationSource`). **These are different signals**, and the gap is the synthesis step:
+
+> A model can read a Reddit/Quora thread saying "BrandX is great," **synthesize** "BrandX is a solid option" into its answer, and **mention BrandX without ever citing the source.** ChatGPT explicitly separates the `sources` it consulted from the `url_citation`s it displays — *consulted ≠ cited.*
+
+So everywhere this doc says a platform "gets 0% / rarely gets cited," the honest claim is **"rarely gets *cited*"** — **not** "doesn't drive *mentions*." Uncited-but-synthesized content is invisible to our citation data, and a mention is what we actually sell. (The "4.1× Quora multiplier" — being *talked about on* Quora correlating with your own domain getting cited — is a fingerprint of exactly this uncited-influence pathway.)
+
+**Why the conclusions still hold:** owned-site / Wikipedia / authority look strong on *both* signals, and the weak platforms look weak on the visible signal. Citations remain the best available proxy for "what the model is reading and surfacing." **But treat citation as a proxy for mention, not a substitute** — and see "Open gap for Layer B" at the end: the only way to actually settle whether Reddit/Quora drive *mentions* is a controlled publish-and-measure experiment, because citation data cannot see uncited synthesis.
+
+---
+
 # Part 1 — Strategy (the "why")
 
 ## 1. First-party citation reality — what our own data shows
@@ -56,13 +68,13 @@ Full mechanics table in `research/stream3-model-mechanics.md`. The essentials:
 
 **Reddit** — Models *retrieve* Reddit constantly but *cite* it rarely (ChatGPT: ~1.93% of retrievals). Cited Reddit threads are **old (~900 days), low-upvote, short, Q&A-format** — engines surface organically-validated aged threads, not fresh self-posts. Only ChatGPT + Perplexity ever emit visible Reddit citations (Claude is litigated/blocklisted by Reddit; Gemini ~0.1%). Finance is a documented low-Reddit vertical. **You cannot reliably publish a new Reddit post and get it cited** — citability comes from aged community validation. (`stream2-platform-reddit.md`)
 
-**Quora** — Quora's `robots.txt` blocks *all four engines'* crawlers (`Disallow: /` for GPTBot, OAI-SearchBot, PerplexityBot, ClaudeBot, et al., verified live 2026-06-03). Absent from every top-cited-domain study; AI-Overviews share fell ~99%. The one "Quora wins" stat (4.1× multiplier) measures domains *mentioned on* Quora, not Quora itself being cited. **Structurally near-uncitable, platform-wide.** (`stream2-platform-quora.md`)
+**Quora** — *Indexed but not selected.* Quora **is** crawled by Googlebot and Bing (verified live 2026-06-03: `Googlebot` is path-restricted, *not* blocked; `Bingbot` unlisted), so it's in the search indexes the models retrieve through — it ranks on Google fine. What it blocks is the engines' *own* AI crawlers (`OAI-SearchBot`, `PerplexityBot`, `Claude-User/SearchBot`, `Google-Extended` all `Disallow: /`), which kills *direct* first-party crawl and live citation-fetch but **not** discovery via the Google/Bing search layer (so Perplexity-via-SERP and ChatGPT-via-Bing *can* technically reach it; Gemini grounding is the one likely blocked by `Google-Extended`). Despite being reachable, the models **don't pick it**: Quora is absent from every top-cited-domain study, and its AI-Overviews share fell ~99% — it's *reached and ignored*, not *unreachable*. The one "Quora wins" stat (4.1× multiplier) measures domains *mentioned on* Quora, not Quora itself being cited. **Verdict: deprioritize for citations — but note this is a citation claim; Quora's effect on uncited *mentions* is untested (see "Read first").** (`stream2-platform-quora.md` §2)
 
 **Medium** — Mid-tier and declining; strength concentrated in *developer/technical* verticals, not B2B/finance. For content you control, an **owned domain ≥ Medium** — and republishing on Medium with a canonical tag can *cannibalize* the owned URL's citation. The real lever near Medium is earned third-party **news** distribution (+325% lift), which is a different thing. (`stream2-platform-medium.md`)
 
 **LinkedIn** — The one nuanced case. LinkedIn earns real citations for B2B — but only **public, Google-indexed long-form Pulse *articles*** (not gated feed posts), and concentrated on **ChatGPT Search (~14.3%) and Google AI Mode (~13.5%)**, with Perplexity far lower (~5.3%) and Claude/Gemini unconfirmed. The surge is *recent* (Nov-2025→Feb-2026), so our 0% is partly staleness + engine-mix. **Our current `linkedin_post`/`linkedin_reply` specs target the wrong artifact; `linkedin_article` is the citation-relevant one.** (`stream2-platform-linkedin.md`)
 
-**X** — A non-citation surface for all four engines. `robots.txt` blocks all AI crawlers; the 2025 developer agreement bans training on X data; only Grok (xAI, untracked) has real access. Reach-only. (`stream2-platform-x.md`)
+**X** — Empirically absent from citations across >100M-citation studies for all four tracked engines, and below reporting threshold. The structural contributors: `robots.txt` blocks the AI crawlers and the 2025 developer agreement bans training on X data; Google indexes only a thin slice of public posts, so the indirect search-layer path is weak too. Only Grok (xAI, untracked) has privileged firehose access. **Verdict: reach-only for AI *citation* in the 4 tracked models — though, as with Quora, this is a citation claim, not proof it can't seed an uncited mention.** (`stream2-platform-x.md`)
 
 **Verdict:** of the current 5, **LinkedIn (articles only) is the sole defensible AI-citation play**, and only on a subset of engines. Reddit/Quora/Medium/X range from low-leverage to structurally uncitable for AI visibility.
 
@@ -191,34 +203,42 @@ reddit:
 ### quora
 ```
 quora:
-  retrieved_by: NONE — robots.txt blocks all 4 engines' crawlers (verified 2026-06-03)
-  format: n/a for AI citation
-  length: n/a
+  retrieved_by: indexed by Google/Bing (so reachable via Perplexity-SERP + ChatGPT-Bing) but NOT SELECTED — ~0 cited; Gemini grounding blocked by Google-Extended; AI bots block direct crawl/fetch
+  format: question-indexed exact-match Q&A (the only form that ever surfaces, via Perplexity)
+  length: n/a for citation purposes
   sourcing: n/a
-  citation_bait: none — structurally crawler-blocked
+  citation_bait: minimal — reached via search layer but down-ranked/ignored by every engine; share collapsed ~99% on AI Overviews
   do: []
-  dont: [generate Quora drafts expecting AI citation]
+  dont: [generate Quora drafts expecting AI CITATION]
   brand_mention_rule: n/a
-  confidence: high that it is near-uncitable (Stream 1 0% + verified robots.txt block + absent from all studies)
-  note: strong candidate for REMOVAL from the engine for AI-visibility purposes
+  confidence: high that it is near-zero for CITATION (Stream 1 0% + absent from all studies + ~99% decline). UNTESTED for uncited mention-seeding.
+  note: strong candidate for REMOVAL as a citation play. Open question = does it seed uncited mentions? (see Open gap). Not "blocked", but "indexed and ignored".
 ```
 
 ### x
 ```
 x:
-  retrieved_by: NONE of the 4 tracked engines (robots.txt Disallow: /; dev-agreement bans training); only Grok (untracked)
+  retrieved_by: empirically absent from citations in all 4 tracked engines; AI crawlers blocked, dev-agreement bans training, only thin public-post slice in Google; only Grok (untracked) has firehose
   format: n/a for AI citation
   length: n/a
   sourcing: n/a
-  citation_bait: none — non-citation surface
+  citation_bait: none observed — below reporting threshold across >100M-citation studies
   do: []
-  dont: [generate X drafts expecting AI citation in the 4 tracked models]
+  dont: [generate X drafts expecting AI CITATION in the 4 tracked models]
   brand_mention_rule: n/a
-  confidence: high that it is reach-only for AI citation (Stream 1 0% + Stream 2 cross-study absence + robots block)
-  note: strong candidate for REMOVAL; only relevant if Grok is ever tracked
+  confidence: high that it is reach-only for AI CITATION (Stream 1 0% + Stream 2 cross-study absence). UNTESTED for uncited mention-seeding.
+  note: strong candidate for REMOVAL as a citation play; relevant only if Grok is ever tracked. Open question = uncited mention-seeding (see Open gap).
 ```
 
 ---
+
+## Open gap for Layer B — does social content drive *mentions* (not just citations)?
+
+Layer A's evidence is citation data; the product goal is mentions; uncited synthesis is the blind spot between them (see "Read first"). Citation data **cannot** answer whether publishing on Reddit/Quora/X moves a brand's *mention*-rate, because a thread can influence an answer without being cited. The only way to settle it:
+
+- **Controlled publish-and-measure experiment.** Pick brands/prompts, publish on the suspect platform (e.g. a Reddit Q&A, a Quora answer), and watch whether the brand's *mention*-rate (not citation count) moves over subsequent tracking runs vs. a control. `DraftAttribution` already tracks score deltas per posted draft — this is the right substrate.
+- **Until that runs, "deprioritize Quora/X/Reddit" is a citation-grounded call, not a mention-grounded one.** Hold the platform-removal decision (below) with that humility: removing them is safe for the *citation* goal but discards a *possible* (untested) mention pathway.
+- **Recommended sequencing:** this experiment is cheap relative to a wrong platform-set decision. Worth running *before or alongside* Layer B's platform-set commitment rather than after.
 
 ## What Layer B inherits from this
 

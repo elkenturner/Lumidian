@@ -240,6 +240,24 @@ Layer A's evidence is citation data; the product goal is mentions; uncited synth
 - **Until that runs, "deprioritize Quora/X/Reddit" is a citation-grounded call, not a mention-grounded one.** Hold the platform-removal decision (below) with that humility: removing them is safe for the *citation* goal but discards a *possible* (untested) mention pathway.
 - **Recommended sequencing:** this experiment is cheap relative to a wrong platform-set decision. Worth running *before or alongside* Layer B's platform-set commitment rather than after.
 
+## Business implications (how this maps to Lumidian — agency + SaaS)
+
+The strategy isn't just an engine spec; it reshapes what the *service* should deliver. The honest read:
+
+**The core tension (and where it resolves).** Lumidian sells "we create content that improves your AI visibility." Layer A shows the content the engine currently produces goes to ~0%-citation platforms, and we can't yet prove it moves mentions either — i.e. **we're selling an outcome the current deliverable hasn't been shown to produce.** The fix is built into the findings: point the deliverable at the channels that actually move the metric (owned-site, Wikipedia, LinkedIn articles). That turns a hopeful pitch into a deliverable one — but it's a real shift, not a tweak.
+
+**Owned-site is the centerpiece.** It's the only Tier-1 channel the agency fully controls *and* the one that drives the metric. Highest business ROI in the whole strategy. Layer B should build the owned-site content surface first.
+
+**Earned media / PR is explicitly OUT of scope (Ken, 2026-06-03).** The data says earned third-party news placement is the single biggest lift (+325%), but placing it is an editor-pitching/outreach motion, not a writing motion, and it is **not Lumidian's territory.** We acknowledge the lever and do not chase it. Layer B builds no PR/outreach capability.
+
+**Optics vs. results — keep breadth as the show, Tier-1 as the substance.** Keeping Reddit/Quora/X for visible breadth is fine for client perception, but the classic agency failure is clients paying for activity and churning on results. Guard against it: the result-driving Tier-1 work (owned-site, Wikipedia, LinkedIn articles) must be the backbone; the social breadth is the garnish, not the meal.
+
+**Agency ≠ SaaS content defaults.** Different last-mile realities → different default platform mixes from the same engine:
+- **Agency:** humans publish, so full multi-channel breadth (owned-site + Wikipedia + LinkedIn + social optics).
+- **SaaS self-serve:** the user must self-publish and the app can't auto-post (manual-only), so they'll realistically only act on **owned-site** content (paste on their own blog). Default self-serve to owned-site-first, or self-serve users churn on social drafts that never move their score. Layer B should make the default platform set *configurable per customer type*, not one-size-fits-all.
+
+**Positioning to decide consciously.** Following the evidence (minus PR) shifts the content service's center of gravity toward **writing the client's owned site + maintaining Wikipedia** — closer to a premium content-marketing service than "we post on social and you get cited." That's a stronger, harder-to-commoditize story with clearer ROI — worth owning deliberately rather than drifting into.
+
 ## What Layer B inherits from this
 
 1. **Part 2 universal rules + per-platform blocks** → the new unified writer's prompt rules.

@@ -3,11 +3,22 @@
 > **This file is the shared brain across all Claude surfaces working on Lumidian.**
 > Claude Code, Cowork, and Claude in Chrome should all (a) read this file at the start of every session and (b) update it before ending the session. Stable architecture lives in `CLAUDE.md`; this file holds volatile state only.
 
-**Last updated:** 2026-05-27 by Claude Code (Agency cockpit playbook redesign — 4 tabs, milestone checklist, wikipedia/site plan templates)
+**Last updated:** 2026-06-03 by Claude Code (Content-engine rebuild **Layer A** shipped — research-grounded AIO content strategy; first-party data shows the 5 draft platforms get ~0% AI citations)
 
 ---
 
 ## Current Task / WIP
+
+**Active work: rebuilding the content engine (the core service) in three layers.** Content quality/logic is the priority — the methodology was scattered across 5 generation paths + 6 rule files and nobody fully understood it. Decomposed into **Layer A** (research-grounded strategy — *what good AIO content is*), **Layer B** (one unified engine that executes A, with consistent source-grounding), **Layer C** (prose-quality pass). Each gets its own spec→plan→build.
+
+- **Layer A: SHIPPED** on branch `feat/aio-content-strategy-layer-a`. Spec `docs/superpowers/specs/2026-06-03-aio-content-strategy-layer-a-design.md`, plan `docs/superpowers/plans/2026-06-03-aio-content-strategy-layer-a.md`, deliverable **`docs/strategy/aio-content-strategy-2026.md`** (Part 1 prose + Part 2 machine-ready per-platform ruleset). Triangulated 3 evidence streams (all under `docs/strategy/research/`): Stream 1 first-party citation mining of production data, Stream 2 ten adversarial deep-research passes (4 models + 5 platforms + channel ranking), Stream 3 first-principles mechanics.
+  - **Bombshell finding:** across every resolvable production citation (ChatGPT 1,669 + Perplexity 480), **0% come from Reddit/Quora/Medium/LinkedIn/X** — the 5 platforms the engine writes for. Models cite owned/authority domains, Wikipedia, sec.gov, YouTube, PR. Caveats: single-vertical (finance) skew, and Claude+Gemini are citation-blind due to 2 instrumentation bugs.
+  - **What the engine should target instead:** Tier 1 = owned-site (no surface exists today!), Wikipedia (currently an excluded placeholder), industry/trade press. Of the current 5, only **LinkedIn *articles*** (not posts) is a defensible AI-citation play, and only on some engines. Quora + X are crawler-blocked (robots.txt) → near-uncitable. Reddit is retrieve-but-rarely-cite + aged-thread-only.
+  - **3 engine bugs found + verified in code** (→ Layer B): Claude structured citations never extracted (`llm_service.py:399-404`); Gemini redirects stored unresolved (`:226`); Gemini JSON-schema-empties-grounding guardrail (not currently firing). Plus a stale duplicate rule set (`content_service.py:39-117`).
+- **Next concrete step:** Ken reads `docs/strategy/aio-content-strategy-2026.md` end-to-end (human verification gate). Then write the **Layer B spec** against Part 2 + `contradictions.md`. Open product decision for Layer B: whether to *remove* Quora/X/Reddit draft platforms or keep-but-deprioritize.
+- **Branch hygiene:** Layer A is on its own branch off `fix/cluster-pipeline-regressions` (which itself has 1 unmerged commit — the cluster draft-wiping fix — still pending merge to main).
+
+---
 
 **Direction committed: Lumidian runs as agency + SaaS — both, layered on one codebase.** Not a pivot away from SaaS; both offerings coexist.
 
@@ -33,6 +44,8 @@ Three recovery branches exist from earlier session-mixing accidents (a parallel 
 ## Recent Decisions
 
 _Append-only log. Newest first. Each entry: date — decision — rationale (1 line)._
+
+- **2026-06-03** — Started **content-engine rebuild** (core service); shipped **Layer A** (research-grounded AIO content strategy) on `feat/aio-content-strategy-layer-a`. Decomposed the rebuild into A (strategy) → B (unified engine) → C (prose quality). Layer A triangulated first-party citation mining + 10 deep-research passes + first-principles mechanics into `docs/strategy/aio-content-strategy-2026.md`. **Key decision drivers from Ken:** deepest pains are *what content should be* (rules/strategy) + *writing quality*; rules should be grounded in external 2026 research + first principles (not gut, not our thin attribution data); hold the current 5 platforms as the working set but re-rank channels out of curiosity; doc shape = prose + structured ruleset. **Finding that reframes everything:** the 5 draft platforms have ~0% observed AI-citation rate in production; real Tier 1 is owned-site + Wikipedia + trade press. Rationale for the whole effort: the content methodology was fragmented across 5 paths + 6 files and untrustworthy; you can't write to high quality against a fuzzy, evidence-free target.
 
 - **2026-05-27** — Shipped **agency cockpit playbook redesign** on `agency-cockpit-playbook-work` (spec `docs/superpowers/specs/2026-05-22-agency-cockpit-playbook-redesign-design.md`, plan `docs/superpowers/plans/2026-05-26-agency-cockpit-playbook-redesign.md`). Cockpit collapses 5 tabs → 4 (Playbook default / Tracking / Audit / Brand). New `agency_client_milestones` table (6 kinds: kickoff/sow/initial_audit/strategy_locked/wikipedia_plan/site_plan) with `GET`/`PATCH /clients/{id}/milestones`. **Manual checklist** (Ken's explicit choice over auto-derivation — Option B from brainstorm). Two new document templates: `wikipedia_plan` (Wikipedia scan + candidates + brand publications; conditional Approach-paragraph LLM rewrite when publications missing) and `site_plan` (latest completed audit + top 10 recs by priority_score; NO paste-ready artifacts — stays internal). Dropped `peec_dashboard_url` column (tracking is in-house now). Deleted Today page, global Documents page, 9 dead backend endpoints (today/my-queue/tasks/activity-recent/drafts-assign/documents-recent), 3 dead frontend components (`ClientNextStepShelf`, `MyQueueSection`, `GenerateForAnyClientModal`). Pipeline folds into a Playbook drawer; Documents history moves into the Brand tab. Subagent-driven execution — 24 plan tasks, ~24 implementer commits. 14 new backend tests + 1220/1220 full suite green; frontend `tsc` + `build` clean. **Browser smoke pass still pending** — 10-item walkthrough deferred to user. **Branch hygiene caveat:** 2-3 unrelated `feat(design)` commits drifted into the branch from environment automation that ran during execution; filter or rebase before merging.
 

@@ -849,6 +849,17 @@ async def generate_gap_draft(
         # Fall back gracefully if parsing failed
         if not wiki_text:
             wiki_text = raw_text.strip()
+        # B2 Phase 0: anti-AI cosmetic pass on the wikitext (Wikipedia editors are
+        # especially AI-vigilant). autofix is safe for wikitext; we log a scan but
+        # don't regenerate in place to avoid breaking the parsed structure/<ref>s.
+        wiki_text = anti_ai.autofix(wiki_text)
+        _wiki_report = anti_ai.scan(wiki_text)
+        if not _wiki_report.passed:
+            logger.info(
+                "Wikipedia draft for brand %d trips anti-AI gate (score=%.1f) — "
+                "flagged for human review before submission.",
+                brand_id, _wiki_report.score,
+            )
         title = article_title or f"Wikipedia edit: {prompt.text[:80]}"
         brief = article_url  # content_brief stores the article URL
 
@@ -1076,6 +1087,29 @@ async def generate_gap_draft(
                 "[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
             )
 
+    # B2 Phase 0: universal anti-AI gate on the final text. Covers the free/pitch
+    # single-shot fallback (the paid path already gated inside the core; a clean
+    # re-scan there is cheap). Regenerate only while we still hold a writer prompt.
+    async def _anti_ai_regen(feedback: str) -> str:
+        return remove_hedging(await call_claude(
+            claude_prompt
+            + "\n\nREVISION REQUIRED — your draft reads as AI-written. Remove these "
+            "specific tells, keep every fact, vary sentence length:\n" + feedback,
+            max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
+        ))
+
+    raw_text, _aa_report, _ = await anti_ai.enforce(
+        raw_text,
+        regenerate=(_anti_ai_regen if claude_prompt is not None else None),
+    )
+    raw_text = enforce_x_char_limit(raw_text, platform_key)
+    if not _aa_report.passed:
+        logger.info(
+            "generate_gap_draft: draft still trips anti-AI gate "
+            "(brand=%d platform=%s score=%.1f) — flagged, not blocked.",
+            brand_id, platform_key, _aa_report.score,
+        )
+
     title, body = extract_title_and_body(raw_text, platform_key)
 
     # Only feed the cross-ref summary generator when the new pipeline ran.
@@ -1259,6 +1293,25 @@ async def generate_opportunity_draft(
                 brand.name, opportunity_id,
             )
             raw_text = "[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
+
+    # B2 Phase 0: universal anti-AI gate on the opportunity-reply text.
+    async def _opp_anti_ai_regen(feedback: str) -> str:
+        return remove_hedging(await call_claude(
+            claude_prompt
+            + "\n\nREVISION REQUIRED — remove these AI tells, keep the substance, "
+            "keep it brief and human:\n" + feedback,
+            max_tokens=max_tokens, model=_opp_model,
+        ))
+
+    raw_text, _opp_aa_report, _ = await anti_ai.enforce(raw_text, regenerate=_opp_anti_ai_regen)
+    if platform_key.startswith("x_"):
+        raw_text = enforce_x_char_limit(raw_text, platform_key)
+    if not _opp_aa_report.passed:
+        logger.info(
+            "generate_opportunity_draft: reply still trips anti-AI gate "
+            "(opp_id=%d score=%.1f) — flagged, not blocked.",
+            opportunity_id, _opp_aa_report.score,
+        )
 
     _, body = extract_title_and_body(raw_text, platform_key)
 

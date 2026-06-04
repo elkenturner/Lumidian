@@ -227,7 +227,7 @@ x:
   dont: [generate X drafts expecting AI CITATION in the 4 tracked models]
   brand_mention_rule: n/a
   confidence: high that it is reach-only for AI CITATION (Stream 1 0% + Stream 2 cross-study absence). UNTESTED for uncited mention-seeding.
-  note: strong candidate for REMOVAL as a citation play; relevant only if Grok is ever tracked. Open question = uncited mention-seeding (see Open gap).
+  note: KEEP (product decision 2026-06-03) — for AGENCY OPTICS, not AI citation. Client-facing value is visible breadth of output (more platforms = more demonstrable work). Be internally honest that its AI-visibility contribution is ~nil in the 4 tracked engines. Cheapest/lowest-priority block to generate; do not invest writing-quality effort here beyond baseline.
 ```
 
 ---
@@ -247,4 +247,4 @@ Layer A's evidence is citation data; the product goal is mentions; uncited synth
 3. **The three engine bugs** → instrumentation fixes that unblock first-party Claude + Gemini citation data (which will make the next version of this doc far stronger than external studies).
 4. **The strategic re-pointing** → **add** an owned-site surface (the biggest gap), **promote** Wikipedia from placeholder to first-class, **prioritize** LinkedIn *articles* over feed posts, and **keep** Reddit + Quora but repositioned as mention-seeding plays (not direct-citation), with their writing rules fixed (esp. Reddit's anti-Q&A rule).
 
-> **Platform-set decision (Ken, 2026-06-03):** **KEEP Reddit + Quora** — they stay in the engine, repositioned as mention-seeding plays since we can't disprove the uncited-mention pathway and mentions (not citations) are the product metric. Layer B treats them as "write correctly + measure," not "remove." **Still open: X** (the one channel weak on *both* citation and any indirect path, since Google barely indexes it) — keep or drop is Ken's call before Layer B locks.
+> **Platform-set decision (Ken, 2026-06-03) — RESOLVED, keep all 5:** **Reddit + Quora** stay, repositioned as mention-seeding plays (can't disprove the uncited-mention pathway; mentions are the metric). **X** stays for **agency optics** — visible breadth of output is part of the client deliverable — with the internal honesty that its AI-visibility contribution is ~nil. So the engine *adds* owned-site + Wikipedia (Tier 1) and *keeps* all 5 existing platforms; the change is **where effort and expectations go**, not deletion. Layer B: "write each correctly for what it can actually do + measure," not "remove."

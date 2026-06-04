@@ -62,6 +62,7 @@ from app.services.drafting import (
     parse_wikipedia_draft,
     remove_hedging,
 )
+from app.services.drafting import anti_ai
 from app.services.drafting.citations import RenderedCitation, render_citations
 from app.services.drafting.critic import (
     REWRITE_THRESHOLD,
@@ -706,6 +707,42 @@ async def _generate_with_new_pipeline(
                 "Citation rendering failed for brand %d prompt %d: %s",
                 brand_id, prompt_id, exc,
             )
+
+    # Layer 4 (B2 Phase 0): universal anti-AI gate — every draft, every tier.
+    # autofix is always applied; on a failing scan we regenerate once with the
+    # specific tells fed back, re-render citations, and keep the better result.
+    raw_text = anti_ai.autofix(raw_text)
+    report = anti_ai.scan(raw_text)
+    if not report.passed:
+        feedback = anti_ai.feedback_for_regeneration(report)
+        try:
+            retry = anti_ai.autofix(await call_claude(
+                claude_prompt
+                + "\n\nREVISION REQUIRED — your draft reads as AI-written. Rewrite to "
+                "remove these specific tells. Keep every fact and claim. Vary sentence "
+                "length deliberately:\n" + feedback,
+                max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
+                model=writer_model,
+            ))
+            retry_citations = citations
+            if pack is not None:
+                retry, retry_citations = render_citations(
+                    text=retry, pack=pack, platform=platform_key,
+                )
+            retry_report = anti_ai.scan(retry)
+            if retry_report.passed or retry_report.score < report.score:
+                raw_text, citations, report = retry, retry_citations, retry_report
+        except Exception as exc:
+            logger.warning(
+                "Anti-AI regeneration failed for brand %d prompt %d: %s",
+                brand_id, prompt_id, exc,
+            )
+    if not report.passed:
+        logger.info(
+            "Draft for brand %d prompt %d (%s) still trips anti-AI gate after retry "
+            "(score=%.1f) — flagged, not blocked.",
+            brand_id, prompt_id, platform_key, report.score,
+        )
 
     return raw_text, quality_score, citations
 

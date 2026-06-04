@@ -202,15 +202,14 @@ async def generate_owned_site_draft(
     """
     prompt = build_owned_site_prompt(brand, target_query, evidence, voice)
     body = await writer(prompt)
-    attempts = 1
-    report = anti_ai.scan(anti_ai.autofix(body))
-    while not report.passed and attempts <= max_retries:
-        feedback = anti_ai.feedback_for_regeneration(report)
-        body = await writer(build_owned_site_prompt(brand, target_query, evidence, voice, avoid=feedback))
-        attempts += 1
-        report = anti_ai.scan(anti_ai.autofix(body))
 
-    body = anti_ai.autofix(body)
+    async def _regen(feedback: str) -> str:
+        return await writer(
+            build_owned_site_prompt(brand, target_query, evidence, voice, avoid=feedback)
+        )
+
+    body, report, regens = await anti_ai.enforce(body, regenerate=_regen, max_retries=max_retries)
+    attempts = 1 + regens
     title = _extract_title(body)
     jsonld = build_jsonld(title, brand, date_published)
     return OwnedSiteDraft(

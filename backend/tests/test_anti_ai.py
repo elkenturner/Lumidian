@@ -112,3 +112,55 @@ def test_autofix_is_safe_and_cosmetic():
 def test_passes_helper():
     assert anti_ai.passes("We shipped the test to 12 clinics in March and tracked outcomes.") is True
     assert anti_ai.passes("As an AI, I'd be happy to help you delve into this tapestry.") is False
+
+
+# ── enforce() — the canonical gate loop ─────────────────────────────────────
+
+import pytest
+
+
+@pytest.mark.asyncio
+async def test_enforce_clean_text_no_regen():
+    text, report, regens = await anti_ai.enforce("We tested it on 1,400 patients in May. Eleven cases surfaced.")
+    assert report.passed is True
+    assert regens == 0
+
+
+@pytest.mark.asyncio
+async def test_enforce_regenerates_until_clean():
+    clean = "We ran it on 1,400 patients in May. The dogs caught eleven early cases."
+    calls = {"n": 0}
+
+    async def regen(feedback):
+        calls["n"] += 1
+        return clean
+
+    slop = "In today's fast-paced world, we delve into the tapestry. It's not just X, it's Y. In conclusion."
+    text, report, regens = await anti_ai.enforce(slop, regenerate=regen, max_retries=2)
+    assert report.passed is True
+    assert regens == 1
+    assert "delve" not in text.lower()
+
+
+@pytest.mark.asyncio
+async def test_enforce_keeps_best_and_stops_at_max():
+    slop = "In today's fast-paced world we delve into the tapestry. It's not just X, it's Y. In conclusion."
+
+    async def regen(feedback):
+        return slop  # never improves
+
+    text, report, regens = await anti_ai.enforce(slop, regenerate=regen, max_retries=2)
+    assert report.passed is False
+    assert regens == 2
+
+
+@pytest.mark.asyncio
+async def test_enforce_survives_writer_exception():
+    slop = "We delve into the rich tapestry. In conclusion, it underscores the realm."
+
+    async def regen(feedback):
+        raise RuntimeError("LLM down")
+
+    text, report, regens = await anti_ai.enforce(slop, regenerate=regen, max_retries=2)
+    assert report.passed is False     # couldn't fix, but didn't crash
+    assert regens == 0

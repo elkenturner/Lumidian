@@ -371,6 +371,31 @@ def feedback_for_regeneration(report: AntiAIReport) -> str:
     return "\n".join(lines)
 
 
+async def enforce(text: str, regenerate=None, max_retries: int = 2):
+    """Canonical anti-AI gate loop, shared by every generation path.
+
+    autofix → scan → (if failing and `regenerate` given) regenerate-with-feedback,
+    keeping the best-scoring candidate. `regenerate` is an async callable
+    `(feedback: str) -> str` (re-runs the writer with the specific tells to fix).
+    Returns ``(final_text, report, n_regens)``. Never raises on a writer failure —
+    it keeps the best text it has and lets the caller flag-for-review.
+    """
+    text = autofix(text)
+    report = scan(text)
+    regens = 0
+    while not report.passed and regenerate is not None and regens < max_retries:
+        feedback = feedback_for_regeneration(report)
+        try:
+            candidate = autofix(await regenerate(feedback))
+        except Exception:
+            break
+        regens += 1
+        cand_report = scan(candidate)
+        if cand_report.passed or cand_report.score < report.score:
+            text, report = candidate, cand_report
+    return text, report, regens
+
+
 def autofix(text: str) -> str:
     """Apply only safe, meaning-preserving cosmetic fixes (cannot change claims).
 

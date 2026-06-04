@@ -227,7 +227,16 @@ def _extract_gemini_citations(response) -> list[dict] | None:
         if not url or url in seen:
             continue
         seen.add(url)
-        out.append({"url": url, "title": getattr(web, "title", None)})
+        title = getattr(web, "title", None)
+        item = {"url": url, "title": title}
+        # `url` is an opaque grounding-redirect proxy (vertexaisearch.../redirect/…);
+        # registered_domain() would classify every Gemini citation as google.com.
+        # `web.title` carries the bare domain (e.g. "reddit.com") — capture it so
+        # citation classification sees the real domain. (Full URL resolution via
+        # redirect-follow is a later step; the domain is what analytics needs.)
+        if title and "grounding-api-redirect" in url:
+            item["domain_hint"] = title
+        out.append(item)
     return out or None
 
 
@@ -359,6 +368,32 @@ def _extract_claude_text(response) -> str:
     return "".join(parts)
 
 
+def _extract_claude_citations(response) -> list[dict] | None:
+    """Extract the URLs Claude actually cited from its web_search tool.
+
+    Claude returns citations as STRUCTURED objects, not inline prose URLs: each
+    `text` block may carry a `.citations[]` array of web_search_result_location
+    objects (`.url` / `.title`) — the *actually cited* set. We read those (clean
+    prose contains no inline URLs, which is why the regex citation path found
+    nothing and Claude was 100% citation-blind). Returns None when no web search
+    produced citations. Defensive: a `web_search_tool_result` error block carries
+    a dict `.content` (not a list) and simply has no `.citations`, so it's skipped.
+    """
+    out: list[dict] = []
+    seen: set[str] = set()
+    for block in getattr(response, "content", None) or []:
+        cites = getattr(block, "citations", None)
+        if not isinstance(cites, list):
+            continue
+        for c in cites:
+            url = getattr(c, "url", None)
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            out.append({"url": url, "title": getattr(c, "title", None)})
+    return out or None
+
+
 async def _query_claude(prompt: str, brand_name: str, model_version: str = "claude-haiku-4-5-20251001") -> dict:
     """Query Claude with the web_search tool enabled.
 
@@ -401,6 +436,7 @@ async def _query_claude(prompt: str, brand_name: str, model_version: str = "clau
             "mentioned": mentioned,
             "latency_ms": latency_ms,
             "error": None,
+            "citations": _extract_claude_citations(response),
         }
     except Exception as exc:
         latency_ms = int((time.monotonic() - start) * 1000)
@@ -506,6 +542,13 @@ async def _query_gemini(prompt: str, brand_name: str, model_version: str = "gemi
             tools=[types.Tool(google_search=types.GoogleSearch())],
         )
         config_plain = types.GenerateContentConfig()
+        # GUARDRAIL (Layer B0): forcing a response_schema/response_mime_type on a
+        # GROUNDED Gemini call silently nulls grounding_metadata → all citations
+        # lost. Never set a JSON schema on config_with_search. If structured output
+        # is ever needed, use a SEPARATE ungrounded call instead.
+        assert getattr(config_with_search, "response_schema", None) is None, (
+            "grounded Gemini call must not set response_schema (nulls grounding_metadata)"
+        )
 
         response = None
         for config in (config_with_search, config_plain):

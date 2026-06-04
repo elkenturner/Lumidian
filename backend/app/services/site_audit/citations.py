@@ -71,6 +71,26 @@ def classify_url(url: str, own_domain: str | None, competitors_by_domain: dict[s
     return ClassifyResult("unknown", domain)
 
 
+def classify_structured_citation(
+    item: dict,
+    url: str,
+    own_domain: str | None,
+    competitors_by_domain: dict[str, int],
+) -> ClassifyResult:
+    """Classify a structured citation, honouring a `domain_hint`.
+
+    Gemini stores citations as opaque grounding-redirect proxy URLs, which
+    registered_domain() resolves to google.com. `_extract_gemini_citations`
+    attaches a `domain_hint` (the real bare domain from web.title); when present
+    we classify by that instead of the proxy URL. Non-hinted items (Perplexity,
+    real URLs) are unaffected.
+    """
+    hint = item.get("domain_hint") if isinstance(item, dict) else None
+    if hint:
+        return classify_url(f"https://{hint.strip().lstrip('@')}", own_domain, competitors_by_domain)
+    return classify_url(url, own_domain, competitors_by_domain)
+
+
 async def extract_for_run(tracking_run_id: int) -> int:
     """Extract+classify citations for one completed tracking run.
 
@@ -115,6 +135,8 @@ async def extract_for_run(tracking_run_id: int) -> int:
             # Perp/Gemini, which don't embed URLs in response_text.
             urls: list[str] = []
             seen: set[str] = set()
+            # url -> structured citation item (carries domain_hint for Gemini)
+            structured_by_url: dict[str, dict] = {}
             if qr.response_text:
                 for u in extract_urls(qr.response_text):
                     if u not in seen:
@@ -133,8 +155,14 @@ async def extract_for_run(tracking_run_id: int) -> int:
                     continue
                 seen.add(u)
                 urls.append(u)
+                if isinstance(item, dict):
+                    structured_by_url[u] = item
             for url in urls:
-                cls = classify_url(url, own, competitors_by_domain)
+                item = structured_by_url.get(url)
+                if item is not None:
+                    cls = classify_structured_citation(item, url, own, competitors_by_domain)
+                else:
+                    cls = classify_url(url, own, competitors_by_domain)
                 row = CitationSource(
                     brand_id=brand.id,
                     tracking_run_id=run.id,

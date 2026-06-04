@@ -168,6 +168,32 @@ async def _load_profile_context(db: AsyncSession, brand_id: int) -> str:
     return "\n\n".join(lines) if lines else "No brand profile details available."
 
 
+async def _load_voice_directive(db: AsyncSession, brand_id: int) -> str | None:
+    """Build a focused brand-VOICE directive from existing BrandProfile fields.
+
+    Reuses tone_of_voice + approved_language + what_not_to_say (already captured per
+    brand) but surfaces them as one emphatic directive that drives every draft on
+    every tier — rather than three lines buried in the profile blob. Returns None
+    when the brand has no voice fields set (behavior unchanged for those brands).
+    """
+    result = await db.execute(
+        select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+    )
+    profile: BrandProfile | None = result.scalar_one_or_none()
+    if profile is None:
+        return None
+    parts: list[str] = []
+    if profile.tone_of_voice:
+        parts.append(f"Tone: {profile.tone_of_voice.strip()}")
+    approved = json.loads(profile.approved_language) if profile.approved_language else []
+    if approved:
+        parts.append("Prefer these words/phrases where natural: " + ", ".join(approved))
+    prohibited = json.loads(profile.what_not_to_say) if profile.what_not_to_say else []
+    if prohibited:
+        parts.append("Never use these phrases or claims: " + ", ".join(prohibited))
+    return "\n".join(parts) if parts else None
+
+
 async def _load_publications(db: AsyncSession, brand_id: int) -> list[dict]:
     """Load publications list directly from BrandProfile."""
     result = await db.execute(
@@ -634,6 +660,7 @@ async def _generate_with_new_pipeline(
 
     # Writer call
     writer_model = writer_model_for_tier(tier)
+    voice_directive = await _load_voice_directive(db, brand_id)
     claude_prompt = build_prompt(
         brand_name=brand_name,
         platform=platform_key,
@@ -648,6 +675,7 @@ async def _generate_with_new_pipeline(
         evidence_pack=pack,
         voice_sample=voice_sample,
         related_draft_summary=related_summary,
+        voice_directive=voice_directive,
     )
     raw_text = await call_claude(
         claude_prompt,
@@ -1050,6 +1078,7 @@ async def generate_gap_draft(
             platform_spec=spec,
             opportunity_context=effective_opportunity_context,
             existing_drafts_context=existing_drafts_context,
+            voice_directive=await _load_voice_directive(db, brand_id),
         )
         raw_text = await call_claude(
             claude_prompt,
@@ -1260,6 +1289,7 @@ async def generate_opportunity_draft(
         response_analysis=response_analysis,
         platform_spec=spec,
         opportunity_context=opportunity_context,
+        voice_directive=await _load_voice_directive(db, opp.brand_id),
     )
 
     # Use haiku for short reply formats — cheaper and fast enough for short content

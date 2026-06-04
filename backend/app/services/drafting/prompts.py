@@ -163,6 +163,7 @@ def build_prompt(
     voice_sample: str | None = None,
     related_draft_summary: str | None = None,
     brief_context: str | None = None,
+    voice_directive: str | None = None,
 ) -> str:
     spec = platform_spec
     word_min, word_max = spec["word_range"]
@@ -205,6 +206,14 @@ Your task is to write a reply to this specific thread that naturally adds value.
         lines.append("- Never invent sources or cite sources not listed above.")
         lines.append("")
         evidence_section = "\n".join(lines)
+
+    voice_directive_section = ""
+    if voice_directive:
+        voice_directive_section = (
+            "BRAND VOICE — write EVERY sentence in this brand's voice. This is not "
+            "optional styling; it governs word choice, rhythm, and phrasing throughout:\n"
+            f"{voice_directive}\n\n"
+        )
 
     voice_section = ""
     if voice_sample:
@@ -257,7 +266,7 @@ TARGET QUERY (this is the exact question the content must answer):
 CURRENT VISIBILITY:
 {visibility_pct:.1f}% of AI responses mention {brand_name} for this query. The analysis below shows what is currently being said and what specific angle is missing.
 
-{evidence_section}{voice_section}{related_section}WHAT AI SYSTEMS ARE CURRENTLY SAYING:
+{voice_directive_section}{evidence_section}{voice_section}{related_section}WHAT AI SYSTEMS ARE CURRENTLY SAYING:
 {response_analysis}
 {opportunity_section}{existing_section}{cluster_section}
 PLATFORM: {platform}

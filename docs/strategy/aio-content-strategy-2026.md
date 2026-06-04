@@ -197,7 +197,7 @@ reddit:
   dont: [expect a new standalone post to get cited, use in B2B/finance, forbid Q&A format (current rule is wrong)]
   brand_mention_rule: only if genuinely the most direct answer; affiliation disclosed
   confidence: low for "publish-and-get-cited"; the citable artifact is aged validation, not a fresh draft
-  note: fix the anti-Q&A rule (D3); reconsider whether to generate Reddit drafts at all for B2B
+  note: KEEP (product decision 2026-06-03). Highest mention-seeding potential of the 5 (strong external UGC-influence evidence + overlaps our Claude/Gemini citation blind spots). Reposition as mention-seeding + authentic Q&A participation, NOT publish-a-post-get-cited. FIX the anti-Q&A rule (D3 — cited Reddit is Q&A format). Run the mention experiment here first.
 ```
 
 ### quora
@@ -212,7 +212,7 @@ quora:
   dont: [generate Quora drafts expecting AI CITATION]
   brand_mention_rule: n/a
   confidence: high that it is near-zero for CITATION (Stream 1 0% + absent from all studies + ~99% decline). UNTESTED for uncited mention-seeding.
-  note: strong candidate for REMOVAL as a citation play. Open question = does it seed uncited mentions? (see Open gap). Not "blocked", but "indexed and ignored".
+  note: KEEP (product decision 2026-06-03). Reposition from a direct-citation play to a MENTION-SEEDING play — its plausible value is influencing synthesis (brand named in answers) + brand-mention correlation (the 4.1x multiplier), NOT getting the Quora URL cited. Set client/internal expectations accordingly. Measure via the mention experiment. "Indexed and ignored", not "blocked".
 ```
 
 ### x
@@ -245,6 +245,6 @@ Layer A's evidence is citation data; the product goal is mentions; uncited synth
 1. **Part 2 universal rules + per-platform blocks** → the new unified writer's prompt rules.
 2. **`contradictions.md`** → the explicit list of current rules to delete/keep/reframe (with file:line).
 3. **The three engine bugs** → instrumentation fixes that unblock first-party Claude + Gemini citation data (which will make the next version of this doc far stronger than external studies).
-4. **The strategic re-pointing** → add an owned-site surface, promote Wikipedia, prioritize LinkedIn *articles*, and seriously consider dropping Quora + X (and Reddit for B2B) as draft platforms.
+4. **The strategic re-pointing** → **add** an owned-site surface (the biggest gap), **promote** Wikipedia from placeholder to first-class, **prioritize** LinkedIn *articles* over feed posts, and **keep** Reddit + Quora but repositioned as mention-seeding plays (not direct-citation), with their writing rules fixed (esp. Reddit's anti-Q&A rule).
 
-> **Decision deferred to Ken (not Layer A's call):** whether to *remove* Quora/X/Reddit from the engine or keep-but-deprioritize. Layer A's job was to surface the evidence; the platform-set decision is a product call for the Layer B spec.
+> **Platform-set decision (Ken, 2026-06-03):** **KEEP Reddit + Quora** — they stay in the engine, repositioned as mention-seeding plays since we can't disprove the uncited-mention pathway and mentions (not citations) are the product metric. Layer B treats them as "write correctly + measure," not "remove." **Still open: X** (the one channel weak on *both* citation and any indirect path, since Google barely indexes it) — keep or drop is Ken's call before Layer B locks.

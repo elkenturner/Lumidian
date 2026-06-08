@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from typing import Any
 
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,25 @@ from app.models import (
     WikipediaScan,
 )
 from app.services.document_engine.registry import Template, register
+
+
+class WikiCandidateOut(BaseModel):
+    article_title: str
+    angle: str = Field(..., description="One-sentence on how we contribute legitimately")
+    suggested_section: str | None = None
+
+
+class WikipediaPlanOutput(BaseModel):
+    summary: str = Field(..., description="2-3 sentences on the brand's Wikipedia opportunity overall")
+    approach: str = Field(..., description="2-3 paragraphs on the engagement approach (publication strategy)")
+    top_candidates: list[WikiCandidateOut] = Field(default_factory=list)
+    risks: list[str] = Field(default_factory=list)
+
+
+REQUIRED_FIELDS = (
+    "brand.name",
+    "candidates",          # require at least one candidate from the scan
+)
 
 
 async def fetch_data(db: AsyncSession, client: AgencyClient) -> dict[str, Any]:
@@ -119,5 +139,9 @@ register(
         system_prompt=SYSTEM_PROMPT,
         user_prompt_template="Plan data:\n```json\n{data_json}\n```",
         max_tokens=4000,
+        required_fields=REQUIRED_FIELDS,
+        output_schema=WikipediaPlanOutput,
+        typst_template="wikipedia_plan.typ",
+        chart_calls=(),
     )
 )

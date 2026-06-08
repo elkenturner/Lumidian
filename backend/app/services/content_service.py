@@ -1,10 +1,15 @@
 """
-Content Service — generates AI drafts, posts content, and calculates attribution.
+Content Service — low-visibility prompt discovery, posting, and attribution.
+
+Draft GENERATION lives entirely in drafting_service.py (the unified writer);
+the legacy generate_draft path here was removed in B2 Phase 4 (dead code that
+bypassed the drafting/ pipeline). PLATFORM_GUIDELINES is kept because it backs
+the UI-facing platform-info endpoints in routers/content.py — it is NOT a
+generation-rule source (those live in drafting/platforms.py:PLATFORM_SPECS).
 
 Public API
 ----------
 get_low_visibility_prompts(db, brand_id, limit) -> list[dict]
-generate_draft(db, brand_id, platform, prompt_id, custom_brief) -> ContentDraft
 post_draft(db, draft_id, post_url, platform_post_id) -> ContentPost
 calculate_attribution(db, tracking_run_id) -> list[ContentAttribution]
 """
@@ -12,7 +17,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import timedelta
 
 from sqlalchemy import func as sqlfunc
@@ -194,253 +198,6 @@ async def get_low_visibility_prompts(
         }
         for row in rows
     ]
-
-
-async def _get_prompt_visibility(db: AsyncSession, prompt_id: int) -> float:
-    """
-    Return the average mention rate (0-100) for a prompt across all completed runs.
-    Returns 0.0 if no data.
-    """
-    from sqlalchemy import Float, cast
-
-    stmt = (
-        select(
-            sqlfunc.coalesce(
-                sqlfunc.avg(cast(QueryResult.mentioned, Float)),
-                0.0,
-            )
-        )
-        .join(TrackingRun, TrackingRun.id == QueryResult.tracking_run_id)
-        .where(
-            QueryResult.prompt_id == prompt_id,
-            TrackingRun.status == "completed",
-        )
-    )
-    result = await db.execute(stmt)
-    avg = result.scalar_one_or_none()
-    return float(avg) * 100.0 if avg is not None else 0.0
-
-
-# ── Draft generation ──────────────────────────────────────────────────────────
-
-def _build_claude_prompt(
-    brand_name: str,
-    platform: str,
-    target_query: str,
-    visibility_score: float,
-    guidelines: dict,
-    custom_brief: str | None,
-) -> str:
-    """Build the system+user prompt string sent to Claude for draft generation."""
-    rules_text = "\n".join(f"  - {r}" for r in guidelines["rules"])
-    workflow = guidelines["workflow"]
-    tone = guidelines["tone"]
-
-    platform_specific = ""
-    if platform == "wikipedia":
-        platform_specific = (
-            "Write suggested edit language for an EXISTING Wikipedia article that would "
-            "naturally include factual information about this brand or its category. "
-            "Format it as a suggested paragraph or section edit. Do NOT write a new article."
-        )
-    elif platform == "reddit":
-        platform_specific = (
-            "Write a comment or post for a relevant subreddit that answers a related question "
-            "or contributes to a relevant discussion, naturally mentioning the brand where it "
-            "adds genuine value."
-        )
-    elif platform == "quora":
-        platform_specific = (
-            "Write a comprehensive Quora answer to a question related to this search query. "
-            "Mention the brand naturally where it is relevant and helpful to the reader."
-        )
-    elif platform == "medium":
-        platform_specific = (
-            "Write a full Medium article (at least 600 words) with original analysis or "
-            "thought leadership. The brand mention should feel earned and contextual, "
-            "not promotional."
-        )
-
-    brief_section = ""
-    if custom_brief:
-        brief_section = f"\nAdditional context / brief from user:\n{custom_brief}\n"
-
-    return f"""You are a content strategist helping improve a brand's visibility in AI-generated responses.
-
-Brand: {brand_name}
-Target search query / prompt: "{target_query}"
-Current visibility score for this prompt: {visibility_score:.1f}% (percentage of AI responses that mention the brand)
-Platform: {platform}
-Platform tone: {tone}
-Platform workflow: {workflow}
-
-Platform rules to follow:
-{rules_text}
-{brief_section}
-Your goal: Write content for {platform} that would naturally cause an LLM to mention "{brand_name}" when answering the query "{target_query}", without being promotional or violating the platform's guidelines.
-
-{platform_specific}
-
-Instructions:
-1. Start with a title (if applicable for the platform) on the first line.
-2. Write the full content body.
-3. The content must genuinely add value to a reader — it should not read as advertising.
-4. Naturally incorporate "{brand_name}" in a way that is factual, relevant, and helpful.
-5. Follow all platform rules listed above strictly.
-
-Write the content now:"""
-
-
-async def generate_draft(
-    db: AsyncSession,
-    brand_id: int,
-    platform: str,
-    prompt_id: int | None = None,
-    custom_brief: str | None = None,
-    quora_question_url: str | None = None,
-    quora_question_title: str | None = None,
-) -> ContentDraft:
-    """
-    Generate a content draft using Claude (claude-sonnet-4-6).
-
-    1. Load brand info.
-    2. If no prompt_id, find the lowest-scoring prompt automatically.
-    3. Get current visibility data for that prompt.
-    4. Build a detailed prompt for Claude with platform guidelines.
-    5. Call Claude to generate the draft.
-    6. Store and return the ContentDraft.
-    """
-    if platform not in PLATFORM_GUIDELINES:
-        raise ValueError(f"Unsupported platform: {platform}. Must be one of {list(PLATFORM_GUIDELINES.keys())}")
-
-    # Load brand
-    brand_result = await db.execute(select(Brand).where(Brand.id == brand_id))
-    brand: Brand | None = brand_result.scalar_one_or_none()
-    if brand is None:
-        raise ValueError(f"Brand {brand_id} not found")
-
-    # Resolve prompt
-    if prompt_id is not None:
-        prompt_result = await db.execute(
-            select(Prompt).where(Prompt.id == prompt_id, Prompt.brand_id == brand_id)
-        )
-        prompt: Prompt | None = prompt_result.scalar_one_or_none()
-        if prompt is None:
-            raise ValueError(f"Prompt {prompt_id} not found for brand {brand_id}")
-    else:
-        # Find lowest-scoring prompt automatically
-        low_prompts = await get_low_visibility_prompts(db, brand_id, limit=1)
-        if not low_prompts:
-            raise ValueError(f"Brand {brand_id} has no prompts configured")
-        prompt_id = low_prompts[0]["prompt_id"]
-        prompt_result = await db.execute(select(Prompt).where(Prompt.id == prompt_id))
-        prompt = prompt_result.scalar_one_or_none()
-        if prompt is None:
-            raise ValueError(f"Could not load prompt {prompt_id}")
-
-    # Get visibility score for this prompt
-    visibility_score = await _get_prompt_visibility(db, prompt.id)
-
-    # Build guidelines and prompt for Claude
-    guidelines = PLATFORM_GUIDELINES[platform]
-
-    # For Quora with a targeted question, inject the question into the brief
-    effective_brief = custom_brief
-    if platform == "quora" and quora_question_title and quora_question_url:
-        question_context = (
-            f"Write a Quora answer to this specific question: "
-            f"{quora_question_title} ({quora_question_url}). "
-            f"The answer should directly address this question while naturally "
-            f"incorporating relevant information about {brand.name}."
-        )
-        effective_brief = question_context + (f"\n\n{custom_brief}" if custom_brief else "")
-
-    claude_prompt = _build_claude_prompt(
-        brand_name=brand.name,
-        platform=platform,
-        target_query=prompt.text,
-        visibility_score=visibility_score,
-        guidelines=guidelines,
-        custom_brief=effective_brief,
-    )
-
-    # Call Claude
-    anthropic_api_key = os.getenv("ANTHROPIC_API_KEY", "")
-    if not anthropic_api_key:
-        raise ValueError(
-            "ANTHROPIC_API_KEY is not configured. "
-            "Add your API key in Settings → Connected Accounts to enable draft generation."
-        )
-
-    import anthropic
-
-    client = anthropic.AsyncAnthropic(api_key=anthropic_api_key)
-    response = await client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=2000,
-        timeout=30.0,
-        messages=[{"role": "user", "content": claude_prompt}],
-    )
-    generated_text: str = response.content[0].text if response.content else ""
-
-    # Extract title from first line if present
-    title: str | None = None
-    content_body = generated_text.strip()
-    lines = content_body.split("\n", 1)
-    if len(lines) >= 1:
-        first_line = lines[0].strip()
-        # Use the first line as title if it's reasonably short (not a full paragraph)
-        if 5 < len(first_line) <= 200 and not first_line.endswith("."):
-            title = first_line.lstrip("#").strip()
-            content_body = lines[1].strip() if len(lines) > 1 else generated_text.strip()
-
-    # Build content brief — for Quora targeted drafts, store question URL in brief
-    # and question title in platform_guidelines_applied so the card can render a link
-    if platform == "quora" and quora_question_url and quora_question_title:
-        brief = quora_question_url
-        guidelines_applied = quora_question_title
-    else:
-        brief = custom_brief or (
-            f"Auto-generated to improve visibility for prompt: \"{prompt.text}\" "
-            f"(current score: {visibility_score:.1f}%)"
-        )
-        guidelines_applied = json.dumps(guidelines["rules"])
-
-    draft = ContentDraft(
-        brand_id=brand_id,
-        prompt_id=prompt.id,
-        platform=platform,
-        status="draft",
-        title=title,
-        content_text=content_body,
-        content_brief=brief,
-        platform_guidelines_applied=guidelines_applied,
-        visibility_score_at_draft=round(visibility_score, 2),
-    )
-    db.add(draft)
-    await db.commit()
-    await db.refresh(draft)
-    logger.info(
-        "Generated %s draft %d for brand %d (prompt %d, visibility %.1f%%)",
-        platform,
-        draft.id,
-        brand_id,
-        prompt.id,
-        visibility_score,
-    )
-
-    from app.services.analytics_service import log_event
-    await log_event(
-        "draft_created",
-        {
-            "platform": platform,
-            "target_prompt_id": prompt.id,
-            "visibility_score_at_creation": round(visibility_score, 2),
-        },
-        brand_id=brand_id,
-    )
-
-    return draft
 
 
 # ── Posting ───────────────────────────────────────────────────────────────────

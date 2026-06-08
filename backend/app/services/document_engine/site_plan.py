@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +16,27 @@ from app.models import (
     WebsiteAuditRecommendation,
 )
 from app.services.document_engine.registry import Template, register
+
+
+class SitePlanFixOut(BaseModel):
+    title: str
+    category: str
+    priority: str  # "high"/"medium"/"low"
+    why_it_matters: str
+    plain_action: str
+
+
+class SitePlanOutput(BaseModel):
+    summary: str
+    score_interpretation: str = Field(..., description="One paragraph reading the audit scores")
+    top_fixes: list[SitePlanFixOut] = Field(default_factory=list)
+    next_30_days: list[str] = Field(default_factory=list)
+
+
+REQUIRED_FIELDS = (
+    "brand.name",
+    "audit.overall_score",
+)
 
 
 async def fetch_data(db: AsyncSession, client: AgencyClient) -> dict[str, Any]:
@@ -120,5 +142,9 @@ register(
         system_prompt=SYSTEM_PROMPT,
         user_prompt_template="Site plan data:\n```json\n{data_json}\n```",
         max_tokens=4000,
+        required_fields=REQUIRED_FIELDS,
+        output_schema=SitePlanOutput,
+        typst_template="site_plan.typ",
+        chart_calls=(),
     )
 )

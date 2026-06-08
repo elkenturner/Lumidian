@@ -2072,6 +2072,7 @@ export interface AgencyDocument {
   kind: string;
   title: string;
   body_markdown: string;
+  data_snapshot: string | null;
   generated_by_user_id: number | null;
   generated_by_name: string | null;
   generated_at: string;
@@ -2095,19 +2096,6 @@ export async function agencyGetDocument(documentId: number): Promise<AgencyDocum
   return res.data;
 }
 
-export async function agencyGenerateDocument(clientId: number, kind: string): Promise<AgencyDocument> {
-  const res = await api.post<AgencyDocument>(`/agency/clients/${clientId}/documents`, { kind });
-  return res.data;
-}
-
-export async function agencyGenerateWeeklyReport(clientId: number): Promise<AgencyDocument> {
-  const res = await api.post<AgencyDocument>(
-    `/agency/clients/${clientId}/documents`,
-    { kind: "agency_weekly_report" },
-  );
-  return res.data;
-}
-
 export async function agencyUpdateDocument(documentId: number, bodyMarkdown: string): Promise<AgencyDocument> {
   const res = await api.patch<AgencyDocument>(`/agency/documents/${documentId}`, { body_markdown: bodyMarkdown });
   return res.data;
@@ -2115,13 +2103,6 @@ export async function agencyUpdateDocument(documentId: number, bodyMarkdown: str
 
 export async function agencyDeleteDocument(documentId: number): Promise<void> {
   await api.delete(`/agency/documents/${documentId}`);
-}
-
-export async function agencyDownloadDocumentPdf(documentId: number): Promise<Blob> {
-  const res = await api.get(`/agency/documents/${documentId}/pdf`, {
-    responseType: 'blob',
-  });
-  return res.data as Blob;
 }
 
 export class MissingFieldsError extends Error {

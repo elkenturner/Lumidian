@@ -229,6 +229,7 @@ export function PlaybookTab({
 
       <DocumentViewer
         doc={viewerDoc}
+        clientId={client.id}
         onClose={() => setViewerDoc(null)}
         onChange={(next) => setViewerDoc(next)}
         onDelete={(_id) => setViewerDoc(null)}

@@ -1203,6 +1203,7 @@ class DocumentOut(BaseModel):
     kind: str
     title: str
     body_markdown: str
+    data_snapshot: str | None
     generated_by_user_id: int | None
     generated_by_name: str | None
     generated_at: datetime

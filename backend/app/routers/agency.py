@@ -40,7 +40,7 @@ from app.schemas import (
     NoteUpdate,
     ReviewLinkOut,
 )
-from app.services.document_engine import generate_document, generate_pdf, get_template, list_templates, MissingDataError, LLMJSONError
+from app.services.document_engine import generate_pdf, get_template, list_templates, MissingDataError, LLMJSONError
 from app.services.document_engine.typst_renderer import TypstCompileError
 from app.services.agency_activity import (
     emit_event,
@@ -565,6 +565,7 @@ async def _doc_to_out(db: AsyncSession, doc: ClientDocument) -> DocumentOut:
         kind=doc.kind,
         title=doc.title,
         body_markdown=doc.body_markdown,
+        data_snapshot=doc.data_snapshot,
         generated_by_user_id=doc.generated_by_user_id,
         generated_by_name=name,
         generated_at=doc.generated_at,
@@ -609,56 +610,6 @@ async def get_document(
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
     await ensure_client_access(db, user, doc.agency_client_id)
-    return await _doc_to_out(db, doc)
-
-
-@router.get("/documents/{document_id}/pdf")
-async def get_document_pdf(
-    document_id: int,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_agency_staff),
-):
-    """Render an agency document as PDF (any registered kind)."""
-    from fastapi import Response
-    import re as _re
-    from app.services.document_engine.pdf_renderer import render_pdf
-
-    doc = await db.get(ClientDocument, document_id)
-    if doc is None:
-        raise HTTPException(status_code=404, detail="Document not found")
-    await ensure_client_access(db, user, doc.agency_client_id)
-    try:
-        pdf_bytes = await render_pdf(db, doc)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to render PDF: {e}") from e
-    safe_title = _re.sub(r"[^a-zA-Z0-9_-]+", "-", (doc.title or f"weekly-report-{doc.id}"))[:120].strip("-")
-    return Response(
-        content=pdf_bytes,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
-    )
-
-
-@router.post("/clients/{client_id}/documents", response_model=DocumentOut, status_code=http_status.HTTP_201_CREATED)
-async def create_document(
-    client_id: int,
-    body: DocumentGenerateIn,
-    db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_client_access),
-):
-    client = await db.get(AgencyClient, client_id)
-    if client is None:
-        raise HTTPException(status_code=404, detail="Client not found")
-    template = get_template(body.kind)
-    if template is None:
-        raise HTTPException(status_code=http_status.HTTP_400_BAD_REQUEST, detail=f"Unknown template kind: {body.kind}")
-    try:
-        doc = await generate_document(db, client=client, template=template, actor_user_id=user.id)
-    except ValueError as e:
-        # e.g., missing ANTHROPIC_API_KEY
-        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
     return await _doc_to_out(db, doc)
 
 

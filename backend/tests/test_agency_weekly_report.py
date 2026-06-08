@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from sqlalchemy import select, update
@@ -123,25 +123,64 @@ async def test_run_agency_brand_and_report_swallows_errors():
 
     with patch("app.scheduler._safe_run", new=AsyncMock(return_value=None)), \
          patch(
-             "app.services.document_engine.generate_document",
+             "app.services.document_engine.generate_pdf",
              new=AsyncMock(side_effect=RuntimeError("boom")),
          ):
         await _run_agency_brand_and_report(brand_id=1, client_id=1)
 
 
 @pytest.mark.asyncio
-async def test_create_document_with_weekly_kind(client):
+async def test_render_weekly_report_returns_pdf(client, db_session):
+    """New-path smoke test: render endpoint produces PDF for weekly report."""
+    import shutil
+    import pytest as _pytest
+    from app.services.document_engine.agency_weekly_report import WeeklyReportOutput
+    from tests.conftest import factory_agency_client_full
+
+    if shutil.which("typst") is None:
+        _pytest.skip("typst CLI not installed")
+
     await _make_agency_user(client, email="weekly3@example.com")
-    cid, _bid = await _create_agency_client(client, name="WeeklyCo3")
+    async with AsyncSessionLocal() as db:
+        user = (await db.execute(select(User).where(User.email == "weekly3@example.com"))).scalar_one()
+    cid, bid = await factory_agency_client_full(
+        db_session, user.id, brand_name="WeeklyCo3", website_url="https://weeklyCo3.com"
+    )
+
+    # Insert a tracking run so REQUIRED_FIELDS preflight passes
+    from datetime import datetime as _dt
+    async with AsyncSessionLocal() as db:
+        db.add(
+            TrackingRun(
+                brand_id=bid,
+                status="completed",
+                run_type="scheduled",
+                overall_score=55.0,
+                total_queries=12,
+                total_mentions=7,
+                started_at=_dt.utcnow(),
+                completed_at=_dt.utcnow(),
+            )
+        )
+        await db.commit()
+
+    fake_output = WeeklyReportOutput(
+        executive_summary="Visibility improved slightly this week.",
+        week_in_review="Slight improvement overall.",
+        per_prompt_callouts=["LinkedIn up 5 points"],
+        competitor_delta=None,
+        content_shipped=[],
+        top_gaps=["Reddit gap persists"],
+        next_week=["Ship 2 Reddit posts"],
+    )
+
     with patch(
-        "app.services.document_engine.generator.call_claude",
-        new=AsyncMock(return_value="# Weekly report\n\nstub body"),
+        "app.services.document_engine.generator.request_structured_output",
+        new=AsyncMock(return_value=fake_output),
     ):
         resp = await client.post(
-            f"/api/agency/clients/{cid}/documents",
-            json={"kind": "agency_weekly_report"},
+            f"/api/agency/clients/{cid}/documents/agency_weekly_report/render",
         )
-    assert resp.status_code == 201, resp.text
-    body = resp.json()
-    assert body["kind"] == "agency_weekly_report"
-    assert body["title"].startswith("Weekly report")
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"] == "application/pdf"
+    assert resp.content.startswith(b"%PDF-")

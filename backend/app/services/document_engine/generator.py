@@ -12,47 +12,9 @@ from app.services.document_engine.preflight import check_required
 from app.services.document_engine.registry import Template
 from app.services.document_engine.structured_output import request_structured_output
 from app.services.document_engine.typst_renderer import render_pdf as typst_render_pdf
-from app.services.drafting.client import call_claude
 
 
 _TEMPLATES_DIR = Path(__file__).parent / "templates"
-
-
-async def generate_document(
-    db: AsyncSession,
-    *,
-    client: AgencyClient,
-    template: Template,
-    actor_user_id: int | None,
-) -> ClientDocument:
-    """LEGACY markdown path — used by kinds not yet on Typst."""
-    data = await template.fetch_data(db, client)
-    data_json = json.dumps(data, default=str, indent=2)
-    user_prompt = template.user_prompt_template.format(data_json=data_json)
-    full_prompt = f"{template.system_prompt}\n\n{user_prompt}"
-    body_markdown = await call_claude(
-        full_prompt,
-        max_tokens=template.max_tokens,
-        model="claude-sonnet-4-6",
-    )
-    doc = ClientDocument(
-        agency_client_id=client.id,
-        kind=template.kind,
-        title=template.title_factory(client),
-        body_markdown=body_markdown,
-        data_snapshot=data_json,
-        generated_by_user_id=actor_user_id,
-    )
-    db.add(doc)
-    await db.flush()
-    await emit_event(db, agency_client_id=client.id,
-                     event_type=EVENT_DOCUMENT_GENERATED,
-                     body=f"Generated {template.name}",
-                     actor_user_id=actor_user_id,
-                     payload={"document_id": doc.id, "kind": template.kind})
-    await db.commit()
-    await db.refresh(doc)
-    return doc
 
 
 async def generate_pdf(

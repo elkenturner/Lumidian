@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Download, FileText, Loader2 } from 'lucide-react';
-import { agencyDownloadDocumentPdf, agencyListDocuments, type AgencyDocument } from '@/lib/api';
+import { agencyListDocuments, agencyRenderDocument, type AgencyDocument } from '@/lib/api';
 import { DocumentViewer } from './DocumentViewer';
 
 interface Props {
@@ -11,18 +11,18 @@ interface Props {
   injectDoc?: AgencyDocument | null;
 }
 
-function DownloadPdfButton({ documentId, title }: { documentId: number; title: string }) {
+function DownloadPdfButton({ clientId, kind, title }: { clientId: number; kind: string; title: string }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const onClick = async () => {
     setBusy(true);
     setError(null);
     try {
-      const blob = await agencyDownloadDocumentPdf(documentId);
+      const { blob, filename } = await agencyRenderDocument(clientId, kind);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${title.replace(/[^a-zA-Z0-9_-]+/g, '-')}.pdf`;
+      a.download = filename || `${title.replace(/[^a-zA-Z0-9_-]+/g, '-')}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -98,17 +98,16 @@ export function DocumentList({ clientId, injectDoc }: Props) {
                   {d.generated_by_name && <> · {d.generated_by_name}</>}
                 </div>
               </div>
-              {d.kind === 'agency_weekly_report' && (
-                <div className="flex items-center gap-1 shrink-0">
-                  <DownloadPdfButton documentId={d.id} title={d.title} />
-                </div>
-              )}
+              <div className="flex items-center gap-1 shrink-0">
+                <DownloadPdfButton clientId={clientId} kind={d.kind} title={d.title} />
+              </div>
             </li>
           ))}
         </ul>
       </section>
       <DocumentViewer
         doc={activeDoc}
+        clientId={clientId}
         onClose={() => setActiveDoc(null)}
         onChange={(next) => {
           setDocs((prev) => prev.map((d) => (d.id === next.id ? next : d)));

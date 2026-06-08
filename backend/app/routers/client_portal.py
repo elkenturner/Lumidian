@@ -386,17 +386,33 @@ async def get_document_pdf(
     ctx: ClientViewContext = Depends(get_client_view_context),
     db: AsyncSession = Depends(get_db),
 ):
-    """Render a client document as PDF."""
+    """Re-render a Typst document from its stored data_snapshot."""
+    import json as _json
     import re as _re
-    from app.services.document_engine.pdf_renderer import render_pdf
+    from pathlib import Path
+    from app.services.document_engine import get_template
+    from app.services.document_engine.typst_renderer import render_pdf as typst_render_pdf, TypstCompileError
 
     doc = await db.get(ClientDocument, document_id)
     if doc is None or doc.agency_client_id != ctx.agency_client.id:
         raise HTTPException(status_code=404, detail="Document not found")
+    template = get_template(doc.kind)
+    if template is None or template.typst_template is None:
+        raise HTTPException(status_code=400, detail=f"PDF not available for document kind: {doc.kind}")
+    if not doc.data_snapshot:
+        raise HTTPException(status_code=409, detail="Document has no stored data; re-generate to produce a PDF.")
     try:
-        pdf_bytes = await render_pdf(db, doc)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+        data = _json.loads(doc.data_snapshot)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Stored data snapshot is corrupt.")
+    templates_dir = Path(__file__).resolve().parents[1] / "services" / "document_engine" / "templates"
+    try:
+        pdf_bytes = typst_render_pdf(
+            template_path=templates_dir / template.typst_template,
+            data=data,
+        )
+    except TypstCompileError as e:
+        raise HTTPException(status_code=500, detail=f"PDF render error: {e}") from e
     safe_title = _re.sub(r"[^a-zA-Z0-9_-]+", "-", (doc.title or f"document-{doc.id}"))[:120].strip("-")
     return Response(
         content=pdf_bytes,

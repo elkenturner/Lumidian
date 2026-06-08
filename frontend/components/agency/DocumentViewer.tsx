@@ -2,17 +2,18 @@
 
 import { useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Copy, Download, Loader2, X } from 'lucide-react';
-import { agencyDeleteDocument, agencyDownloadDocumentPdf, agencyUpdateDocument, type AgencyDocument } from '@/lib/api';
+import { Download, Loader2, X } from 'lucide-react';
+import { agencyDeleteDocument, agencyRenderDocument, agencyUpdateDocument, type AgencyDocument } from '@/lib/api';
 
 interface Props {
   doc: AgencyDocument | null;
+  clientId: number;
   onClose: () => void;
   onChange: (next: AgencyDocument) => void;
   onDelete: (id: number) => void;
 }
 
-export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
+export function DocumentViewer({ doc, clientId, onClose, onChange, onDelete }: Props) {
   const [editing, setEditing] = useState(false);
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
@@ -21,6 +22,9 @@ export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
   const [error, setError] = useState<string | null>(null);
 
   if (!doc) return null;
+
+  // Typst docs have empty body_markdown and a data_snapshot; legacy markdown docs have body_markdown.
+  const isTypst = !doc.body_markdown;
 
   const startEdit = () => {
     setBody(doc.body_markdown);
@@ -61,17 +65,16 @@ export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  const download = async () => {
+  const redownload = async () => {
     if (!doc) return;
     setDownloading(true);
     setError(null);
     try {
-      const blob = await agencyDownloadDocumentPdf(doc.id);
+      const { blob, filename } = await agencyRenderDocument(clientId, doc.kind);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const safeName = (doc.title || `${doc.kind}-${doc.id}`).replace(/[^a-zA-Z0-9_-]+/g, '-').slice(0, 120);
-      a.download = `${safeName}.pdf`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -82,6 +85,16 @@ export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
       setDownloading(false);
     }
   };
+
+  // Format data_snapshot JSON for display
+  const snapshotDisplay = (() => {
+    if (!isTypst || !doc.data_snapshot) return null;
+    try {
+      return JSON.stringify(JSON.parse(doc.data_snapshot), null, 2);
+    } catch {
+      return doc.data_snapshot;
+    }
+  })();
 
   return (
     <Dialog.Root open={!!doc} onOpenChange={(o) => !o && onClose()}>
@@ -95,6 +108,7 @@ export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
                 {doc.kind} · generated{' '}
                 {new Date(doc.generated_at + (doc.generated_at.endsWith('Z') ? '' : 'Z')).toLocaleString()}
                 {doc.generated_by_name && <> by {doc.generated_by_name}</>}
+                {isTypst && <span className="ml-1 rounded bg-[var(--bg-elevated)] px-1 py-0.5 text-[10px] text-[var(--text-muted)]">Typst</span>}
               </p>
             </div>
             <Dialog.Close asChild>
@@ -105,7 +119,11 @@ export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
           </div>
 
           <div className="max-h-[60vh] overflow-y-auto p-5">
-            {editing ? (
+            {isTypst ? (
+              <pre className="whitespace-pre-wrap rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] p-3 font-mono text-xs text-[var(--text-secondary)]">
+                {snapshotDisplay ?? '(no snapshot stored)'}
+              </pre>
+            ) : editing ? (
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
@@ -122,7 +140,16 @@ export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
 
           <div className="flex items-center justify-between gap-2 border-t border-[var(--border-subtle)] p-4">
             <div className="flex gap-2">
-              {editing ? (
+              {isTypst ? (
+                <button
+                  onClick={redownload}
+                  disabled={downloading}
+                  className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-card)] disabled:opacity-50"
+                >
+                  {downloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                  {downloading ? 'Generating…' : 'Re-download'}
+                </button>
+              ) : editing ? (
                 <>
                   <button
                     onClick={save}
@@ -145,16 +172,7 @@ export function DocumentViewer({ doc, onClose, onChange, onDelete }: Props) {
                     onClick={copy}
                     className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-card)]"
                   >
-                    <Copy className="h-3 w-3" />
                     {copied ? 'Copied!' : 'Copy'}
-                  </button>
-                  <button
-                    onClick={download}
-                    disabled={downloading}
-                    className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-3 py-1.5 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-card)] disabled:opacity-50"
-                  >
-                    {downloading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
-                    {downloading ? 'Rendering…' : 'Download PDF'}
                   </button>
                   <button
                     onClick={startEdit}

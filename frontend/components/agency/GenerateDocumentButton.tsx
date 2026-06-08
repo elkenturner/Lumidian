@@ -4,15 +4,15 @@ import { useEffect, useState } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { ChevronDown, FileText, Loader2 } from 'lucide-react';
 import {
-  agencyGenerateDocument,
+  agencyRenderDocument,
   agencyListDocumentTemplates,
-  type AgencyDocument,
+  MissingFieldsError,
   type DocumentTemplate,
 } from '@/lib/api';
 
 interface Props {
   clientId: number;
-  onGenerated: (doc: AgencyDocument) => void;
+  onGenerated?: () => void;
 }
 
 export function GenerateDocumentButton({ clientId, onGenerated }: Props) {
@@ -28,14 +28,26 @@ export function GenerateDocumentButton({ clientId, onGenerated }: Props) {
     setGenerating(true);
     setError(null);
     try {
-      const doc = await agencyGenerateDocument(clientId, kind);
-      onGenerated(doc);
+      const { blob, filename } = await agencyRenderDocument(clientId, kind);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      onGenerated?.();
     } catch (e) {
-      const status = (e as { response?: { status?: number } })?.response?.status;
-      if (status === 503) {
-        setError('LLM unavailable. Check that ANTHROPIC_API_KEY is set on the backend.');
+      if (e instanceof MissingFieldsError) {
+        setError(`Missing brand data: ${e.missingFields.join(', ')}`);
       } else {
-        setError(e instanceof Error ? e.message : 'Generation failed');
+        const status = (e as { response?: { status?: number } })?.response?.status;
+        if (status === 503) {
+          setError('LLM unavailable. Check that ANTHROPIC_API_KEY is set on the backend.');
+        } else {
+          setError(e instanceof Error ? e.message : 'Generation failed');
+        }
       }
     } finally {
       setGenerating(false);

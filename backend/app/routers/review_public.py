@@ -201,9 +201,11 @@ async def reject_draft(
 
 # ── Document library endpoints ────────────────────────────────────────────────
 
-# Kinds that have a registered PDF template — must stay in sync with
-# pdf_renderer._KIND_TO_TEMPLATE.
-_PDF_AVAILABLE_KINDS = {"agency_weekly_report", "monthly_report", "sow", "audit_initial", "kickoff_checklist"}
+# All 7 registered kinds are now on Typst — PDF is always available.
+_PDF_AVAILABLE_KINDS = {
+    "agency_weekly_report", "monthly_report", "sow",
+    "audit_initial", "kickoff_checklist", "wikipedia_plan", "site_plan",
+}
 
 
 @router.get("/{token}/documents", response_model=list[PublicDocumentSummaryOut])
@@ -237,24 +239,47 @@ async def _resolve_client_doc(db: AsyncSession, token: str, doc_id: int) -> Clie
 
 @router.get("/{token}/document/{doc_id}", response_class=Response)
 async def get_document_html(token: str, doc_id: int, db: AsyncSession = Depends(get_db)):
-    from app.services.document_engine.pdf_renderer import render_html, _resolve_data
+    """Return a simple HTML page wrapping the document content for in-browser review."""
+    import html as _html
     doc = await _resolve_client_doc(db, token, doc_id)
-    data = await _resolve_data(db, doc)
-    html = render_html(doc, data)
-    return Response(content=html, media_type="text/html; charset=utf-8")
+    safe_title = _html.escape(doc.title or "Document")
+    if doc.body_markdown:
+        # Legacy markdown doc — render as plain pre-formatted HTML
+        safe_body = _html.escape(doc.body_markdown)
+        content = f"<pre style='white-space:pre-wrap;font-family:sans-serif;font-size:14px;line-height:1.6;padding:24px;'>{safe_body}</pre>"
+    else:
+        content = "<p style='padding:24px;font-family:sans-serif;font-size:14px;'>This document is available as a PDF download.</p>"
+    page = f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>{safe_title}</title></head><body>{content}</body></html>"
+    return Response(content=page, media_type="text/html; charset=utf-8")
 
 
 @router.get("/{token}/document/{doc_id}/pdf", response_class=Response)
 async def get_document_pdf(token: str, doc_id: int, db: AsyncSession = Depends(get_db)):
-    from app.services.document_engine.pdf_renderer import render_pdf
+    """Re-render a Typst document from its stored data_snapshot."""
+    import json as _json
+    from pathlib import Path
+    from app.services.document_engine import get_template
+    from app.services.document_engine.typst_renderer import render_pdf as typst_render_pdf, TypstCompileError
+
     doc = await _resolve_client_doc(db, token, doc_id)
+    template = get_template(doc.kind)
+    if template is None or template.typst_template is None:
+        raise HTTPException(status_code=400, detail=f"PDF not available for document kind: {doc.kind}")
+    if not doc.data_snapshot:
+        raise HTTPException(status_code=409, detail="Document has no stored data; re-generate to produce a PDF.")
     try:
-        pdf_bytes = await render_pdf(db, doc)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to render PDF: {e}") from e
-    safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in doc.title)[:120].strip() or f"document-{doc.id}"
+        data = _json.loads(doc.data_snapshot)
+    except Exception:
+        raise HTTPException(status_code=500, detail="Stored data snapshot is corrupt.")
+    templates_dir = Path(__file__).resolve().parents[1] / "services" / "document_engine" / "templates"
+    try:
+        pdf_bytes = typst_render_pdf(
+            template_path=templates_dir / template.typst_template,
+            data=data,
+        )
+    except TypstCompileError as e:
+        raise HTTPException(status_code=500, detail=f"PDF render error: {e}") from e
+    safe_title = "".join(c if c.isalnum() or c in " -_" else "_" for c in (doc.title or f"document-{doc.id}"))[:120].strip() or f"document-{doc.id}"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",

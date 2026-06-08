@@ -169,7 +169,7 @@ async def _run_agency_brand_and_report(brand_id: int, client_id: int) -> None:
     try:
         from app.database import AsyncSessionLocal
         from app.models import AgencyClient
-        from app.services.document_engine import generate_document, get_template
+        from app.services.document_engine import generate_pdf, get_template, MissingDataError
 
         template = get_template("agency_weekly_report")
         if template is None:
@@ -178,7 +178,13 @@ async def _run_agency_brand_and_report(brand_id: int, client_id: int) -> None:
             client = await db.get(AgencyClient, client_id)
             if client is None:
                 return
-            await generate_document(db, client=client, template=template, actor_user_id=None)
+            try:
+                await generate_pdf(db, client=client, template=template, actor_user_id=None)
+            except MissingDataError as e:
+                logger.warning(
+                    "Skipping weekly report for client %d — missing brand data: %s",
+                    client_id, e.missing,
+                )
     except Exception as e:
         logger.error("Weekly agency report generation failed for brand %d: %s", brand_id, e)
 

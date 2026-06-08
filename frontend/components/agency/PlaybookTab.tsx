@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  agencyGenerateDocument,
   agencyListDocuments,
   agencyListMilestones,
   agencyRenderDocument,
@@ -36,7 +35,6 @@ interface Props {
   onOpenSendModal: () => void;
 }
 
-const NEW_PATH_KINDS = new Set(['audit_initial', 'wikipedia_plan', 'site_plan']);
 
 const LAUNCH_LABELS: Record<string, { label: string; docKind: string | null; secondary?: { href: string; label: string } }> = {
   kickoff:         { label: 'Kickoff',          docKind: 'kickoff_checklist' },
@@ -95,22 +93,15 @@ export function PlaybookTab({
     setMissing(null);
     setBusyKind(kind);
     try {
-      if (NEW_PATH_KINDS.has(kind)) {
-        const { blob, filename } = await agencyRenderDocument(client.id, kind);
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      } else {
-        const doc = await agencyGenerateDocument(client.id, kind);
-        setViewerDoc(doc);
-        if (kind === 'agency_weekly_report') setReports((r) => ({ ...r, weekly: doc }));
-        if (kind === 'monthly_report') setReports((r) => ({ ...r, monthly: doc }));
-      }
+      const { blob, filename } = await agencyRenderDocument(client.id, kind);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (e) {
       if (e instanceof MissingFieldsError) {
         setMissing(e.missingFields);
@@ -225,10 +216,10 @@ export function PlaybookTab({
 
           <PlaybookReports
             clientId={client.id}
+            brandId={client.brand_id}
             lastWeekly={reports.weekly}
             lastMonthly={reports.monthly}
             onGenerated={(doc) => {
-              setViewerDoc(doc);
               if (doc.kind === 'agency_weekly_report') setReports((r) => ({ ...r, weekly: doc }));
               if (doc.kind === 'monthly_report') setReports((r) => ({ ...r, monthly: doc }));
             }}

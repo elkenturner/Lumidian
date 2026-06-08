@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import { FileText, Loader2 } from 'lucide-react';
-import { agencyGenerateDocument, type AgencyDocument } from '@/lib/api';
+import { agencyRenderDocument, agencyListDocuments, MissingFieldsError, type AgencyDocument } from '@/lib/api';
+import { MissingBrandFieldsCard } from './MissingBrandFieldsCard';
 
 interface Props {
   clientId: number;
+  brandId: number | null;
   lastWeekly: AgencyDocument | null;
   lastMonthly: AgencyDocument | null;
   onGenerated: (doc: AgencyDocument) => void;
@@ -17,18 +19,34 @@ function fmt(doc: AgencyDocument | null): string {
   return new Date(iso).toLocaleDateString() + (doc.generated_by_name ? ` by ${doc.generated_by_name}` : '');
 }
 
-export function PlaybookReports({ clientId, lastWeekly, lastMonthly, onGenerated }: Props) {
+export function PlaybookReports({ clientId, brandId, lastWeekly, lastMonthly, onGenerated }: Props) {
   const [busyKind, setBusyKind] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [missing, setMissing] = useState<string[] | null>(null);
 
   const generate = async (kind: 'agency_weekly_report' | 'monthly_report') => {
     setBusyKind(kind);
     setError(null);
+    setMissing(null);
     try {
-      const doc = await agencyGenerateDocument(clientId, kind);
-      onGenerated(doc);
+      const { blob, filename } = await agencyRenderDocument(clientId, kind);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      // Refresh the "last generated" pointer
+      const refreshed = await agencyListDocuments(clientId, kind);
+      if (refreshed[0]) onGenerated(refreshed[0]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to generate');
+      if (e instanceof MissingFieldsError) {
+        setMissing(e.missingFields);
+      } else {
+        setError(e instanceof Error ? e.message : 'Failed to generate');
+      }
     } finally {
       setBusyKind(null);
     }
@@ -68,6 +86,15 @@ export function PlaybookReports({ clientId, lastWeekly, lastMonthly, onGenerated
         </div>
       </div>
 
+      {missing && (
+        <div className="mt-2">
+          <MissingBrandFieldsCard
+            brandId={brandId}
+            missingFields={missing}
+            onDismiss={() => setMissing(null)}
+          />
+        </div>
+      )}
       {error && <p className="mt-2 text-xs text-rose-400">{error}</p>}
     </section>
   );

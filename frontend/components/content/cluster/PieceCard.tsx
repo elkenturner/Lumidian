@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy, Loader2, Maximize2, RefreshCw, X } from "lucide-react";
+import { Check, CheckCircle2, Copy, Loader2, Maximize2, RefreshCw, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
-import { regenerateClusterPiece, type ContentDraft } from "@/lib/api";
+import { regenerateClusterPiece, updateDraft, type ContentDraft } from "@/lib/api";
 import { CitationsSubpanel } from "./CitationsSubpanel";
-import { CriticNotesSubpanel } from "./CriticNotesSubpanel";
 
 interface Props {
   brandId: number;
@@ -56,8 +55,11 @@ function PieceStatusChip({
   if (status === "posted") {
     if (delta === null || delta === undefined) {
       return (
-        <span className="text-[11px] px-2 py-0.5 rounded-md border border-[rgba(56,189,248,0.22)] bg-[rgba(56,189,248,0.10)] text-[#7dd3fc]">
-          Posted, no lift yet
+        <span
+          className="text-[11px] px-2 py-0.5 rounded-md border border-[rgba(56,189,248,0.22)] bg-[rgba(56,189,248,0.10)] text-[#7dd3fc]"
+          title="Published — its effect on AI visibility is still being measured (needs a tracking run after posting)"
+        >
+          Posted · measuring
         </span>
       );
     }
@@ -69,8 +71,9 @@ function PieceStatusChip({
             ? "border-[rgba(34,197,94,0.22)] bg-[rgba(34,197,94,0.10)] text-[#4ade80]"
             : "border-[rgba(244,63,94,0.22)] bg-[rgba(244,63,94,0.10)] text-[#fb7185]"
         }`}
+        title="Change in this brand's AI-visibility score for this question since the post went live"
       >
-        Posted {positive ? "+" : ""}{delta.toFixed(1)}pp
+        Posted {positive ? "+" : ""}{delta.toFixed(1)} pts
       </span>
     );
   }
@@ -81,6 +84,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   async function regenerate() {
     setRegenerating(true);
@@ -89,6 +93,16 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
       onUpdated(updated);
     } finally {
       setRegenerating(false);
+    }
+  }
+
+  async function setStatus(status: "draft" | "approved" | "posted") {
+    if (!draft) return;
+    setUpdatingStatus(true);
+    try {
+      onUpdated(await updateDraft(draft.id, { status }));
+    } finally {
+      setUpdatingStatus(false);
     }
   }
 
@@ -136,7 +150,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 {draft.title}
               </h4>
             )}
-            <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-5 flex-1">
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-[10] flex-1 whitespace-pre-wrap">
               {draft.content_text}
             </p>
           </>
@@ -155,17 +169,17 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                   size="sm"
                   onClick={() => setExpanded(true)}
                   className="!px-2"
-                  title="View full draft"
+                  title="Read the full post"
                 >
                   <Maximize2 className="h-3 w-3" />
-                  View
+                  Read
                 </Button>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={copy}
                   className="!px-2"
-                  title="Copy text"
+                  title="Copy the text to paste where you'll publish it"
                 >
                   {copied ? (
                     <>
@@ -182,20 +196,49 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               </>
             )}
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={regenerate}
-            disabled={regenerating}
-            className="!px-2"
-          >
-            {regenerating ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <RefreshCw className="h-3 w-3" />
+          <div className="flex items-center gap-1">
+            {draft && draft.status !== "posted" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setStatus("posted")}
+                disabled={updatingStatus}
+                className="!px-2 text-[#7dd3fc] hover:text-[#bae6fd]"
+                title="Mark this as published so its visibility impact gets tracked"
+              >
+                {updatingStatus ? <Loader2 className="h-3 w-3 animate-spin" /> : <Send className="h-3 w-3" />}
+                Mark posted
+              </Button>
             )}
-            {regenerating ? "Regenerating…" : "Regenerate"}
-          </Button>
+            {draft && draft.status === "posted" && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setStatus("draft")}
+                disabled={updatingStatus}
+                className="!px-2 text-[#7dd3fc]"
+                title="Undo — mark as not yet posted"
+              >
+                <CheckCircle2 className="h-3 w-3" />
+                Posted
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={regenerate}
+              disabled={regenerating}
+              className="!px-2"
+              title="Rewrite this post from scratch"
+            >
+              {regenerating ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+              Rewrite
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -234,20 +277,14 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               {draft.content_text}
             </div>
 
-            <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div>
+            {(draft.citations?.length ?? 0) > 0 && (
+              <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
                 <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-2">
-                  Citations
+                  Sources cited in this post
                 </div>
                 <CitationsSubpanel citations={draft.citations ?? []} />
               </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-2">
-                  Critic notes
-                </div>
-                <CriticNotesSubpanel isPro={isPro} notes={null} />
-              </div>
-            </div>
+            )}
 
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
               <Button variant="outline" size="sm" onClick={copy}>
@@ -263,6 +300,18 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                   </>
                 )}
               </Button>
+              {draft.status !== "posted" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setStatus("posted")}
+                  disabled={updatingStatus}
+                  className="text-[#7dd3fc]"
+                >
+                  {updatingStatus ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                  Mark posted
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -274,7 +323,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 ) : (
                   <RefreshCw className="h-3.5 w-3.5" />
                 )}
-                {regenerating ? "Regenerating…" : "Regenerate"}
+                Rewrite
               </Button>
             </div>
           </div>

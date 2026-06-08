@@ -42,7 +42,7 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
     : "text-[#fb7185]";
   const deltaLabel = !hasDelta
     ? "—"
-    : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)}pp`;
+    : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)} pts`;
   const statusLabel = STATUS_LABEL[cluster.status] ?? cluster.status.replace("_", " ");
 
   return (
@@ -58,27 +58,34 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
               <span className="text-[var(--text-secondary)] font-medium">{statusLabel}</span>
             </span>
             <span className="text-[var(--text-faint)]">·</span>
-            <span>Posted {postedCount} of {totalEnabled}</span>
+            <span>Posted {postedCount} of {totalEnabled} posts</span>
             {cluster.pillar_mode === "attached" && (
               <>
                 <span className="text-[var(--text-faint)]">·</span>
-                <span className="text-[#4ade80] font-medium">Pillar attached</span>
+                <span className="text-[#4ade80] font-medium" title="A page on the brand's own site that these posts link back to">Hub page linked</span>
               </>
             )}
             {cluster.pillar_mode === "proposed" && (
               <>
                 <span className="text-[var(--text-faint)]">·</span>
-                <span className="text-[#fbbf24] font-medium">Pillar proposed</span>
+                <span className="text-[#fbbf24] font-medium" title="A suggested page on the brand's own site for these posts to link back to">Hub page suggested</span>
               </>
             )}
           </div>
         </div>
-        <div className="shrink-0 text-right">
+        <div
+          className="shrink-0 text-right"
+          title={
+            hasDelta
+              ? "Change in this brand's AI-visibility score for this question since these posts went live"
+              : "No posts measured yet — publish a post and run tracking to see the impact"
+          }
+        >
           <div className={`flex items-center justify-end gap-1 text-xl font-bold ${deltaTone}`}>
             {deltaLabel}
           </div>
           <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
-            Cluster lift
+            AI visibility lift
           </div>
         </div>
       </div>
@@ -149,7 +156,7 @@ function ClusterCardKebab({
             className="w-full text-left px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-base)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
-            {regenerating ? "Regenerating…" : "Regenerate all pieces"}
+            {regenerating ? "Rewriting…" : "Rewrite all posts"}
           </button>
         </div>
       )}

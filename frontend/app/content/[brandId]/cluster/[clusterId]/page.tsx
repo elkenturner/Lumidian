@@ -127,7 +127,7 @@ export default function ClusterDetailPage() {
     : "text-[#fb7185]";
   const deltaLabel = !hasDelta
     ? "—"
-    : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)}pp`;
+    : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)} pts`;
   const statusLabel = STATUS_LABEL[effectiveStatus] ?? effectiveStatus.replace("_", " ");
 
   function updateDraft(updated: ContentDraft) {
@@ -188,7 +188,7 @@ export default function ClusterDetailPage() {
             </span>
             <span>·</span>
             <span>
-              {cluster.drafts.length} of {PLATFORMS.length} pieces
+              {cluster.drafts.length} of {PLATFORMS.length} posts
             </span>
             {cluster.last_generated_at && (
               <>
@@ -205,14 +205,14 @@ export default function ClusterDetailPage() {
               onClick={onRegeneratePieces}
               disabled={isActive || regenAction !== null}
               className="gap-1.5"
-              title="Reuse the current brief and evidence pack; rewrite all 5 pieces"
+              title="Keep the same strategy and sources; rewrite all 5 posts"
             >
               {regenAction === "pieces" ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
                 <RefreshCw className="h-3 w-3" />
               )}
-              Regenerate pieces
+              Rewrite all posts
             </Button>
             <Button
               variant="outline"
@@ -220,23 +220,30 @@ export default function ClusterDetailPage() {
               onClick={onRebuild}
               disabled={isActive || regenAction !== null}
               className="gap-1.5"
-              title="Re-run the brief LLM, rebuild the evidence pack, then rewrite all 5 pieces"
+              title="Start over: rebuild the strategy and sources from scratch, then rewrite all 5 posts"
             >
               {regenAction === "rebuild" ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
                 <RotateCw className="h-3 w-3" />
               )}
-              Rebuild brief &amp; pieces
+              Start fresh
             </Button>
           </div>
         </div>
-        <div className="shrink-0 text-right">
+        <div
+          className="shrink-0 text-right"
+          title={
+            hasDelta
+              ? "Change in this brand's AI-visibility score for this question since these posts went live"
+              : "No posts measured yet — mark a post as posted and run tracking to see the impact"
+          }
+        >
           <div className={`flex items-center justify-end gap-1.5 text-3xl font-bold ${deltaTone}`}>
             {deltaLabel}
           </div>
           <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
-            Cluster lift
+            AI visibility lift
           </div>
         </div>
       </header>
@@ -247,10 +254,10 @@ export default function ClusterDetailPage() {
         </div>
       )}
 
-      {/* ZONE 1 — Pieces (the primary action) */}
+      {/* ZONE 1 — Posts (the primary action) */}
       <div>
         <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-3">
-          Pieces
+          Posts
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {PLATFORMS.map((platform) => (

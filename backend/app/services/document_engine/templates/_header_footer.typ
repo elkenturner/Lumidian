@@ -14,11 +14,11 @@
       )
       #line(length: 100%, stroke: 0.5pt + lumidian.border)
     ],
-    footer: [
+    footer: context [
       #line(length: 100%, stroke: 0.5pt + lumidian.border)
       #grid(columns: (1fr, auto),
         text(font: lumidian.body_font, size: lumidian.size_caption, fill: lumidian.muted)[Lumidian],
-        text(font: lumidian.body_font, size: lumidian.size_caption, fill: lumidian.muted)[#counter(page).display() / #context counter(page).final().first()]
+        text(font: lumidian.body_font, size: lumidian.size_caption, fill: lumidian.muted)[#counter(page).display() / #counter(page).final().first()]
       )
     ],
   )

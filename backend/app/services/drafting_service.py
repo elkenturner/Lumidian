@@ -608,6 +608,7 @@ async def _generate_with_new_pipeline(
     existing_drafts_context: str | None = None,
     brief_context: str | None = None,
     enforce_brand_mention: bool = False,
+    model_override: str | None = None,
 ) -> tuple[str, float | None, list[RenderedCitation]]:
     """
     Run the full retrieve → draft → critique → rewrite → render pipeline.
@@ -660,7 +661,7 @@ async def _generate_with_new_pipeline(
             logger.warning("Related draft lookup failed for brand %d: %s", brand_id, exc)
 
     # Writer call
-    writer_model = writer_model_for_tier(tier)
+    writer_model = model_override or writer_model_for_tier(tier)
     voice_directive = await _load_voice_directive(db, brand_id)
     claude_prompt = build_prompt(
         brand_name=brand_name,
@@ -1242,68 +1243,35 @@ async def generate_opportunity_draft(
     if opp.prompt_id:
         response_analysis = await _analyze_responses_for_prompt(db, opp.brand_id, opp.prompt_id)
 
-    claude_prompt = build_prompt(
-        brand_name=brand.name,
-        platform=platform_key,
-        prompt_text=prompt_text or opp.thread_title or "brand visibility",
-        visibility_pct=visibility_pct,
-        profile_context=profile_context,
-        response_analysis=response_analysis,
-        platform_spec=spec,
-        opportunity_context=opportunity_context,
-        voice_directive=await _load_voice_directive(db, opp.brand_id),
-    )
-
     # Use haiku for short reply formats — cheaper and fast enough for short content
     _opp_model = (
         "claude-haiku-4-5-20251001" if platform_key in ("reddit_reply", "linkedin_reply", "x_reply")
         else "claude-sonnet-4-6"
     )
-    raw_text = await call_claude(claude_prompt, max_tokens=max_tokens, model=_opp_model)
+    # B2 Phase 3b: route opportunity replies through the core. tier=None preserves the
+    # cheap single-shot behavior (replies never used pack/critic/voice-sample);
+    # model_override keeps haiku for short formats. The core supplies the brand-voice
+    # directive, the brand-mention guard, and the universal anti-AI gate.
+    raw_text, _opp_quality, _ = await _generate_with_new_pipeline(
+        brand_id=opp.brand_id,
+        brand_name=brand.name,
+        prompt_id=opp.prompt_id or 0,
+        prompt_text=prompt_text or opp.thread_title or "brand visibility",
+        platform_key=platform_key,
+        visibility_pct=visibility_pct,
+        profile_context=profile_context,
+        response_analysis=response_analysis,
+        platform_spec=spec,
+        tier=None,
+        db=db,
+        opportunity_context=opportunity_context,
+        enforce_brand_mention=(promo_strategy != "restricted"),
+        model_override=_opp_model,
+    )
     raw_text = remove_hedging(raw_text)
-
-    # Enforce X character limits
     if platform_key.startswith("x_"):
         from app.services.drafting import enforce_x_char_limit
         raw_text = enforce_x_char_limit(raw_text, platform_key)
-
-    # Quality check: brand name must appear.
-    # Skip for restricted subreddits — the prompt intentionally avoids direct brand mentions.
-    if brand.name.lower() not in raw_text.lower() and promo_strategy != "restricted":
-        _retry_prompt = (
-            claude_prompt
-            + f"\n\n⚠ QUALITY REQUIREMENT: Your previous output did not mention '{brand.name}'."
-            f" You MUST include '{brand.name}' naturally at least once in the content."
-        )
-        _retry_raw = await call_claude(_retry_prompt, max_tokens=max_tokens, model=_opp_model)
-        _retry_raw = remove_hedging(_retry_raw)
-        if brand.name.lower() in _retry_raw.lower():
-            raw_text = _retry_raw
-        else:
-            logger.warning(
-                "generate_opportunity_draft: brand '%s' not mentioned after retry — opp_id=%d",
-                brand.name, opportunity_id,
-            )
-            raw_text = "[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
-
-    # B2 Phase 0: universal anti-AI gate on the opportunity-reply text.
-    async def _opp_anti_ai_regen(feedback: str) -> str:
-        return remove_hedging(await call_claude(
-            claude_prompt
-            + "\n\nREVISION REQUIRED — remove these AI tells, keep the substance, "
-            "keep it brief and human:\n" + feedback,
-            max_tokens=max_tokens, model=_opp_model,
-        ))
-
-    raw_text, _opp_aa_report, _ = await anti_ai.enforce(raw_text, regenerate=_opp_anti_ai_regen)
-    if platform_key.startswith("x_"):
-        raw_text = enforce_x_char_limit(raw_text, platform_key)
-    if not _opp_aa_report.passed:
-        logger.info(
-            "generate_opportunity_draft: reply still trips anti-AI gate "
-            "(opp_id=%d score=%.1f) — flagged, not blocked.",
-            opportunity_id, _opp_aa_report.score,
-        )
 
     _, body = extract_title_and_body(raw_text, platform_key)
 

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import (
     Brand,
     BrandContentSettings,
+    BrandProfile,
     ContentBrief,
     ContentCluster,
     ContentDraft,
@@ -182,6 +183,60 @@ async def _generate_piece_text(
     return (title or "(untitled)"), body, quality_score, citations
 
 
+async def _resolve_post_targets(
+    db: AsyncSession,
+    *,
+    brand_id: int,
+    prompt_id: int,
+    prompt_text: str,
+    enabled: list[str],
+) -> dict[str, str]:
+    """Resolve a concrete 'where to post this' target for reddit/quora pieces.
+
+    Reddit → a real, validated subreddit ("r/foo"); Quora → a real question URL.
+    Stored on the draft's content_brief so the operator knows exactly where to
+    publish. Fully best-effort and timeout-bounded — a failure (missing key,
+    network, LLM) just leaves the piece without a target, never blocks generation.
+    """
+    targets: dict[str, str] = {}
+    if "reddit" in enabled:
+        try:
+            from app.services.reddit_scanner_service import (
+                find_first_valid_subreddit,
+                get_relevant_subreddits,
+            )
+            prof = (await db.execute(
+                select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+            )).scalar_one_or_none()
+            prompts = list((await db.execute(
+                select(Prompt).where(Prompt.brand_id == brand_id)
+            )).scalars().all())
+            subs = await asyncio.wait_for(
+                asyncio.to_thread(
+                    get_relevant_subreddits,
+                    prof.company_description if prof else None,
+                    [p.text for p in prompts], 5,
+                ),
+                timeout=12,
+            )
+            sub = await asyncio.wait_for(find_first_valid_subreddit(subs), timeout=8) if subs else None
+            if sub:
+                targets["reddit"] = f"r/{sub}"
+        except Exception as exc:
+            logger.warning("cluster reddit target resolve skipped: %s", exc)
+    if "quora" in enabled:
+        try:
+            from app.services.quora_search_service import search_quora_questions
+            qs = await asyncio.wait_for(
+                search_quora_questions(prompt_text, cache_key=prompt_id), timeout=10,
+            )
+            if qs:
+                targets["quora"] = qs[0]["url"]
+        except Exception as exc:
+            logger.warning("cluster quora target resolve skipped: %s", exc)
+    return targets
+
+
 async def _persist_citations_and_summary(
     db: AsyncSession,
     *,
@@ -331,6 +386,13 @@ async def regenerate_cluster(
     visibility_pct = await _get_prompt_visibility(db, cluster.prompt_id)
     enabled = await _enabled_platforms(db, cluster.brand_id)
 
+    # Resolve concrete post targets (real subreddit / Quora question) so reddit &
+    # quora pieces tell the operator exactly where to publish. Best-effort.
+    post_targets = await _resolve_post_targets(
+        db, brand_id=cluster.brand_id, prompt_id=cluster.prompt_id,
+        prompt_text=prompt_row.text, enabled=enabled,
+    )
+
     # Drop existing drafts before regen
     await db.execute(
         delete(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
@@ -403,6 +465,7 @@ async def regenerate_cluster(
             cluster_id=cluster.id, platform=platform,
             status="draft", title=title or "(untitled)",
             content_text=body, source="cluster",
+            content_brief=post_targets.get(platform),
             quality_score=q, generation_state="done",
         )
         db.add(draft)

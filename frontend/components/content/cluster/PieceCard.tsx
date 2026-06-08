@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, CheckCircle2, Copy, Loader2, Maximize2, RefreshCw, Send, X } from "lucide-react";
+import { ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
 import { regenerateClusterPiece, updateDraft, type ContentDraft } from "@/lib/api";
@@ -158,6 +158,22 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
           <p className="text-sm text-[var(--text-faint)] italic flex-1">
             Not generated yet.
           </p>
+        )}
+
+        {draft?.content_brief && (platform === "reddit" || platform === "quora") && (
+          <a
+            href={platform === "reddit" ? `https://reddit.com/${draft.content_brief}` : draft.content_brief}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[var(--accent-foreground)] hover:text-[var(--text-primary)]"
+            title={platform === "reddit" ? "Suggested subreddit to post this in" : "A real Quora question this answers"}
+          >
+            <MapPin className="h-3 w-3 shrink-0" />
+            <span className="truncate">
+              {platform === "reddit" ? `Post in ${draft.content_brief}` : "Answer this Quora question"}
+            </span>
+            <ArrowUpRight className="h-3 w-3 shrink-0" />
+          </a>
         )}
 
         <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2">

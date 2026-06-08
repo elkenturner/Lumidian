@@ -62,7 +62,7 @@ from app.services.drafting import (
     parse_wikipedia_draft,
     remove_hedging,
 )
-from app.services.drafting import anti_ai
+from app.services.drafting import anti_ai, owned_site
 from app.services.drafting.citations import RenderedCitation, render_citations
 from app.services.drafting.critic import (
     REWRITE_THRESHOLD,
@@ -946,6 +946,79 @@ async def generate_gap_draft(
             "Wikipedia draft created: id=%d brand=%d article=%r section=%r location=%r",
             draft.id, brand_id, article_title, section, insert_location,
         )
+        return draft
+
+    if platform == "owned_site":
+        # Tier-1 AIO channel — content on the brand's OWN domain (AI engines cite
+        # owned/authority pages far more than social). Uses the dedicated owned_site
+        # generator: citation-driver prompt + JSON-LD schema + anti-AI gate loop.
+        from datetime import datetime, timezone
+
+        _prof_res = await db.execute(
+            select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+        )
+        _prof = _prof_res.scalar_one_or_none()
+        brand_dict = {
+            "name": brand.name,
+            "description": _prof.company_description if _prof else None,
+            "url": brand.website_url or None,
+            "audience": _prof.target_audience if _prof else None,
+            "approved_language": (
+                ", ".join(json.loads(_prof.approved_language))
+                if _prof and _prof.approved_language else None
+            ),
+            "what_not_to_say": (
+                ", ".join(json.loads(_prof.what_not_to_say))
+                if _prof and _prof.what_not_to_say else None
+            ),
+        }
+        _pubs = await _load_publications(db, brand_id)
+        _evidence = [
+            {"title": p.get("title"), "url": p.get("url", ""), "snippet": p.get("publisher", "")}
+            for p in _pubs
+        ] or None
+        _voice = await _load_voice_directive(db, brand_id)
+
+        async def _owned_writer(p: str) -> str:
+            return await call_claude(p, max_tokens=PLATFORM_MAX_TOKENS.get("owned_site", 3000))
+
+        owned = await owned_site.generate_owned_site_draft(
+            writer=_owned_writer,
+            brand=brand_dict,
+            target_query=prompt.text,
+            evidence=_evidence,
+            voice=_voice,
+            date_published=datetime.now(timezone.utc).date().isoformat(),
+        )
+        body_with_schema = (
+            owned.body
+            + "\n\n---\nSchema markup (JSON-LD — paste inside the page's <head>):\n\n```json\n"
+            + json.dumps(owned.jsonld, indent=2)
+            + "\n```\n"
+        )
+        _owned_title = owned.jsonld.get("headline") or f"Owned-site page: {prompt.text[:80]}"
+        if owned.flagged_for_review:
+            logger.info(
+                "Owned-site draft for brand %d trips anti-AI gate (score=%.1f) — flagged.",
+                brand_id, owned.anti_ai_score,
+            )
+        draft = ContentDraft(
+            brand_id=brand_id,
+            prompt_id=prompt_id,
+            platform=platform,
+            status="draft",
+            title=_owned_title,
+            content_text=body_with_schema,
+            content_brief=brand.website_url or "",
+            platform_guidelines_applied="",
+            visibility_score_at_draft=round(visibility_pct, 2),
+            estimated_impact=round(estimated_impact, 1),
+            source=source,
+        )
+        db.add(draft)
+        await db.commit()
+        await db.refresh(draft)
+        logger.info("Owned-site draft created: id=%d brand=%d", draft.id, brand_id)
         return draft
 
     # Determine suggested subreddit for Reddit drafts

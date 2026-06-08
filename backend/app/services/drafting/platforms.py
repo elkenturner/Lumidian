@@ -69,6 +69,22 @@ PLATFORM_SPECS: dict[str, dict] = {
         "disclaimer": None,
         "posting_tip": "Publish to your personal Medium profile or a relevant publication.",
     },
+    "owned_site": {
+        "format": "owned_website_answer_page",
+        "word_range": (400, 1200),
+        "tone": "authoritative, concrete, first-party — a brand explaining its own thing factually",
+        "rules": [
+            # owned_site uses its own dedicated generator (drafting/owned_site.py); these
+            # are informational/UI rules. The Tier-1 AIO channel: content on the brand's
+            # OWN domain, which the research shows AI engines cite far more than social.
+            "Publish on the brand's OWN website/blog (its own domain), not a third-party platform",
+            "Lead with the direct answer; use H2/H3 headings with self-contained ~120-180 word answer blocks",
+            "Include concrete statistics and cite authoritative sources inline; emit JSON-LD schema",
+            "This is the highest-value AIO channel — owned/authority domains get cited; social rarely does",
+        ],
+        "disclaimer": None,
+        "posting_tip": "Publish this as a page/post on your own website. The JSON-LD block goes in the page <head>.",
+    },
     "wikipedia": {
         "format": "suggested_edit",
         "word_range": (100, 300),
@@ -204,6 +220,7 @@ PLATFORM_MAX_TOKENS: dict[str, int] = {
     "reddit": 1200,
     "quora": 1800,
     "medium": 3500,
+    "owned_site": 3000,  # handled in a separate branch (owned_site.py generator)
     "wikipedia": 900,  # handled in separate branch, kept here for reference
     "linkedin_article": 3000,
     "linkedin_post": 800,

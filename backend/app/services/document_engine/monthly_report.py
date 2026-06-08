@@ -122,6 +122,60 @@ Keep tight, factual, no fluff.
 """
 
 
+from pydantic import BaseModel, Field
+from app.services.document_engine.charts.visibility_over_time import render_visibility_over_time
+from app.services.document_engine.charts.model_mix import render_model_mix
+
+
+class MonthlyReportOutput(BaseModel):
+    executive_summary: str = Field(..., description="2-3 sentence summary of the month")
+    month_over_month: str = Field(..., description="1-2 paragraphs comparing this month to last month")
+    content_velocity: str | None = Field(None, description="One paragraph on volume and platform mix; null if no drafts posted")
+    highlights: list[str] = Field(default_factory=list, description="3-5 noteworthy events this month")
+    next_month: list[str] = Field(default_factory=list, description="2-3 priorities for the coming month")
+
+
+REQUIRED_FIELDS = (
+    "client.name",
+    "this_month_run.overall_score",
+)
+
+
+async def _chart_visibility_over_time(db, client, data) -> bytes:
+    """Last 90 days of completed tracking runs for a monthly view."""
+    from sqlalchemy import select
+    from datetime import datetime, timedelta
+    from datetime import date as _date
+    from app.models import Brand
+    brand_q = await db.execute(select(Brand).where(Brand.agency_client_id == client.id).limit(1))
+    brand = brand_q.scalar_one_or_none()
+    points: list[tuple[_date, float]] = []
+    if brand is not None:
+        since = datetime.utcnow() - timedelta(days=90)
+        runs_q = await db.execute(
+            select(TrackingRun)
+            .where(
+                TrackingRun.brand_id == brand.id,
+                TrackingRun.status == "completed",
+                TrackingRun.completed_at >= since,
+            )
+            .order_by(TrackingRun.completed_at.asc())
+        )
+        for r in runs_q.scalars().all():
+            if r.completed_at and r.overall_score is not None:
+                points.append((r.completed_at.date(), float(r.overall_score)))
+    return render_visibility_over_time(points)
+
+
+async def _chart_drafts_by_platform_mix(db, client, data) -> bytes:
+    """Reuse the donut chart for drafts-by-platform breakdown.
+    Actual key from fetch_data: 'drafts_by_platform' (dict[str, int]).
+    """
+    raw = data.get("drafts_by_platform") or {}
+    scores = {k: float(v) for k, v in raw.items() if v}
+    return render_model_mix(scores)  # same shape; donut is general
+
+
 register(
     Template(
         kind="monthly_report",
@@ -132,5 +186,9 @@ register(
         system_prompt=SYSTEM_PROMPT,
         user_prompt_template="Report data:\n```json\n{data_json}\n```",
         max_tokens=3000,
+        required_fields=REQUIRED_FIELDS,
+        output_schema=MonthlyReportOutput,
+        typst_template="monthly_report.typ",
+        chart_calls=(_chart_visibility_over_time, _chart_drafts_by_platform_mix),
     )
 )

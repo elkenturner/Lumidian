@@ -373,6 +373,100 @@ Stay tight, factual, no fluff. Numbers should be exact from the data — don't r
 """
 
 
+from datetime import date as _date
+from pydantic import BaseModel, Field
+
+from app.services.document_engine.charts.visibility_over_time import render_visibility_over_time
+from app.services.document_engine.charts.model_mix import render_model_mix
+from app.services.document_engine.charts.prompt_scorecard import render_prompt_scorecard
+from app.services.document_engine.charts.competitor_compare import render_competitor_compare
+
+
+class WeeklyReportOutput(BaseModel):
+    executive_summary: str = Field(..., description="2-3 sentence headline of the week")
+    week_in_review: str = Field(..., description="1-2 paragraph narrative on visibility this week")
+    per_prompt_callouts: list[str] = Field(default_factory=list, description="3-5 specific prompt-level takeaways")
+    competitor_delta: str | None = Field(None, description="One paragraph on competitor movement; null if no competitors tracked")
+    content_shipped: list[str] = Field(default_factory=list, description="Bullets summarizing posted content by platform")
+    top_gaps: list[str] = Field(default_factory=list, description="3 actionable next-step bullets per gap")
+    next_week: list[str] = Field(default_factory=list, description="2-3 specific actions for next week")
+
+
+REQUIRED_FIELDS = (
+    "client.name",
+    "this_week_run.overall_score",
+)
+
+
+# ───────────────────────────── chart adapters ──────────────────────────────
+
+async def _chart_visibility_over_time(db, client, data) -> bytes:
+    """Query the last 30 days of completed tracking runs and chart their overall_score."""
+    from sqlalchemy import select
+    from datetime import datetime, timedelta
+    from app.models import Brand
+    brand_q = await db.execute(select(Brand).where(Brand.agency_client_id == client.id).limit(1))
+    brand = brand_q.scalar_one_or_none()
+    points: list[tuple[_date, float]] = []
+    if brand is not None:
+        since = datetime.utcnow() - timedelta(days=30)
+        runs_q = await db.execute(
+            select(TrackingRun)
+            .where(
+                TrackingRun.brand_id == brand.id,
+                TrackingRun.status == "completed",
+                TrackingRun.completed_at >= since,
+            )
+            .order_by(TrackingRun.completed_at.asc())
+        )
+        for r in runs_q.scalars().all():
+            if r.completed_at and r.overall_score is not None:
+                points.append((r.completed_at.date(), float(r.overall_score)))
+    return render_visibility_over_time(points)
+
+
+async def _chart_model_mix(db, client, data) -> bytes:
+    """Build {model: score} dict from data['model_scores'].
+    Actual keys from _model_scores(): 'model' and 'score'.
+    """
+    raw = data.get("model_scores") or []
+    scores: dict[str, float] = {}
+    for entry in raw:
+        if isinstance(entry, dict) and entry.get("model"):
+            scores[entry["model"]] = float(entry.get("score") or 0)
+    return render_model_mix(scores)
+
+
+async def _chart_prompt_scorecard(db, client, data) -> bytes:
+    """Build [(prompt_text, {model: score})] from data['per_prompt'].
+    Actual keys from _per_prompt_scorecard(): 'prompt_text', 'this_week_score'.
+    No per-model breakdown available; uses 'overall' as the single axis.
+    """
+    rows: list[tuple[str, dict[str, float]]] = []
+    for entry in data.get("per_prompt") or []:
+        if isinstance(entry, dict):
+            prompt_text = (entry.get("prompt_text") or "")[:60]
+            score = entry.get("this_week_score")
+            if prompt_text and score is not None:
+                rows.append((prompt_text, {"this week": float(score)}))
+    return render_prompt_scorecard(rows)
+
+
+async def _chart_competitor_compare(db, client, data) -> bytes:
+    """Build brand_score + {competitor_name: score} from data.
+    Actual keys from _competitor_delta(): 'name', 'this_week_mentions'.
+    """
+    brand_score = float((data.get("this_week_run") or {}).get("overall_score") or 0)
+    competitor_scores: dict[str, float] = {}
+    for entry in data.get("competitors") or []:
+        if isinstance(entry, dict):
+            name = entry.get("name")
+            mentions = entry.get("this_week_mentions")
+            if name and mentions is not None:
+                competitor_scores[name] = float(mentions)
+    return render_competitor_compare(brand_score=brand_score, competitor_scores=competitor_scores)
+
+
 register(
     Template(
         kind="agency_weekly_report",
@@ -383,5 +477,14 @@ register(
         system_prompt=SYSTEM_PROMPT,
         user_prompt_template="Report data:\n```json\n{data_json}\n```",
         max_tokens=4000,
+        required_fields=REQUIRED_FIELDS,
+        output_schema=WeeklyReportOutput,
+        typst_template="weekly_report.typ",
+        chart_calls=(
+            _chart_visibility_over_time,
+            _chart_model_mix,
+            _chart_prompt_scorecard,
+            _chart_competitor_compare,
+        ),
     )
 )

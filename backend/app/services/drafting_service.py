@@ -607,6 +607,7 @@ async def _generate_with_new_pipeline(
     opportunity_context: str | None = None,
     existing_drafts_context: str | None = None,
     brief_context: str | None = None,
+    enforce_brand_mention: bool = False,
 ) -> tuple[str, float | None, list[RenderedCitation]]:
     """
     Run the full retrieve → draft → critique → rewrite → render pipeline.
@@ -682,6 +683,27 @@ async def _generate_with_new_pipeline(
         max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
         model=writer_model,
     )
+
+    # Brand-mention guard — for no-critic (free/pitch) tiers only. Paid tiers rely
+    # on the critic+rewrite layer for brand relevance, so this is gated off there
+    # to avoid an extra writer call. Caller sets the flag (it knows e.g. restricted
+    # subreddits intentionally omit the brand).
+    if enforce_brand_mention and brand_name.lower() not in raw_text.lower():
+        retry = await call_claude(
+            claude_prompt
+            + f"\n\n⚠ QUALITY REQUIREMENT: your previous output did not mention "
+            f"'{brand_name}'. Include '{brand_name}' naturally at least once in the body.",
+            max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
+            model=writer_model,
+        )
+        if brand_name.lower() in retry.lower():
+            raw_text = retry
+        else:
+            logger.warning(
+                "Brand '%s' not mentioned after retry — brand_id=%d platform=%s",
+                brand_name, brand_id, platform_key,
+            )
+            raw_text = "[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
 
     # Layer 2: Critic + rewrite — Growth + Pro only
     quality_score: float | None = None
@@ -1050,94 +1072,34 @@ async def generate_gap_draft(
     quality_score: float | None = None
     rendered_citations: list[RenderedCitation] = []
 
-    if user_tier in ("basic", "starter", "pro"):
-        raw_text, quality_score, rendered_citations = await _generate_with_new_pipeline(
-            brand_id=brand.id,
-            brand_name=brand.name,
-            prompt_id=prompt.id,
-            prompt_text=prompt.text,
-            platform_key=platform_key,
-            visibility_pct=visibility_pct,
-            profile_context=profile_context,
-            response_analysis=response_analysis,
-            platform_spec=spec,
-            tier=user_tier,
-            db=db,
-            opportunity_context=effective_opportunity_context,
-            existing_drafts_context=existing_drafts_context,
-        )
-        claude_prompt = None  # only used by the legacy retry branch below
-    else:
-        claude_prompt = build_prompt(
-            brand_name=brand.name,
-            platform=platform_key,
-            prompt_text=prompt.text,
-            visibility_pct=visibility_pct,
-            profile_context=profile_context,
-            response_analysis=response_analysis,
-            platform_spec=spec,
-            opportunity_context=effective_opportunity_context,
-            existing_drafts_context=existing_drafts_context,
-            voice_directive=await _load_voice_directive(db, brand_id),
-        )
-        raw_text = await call_claude(
-            claude_prompt,
-            max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
-        )
+    # B2 Phase 3: single path for all tiers. The core handles paid (evidence pack /
+    # critic / voice / citations) and free-pitch (cheap single-shot) via tier gating,
+    # plus the brand-mention guard and the universal anti-AI gate. Free tier uses the
+    # same writer model (call_claude default == writer_model_for_tier(None) == sonnet).
+    raw_text, quality_score, rendered_citations = await _generate_with_new_pipeline(
+        brand_id=brand.id,
+        brand_name=brand.name,
+        prompt_id=prompt.id,
+        prompt_text=prompt.text,
+        platform_key=platform_key,
+        visibility_pct=visibility_pct,
+        profile_context=profile_context,
+        response_analysis=response_analysis,
+        platform_spec=spec,
+        tier=user_tier,
+        db=db,
+        opportunity_context=effective_opportunity_context,
+        existing_drafts_context=existing_drafts_context,
+        # Free/pitch tiers have no critic to enforce brand relevance — guard it.
+        # Restricted subreddits intentionally omit the brand, so skip the guard there.
+        enforce_brand_mention=(
+            user_tier not in ("basic", "starter", "pro")
+            and _reddit_strategy != "restricted"
+        ),
+    )
 
     raw_text = remove_hedging(raw_text)
     raw_text = enforce_x_char_limit(raw_text, platform_key)
-
-    # Quality check: brand name must appear in the content.
-    # Skip retry for restricted subreddits — the prompt intentionally omits the brand.
-    # Skip retry for the new pipeline path (claude_prompt is None) — the critic+rewrite
-    # passes already enforce brand-relevance and we don't want to bypass those layers.
-    if (
-        claude_prompt is not None
-        and brand.name.lower() not in raw_text.lower()
-        and _reddit_strategy != "restricted"
-    ):
-        _retry_prompt = (
-            claude_prompt
-            + f"\n\n⚠ QUALITY REQUIREMENT: Your previous output did not mention '{brand.name}'."
-            f" You MUST include '{brand.name}' naturally at least once in the content body."
-        )
-        _retry_raw = await call_claude(_retry_prompt, max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500))
-        _retry_raw = remove_hedging(_retry_raw)
-        if brand.name.lower() in _retry_raw.lower():
-            raw_text = _retry_raw
-        else:
-            logger.warning(
-                "generate_gap_draft: brand '%s' not mentioned after retry — "
-                "brand_id=%d platform=%s prompt_id=%d",
-                brand.name, brand_id, platform, prompt_id,
-            )
-            raw_text = (
-                "[Brand not mentioned — review or regenerate this draft]\n\n" + raw_text
-            )
-
-    # B2 Phase 0: universal anti-AI gate on the final text. Covers the free/pitch
-    # single-shot fallback (the paid path already gated inside the core; a clean
-    # re-scan there is cheap). Regenerate only while we still hold a writer prompt.
-    async def _anti_ai_regen(feedback: str) -> str:
-        return remove_hedging(await call_claude(
-            claude_prompt
-            + "\n\nREVISION REQUIRED — your draft reads as AI-written. Remove these "
-            "specific tells, keep every fact, vary sentence length:\n" + feedback,
-            max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
-        ))
-
-    raw_text, _aa_report, _ = await anti_ai.enforce(
-        raw_text,
-        regenerate=(_anti_ai_regen if claude_prompt is not None else None),
-    )
-    raw_text = enforce_x_char_limit(raw_text, platform_key)
-    if not _aa_report.passed:
-        logger.info(
-            "generate_gap_draft: draft still trips anti-AI gate "
-            "(brand=%d platform=%s score=%.1f) — flagged, not blocked.",
-            brand_id, platform_key, _aa_report.score,
-        )
 
     title, body = extract_title_and_body(raw_text, platform_key)
 

@@ -806,11 +806,20 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
             from app.models import User
             user = await db.get(User, brand.user_id)
             tier = user.subscription_tier if user else None
-        model_count = len(models_for_tier(brand.brand_type, tier)) if brand else 4
+        models = models_for_tier(brand.brand_type, tier) if brand else []
+        model_count = len(models) if models else 4
         runs_per_prompt = runs_per_prompt_for_brand(brand.brand_type) if brand else 3
         total_queries = prompt_count * model_count * runs_per_prompt
-        # ~8 effective concurrent queries, ~3s each
+        # Parallel throughput estimate: ~8 effective concurrent queries, ~3s each.
         est_minutes = (total_queries / 8 * 3) / 60
+        # Claude is serialized and rate-paced to ~2 RPM (Anthropic org input-token
+        # cap; see _CLAUDE_PACER in llm_service). When Claude is in the model set it
+        # dominates wall-clock — e.g. an agency run of 12 prompts × 5 runs = 60 Claude
+        # calls takes ~30 min — so the parallel estimate alone badly underestimates it
+        # and the run gets auto-failed mid-flight. Floor the estimate on Claude's pace.
+        if "claude" in models:
+            claude_minutes = (prompt_count * runs_per_prompt) / 2  # 2 RPM, serialized
+            est_minutes = max(est_minutes, claude_minutes)
         max_age_minutes = max(15, int(est_minutes * 2))
 
     cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=max_age_minutes)

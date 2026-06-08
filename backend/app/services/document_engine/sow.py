@@ -4,11 +4,25 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AgencyClient, Brand, BrandProfile
 from app.services.document_engine.registry import Template, register
+
+
+class SowOutput(BaseModel):
+    sow_number: str = Field(..., description="Unique SOW reference number, e.g., SOW-2026-0042")
+    preamble: str = Field(..., description="1-2 paragraphs setting up the engagement")
+    scope: str = Field(..., description="1-2 paragraphs on the scope of work")
+    deliverables: list[str] = Field(default_factory=list, description="Specific deliverables, each ≤ 30 words")
+    exclusions: list[str] = Field(default_factory=list, description="What is explicitly out of scope")
+    timeline: str = Field(..., description="One paragraph on timeline / duration")
+    fees: str = Field(..., description="One paragraph on fees / payment terms")
+
+
+REQUIRED_FIELDS = ("brand.name",)
 
 
 SECTION_MAP: dict[str, str] = {
@@ -90,5 +104,9 @@ register(
         system_prompt=SYSTEM_PROMPT,
         user_prompt_template="Engagement data:\n```json\n{data_json}\n```",
         max_tokens=4000,
+        required_fields=REQUIRED_FIELDS,
+        output_schema=SowOutput,
+        typst_template="sow.typ",
+        chart_calls=(),
     )
 )

@@ -1,9 +1,10 @@
 """Template registry for the document engine."""
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Awaitable, Callable
+from dataclasses import dataclass, field
+from typing import Any, Awaitable, Callable, Type
 
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AgencyClient
@@ -19,6 +20,11 @@ class Template:
     system_prompt: str
     user_prompt_template: str  # python-format string with `{data_json}` slot
     max_tokens: int
+    # New (all optional during migration; Phase 4 makes them required and drops the old ones)
+    required_fields: tuple[str, ...] = ()
+    output_schema: Type[BaseModel] | None = None
+    typst_template: str | None = None  # filename inside templates/ dir, e.g., "audit_initial.typ"
+    chart_calls: tuple[Callable[[AsyncSession, AgencyClient, dict], Awaitable[bytes]], ...] = ()
 
 
 TEMPLATES: dict[str, Template] = {}

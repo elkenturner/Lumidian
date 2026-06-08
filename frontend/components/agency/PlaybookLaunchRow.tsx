@@ -18,6 +18,10 @@ interface Props {
   secondaryLabel?: string;
   onChanged: (next: AgencyClientMilestone) => void;
   onGenerateDoc?: (kind: string) => void;
+  /** True while this row's doc is being generated — shows spinner + disables button. */
+  generating?: boolean;
+  /** True while a sibling row's doc is generating — disables this row's button to avoid races. */
+  disabled?: boolean;
 }
 
 export function PlaybookLaunchRow({
@@ -28,6 +32,8 @@ export function PlaybookLaunchRow({
   secondaryLabel,
   onChanged,
   onGenerateDoc,
+  generating = false,
+  disabled = false,
 }: Props) {
   const [saving, setSaving] = useState(false);
   const done = milestone.status === 'done';
@@ -75,10 +81,11 @@ export function PlaybookLaunchRow({
         {docKind && onGenerateDoc && (
           <button
             onClick={() => onGenerateDoc(docKind)}
-            className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-raised)]"
+            disabled={generating || disabled}
+            className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-raised)] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <FileText className="h-3 w-3" />
-            Generate doc
+            {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+            {generating ? 'Generating…' : 'Generate doc'}
           </button>
         )}
         {!docKind && secondaryHref && secondaryLabel && (

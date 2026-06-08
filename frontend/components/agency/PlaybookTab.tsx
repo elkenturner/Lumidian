@@ -5,6 +5,7 @@ import {
   agencyGenerateDocument,
   agencyListDocuments,
   agencyListMilestones,
+  parseApiError,
   type AgencyClient,
   type AgencyClientMilestone,
   type AgencyDocument,
@@ -55,6 +56,7 @@ export function PlaybookTab({
   });
   const [viewerDoc, setViewerDoc] = useState<AgencyDocument | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
+  const [busyKind, setBusyKind] = useState<string | null>(null);
 
   useEffect(() => {
     agencyListMilestones(client.id).then(setMilestones).catch(() => setMilestones([]));
@@ -82,14 +84,18 @@ export function PlaybookTab({
   };
 
   const generateDoc = async (kind: string) => {
+    if (busyKind) return;
     setGenError(null);
+    setBusyKind(kind);
     try {
       const doc = await agencyGenerateDocument(client.id, kind);
       setViewerDoc(doc);
       if (kind === 'agency_weekly_report') setReports((r) => ({ ...r, weekly: doc }));
       if (kind === 'monthly_report') setReports((r) => ({ ...r, monthly: doc }));
     } catch (e) {
-      setGenError(e instanceof Error ? e.message : 'Failed to generate document');
+      setGenError(parseApiError(e, 'Failed to generate document'));
+    } finally {
+      setBusyKind(null);
     }
   };
 
@@ -99,6 +105,20 @@ export function PlaybookTab({
 
   return (
     <div className="space-y-6">
+      {genError && (
+        <div
+          role="alert"
+          className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm text-rose-200"
+        >
+          <span className="font-medium">Couldn't generate document.</span> {genError}
+        </div>
+      )}
+      {busyKind && (
+        <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-xs text-[var(--text-muted)]">
+          Generating <span className="text-[var(--text-secondary)]">{busyKind.replace(/_/g, ' ')}</span>… this typically takes 20–60s.
+        </div>
+      )}
+
       {/* Launch */}
       <section>
         <h2 className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">
@@ -119,6 +139,8 @@ export function PlaybookTab({
                 secondaryLabel={cfg.secondary?.label}
                 onChanged={upsertMilestone}
                 onGenerateDoc={generateDoc}
+                generating={cfg.docKind != null && busyKind === cfg.docKind}
+                disabled={busyKind != null && busyKind !== cfg.docKind}
               />
             );
           })}
@@ -152,6 +174,8 @@ export function PlaybookTab({
               deepLinkLabel="Open Wikipedia surface"
               onChanged={upsertMilestone}
               onGenerateDoc={generateDoc}
+              generating={busyKind === 'wikipedia_plan'}
+              disabled={busyKind != null && busyKind !== 'wikipedia_plan'}
             />
           )}
 
@@ -164,6 +188,8 @@ export function PlaybookTab({
               deepLinkLabel="Open Site Audit"
               onChanged={upsertMilestone}
               onGenerateDoc={generateDoc}
+              generating={busyKind === 'site_plan'}
+              disabled={busyKind != null && busyKind !== 'site_plan'}
             />
           )}
 
@@ -179,8 +205,6 @@ export function PlaybookTab({
           />
         </div>
       </section>
-
-      {genError && <p className="text-sm text-rose-400">{genError}</p>}
 
       <DocumentViewer
         doc={viewerDoc}

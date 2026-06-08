@@ -18,6 +18,8 @@ interface Props {
   summary?: React.ReactNode;
   onChanged: (next: AgencyClientMilestone) => void;
   onGenerateDoc: (kind: string) => void;
+  generating?: boolean;
+  disabled?: boolean;
 }
 
 function fmtDate(iso: string | null): string {
@@ -41,6 +43,8 @@ export function PlaybookEngagement({
   summary,
   onChanged,
   onGenerateDoc,
+  generating = false,
+  disabled = false,
 }: Props) {
   const [saving, setSaving] = useState(false);
   const overdue = isOverdue(milestone.target_at, milestone.status);
@@ -89,10 +93,11 @@ export function PlaybookEngagement({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           onClick={() => onGenerateDoc(docKind)}
-          className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-raised)]"
+          disabled={generating || disabled}
+          className="flex items-center gap-1 rounded-md border border-[var(--border-default)] px-2.5 py-1 text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-raised)] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <FileText className="h-3 w-3" />
-          Generate doc
+          {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3 w-3" />}
+          {generating ? 'Generating…' : 'Generate doc'}
         </button>
         <Link
           href={deepLinkHref}

@@ -18,6 +18,7 @@ interface Props {
 }
 
 const PLATFORMS: Array<{ value: string; label: string }> = [
+  { value: 'owned_site', label: 'Owned site (highest AI-citation value)' },
   { value: 'medium', label: 'Medium' },
   { value: 'linkedin_post', label: 'LinkedIn post' },
   { value: 'reddit_post', label: 'Reddit post' },

@@ -881,9 +881,10 @@ function QuoraQuestionPicker({
 
 // ── Request Draft modal ───────────────────────────────────────────────────────
 
-const DRAFT_PLATFORMS = ['reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'] as const;
+const DRAFT_PLATFORMS = ['owned_site', 'reddit', 'quora', 'medium', 'wikipedia', 'linkedin', 'x'] as const;
 
 const PLATFORM_DISPLAY: Record<string, string> = {
+  owned_site: 'Owned site',
   reddit: 'Reddit',
   quora: 'Quora',
   medium: 'Medium',

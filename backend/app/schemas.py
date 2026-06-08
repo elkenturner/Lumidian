@@ -1587,3 +1587,8 @@ class ProspectAuditOut(ProspectAuditListItem):
     has_pdf: bool
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class DocumentMissingFieldsError(BaseModel):
+    detail: str
+    missing_fields: list[str]

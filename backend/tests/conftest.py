@@ -284,3 +284,64 @@ class _TmpDb:
 @pytest.fixture
 def tmp_db():
     return _TmpDb()
+
+
+async def factory_agency_client_full(
+    db,
+    creator_user_id: int,
+    *,
+    brand_name: str = "Test Brand",
+    website_url: str = "https://example.com",
+    company_description: str = "Test company description",
+) -> tuple[int, int]:
+    """Create an AgencyClient + Brand + BrandProfile linked together.
+
+    Returns (agency_client_id, brand_id). All required fields populated so
+    REQUIRED_FIELDS preflight passes.
+    """
+    import secrets as _secrets
+    from app.models import AgencyClient, Brand, BrandProfile
+    slug = brand_name.lower().replace(" ", "-") + "-" + _secrets.token_hex(4)
+    agency_client = AgencyClient(
+        name=brand_name,
+        slug=slug,
+        status="active",
+    )
+    db.add(agency_client)
+    await db.flush()
+
+    brand = Brand(
+        user_id=creator_user_id,
+        name=brand_name,
+        slug=f"{slug}-brand",
+        website_url=website_url,
+        brand_type="standard",
+        agency_client_id=agency_client.id,
+    )
+    db.add(brand)
+    await db.flush()
+
+    profile = BrandProfile(
+        brand_id=brand.id,
+        company_description=company_description,
+    )
+    db.add(profile)
+    await db.commit()
+    return agency_client.id, brand.id
+
+
+async def factory_agency_client_only(db, creator_user_id: int) -> int:
+    """Create a bare AgencyClient with no Brand/BrandProfile attached.
+
+    Used to test missing-data preflight failures.
+    """
+    import secrets as _secrets
+    from app.models import AgencyClient
+    agency_client = AgencyClient(
+        name="Bare client",
+        slug="bare-client-" + _secrets.token_hex(4),
+        status="active",
+    )
+    db.add(agency_client)
+    await db.commit()
+    return agency_client.id

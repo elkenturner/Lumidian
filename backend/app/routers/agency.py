@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 import secrets
@@ -39,7 +40,8 @@ from app.schemas import (
     NoteUpdate,
     ReviewLinkOut,
 )
-from app.services.document_engine import generate_document, get_template, list_templates
+from app.services.document_engine import generate_document, generate_pdf, get_template, list_templates, MissingDataError, LLMJSONError
+from app.services.document_engine.typst_renderer import TypstCompileError
 from app.services.agency_activity import (
     emit_event,
     EVENT_DRAFT_GENERATED_BY_STAFF,
@@ -49,6 +51,7 @@ from app.services.agency_activity import (
 from app.services.drafting_service import generate_gap_draft, ALL_DRAFT_PLATFORMS
 
 router = APIRouter(prefix="/agency", tags=["agency"])
+logger = logging.getLogger(__name__)
 
 
 def _slugify(name: str) -> str:
@@ -657,6 +660,56 @@ async def create_document(
         # e.g., missing ANTHROPIC_API_KEY
         raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
     return await _doc_to_out(db, doc)
+
+
+@router.post("/clients/{client_id}/documents/{kind}/render")
+async def render_document_pdf(
+    client_id: int,
+    kind: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_client_access),
+):
+    """Render a doc kind to PDF and return as binary download. One-click flow."""
+    from fastapi import Response
+    import re as _re
+
+    client = await db.get(AgencyClient, client_id)
+    if client is None:
+        raise HTTPException(status_code=404, detail="Client not found")
+    template = get_template(kind)
+    if template is None or template.typst_template is None:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown or unmigrated template kind: {kind}",
+        )
+
+    try:
+        pdf_bytes, doc = await generate_pdf(
+            db, client=client, template=template, actor_user_id=user.id,
+        )
+    except MissingDataError as e:
+        raise HTTPException(
+            status_code=http_status.HTTP_400_BAD_REQUEST,
+            detail={
+                "detail": "Missing required brand data — fill these in before generating.",
+                "missing_fields": e.missing,
+            },
+        ) from e
+    except LLMJSONError as e:
+        logger.exception("LLM JSON error rendering %s", kind)
+        raise HTTPException(status_code=500, detail=f"LLM output error: {e}") from e
+    except TypstCompileError as e:
+        logger.exception("Typst compile error rendering %s", kind)
+        raise HTTPException(status_code=500, detail=f"PDF render error: {e}") from e
+    except ValueError as e:
+        raise HTTPException(status_code=http_status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e)) from e
+
+    safe_title = _re.sub(r"[^a-zA-Z0-9_-]+", "-", (doc.title or f"{kind}-{doc.id}"))[:120].strip("-")
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{safe_title}.pdf"'},
+    )
 
 
 @router.patch("/documents/{document_id}", response_model=DocumentOut)

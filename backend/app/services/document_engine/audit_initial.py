@@ -7,8 +7,25 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from pydantic import BaseModel, Field
+
 from app.models import AgencyClient, Brand, BrandProfile, Competitor, Prompt, TrackingRun
 from app.services.document_engine.registry import Template, register
+
+
+class AuditInitialOutput(BaseModel):
+    current_state: str = Field(..., description="2-3 sentence summary of where the brand stands today")
+    working: list[str] = Field(default_factory=list, description="Strengths bullets")
+    gaps: list[str] = Field(default_factory=list, description="Weakness bullets")
+    recommendations: list[str] = Field(default_factory=list, description="3-5 prioritized actions for next 30 days")
+    open_questions: list[str] = Field(default_factory=list, description="2-4 questions for the client")
+
+
+REQUIRED_FIELDS = (
+    "brand.name",
+    "brand.website_url",
+    "brand_profile.company_description",
+)
 
 
 SECTION_MAP: dict[str, str] = {
@@ -107,5 +124,9 @@ register(
         system_prompt=SYSTEM_PROMPT,
         user_prompt_template="Client data:\n```json\n{data_json}\n```",
         max_tokens=3000,
+        required_fields=REQUIRED_FIELDS,
+        output_schema=AuditInitialOutput,
+        typst_template="audit_initial.typ",
+        chart_calls=(),
     )
 )

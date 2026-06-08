@@ -1,15 +1,15 @@
 """Document engine — template registry + generator."""
-# Importing each template module triggers its register() call
 from app.services.document_engine import (
-    agency_weekly_report,  # noqa: F401
-    audit_initial,  # noqa: F401
-    kickoff_checklist,  # noqa: F401
-    monthly_report,  # noqa: F401
-    site_plan,  # noqa: F401
-    sow,  # noqa: F401
-    wikipedia_plan,  # noqa: F401
+    agency_weekly_report,
+    audit_initial,
+    kickoff_checklist,
+    monthly_report,
+    site_plan,
+    sow,
+    wikipedia_plan,
 )
-from app.services.document_engine.generator import generate_document
+from app.services.document_engine.generator import generate_document, generate_pdf
+from app.services.document_engine.preflight import MissingDataError
 from app.services.document_engine.registry import (
     TEMPLATES,
     Template,
@@ -17,12 +17,16 @@ from app.services.document_engine.registry import (
     list_templates,
     register,
 )
+from app.services.document_engine.structured_output import LLMJSONError
 
 __all__ = [
     "TEMPLATES",
     "Template",
     "generate_document",
+    "generate_pdf",
     "get_template",
     "list_templates",
     "register",
+    "MissingDataError",
+    "LLMJSONError",
 ]

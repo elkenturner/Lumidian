@@ -226,6 +226,11 @@ PLATFORM_MAX_TOKENS: dict[str, int] = {
     "linkedin_post": 800,
     "x_thread": 2000,
     "x_post": 300,
+    # Short reply formats — kept tight so opportunity replies (routed through the
+    # core since B2 Phase 3b) don't balloon to the 2500 default. ~1-4 sentences.
+    "reddit_reply": 500,
+    "linkedin_reply": 500,
+    "x_reply": 200,
 }
 
 

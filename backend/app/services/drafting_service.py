@@ -179,7 +179,12 @@ async def _load_voice_directive(db: AsyncSession, brand_id: int) -> str | None:
     result = await db.execute(
         select(BrandProfile).where(BrandProfile.brand_id == brand_id)
     )
-    profile: BrandProfile | None = result.scalar_one_or_none()
+    return _voice_directive_from_profile(result.scalar_one_or_none())
+
+
+def _voice_directive_from_profile(profile: BrandProfile | None) -> str | None:
+    """Pure builder for the voice directive — lets callers that already hold the
+    BrandProfile row (e.g. the owned_site branch) reuse it without a second query."""
     if profile is None:
         return None
     parts: list[str] = []
@@ -615,7 +620,9 @@ async def _generate_with_new_pipeline(
     Returns ``(final_text, quality_score_or_None, citations)``.
 
     Tier gating:
-      - ``None`` / ``'pitch'`` → bypass (caller falls back to the existing single-shot flow)
+      - ``None`` / ``'pitch'`` → cheap single-shot (no pack/critic/voice-sample); still
+        runs the brand-mention guard + anti-AI gate. (Since B2 Phase 3 ALL tiers route
+        through here — there is no separate fallback path.)
       - ``'basic'``  (Starter) → Evidence Pack only
       - ``'starter'`` (Growth) → Evidence Pack + critic + rewrite (Layer 2)
       - ``'pro'``    (Pro)    → Evidence Pack + critic + rewrite + voice + cross-ref (Layer 3)
@@ -746,22 +753,11 @@ async def _generate_with_new_pipeline(
                 brand_id, prompt_id, exc,
             )
 
-    # Render citations per platform (only if we have a pack)
-    citations: list[RenderedCitation] = []
-    if pack is not None:
-        try:
-            raw_text, citations = render_citations(
-                text=raw_text, pack=pack, platform=platform_key,
-            )
-        except Exception as exc:
-            logger.warning(
-                "Citation rendering failed for brand %d prompt %d: %s",
-                brand_id, prompt_id, exc,
-            )
-
     # Layer 4 (B2 Phase 0): universal anti-AI gate — every draft, every tier.
-    # autofix is always applied; on a failing scan we regenerate once with the
-    # specific tells fed back, re-render citations, and keep the better result.
+    # IMPORTANT: this runs on the writer PROSE, BEFORE citation rendering, so
+    # autofix's em-dash→comma replacement never mangles the rendered citation
+    # footer (linkedin_post / reddit footers use " — " separators). The writer's
+    # [SN] markers pass through untouched and are rendered once below.
     raw_text = anti_ai.autofix(raw_text)
     report = anti_ai.scan(raw_text)
     if not report.passed:
@@ -775,14 +771,9 @@ async def _generate_with_new_pipeline(
                 max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
                 model=writer_model,
             ))
-            retry_citations = citations
-            if pack is not None:
-                retry, retry_citations = render_citations(
-                    text=retry, pack=pack, platform=platform_key,
-                )
             retry_report = anti_ai.scan(retry)
             if retry_report.passed or retry_report.score < report.score:
-                raw_text, citations, report = retry, retry_citations, retry_report
+                raw_text, report = retry, retry_report
         except Exception as exc:
             logger.warning(
                 "Anti-AI regeneration failed for brand %d prompt %d: %s",
@@ -794,6 +785,20 @@ async def _generate_with_new_pipeline(
             "(score=%.1f) — flagged, not blocked.",
             brand_id, prompt_id, platform_key, report.score,
         )
+
+    # Render citations per platform AFTER the gate (only if we have a pack), so the
+    # rendered footer's " — " separators survive autofix untouched.
+    citations: list[RenderedCitation] = []
+    if pack is not None:
+        try:
+            raw_text, citations = render_citations(
+                text=raw_text, pack=pack, platform=platform_key,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Citation rendering failed for brand %d prompt %d: %s",
+                brand_id, prompt_id, exc,
+            )
 
     return raw_text, quality_score, citations
 
@@ -977,7 +982,7 @@ async def generate_gap_draft(
             {"title": p.get("title"), "url": p.get("url", ""), "snippet": p.get("publisher", "")}
             for p in _pubs
         ] or None
-        _voice = await _load_voice_directive(db, brand_id)
+        _voice = _voice_directive_from_profile(_prof)  # reuse the row already loaded
 
         async def _owned_writer(p: str) -> str:
             return await call_claude(p, max_tokens=PLATFORM_MAX_TOKENS.get("owned_site", 3000))
@@ -1290,7 +1295,6 @@ async def generate_opportunity_draft(
     }
     platform_key = platform_key_map.get(opp.platform, opp.platform)
     spec = PLATFORM_SPECS.get(platform_key, PLATFORM_SPECS["reddit_reply"])
-    max_tokens = PLATFORM_MAX_TOKENS.get(platform_key, 600)
 
     # Build opportunity context block
     promo_strategy = "cautious"  # default; overridden for Reddit below

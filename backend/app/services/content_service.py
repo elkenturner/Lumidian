@@ -41,6 +41,17 @@ logger = logging.getLogger(__name__)
 # ── Platform guidelines ───────────────────────────────────────────────────────
 
 PLATFORM_GUIDELINES: dict[str, dict] = {
+    "owned_site": {
+        "tone": "Authoritative, concrete, first-party",
+        "rules": [
+            "Publish on your own website/blog (your own domain) — the highest-value AI-citation channel",
+            "Lead with the direct answer; use H2/H3 headings with self-contained ~120-180 word answer blocks",
+            "Include concrete statistics and cite authoritative sources inline",
+            "Paste the generated JSON-LD schema block into the page's <head>",
+        ],
+        "disclaimer": None,
+        "workflow": "publish_owned",
+    },
     "wikipedia": {
         "tone": "Neutral, encyclopedic, fact-based",
         "rules": [

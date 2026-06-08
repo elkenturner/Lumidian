@@ -11,6 +11,7 @@ from app.services.site_audit.constants import THIRD_PARTY_AUTHORITY_DOMAINS, nor
 
 logger = logging.getLogger(__name__)
 
+_DOMAIN_RE = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$", re.IGNORECASE)
 _MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^)\s]+)\)")
 _BARE_URL_RE = re.compile(r"(?<![\[\(])(https?://[^\s\]\)\}\"']+)")
 _TRAILING_PUNCT = ".,;:!?"
@@ -87,7 +88,13 @@ def classify_structured_citation(
     """
     hint = item.get("domain_hint") if isinstance(item, dict) else None
     if hint:
-        return classify_url(f"https://{hint.strip().lstrip('@')}", own_domain, competitors_by_domain)
+        cleaned = hint.strip().lstrip("@").lower()
+        # Only trust the hint when it actually looks like a bare domain. Gemini's
+        # web.title is "usually" the domain but is sometimes a human page title
+        # ("Best CRMs 2026 | TechRadar") — feeding that to classify_url would yield
+        # a garbage/empty domain. When it doesn't look like a domain, fall back.
+        if _DOMAIN_RE.match(cleaned):
+            return classify_url(f"https://{cleaned}", own_domain, competitors_by_domain)
     return classify_url(url, own_domain, competitors_by_domain)
 
 

@@ -80,3 +80,13 @@ def test_structured_hint_classifies_real_domain():
     # Without the hint, the proxy URL resolves to google.com (the bug we fixed)
     no_hint = {"url": proxy}
     assert classify_structured_citation(no_hint, proxy, None, {}).domain == "google.com"
+
+
+def test_structured_hint_page_title_falls_back_not_garbage():
+    # Gemini web.title is sometimes a page title, not a bare domain — must NOT be
+    # turned into a garbage domain; fall back to classifying the proxy URL.
+    proxy = "https://vertexaisearch.cloud.google.com/grounding-api-redirect/x"
+    bad = {"url": proxy, "domain_hint": "Best CRMs in 2026 | TechRadar"}
+    cls = classify_structured_citation(bad, proxy, None, {})
+    assert cls.domain == "google.com"   # fell back to the URL, not the title
+    assert " " not in cls.domain and "|" not in cls.domain

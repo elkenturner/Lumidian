@@ -29,6 +29,12 @@ def test_in_conclusion_fails():
     assert r.passed is False
 
 
+def test_the_bottom_line_fails():
+    r = anti_ai.scan("We tested it on many patients. The bottom line is that it catches cancer early.")
+    assert r.passed is False
+    assert any(v.category == "construction" for v in r.violations)
+
+
 def test_smoking_gun_word_fails_alone():
     # "delve" + "tapestry" are S1/FP-LOW — should fail even in short text
     r = anti_ai.scan("Let us delve into the rich tapestry of modern diagnostics.")

@@ -81,7 +81,7 @@ _CONSTRUCTIONS: list[tuple[str, re.Pattern, str]] = [
      re.compile(r"\bhere(?:'s|\s+is)\s+the\s+(?:thing|kicker|deal|catch|truth|secret|problem)\b", re.IGNORECASE),
      "Cut the 'here's the thing' framing."),
     ("signposted conclusion",
-     re.compile(r"(?:^|[.!?]\s+)(?:in conclusion|to sum up|in summary|to summarize|all in all|at the end of the day|when all is said and done)\b", re.IGNORECASE),
+     re.compile(r"(?:^|[.!?]\s+)(?:in conclusion|to sum up|in summary|to summarize|all in all|at the end of the day|when all is said and done|the bottom line(?:\s+is)?)\b", re.IGNORECASE),
      "Delete the 'In conclusion / at the end of the day' wrap-up."),
     ("'despite … challenges' pivot",
      re.compile(r"\bdespite\s+(?:its|these|the|several|numerous|various|ongoing)\s+(?:challenges|obstacles|setbacks|limitations|complexities|difficulties)\b", re.IGNORECASE),

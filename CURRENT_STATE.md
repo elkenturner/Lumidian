@@ -9,6 +9,8 @@
 
 ## Current Task / WIP
 
+**✅ MERGED TO MAIN 2026-06-08** (fast-forward, `0e74f87..7231744`; Railway auto-deploying). The full content-engine rebuild (Layer A strategy + research, Layer B Phases 0-5, legacy cleanup, code-review fixes) is now live on `main`. Branch `feat/aio-content-strategy-layer-a` == origin/main. Note: local `main` ref is stale (checked out in a `.worktrees/design-cleanup` worktree at the old `4f49360`); origin/main is the source of truth. Remaining: the pre-existing `test_client_portal` failures (Ken's active WIP) and the logged altitude follow-ups.
+
 **Active work: rebuilding the content engine (the core service) in three layers.** Content quality/logic is the priority — the methodology was scattered across 5 generation paths + 6 rule files and nobody fully understood it. Decomposed into **Layer A** (research-grounded strategy — *what good AIO content is*), **Layer B** (one unified engine that executes A, with consistent source-grounding), **Layer C** (prose-quality pass). Each gets its own spec→plan→build.
 
 - **Layer A: SHIPPED** on branch `feat/aio-content-strategy-layer-a`. Spec `docs/superpowers/specs/2026-06-03-aio-content-strategy-layer-a-design.md`, plan `docs/superpowers/plans/2026-06-03-aio-content-strategy-layer-a.md`, deliverable **`docs/strategy/aio-content-strategy-2026.md`** (Part 1 prose + Part 2 machine-ready per-platform ruleset). Triangulated 3 evidence streams (all under `docs/strategy/research/`): Stream 1 first-party citation mining of production data, Stream 2 ten adversarial deep-research passes (4 models + 5 platforms + channel ranking), Stream 3 first-principles mechanics.

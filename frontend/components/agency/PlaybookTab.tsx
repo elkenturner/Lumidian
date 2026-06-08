@@ -36,6 +36,8 @@ interface Props {
   onOpenSendModal: () => void;
 }
 
+const NEW_PATH_KINDS = new Set(['audit_initial', 'wikipedia_plan', 'site_plan']);
+
 const LAUNCH_LABELS: Record<string, { label: string; docKind: string | null; secondary?: { href: string; label: string } }> = {
   kickoff:         { label: 'Kickoff',          docKind: 'kickoff_checklist' },
   sow:             { label: 'SOW',              docKind: 'sow' },
@@ -93,9 +95,7 @@ export function PlaybookTab({
     setMissing(null);
     setBusyKind(kind);
     try {
-      // Only audit_initial uses the new render path for now.
-      // Other kinds fall back to the legacy generate-doc-then-open-modal flow.
-      if (kind === 'audit_initial') {
+      if (NEW_PATH_KINDS.has(kind)) {
         const { blob, filename } = await agencyRenderDocument(client.id, kind);
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');

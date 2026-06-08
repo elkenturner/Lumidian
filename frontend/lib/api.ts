@@ -2124,6 +2124,44 @@ export async function agencyDownloadDocumentPdf(documentId: number): Promise<Blo
   return res.data as Blob;
 }
 
+export class MissingFieldsError extends Error {
+  constructor(public missingFields: string[], message: string) {
+    super(message);
+    this.name = 'MissingFieldsError';
+  }
+}
+
+export async function agencyRenderDocument(clientId: number, kind: string): Promise<{ blob: Blob; filename: string }> {
+  try {
+    const res = await api.post(`/agency/clients/${clientId}/documents/${kind}/render`, null, {
+      responseType: 'blob',
+    });
+    const cd = res.headers['content-disposition'] as string | undefined;
+    const match = cd && /filename="([^"]+)"/.exec(cd);
+    const filename = match ? match[1] : `${kind}.pdf`;
+    return { blob: res.data as Blob, filename };
+  } catch (err) {
+    // Axios with responseType:blob returns the error body as a Blob — parse it.
+    const e = err as { response?: { status?: number; data?: Blob } };
+    if (e.response?.data instanceof Blob) {
+      const text = await e.response.data.text();
+      try {
+        const body = JSON.parse(text);
+        if (e.response.status === 400 && body?.detail?.missing_fields) {
+          throw new MissingFieldsError(body.detail.missing_fields, body.detail.detail || 'Missing brand fields');
+        }
+        if (body?.detail) {
+          throw new Error(typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail));
+        }
+      } catch (parseErr) {
+        if (parseErr instanceof MissingFieldsError) throw parseErr;
+        // fall through
+      }
+    }
+    throw err;
+  }
+}
+
 // ── Per-client staff assignment (2026-05-20) ─────────────────────────────────
 
 export interface ClientStaffAssignment {

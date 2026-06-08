@@ -5,6 +5,8 @@ import {
   agencyGenerateDocument,
   agencyListDocuments,
   agencyListMilestones,
+  agencyRenderDocument,
+  MissingFieldsError,
   parseApiError,
   type AgencyClient,
   type AgencyClientMilestone,
@@ -12,6 +14,7 @@ import {
   type ContentDraft,
 } from '@/lib/api';
 import { DocumentViewer } from './DocumentViewer';
+import { MissingBrandFieldsCard } from './MissingBrandFieldsCard';
 import { PlaybookEngagement } from './PlaybookEngagement';
 import { PlaybookLaunchRow } from './PlaybookLaunchRow';
 import { PlaybookReports } from './PlaybookReports';
@@ -56,6 +59,7 @@ export function PlaybookTab({
   });
   const [viewerDoc, setViewerDoc] = useState<AgencyDocument | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
+  const [missing, setMissing] = useState<string[] | null>(null);
   const [busyKind, setBusyKind] = useState<string | null>(null);
 
   useEffect(() => {
@@ -86,14 +90,33 @@ export function PlaybookTab({
   const generateDoc = async (kind: string) => {
     if (busyKind) return;
     setGenError(null);
+    setMissing(null);
     setBusyKind(kind);
     try {
-      const doc = await agencyGenerateDocument(client.id, kind);
-      setViewerDoc(doc);
-      if (kind === 'agency_weekly_report') setReports((r) => ({ ...r, weekly: doc }));
-      if (kind === 'monthly_report') setReports((r) => ({ ...r, monthly: doc }));
+      // Only audit_initial uses the new render path for now.
+      // Other kinds fall back to the legacy generate-doc-then-open-modal flow.
+      if (kind === 'audit_initial') {
+        const { blob, filename } = await agencyRenderDocument(client.id, kind);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        const doc = await agencyGenerateDocument(client.id, kind);
+        setViewerDoc(doc);
+        if (kind === 'agency_weekly_report') setReports((r) => ({ ...r, weekly: doc }));
+        if (kind === 'monthly_report') setReports((r) => ({ ...r, monthly: doc }));
+      }
     } catch (e) {
-      setGenError(parseApiError(e, 'Failed to generate document'));
+      if (e instanceof MissingFieldsError) {
+        setMissing(e.missingFields);
+      } else {
+        setGenError(parseApiError(e, 'Failed to generate document'));
+      }
     } finally {
       setBusyKind(null);
     }
@@ -112,6 +135,13 @@ export function PlaybookTab({
         >
           <span className="font-medium">Couldn't generate document.</span> {genError}
         </div>
+      )}
+      {missing && (
+        <MissingBrandFieldsCard
+          brandId={client.brand_id}
+          missingFields={missing}
+          onDismiss={() => setMissing(null)}
+        />
       )}
       {busyKind && (
         <div className="rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card)] px-3 py-2 text-xs text-[var(--text-muted)]">

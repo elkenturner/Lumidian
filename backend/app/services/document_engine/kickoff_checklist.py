@@ -4,11 +4,27 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AgencyClient, Brand, BrandProfile, Prompt
 from app.services.document_engine.registry import Template, register
+
+
+class KickoffChecklistItem(BaseModel):
+    label: str
+    done: bool = False
+    owner: str | None = None
+
+
+class KickoffChecklistOutput(BaseModel):
+    pre_kickoff: list[KickoffChecklistItem] = Field(default_factory=list)
+    in_meeting: list[KickoffChecklistItem] = Field(default_factory=list)
+    post_kickoff: list[KickoffChecklistItem] = Field(default_factory=list)
+
+
+REQUIRED_FIELDS = ("brand.name",)
 
 
 SECTION_MAP: dict[str, str] = {
@@ -91,5 +107,9 @@ register(
         system_prompt=SYSTEM_PROMPT,
         user_prompt_template="Client onboarding state:\n```json\n{data_json}\n```",
         max_tokens=1500,
+        required_fields=REQUIRED_FIELDS,
+        output_schema=KickoffChecklistOutput,
+        typst_template="kickoff_checklist.typ",
+        chart_calls=(),
     )
 )

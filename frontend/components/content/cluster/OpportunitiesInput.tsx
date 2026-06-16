@@ -17,7 +17,7 @@ export function OpportunitiesInput({ items }: { items: ContentOpportunity[] }) {
             <div className="flex items-center gap-2 text-xs text-[var(--text-faint)] uppercase tracking-wide">
               <span>{o.platform}</span>
               {o.subreddit && <span>· r/{o.subreddit}</span>}
-              <span>· {Math.round(o.relevance_score * 100)}% match</span>
+              <span>· {Math.round(o.relevance_score)}% match</span>
             </div>
             <a
               href={o.thread_url}

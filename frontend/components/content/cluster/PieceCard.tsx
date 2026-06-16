@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
 import { regenerateClusterPiece, updateDraft, type ContentDraft } from "@/lib/api";
@@ -80,6 +80,18 @@ function PieceStatusChip({
   return null;
 }
 
+function LowEvidenceBadge() {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.10)] text-[#fbbf24]"
+      title="Thin sourcing — the writer couldn't ground this post in verified sources. Rewrite to try again, or add sources in the brand's source library."
+    >
+      <AlertTriangle className="h-3 w-3" />
+      Thin sourcing
+    </span>
+  );
+}
+
 export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, onUpdated }: Props) {
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -132,6 +144,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 {draft.generation_state}
               </span>
             )}
+            {draft?.low_evidence && <LowEvidenceBadge />}
             {draft && (
               <PieceStatusChip status={draft.status} delta={draft.attribution_delta} />
             )}
@@ -145,7 +158,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
 
         {draft ? (
           <>
-            {draft.title && (
+            {draft.title && draft.title !== "(untitled)" && (
               <h4 className="font-semibold text-[var(--text-primary)] leading-snug line-clamp-2 mb-1.5">
                 {draft.title}
               </h4>
@@ -268,8 +281,9 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 mb-4">
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <PlatformBadge platform={platform} />
+                {draft.low_evidence && <LowEvidenceBadge />}
                 <PieceStatusChip status={draft.status} delta={draft.attribution_delta} />
               </div>
               <Button
@@ -283,7 +297,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               </Button>
             </div>
 
-            {draft.title && (
+            {draft.title && draft.title !== "(untitled)" && (
               <h3 className="text-lg font-bold text-[var(--text-primary)] mb-3">
                 {draft.title}
               </h3>

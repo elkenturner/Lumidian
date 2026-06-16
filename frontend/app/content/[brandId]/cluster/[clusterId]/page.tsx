@@ -11,15 +11,21 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   getCluster,
+  getContentGaps,
+  getOpportunities,
   proposeClusterPillar,
   rebuildCluster,
   regenerateClusterPieces,
   type ContentClusterDetail,
   type ContentDraft,
+  type ContentGap,
+  type ContentOpportunity,
   type PillarCandidate,
 } from "@/lib/api";
 import { BriefPanel } from "@/components/content/cluster/BriefPanel";
+import { GapInput } from "@/components/content/cluster/GapInput";
 import { InputsZone } from "@/components/content/cluster/InputsZone";
+import { OpportunitiesInput } from "@/components/content/cluster/OpportunitiesInput";
 import { PieceCard } from "@/components/content/cluster/PieceCard";
 import { PillarCard } from "@/components/content/cluster/PillarCard";
 import { SourceSpinePanel } from "@/components/content/cluster/SourceSpinePanel";
@@ -49,19 +55,27 @@ export default function ClusterDetailPage() {
 
   const [cluster, setCluster] = useState<ContentClusterDetail | null>(null);
   const [candidate, setCandidate] = useState<PillarCandidate | null>(null);
+  const [opportunities, setOpportunities] = useState<ContentOpportunity[]>([]);
+  const [gaps, setGaps] = useState<ContentGap[]>([]);
   const [loading, setLoading] = useState(true);
   const [regenAction, setRegenAction] = useState<null | "pieces" | "rebuild">(null);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const [c, cand] = await Promise.all([
+      const [c, cand, opps, gapList] = await Promise.all([
         getCluster(brandId, clusterId),
         proposeClusterPillar(brandId, clusterId).catch(() => null),
+        getOpportunities(brandId).catch(() => [] as ContentOpportunity[]),
+        getContentGaps(brandId).catch(() => [] as ContentGap[]),
       ]);
       if (!cancelled) {
         setCluster(c);
         setCandidate(cand);
+        setOpportunities(
+          opps.filter((o) => o.prompt_id === c.prompt_id && o.status !== "dismissed"),
+        );
+        setGaps(gapList.filter((g) => g.prompt_id === c.prompt_id));
         setLoading(false);
       }
     }
@@ -281,6 +295,7 @@ export default function ClusterDetailPage() {
           brief={cluster.brief}
           currentVersion={cluster.brief?.version}
           onUpdated={(b) => setCluster((c) => (c ? { ...c, brief: b } : c))}
+          onRegeneratePieces={onRegeneratePieces}
         />
         <div className="card !p-0 overflow-hidden">
           <div className="px-5 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
@@ -306,8 +321,10 @@ export default function ClusterDetailPage() {
             />
           ) : undefined
         }
-        opportunities={undefined}
-        gaps={undefined}
+        opportunities={
+          opportunities.length ? <OpportunitiesInput items={opportunities} /> : undefined
+        }
+        gaps={gaps.length ? <GapInput items={gaps} /> : undefined}
       />
     </div>
   );

@@ -13,16 +13,23 @@ interface Props {
   /** Version pieces were generated from. Defaults to brief.version when omitted. */
   currentVersion?: number;
   onUpdated: (b: ContentBrief) => void;
+  /** When provided, enables a "Save & regenerate" action that saves the brief then rewrites all posts. */
+  onRegeneratePieces?: () => Promise<void>;
 }
 
-export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdated }: Props) {
+export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdated, onRegeneratePieces }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [positioning, setPositioning] = useState(brief?.positioning ?? "");
   const [keyClaims, setKeyClaims] = useState((brief?.key_claims ?? []).join("\n"));
   const [phrasings, setPhrasings] = useState((brief?.canonical_phrasings ?? []).join("\n"));
   const [narrative, setNarrative] = useState(brief?.narrative_spine ?? "");
+  const [stats, setStats] = useState(
+    (brief?.stats ?? []).map((s) => [s.label, s.value, s.source].join(" | ")).join("\n"),
+  );
+  const [toneNotes, setToneNotes] = useState(brief?.tone_notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
   const [draftDirty, setDraftDirty] = useState(false);
   const [draftVersion, setDraftVersion] = useState<number>(brief?.version ?? 1);
   const effectiveCurrentVersion = currentVersion ?? brief?.version ?? 1;
@@ -50,6 +57,15 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
           .map((s) => s.trim())
           .filter(Boolean),
         narrative_spine: narrative,
+        stats: stats
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean)
+          .map((l) => {
+            const [label = "", value = "", source = ""] = l.split("|").map((p) => p.trim());
+            return { label, value, source };
+          }),
+        tone_notes: toneNotes,
       });
       onUpdated(updated);
       setDraftVersion(updated.version);
@@ -60,14 +76,25 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
     }
   }
 
+  async function saveAndRegenerate() {
+    await save();
+    if (!onRegeneratePieces) return;
+    setRegenerating(true);
+    try {
+      await onRegeneratePieces();
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
   return (
     <div className="card !p-0 overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full px-5 py-3 flex items-center justify-between text-left hover:bg-[var(--bg-card)]"
-      >
-        <span className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">
+      <div className="w-full px-5 py-3 flex items-center justify-between hover:bg-[var(--bg-card)]">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="flex items-center gap-2 font-semibold text-[var(--text-primary)] text-left"
+        >
           {expanded ? (
             <ChevronDown className="h-4 w-4 text-[var(--text-secondary)]" />
           ) : (
@@ -75,11 +102,23 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
           )}
           Brief
           <span className="text-xs font-medium text-[var(--text-faint)]">v{brief.version}</span>
-        </span>
-        <span className="text-xs text-[var(--text-faint)]">
-          Generated {new Date(brief.created_at).toLocaleString()}
-        </span>
-      </button>
+        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-[var(--text-faint)] hidden sm:inline">
+            Generated {new Date(brief.created_at).toLocaleString()}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setExpanded(true);
+              setEditing(true);
+            }}
+            className="text-xs font-medium text-[var(--accent,#60a5fa)] hover:underline"
+          >
+            Edit
+          </button>
+        </div>
+      </div>
 
       {expanded && (
         <div className="border-t border-[var(--border-subtle)] p-5 space-y-5 text-sm">
@@ -196,18 +235,53 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
                   rows={2}
                 />
               </Field>
+              <Field label="Stats (one per line — label | value | source)">
+                <textarea
+                  value={stats}
+                  onChange={(e) => {
+                    setStats(e.target.value);
+                    setDraftDirty(true);
+                  }}
+                  className="input font-mono text-xs"
+                  rows={3}
+                  placeholder="Conversion lift | 32% | internal benchmark 2026"
+                />
+              </Field>
+              <Field label="Tone notes">
+                <textarea
+                  value={toneNotes}
+                  onChange={(e) => {
+                    setToneNotes(e.target.value);
+                    setDraftDirty(true);
+                  }}
+                  className="input"
+                  rows={2}
+                />
+              </Field>
               <div className="flex gap-2">
                 <Button
                   size="sm"
                   onClick={save}
-                  disabled={saving}
+                  disabled={saving || regenerating}
                 >
                   {saving ? "Saving…" : "Save"}
                 </Button>
+                {onRegeneratePieces && (
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={saveAndRegenerate}
+                    disabled={saving || regenerating}
+                    title="Save the brief and immediately rewrite all 5 posts from it"
+                  >
+                    {regenerating ? "Regenerating…" : "Save & regenerate"}
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setEditing(false)}
+                  disabled={saving || regenerating}
                 >
                   Cancel
                 </Button>
@@ -223,6 +297,8 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
               setPhrasings((b.canonical_phrasings ?? []).join("\n"));
               setKeyClaims((b.key_claims ?? []).join("\n"));
               setNarrative(b.narrative_spine ?? "");
+              setStats((b.stats ?? []).map((s) => [s.label, s.value, s.source].join(" | ")).join("\n"));
+              setToneNotes(b.tone_notes ?? "");
               setDraftDirty(true);
               setEditing(true);
             }}

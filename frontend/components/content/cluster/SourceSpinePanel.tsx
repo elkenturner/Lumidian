@@ -40,15 +40,9 @@ export function SourceSpinePanel({ brandId, clusterId }: Props) {
   return (
     <div className="space-y-3">
       <div className="flex gap-3 text-xs text-slate-300">
-        <span>
-          <span className="font-semibold text-emerald-300">T1</span> {data.total_t1}
-        </span>
-        <span>
-          <span className="font-semibold text-sky-300">T2</span> {data.total_t2}
-        </span>
-        <span>
-          <span className="font-semibold text-slate-400">T3</span> {data.total_t3}
-        </span>
+        <TierCount label="T1" count={data.total_t1} activeColor="text-emerald-300" />
+        <TierCount label="T2" count={data.total_t2} activeColor="text-sky-300" />
+        <TierCount label="T3" count={data.total_t3} activeColor="text-slate-400" />
       </div>
       <ul className="divide-y divide-slate-800">
         {data.sources.map((s) => (
@@ -71,10 +65,27 @@ export function SourceSpinePanel({ brandId, clusterId }: Props) {
                 {s.title || s.url}
               </a>
             </div>
-            <div className="text-xs text-slate-500 shrink-0">used by {s.times_cited}</div>
           </li>
         ))}
       </ul>
     </div>
+  );
+}
+
+function TierCount({
+  label,
+  count,
+  activeColor,
+}: {
+  label: string;
+  count: number;
+  activeColor: string;
+}) {
+  const dim = count === 0;
+  return (
+    <span className={dim ? "opacity-40" : ""}>
+      <span className={`font-semibold ${dim ? "text-slate-500" : activeColor}`}>{label}</span>{" "}
+      {count}
+    </span>
   );
 }

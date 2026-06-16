@@ -60,37 +60,23 @@ async def fetch_data(db: AsyncSession, client: AgencyClient) -> dict[str, Any]:
     }
 
 
-SYSTEM_PROMPT = """You are drafting a Statement of Work for an AI visibility agency engagement.
-Output contract-style markdown. Use these exact sections in this order:
+SYSTEM_PROMPT = """You are drafting a Statement of Work for an AI-visibility agency engagement between Lumidian (the agency) and the client.
 
-# Statement of Work
+Voice: Plain contract English. Direct, specific, unambiguous. No hedging, no marketing language, no AI-tells ("leverage," "robust," "comprehensive"). No "We are excited to…" preambles.
 
-**Client:** {client.name}
-**Effective date:** {today}
-**Monthly retainer:** ${retainer or "TBD"}
+Title-Case the client name even when source data is lowercase.
 
-## 1. Engagement Summary
-(2-3 sentences describing what the agency will do)
+The output is structured fields, rendered into a formatted SOW. Do not invent dollar amounts, deliverable counts, or terms not present in the source data — if a number is missing, omit it from the language and let the agency fill it in by hand.
 
-## 2. Scope of Services
-(bullet list — Brand visibility tracking, weekly content drafting for Reddit/Quora/Medium, monthly client report, opportunity scanning. Include LinkedIn / X / blog posting as upcoming.)
+Per-field rules:
 
-## 3. Deliverables
-(quantified per-month deliverables — e.g., "8 LinkedIn drafts/mo, 4 Medium drafts/mo, 4 Reddit/Quora replies/mo")
-
-## 4. Term
-(Monthly renewal, 30-day notice to cancel, no minimum)
-
-## 5. Payment Terms
-(Net 30, invoiced on the 1st of each month)
-
-## 6. Termination
-(Either party with 30 days written notice)
-
-## 7. Signatures
-(Two signature blocks: Agency representative + Client)
-
-Keep professional, plain language. Do not invent terms not specified. If retainer is empty, write "TBD".
+- **sow_number**: A reference id in the form `SOW-{YYYY}-{NNNN}` using today's year and a 4-digit sequence based on the client's slug hash. If you cannot generate a stable id, use `SOW-{YYYY}-DRAFT`.
+- **preamble**: 1 paragraph, ≤ 60 words. State the parties (Lumidian and {Client Name}), the engagement type ("AI-visibility services"), and the effective date. No marketing language.
+- **scope**: 1-2 paragraphs, ≤ 100 words. State what the agency will do in plain prose — tracking, content production for AI-visibility channels, monthly reporting, opportunity scanning. Reference the specific channels (Reddit, Quora, Medium, LinkedIn) only if relevant. No quantities here (those belong in deliverables).
+- **deliverables**: 4-7 bullets. Each ≤ 20 words. Quantified per-month amounts ("8 LinkedIn drafts/month"). Sorted by client value. Imperative-verb start ("Produce," "Deliver," "Run").
+- **exclusions**: 3-5 bullets. Each ≤ 20 words. Name specific work that is OUT of scope (paid ads, direct outreach to publishers, web development, posting to client-controlled accounts on behalf of the client). Plain language.
+- **timeline**: 1 paragraph, ≤ 50 words. Monthly renewal, 30-day notice to terminate, no minimum term. State the start date.
+- **fees**: 1 paragraph, ≤ 50 words. Net-30, invoiced on the 1st of each month. If the retainer amount is provided, state it as `$N,NNN/month`; otherwise use `[retainer amount]` as a fill-in placeholder for Lumidian to complete by hand.
 """
 
 

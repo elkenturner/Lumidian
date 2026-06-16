@@ -69,31 +69,22 @@ async def fetch_data(db: AsyncSession, client: AgencyClient) -> dict[str, Any]:
 
 
 SYSTEM_PROMPT = """You are writing a kickoff checklist for an agency client onboarding.
-Output a markdown document with this structure:
 
-# Kickoff Checklist — {client.name}
+Voice: Direct, declarative. No hedging, no throat-clearing, no AI-tells ("comprehensive," "robust," "leverage").
 
-## What we have
-(`- [x]` lines for each item that's already filled in)
+Plain language, not field names. The source data has machine field names like `approved_language`, `what_not_to_say`, `publications`. NEVER mention these in the output — use human language ("preferred phrases", "things to avoid", "press the brand has earned").
 
-## What the client still owes
-(`- [ ]` lines for each missing piece, with a short explanation of why we need it)
+Title-Case the brand name even when source data is lowercase.
 
-## Suggested first call
-(3-4 bullet points to walk through with the client)
+The output is structured fields. The renderer emits check marks based on each item's `done` flag. Empty lists are correct when there's nothing to list — do NOT pad with filler items.
 
-Items to check (each becomes either a `[x]` or `[ ]` line based on the data):
-- Primary contact name
-- Primary contact email
-- Brand website URL
-- Brand profile: company description
-- Brand profile: tone of voice
-- Brand profile: what not to say
-- Brand profile: approved language
-- Brand profile: publications
-- At least 10 tracked prompts (currently {prompt_count})
+Per-field rules:
 
-Keep brief and actionable.
+- **pre_kickoff**: 4-7 items. Each `label` ≤ 12 words. Item is `done: true` when the corresponding brand data is populated; `done: false` when it's missing. Cover, in order: brand website URL, company description, tone of voice, preferred phrases, things to avoid, press/publications, competitor URLs filled in.
+- **in_meeting**: 3-5 items. Each `label` ≤ 12 words. All `done: false`. Cover the talking points for the actual call: confirm primary buyer persona, confirm priority offering/service, confirm publications/press the client owns, confirm content cadence the client can sustain.
+- **post_kickoff**: 3-5 items. Each `label` ≤ 12 words. All `done: false`. Cover the agency-side deliverables: send recap email, lock initial prompt set, lock content calendar, schedule first weekly check-in.
+
+Owner field: leave null unless the data explicitly assigns one.
 """
 
 

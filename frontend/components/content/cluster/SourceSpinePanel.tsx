@@ -17,11 +17,15 @@ const TIER_COLORS: Record<ClusterSourceItem["tier"], string> = {
 export function SourceSpinePanel({ brandId, clusterId }: Props) {
   const [data, setData] = useState<ClusterSourcesPayload | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+    setLoading(true);
+    setError(false);
     getClusterSources(brandId, clusterId)
       .then((d) => mounted && setData(d))
+      .catch(() => mounted && setError(true))
       .finally(() => mounted && setLoading(false));
     return () => {
       mounted = false;
@@ -29,6 +33,13 @@ export function SourceSpinePanel({ brandId, clusterId }: Props) {
   }, [brandId, clusterId]);
 
   if (loading) return <div className="text-sm text-slate-400">Loading sources…</div>;
+  if (error) {
+    return (
+      <div className="text-sm text-[#fb7185]">
+        Couldn&apos;t load sources. Reload the page to try again.
+      </div>
+    );
+  }
   if (!data || data.sources.length === 0) {
     return (
       <div className="text-sm text-slate-400">

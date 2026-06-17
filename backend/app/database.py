@@ -737,6 +737,26 @@ async def run_migrations():
             await conn.execute(text("ALTER TABLE query_results ADD COLUMN citations JSON"))
             logger.info("Migration applied: query_results.citations column")
 
+    # --- Migration: content_drafts.low_evidence (2026-06-16) ---
+    # Flags drafts whose citation sourcing collapsed (writer cited nothing real,
+    # or the evidence pack was empty). Surfaced as a "thin sourcing" badge.
+    async with engine.begin() as conn:
+        result = await conn.execute(text("PRAGMA table_info(content_drafts)"))
+        cols = {row[1] for row in result.fetchall()}
+        if "low_evidence" not in cols:
+            await conn.execute(text("ALTER TABLE content_drafts ADD COLUMN low_evidence BOOLEAN NOT NULL DEFAULT 0"))
+            logger.info("Migration applied: content_drafts.low_evidence column")
+
+    # --- Migration: content_draft_citations.tier (2026-06-16) ---
+    # Records the T1/T2/T3 authority of each cited domain so the UI can show
+    # source quality at a glance.
+    async with engine.begin() as conn:
+        result = await conn.execute(text("PRAGMA table_info(content_draft_citations)"))
+        cols = {row[1] for row in result.fetchall()}
+        if "tier" not in cols:
+            await conn.execute(text("ALTER TABLE content_draft_citations ADD COLUMN tier VARCHAR(4)"))
+            logger.info("Migration applied: content_draft_citations.tier column")
+
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):
     """Mark tracking runs stuck in pending/running for > max_age_minutes as failed.

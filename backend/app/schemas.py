@@ -314,6 +314,7 @@ class ContentDraftSchema(BaseModel):
     time_to_approve_seconds: int | None = None
     created_at: datetime
     updated_at: datetime
+    low_evidence: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -1293,6 +1294,7 @@ class ClusterPieceSummary(BaseModel):
     status: str  # draft / approved / posted / failed / missing
     title: str | None
     excerpt: str | None  # first 140 chars of content_text
+    low_evidence: bool = False  # thin sourcing — writer cited nothing real
 
 
 class ContentClusterSummary(BaseModel):
@@ -1320,6 +1322,7 @@ class ContentDraftCitationSchema(BaseModel):
     url: str
     title: str | None
     position_marker: int | None
+    tier: str | None = None  # T1/T2/T3 authority of the cited domain
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1341,6 +1344,8 @@ class ContentClusterDraft(BaseModel):
     citations: list[ContentDraftCitationSchema] = []
     # Per-piece attribution lift (DraftAttribution.delta if a row exists)
     attribution_delta: float | None = None
+    # Thin sourcing — writer cited nothing real / empty evidence pack
+    low_evidence: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 

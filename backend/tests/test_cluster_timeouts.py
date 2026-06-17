@@ -58,8 +58,8 @@ async def test_regenerate_cluster_completes_when_one_piece_hangs(
         if platform == "linkedin":
             # Simulate the buggy Claude hang the SpotitEarly bug exhibited.
             await asyncio.sleep(30)
-            return ("title", "body", None, [])
-        return ("Title", f"Body for {platform}.", None, [])
+            return ("title", "body", None, [], False)
+        return ("Title", f"Body for {platform}.", None, [], False)
 
     started = time.monotonic()
     with (
@@ -69,6 +69,10 @@ async def test_regenerate_cluster_completes_when_one_piece_hangs(
               new=AsyncMock(return_value=_FAKE_PACK)),
         patch.object(clustering_service, "_generate_piece_text",
                      side_effect=maybe_hang_piece),
+        # Post-piece claim verifier makes a real LLM call otherwise; neutralize
+        # it so this test stays hermetic and measures only timeout behavior.
+        patch("app.services.drafting.claim_verifier.verify_claims",
+              new=AsyncMock(side_effect=lambda *, draft_text, sources: draft_text)),
         patch("app.services.clustering_service.generate_draft_summary",
               new=AsyncMock(return_value="summary")),
         patch("app.services.cluster_pillar.propose_pillar", new=AsyncMock(return_value=None)),

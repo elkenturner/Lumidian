@@ -3,6 +3,7 @@ from app.services.drafting.evidence import EvidencePack, EvidenceSource
 from app.services.drafting.citations import (
     render_citations,
     extract_used_refs,
+    drop_out_of_range_markers,
 )
 
 
@@ -64,3 +65,39 @@ def test_extract_used_refs():
     text = "A [S1] B [S2] C [S2] D [S5]."
     refs = extract_used_refs(text)
     assert refs == ["S1", "S2", "S5"]
+
+
+def test_drop_out_of_range_markers_removes_high_refs():
+    # Writer hallucinated [S5] when only 2 sources exist.
+    text = "Foo [S1] bar [S5] baz [S2]."
+    cleaned, dropped = drop_out_of_range_markers(text, source_count=2)
+    assert "[S5]" not in cleaned
+    assert "[S1]" in cleaned and "[S2]" in cleaned
+    assert dropped == 1
+
+
+def test_drop_out_of_range_markers_zero_sources_drops_all():
+    text = "Foo [S1] bar [S2]."
+    cleaned, dropped = drop_out_of_range_markers(text, source_count=0)
+    assert "[S1]" not in cleaned and "[S2]" not in cleaned
+    assert dropped == 2
+
+
+def test_drop_out_of_range_markers_none_to_drop():
+    text = "Foo [S1] bar [S2]."
+    cleaned, dropped = drop_out_of_range_markers(text, source_count=3)
+    assert cleaned == text
+    assert dropped == 0
+
+
+def test_rendered_citation_carries_tier():
+    # T1 authority domain vs long-tail T3.
+    text = "Accuracy hit 94% [S1]. Also relevant [S2]."
+    pack = _pack(
+        ("S1", "https://www.nature.com/a", "Nature"),
+        ("S2", "https://some-random-blog.example/x", "Blog"),
+    )
+    _, citations = render_citations(text=text, pack=pack, platform="medium")
+    by_ref = {c.source_ref: c for c in citations}
+    assert by_ref["S1"].tier == "T1"
+    assert by_ref["S2"].tier == "T3"

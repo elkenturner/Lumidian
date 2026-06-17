@@ -63,7 +63,12 @@ from app.services.drafting import (
     remove_hedging,
 )
 from app.services.drafting import anti_ai, owned_site
-from app.services.drafting.citations import RenderedCitation, render_citations
+from app.services.drafting.citations import (
+    RenderedCitation,
+    extract_used_refs,
+    render_citations,
+)
+from app.services.drafting.citation_integrity import enforce_citation_integrity
 from app.services.drafting.critic import (
     REWRITE_THRESHOLD,
     critic_score,
@@ -493,6 +498,7 @@ async def _store_draft(
     quality_score: float | None = None,
     citations: list[RenderedCitation] | None = None,
     query_for_summary: str | None = None,
+    low_evidence: bool = False,
 ) -> ContentDraft:
     spec = PLATFORM_SPECS.get(platform, {})
     guidelines_applied = guidelines_override if guidelines_override is not None else json.dumps(spec.get("rules", []))
@@ -526,6 +532,7 @@ async def _store_draft(
         estimated_impact=round(estimated_impact, 1),
         quality_score=quality_score,
         source=source,
+        low_evidence=low_evidence,
     )
     db.add(draft)
     await db.flush()  # populate draft.id so we can attach citations
@@ -538,6 +545,7 @@ async def _store_draft(
                 url=c.url,
                 title=c.title,
                 position_marker=c.position_marker,
+                tier=c.tier,
             ))
 
     # Cross-ref summary — only generate if we ran the new pipeline (query supplied)
@@ -596,6 +604,27 @@ async def _get_prompt_visibility(db: AsyncSession, prompt_id: int) -> float:
 # ── New pipeline orchestrator (tier-gated) ────────────────────────────────────
 
 
+async def _verify_citations(
+    *,
+    prose: str,
+    pack,
+    tier: str | None,
+) -> tuple[str, bool]:
+    """Citation-integrity pass on raw prose (markers still present).
+
+    Runs BEFORE the anti-AI gate and render so hallucinated/unsupported [SN]
+    markers are removed against the SAME pack that was injected into the writer
+    prompt — deterministic bounds-drop on every tier with a pack, plus the
+    snippet-support critic on paid tiers. Returns ``(cleaned_prose, low_evidence)``.
+    """
+    paid = tier in ("basic", "starter", "pro")
+    result = await enforce_citation_integrity(
+        text=prose, pack=pack, run_support_critic=paid,
+    )
+    return result.text, result.low_evidence
+
+
+
 async def _generate_with_new_pipeline(
     *,
     brand_id: int,
@@ -614,10 +643,10 @@ async def _generate_with_new_pipeline(
     brief_context: str | None = None,
     enforce_brand_mention: bool = False,
     model_override: str | None = None,
-) -> tuple[str, float | None, list[RenderedCitation]]:
+) -> tuple[str, float | None, list[RenderedCitation], bool]:
     """
     Run the full retrieve → draft → critique → rewrite → render pipeline.
-    Returns ``(final_text, quality_score_or_None, citations)``.
+    Returns ``(final_text, quality_score_or_None, citations, low_evidence)``.
 
     Tier gating:
       - ``None`` / ``'pitch'`` → cheap single-shot (no pack/critic/voice-sample); still
@@ -753,6 +782,40 @@ async def _generate_with_new_pipeline(
                 brand_id, prompt_id, exc,
             )
 
+    # Layer 3.5: citation integrity — verify [SN] markers against the SAME pack
+    # injected into the prompt, BEFORE the anti-AI gate and render. Removes
+    # hallucinated/unsupported markers that render_citations would otherwise drop
+    # silently, and flags pieces whose sourcing collapsed. Runs on the raw prose
+    # (markers still present).
+    low_evidence = False
+    if pack is not None:
+        raw_text, low_evidence = await _verify_citations(
+            prose=raw_text, pack=pack, tier=tier,
+        )
+        # Regenerate once with feedback if the writer's sourcing collapsed and we
+        # actually have sources to cite. Keep the retry only if it cites more.
+        if low_evidence and pack.sources:
+            try:
+                regen = await call_claude(
+                    claude_prompt
+                    + "\n\n⚠ SOURCING REQUIRED — your previous draft cited sources that "
+                    "don't exist or aren't supported by the provided snippets. Use ONLY the "
+                    "numbered sources above, end every statistic or specific factual claim "
+                    "with its [SN] marker, and remove any claim you cannot support.",
+                    max_tokens=PLATFORM_MAX_TOKENS.get(platform_key, 2500),
+                    model=writer_model,
+                )
+                regen_text, regen_low = await _verify_citations(
+                    prose=regen, pack=pack, tier=tier,
+                )
+                if len(extract_used_refs(regen_text)) > len(extract_used_refs(raw_text)):
+                    raw_text, low_evidence = regen_text, regen_low
+            except Exception as exc:
+                logger.warning(
+                    "Low-evidence regeneration failed for brand %d prompt %d: %s",
+                    brand_id, prompt_id, exc,
+                )
+
     # Layer 4 (B2 Phase 0): universal anti-AI gate — every draft, every tier.
     # IMPORTANT: this runs on the writer PROSE, BEFORE citation rendering, so
     # autofix's em-dash→comma replacement never mangles the rendered citation
@@ -800,7 +863,7 @@ async def _generate_with_new_pipeline(
                 brand_id, prompt_id, exc,
             )
 
-    return raw_text, quality_score, citations
+    return raw_text, quality_score, citations, low_evidence
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -1155,7 +1218,7 @@ async def generate_gap_draft(
     # critic / voice / citations) and free-pitch (cheap single-shot) via tier gating,
     # plus the brand-mention guard and the universal anti-AI gate. Free tier uses the
     # same writer model (call_claude default == writer_model_for_tier(None) == sonnet).
-    raw_text, quality_score, rendered_citations = await _generate_with_new_pipeline(
+    raw_text, quality_score, rendered_citations, low_evidence = await _generate_with_new_pipeline(
         brand_id=brand.id,
         brand_name=brand.name,
         prompt_id=prompt.id,
@@ -1202,6 +1265,7 @@ async def generate_gap_draft(
             quality_score=quality_score,
             citations=rendered_citations,
             query_for_summary=summary_query,
+            low_evidence=low_evidence,
         )
     elif platform == "quora":
         brief = (
@@ -1238,6 +1302,7 @@ async def generate_gap_draft(
         quality_score=quality_score,
         citations=rendered_citations,
         query_for_summary=summary_query,
+        low_evidence=low_evidence,
     )
 
 
@@ -1329,7 +1394,7 @@ async def generate_opportunity_draft(
     # cheap single-shot behavior (replies never used pack/critic/voice-sample);
     # model_override keeps haiku for short formats. The core supplies the brand-voice
     # directive, the brand-mention guard, and the universal anti-AI gate.
-    raw_text, _opp_quality, _ = await _generate_with_new_pipeline(
+    raw_text, _opp_quality, _, _opp_low_ev = await _generate_with_new_pipeline(
         brand_id=opp.brand_id,
         brand_name=brand.name,
         prompt_id=opp.prompt_id or 0,

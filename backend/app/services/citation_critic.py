@@ -73,8 +73,11 @@ async def critique_citations(
     if not _MARKER_RE.search(text):
         return text
 
+    # Collapse any run of 3+ double-quotes so a draft can't break out of the
+    # triple-quoted DRAFT TEXT block and inject instructions to the critic.
+    safe_text = re.sub(r'"{3,}', '"', text)
     prompt = _CRITIC_TEMPLATE.format(
-        text=text, sources_block=_build_sources_block(pack_sources),
+        text=safe_text, sources_block=_build_sources_block(pack_sources),
     )
     try:
         raw = await _call_critic(prompt)

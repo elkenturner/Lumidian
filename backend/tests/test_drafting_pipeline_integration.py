@@ -81,12 +81,14 @@ async def test_starter_runs_evidence_and_writer_but_no_critic(db_session):
                new=AsyncMock(return_value="Para body. [S1]")) as writer, \
          patch("app.services.drafting.evidence._serper_search",
                new=AsyncMock(return_value=[])), \
+         patch("app.services.citation_critic.critique_citations",
+               new=AsyncMock(side_effect=lambda text, pack_sources: text)), \
          patch("app.services.drafting.critic._anthropic_client") as critic_factory:
         critic_client = MagicMock()
         critic_client.messages.create = AsyncMock()
         critic_factory.return_value = critic_client
 
-        text, score, citations = await _generate_with_new_pipeline(
+        text, score, citations, _low = await _generate_with_new_pipeline(
             brand_id=brand.id, brand_name=brand.name,
             prompt_id=prompt.id, prompt_text=prompt.text,
             platform_key="medium", visibility_pct=0.0,
@@ -113,6 +115,8 @@ async def test_growth_runs_critic_and_rewriter_when_score_low(db_session):
                new=AsyncMock(return_value="Weak draft. [S1]")) as writer, \
          patch("app.services.drafting.evidence._serper_search",
                new=AsyncMock(return_value=[])), \
+         patch("app.services.citation_critic.critique_citations",
+               new=AsyncMock(side_effect=lambda text, pack_sources: text)), \
          patch("app.services.drafting.critic._anthropic_client") as crit_factory:
         mock_client = MagicMock()
         # Critic returns low score → triggers rewrite.
@@ -123,7 +127,7 @@ async def test_growth_runs_critic_and_rewriter_when_score_low(db_session):
         ])
         crit_factory.return_value = mock_client
 
-        text, score, _ = await _generate_with_new_pipeline(
+        text, score, _, _low = await _generate_with_new_pipeline(
             brand_id=brand.id, brand_name=brand.name,
             prompt_id=prompt.id, prompt_text=prompt.text,
             platform_key="medium", visibility_pct=0.0,
@@ -183,3 +187,72 @@ async def test_pro_injects_voice_and_cross_ref_into_prompt(db_session):
         )
     assert "VOICE EXAMPLE" in captured["text"], "Voice sample should be in the prompt on Pro tier"
     assert "Short concrete writing for PipeCo brand." in captured["text"]
+
+
+@pytest.mark.asyncio
+async def test_low_evidence_triggers_one_regeneration(db_session):
+    """Writer first cites an out-of-range marker (sourcing collapses) → the
+    pipeline regenerates once with feedback and keeps the better-cited draft,
+    clearing the low_evidence flag."""
+    user, brand, prompt = await _setup_brand_with_audit(
+        db_session, email="t25-lowev@test.com", tier="basic",
+    )
+
+    from app.services.drafting_service import _generate_with_new_pipeline
+
+    # 1st writer call hallucinates [S9] (out of range → dropped → no real cites).
+    # 2nd call (the regen) cites the valid [S1].
+    writer = AsyncMock(side_effect=[
+        "First draft cites nothing real [S9].",
+        "Regenerated draft grounded in source [S1].",
+    ])
+    with patch("app.services.drafting_service.call_claude", new=writer), \
+         patch("app.services.drafting.evidence._serper_search",
+               new=AsyncMock(return_value=[])), \
+         patch("app.services.citation_critic.critique_citations",
+               new=AsyncMock(side_effect=lambda text, pack_sources: text)):
+        text, score, citations, low_evidence = await _generate_with_new_pipeline(
+            brand_id=brand.id, brand_name=brand.name,
+            prompt_id=prompt.id, prompt_text=prompt.text,
+            platform_key="medium", visibility_pct=0.0,
+            profile_context="x", response_analysis="none",
+            platform_spec={"format": "article", "word_range": (200, 500), "tone": "x", "rules": []},
+            tier="basic", db=db_session,
+        )
+    # Writer ran twice: original + one regeneration.
+    assert writer.call_count == 2
+    # The regen was kept (it cites a real source), so the flag is cleared and the
+    # rendered body carries the resolved citation.
+    assert low_evidence is False
+    assert len(citations) == 1
+    assert "Regenerated draft" in text
+
+
+@pytest.mark.asyncio
+async def test_low_evidence_flag_set_when_regen_also_fails(db_session):
+    """If both the original and the regen cite nothing real, the piece ships
+    flagged (low_evidence=True) rather than looping forever."""
+    user, brand, prompt = await _setup_brand_with_audit(
+        db_session, email="t25-lowev2@test.com", tier="basic",
+    )
+
+    from app.services.drafting_service import _generate_with_new_pipeline
+
+    writer = AsyncMock(return_value="Still cites nothing real [S9].")
+    with patch("app.services.drafting_service.call_claude", new=writer), \
+         patch("app.services.drafting.evidence._serper_search",
+               new=AsyncMock(return_value=[])), \
+         patch("app.services.citation_critic.critique_citations",
+               new=AsyncMock(side_effect=lambda text, pack_sources: text)):
+        text, score, citations, low_evidence = await _generate_with_new_pipeline(
+            brand_id=brand.id, brand_name=brand.name,
+            prompt_id=prompt.id, prompt_text=prompt.text,
+            platform_key="medium", visibility_pct=0.0,
+            profile_context="x", response_analysis="none",
+            platform_spec={"format": "article", "word_range": (200, 500), "tone": "x", "rules": []},
+            tier="basic", db=db_session,
+        )
+    # One regeneration attempted, both thin → flagged, no infinite loop.
+    assert writer.call_count == 2
+    assert low_evidence is True
+    assert citations == []

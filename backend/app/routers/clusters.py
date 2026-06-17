@@ -65,6 +65,7 @@ def _summarize_pieces(drafts: list[ContentDraft]) -> list[dict]:
             "status": d.status,
             "title": d.title,
             "excerpt": (d.content_text or "")[:140],
+            "low_evidence": d.low_evidence,
         })
     return out
 
@@ -147,6 +148,7 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
             "url": c.url,
             "title": c.title,
             "position_marker": c.position_marker,
+            "tier": c.tier,
         })
 
     # Per-draft attribution — single batched query keyed by draft id.
@@ -174,6 +176,7 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
             "failure_reason": d.failure_reason,
             "citations": cites_by_draft.get(d.id, []),
             "attribution_delta": delta_by_draft.get(d.id),
+            "low_evidence": d.low_evidence,
         })
 
     # Aggregate cluster-level attribution from posted drafts only.

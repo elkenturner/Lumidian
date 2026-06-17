@@ -318,11 +318,17 @@ async def build_cluster_pack_from_brand_authority(
         select(BrandProfile).where(BrandProfile.brand_id == cluster.brand_id)
     )).scalar_one_or_none()
     if profile and (profile.company_description or profile.key_stats):
+        # Carry a real snippet so the claim verifier / citation critic can judge
+        # support from the brand's own words rather than an empty string.
+        profile_snippet = " ".join(
+            s for s in (profile.company_description, profile.key_stats) if s
+        ).strip()[:600]
         sources.append({
             "url": "internal://brand-profile",
             "domain": "brand-profile",
             "tier": "brand",
             "title": "Brand profile (first-party)",
+            "snippet": profile_snippet,
         })
 
     # Most recent completed audit's top pages — the brand's own crawled site.
@@ -344,6 +350,7 @@ async def build_cluster_pack_from_brand_authority(
                 "domain": (p.url.split("/")[2] if "://" in p.url else p.url)[:255],
                 "tier": "brand",
                 "title": (p.title or p.url)[:200],
+                "snippet": (getattr(p, "content_excerpt", None) or "")[:600],
             })
 
     if not sources:

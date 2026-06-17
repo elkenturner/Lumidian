@@ -25,7 +25,7 @@ async def test_regenerate_uses_shared_pack_and_sets_last_brief_id(monkeypatch):
 
     # Mock the per-piece writer to return a fixed body.
     async def fake_gen(*args, **kwargs):
-        return "Piece title", "Piece body [S1]", 0.9, []
+        return "Piece title", "Piece body [S1]", 0.9, [], False
     monkeypatch.setattr(
         "app.services.clustering_service._generate_piece_text", fake_gen,
     )

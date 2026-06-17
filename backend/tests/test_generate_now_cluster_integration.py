@@ -53,7 +53,7 @@ async def test_bg_generate_drafts_creates_cluster_per_prompt(
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=BRIEF_JSON)), patch(
         "app.services.clustering_service._generate_piece_text",
-        new=AsyncMock(return_value=("Title", "Body content.", None, [])),
+        new=AsyncMock(return_value=("Title", "Body content.", None, [], False)),
     ), patch(
         "app.services.cluster_evidence.fetch_and_dedupe",
         new=AsyncMock(return_value=[
@@ -91,7 +91,7 @@ async def test_bg_generate_drafts_max_gaps_bounds_prompts(
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=BRIEF_JSON)), patch(
         "app.services.clustering_service._generate_piece_text",
-        new=AsyncMock(return_value=("T", "B", None, [])),
+        new=AsyncMock(return_value=("T", "B", None, [], False)),
     ), patch(
         "app.services.cluster_evidence.fetch_and_dedupe",
         new=AsyncMock(return_value=[

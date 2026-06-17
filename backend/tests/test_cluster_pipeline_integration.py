@@ -97,6 +97,7 @@ async def test_cluster_pieces_route_through_content_quality_pipeline(
                 title="Nature study",
                 position_marker=10,
             )],
+            False,
         )
 
     async def fake_summary(*, draft_text: str, query: str) -> str:
@@ -216,7 +217,7 @@ async def test_free_tier_cluster_still_persists_no_quality_or_citations(
 
     async def fake_pipeline(**kwargs):
         # No critic, no citations on tier=None.
-        return (f"Body for {kwargs['platform_key']}.", None, [])
+        return (f"Body for {kwargs['platform_key']}.", None, [], False)
 
     async def fake_build_brief(db, *, cluster, tier):
         from datetime import UTC, datetime

@@ -147,14 +147,15 @@ async def _generate_piece_text(
     response_analysis: str,
     brief_context: str,
     tier: str | None,
-) -> tuple[str, str, float | None, list[RenderedCitation]]:
+) -> tuple[str, str, float | None, list[RenderedCitation], bool]:
     """Generate one cluster piece via the full content-quality pipeline.
 
     Delegates to ``drafting_service._generate_with_new_pipeline`` so every
-    piece picks up Evidence Pack + critic + rewrite + voice + cross-ref
+    piece picks up Evidence Pack + critic + rewrite + voice + cross-ref AND the
+    citation-integrity stage (claim verify + bounds-drop + support critic)
     according to tier, then renders citations and extracts a title/body.
 
-    Returns ``(title, body, quality_score_or_None, citations)``.
+    Returns ``(title, body, quality_score_or_None, citations, low_evidence)``.
     """
     # Lazy import to avoid the drafting_service ↔ clustering_service cycle
     # introduced by ``dc3c377`` (which routes generate_now through clusters).
@@ -163,7 +164,7 @@ async def _generate_piece_text(
     platform_key = resolve_platform_key(platform)
     spec = PLATFORM_SPECS[platform_key]
 
-    raw_text, quality_score, citations = await _generate_with_new_pipeline(
+    raw_text, quality_score, citations, low_evidence = await _generate_with_new_pipeline(
         brand_id=brand_id,
         brand_name=brand_name,
         prompt_id=prompt_id,
@@ -180,7 +181,7 @@ async def _generate_piece_text(
     # Final polish (same step the gap-draft path applies after the pipeline).
     raw_text = remove_hedging(raw_text)
     title, body = extract_title_and_body(raw_text, platform_key)
-    return (title or "(untitled)"), body, quality_score, citations
+    return (title or "(untitled)"), body, quality_score, citations, low_evidence
 
 
 async def _resolve_post_targets(
@@ -256,6 +257,7 @@ async def _persist_citations_and_summary(
             url=c.url,
             title=c.title,
             position_marker=c.position_marker,
+            tier=c.tier,
         ))
     try:
         summary = await generate_draft_summary(
@@ -402,7 +404,7 @@ async def regenerate_cluster(
     async def _gen(platform: str):
         ctx = _build_brief_context(brief, sibling_platforms=[])
         try:
-            title, body, q, citations = await asyncio.wait_for(
+            title, body, q, citations, low_ev = await asyncio.wait_for(
                 _generate_piece_text(
                     db, brand_id=cluster.brand_id, brand_name=brand_row.name,
                     prompt_id=cluster.prompt_id, platform=platform,
@@ -413,17 +415,14 @@ async def regenerate_cluster(
                 ),
                 timeout=PIECE_TIMEOUT_SECONDS,
             )
-            # L3 critic on Pro tier only
-            if tier == "pro" and citations:
-                from app.services.citation_critic import critique_citations
-                body = await critique_citations(
-                    text=body,
-                    pack_sources=(pack.sources if pack else []),
-                )
+            # NOTE: the citation SUPPORT CRITIC now runs INSIDE the pipeline
+            # (drafting_service._verify_citations), BEFORE render, against the same
+            # per-piece pack the [SN] markers map to. It used to run here on the
+            # already-rendered body (markers gone) with the wrong (ORM cluster)
+            # pack — a guaranteed no-op. Don't re-add it here.
             # Claim verifier — strips factual claims not supported by the pack.
             # Runs on every paid tier so the brand-as-authority soft-fail path
-            # can't ship fabricated stats. Failures here leave the body
-            # unchanged (the verifier is best-effort, not a hard gate).
+            # can't ship fabricated stats. Best-effort; failures leave body as-is.
             if tier in ("basic", "starter", "pro"):
                 from app.services.drafting.claim_verifier import verify_claims
                 body = await verify_claims(
@@ -435,7 +434,9 @@ async def regenerate_cluster(
             body = append_pillar_reference(
                 text=body, platform=platform, pillar_url=pillar,
             )
-            return ("ok", platform, title, body, q, citations)
+            # A piece off the brand-authority soft-fail pack is inherently thin.
+            low_ev = low_ev or low_evidence
+            return ("ok", platform, title, body, q, citations, low_ev)
         except asyncio.TimeoutError:
             logger.warning("Piece %s timed out after %ss", platform, PIECE_TIMEOUT_SECONDS)
             return ("fail", platform, f"timeout after {PIECE_TIMEOUT_SECONDS:.0f}s")
@@ -459,7 +460,7 @@ async def regenerate_cluster(
                 generation_state="failed", failure_reason=reason[:255],
             ))
             continue
-        _, platform, title, body, q, citations = r
+        _, platform, title, body, q, citations, low_ev = r
         draft = ContentDraft(
             brand_id=cluster.brand_id, prompt_id=cluster.prompt_id,
             cluster_id=cluster.id, platform=platform,
@@ -467,6 +468,7 @@ async def regenerate_cluster(
             content_text=body, source="cluster",
             content_brief=post_targets.get(platform),
             quality_score=q, generation_state="done",
+            low_evidence=low_ev,
         )
         db.add(draft)
         drafts_with_citations.append((draft, citations))
@@ -532,7 +534,7 @@ async def regenerate_piece(
     sibs = [p for p in enabled if p != platform]
     ctx = _build_brief_context(brief_row, sibs)
 
-    title, body, quality_score, citations = await _generate_piece_text(
+    title, body, quality_score, citations, low_ev = await _generate_piece_text(
         db,
         brand_id=cluster.brand_id,
         brand_name=brand_row.name,
@@ -558,6 +560,7 @@ async def regenerate_piece(
         existing.content_text = body
         existing.status = "draft"
         existing.quality_score = quality_score
+        existing.low_evidence = low_ev
         # Replace prior citations so the row reflects the regenerated body.
         await db.execute(
             delete(ContentDraftCitation).where(ContentDraftCitation.draft_id == existing.id)
@@ -574,6 +577,7 @@ async def regenerate_piece(
             content_text=body,
             source="cluster",
             quality_score=quality_score,
+            low_evidence=low_ev,
         )
         db.add(draft)
 

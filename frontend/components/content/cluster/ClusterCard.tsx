@@ -31,7 +31,9 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Props) {
-  const totalEnabled = cluster.pieces.length || 5;
+  // Drive off the actual pieces the cluster reports — no hardcoded "5" that
+  // hides a not-yet-generated platform.
+  const totalEnabled = cluster.pieces.length;
   const postedCount = cluster.posted_count;
   const delta = cluster.cluster_delta;
   const hasDelta = delta !== null && delta !== undefined;
@@ -58,7 +60,11 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
               <span className="text-[var(--text-secondary)] font-medium">{statusLabel}</span>
             </span>
             <span className="text-[var(--text-faint)]">·</span>
-            <span>Posted {postedCount} of {totalEnabled} posts</span>
+            <span>
+              {totalEnabled > 0
+                ? `Posted ${postedCount} of ${totalEnabled} posts`
+                : "No posts generated yet"}
+            </span>
             {cluster.pillar_mode === "attached" && (
               <>
                 <span className="text-[var(--text-faint)]">·</span>
@@ -97,11 +103,20 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
             <span
               key={piece.platform}
               className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium border ${tone}`}
-              title={`${piece.platform} — ${piece.status}`}
+              title={
+                piece.low_evidence
+                  ? `${piece.platform} — ${piece.status} · thin sourcing`
+                  : `${piece.platform} — ${piece.status}`
+              }
             >
               <PlatformBadge platform={piece.platform} size="sm" />
               <span className="opacity-70">·</span>
               <span className="capitalize">{piece.status}</span>
+              {piece.low_evidence && (
+                <span className="text-[#fbbf24]" title="Thin sourcing — couldn't ground this post in verified sources">
+                  ⚠
+                </span>
+              )}
             </span>
           );
         })}

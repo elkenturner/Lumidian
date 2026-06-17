@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from urllib.parse import urlparse
 
 from app.services.drafting.evidence import EvidencePack, EvidenceSource
+from app.services.source_authority import classify_domain
 
 _MARKER_RE = re.compile(r"\[S(\d+)\]")
 
@@ -26,6 +27,7 @@ class RenderedCitation:
     url: str
     title: str
     position_marker: int
+    tier: str = "T3"  # T1/T2/T3 authority of the cited domain
 
 
 def extract_used_refs(text: str) -> list[str]:
@@ -36,6 +38,30 @@ def extract_used_refs(text: str) -> list[str]:
         if ref not in seen:
             seen.append(ref)
     return seen
+
+
+def drop_out_of_range_markers(text: str, source_count: int) -> tuple[str, int]:
+    """Deterministically strip [SN] markers whose N has no matching source.
+
+    The writer can hallucinate a marker like [S7] when only 5 sources were
+    provided. ``render_citations`` would silently drop these, hiding the
+    problem. We strip them here BEFORE rendering and return a count so the
+    caller can decide whether the draft is under-sourced.
+
+    Returns ``(cleaned_text, dropped_count)``.
+    """
+    dropped = 0
+
+    def _replace(m: re.Match) -> str:
+        nonlocal dropped
+        n = int(m.group(1))
+        if n < 1 or n > source_count:
+            dropped += 1
+            return ""
+        return m.group(0)
+
+    cleaned = _MARKER_RE.sub(_replace, text)
+    return cleaned, dropped
 
 
 def _domain(url: str) -> str:
@@ -73,6 +99,7 @@ def render_citations(
             src = by_ref[ref]
             used.append(RenderedCitation(
                 source_ref=ref, url=src.url, title=src.title, position_marker=m.start(),
+                tier=classify_domain(_domain(src.url)),
             ))
 
     def _replace(match: re.Match) -> str:

@@ -240,8 +240,10 @@ export interface ContentDraft {
     url: string;
     title: string | null;
     position_marker: number | null;
+    tier?: 'T1' | 'T2' | 'T3' | null;
   }>;
   attribution_delta?: number | null;
+  low_evidence?: boolean;
 }
 
 export interface ContentOpportunity {
@@ -2189,6 +2191,7 @@ export interface ClusterPieceSummary {
   status: string;
   title: string | null;
   excerpt: string | null;
+  low_evidence?: boolean;
 }
 
 export interface ContentClusterSummary {

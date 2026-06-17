@@ -31,7 +31,10 @@ import { PillarCard } from "@/components/content/cluster/PillarCard";
 import { SourceSpinePanel } from "@/components/content/cluster/SourceSpinePanel";
 import { useClusterStatus } from "@/hooks/useClusterStatus";
 
-const PLATFORMS = ["linkedin", "medium", "reddit", "quora", "x"] as const;
+// Display order only. The actual set of platforms shown is derived at runtime
+// from the cluster's live status + drafts, so a platform added server-side
+// (e.g. owned_site) renders without a frontend change.
+const PLATFORM_ORDER = ["linkedin", "medium", "reddit", "quora", "x"];
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
@@ -132,6 +135,21 @@ export default function ClusterDetailPage() {
     }
   }
 
+  // Canonical platform set for this cluster — live status pieces are
+  // authoritative (they list every enabled platform); fall back to whatever
+  // drafts exist, then to the known order. Ordered by PLATFORM_ORDER for a
+  // stable layout, with any unknown platforms appended.
+  const platformSet = new Set<string>([
+    ...(liveStatus?.pieces.map((p) => p.platform) ?? []),
+    ...cluster.drafts.map((d) => d.platform),
+  ]);
+  const platforms = platformSet.size
+    ? [
+        ...PLATFORM_ORDER.filter((p) => platformSet.has(p)),
+        ...Array.from(platformSet).filter((p) => !PLATFORM_ORDER.includes(p)),
+      ]
+    : PLATFORM_ORDER;
+
   const delta = cluster.cluster_delta;
   const hasDelta = delta !== null && delta !== undefined;
   const deltaTone = !hasDelta
@@ -202,7 +220,7 @@ export default function ClusterDetailPage() {
             </span>
             <span>·</span>
             <span>
-              {cluster.drafts.length} of {PLATFORMS.length} posts
+              {cluster.drafts.length} of {platforms.length} posts
             </span>
             {cluster.last_generated_at && (
               <>
@@ -274,7 +292,7 @@ export default function ClusterDetailPage() {
           Posts
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {PLATFORMS.map((platform) => (
+          {platforms.map((platform) => (
             <PieceCard
               key={platform}
               brandId={brandId}

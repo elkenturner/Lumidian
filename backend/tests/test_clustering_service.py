@@ -83,7 +83,7 @@ async def test_regenerate_cluster_produces_5_pieces(db_session: AsyncSession, re
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
          patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
-         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body content here.", None, []))):
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body content here.", None, [], False))):
         result = await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
 
     assert result.status == "ready"
@@ -108,7 +108,7 @@ async def test_regenerate_cluster_respects_disabled_platform(db_session: AsyncSe
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
          patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
-         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body.", None, []))):
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body.", None, [], False))):
         await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
 
     drafts = (await db_session.execute(select(ContentDraft).where(ContentDraft.cluster_id == cluster.id))).scalars().all()
@@ -130,10 +130,10 @@ async def test_regenerate_piece_replaces_only_target(db_session: AsyncSession, r
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
          patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
-         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("First", "First body.", None, []))):
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("First", "First body.", None, [], False))):
         await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
 
-    with patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Updated", "Updated body.", None, []))):
+    with patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Updated", "Updated body.", None, [], False))):
         await regenerate_piece(db_session, cluster_id=cluster.id, platform="linkedin", tier="starter")
 
     drafts = (await db_session.execute(select(ContentDraft).where(ContentDraft.cluster_id == cluster.id))).scalars().all()

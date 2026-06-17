@@ -118,7 +118,12 @@ def _build_brief_context(brief: ContentBrief, sibling_platforms: list[str]) -> s
     _ = sibling_platforms  # explicitly unused
     lines = [f"POSITIONING: {brief.positioning}"]
     if brief.canonical_phrasings:
-        lines.append("CANONICAL PHRASINGS — VERBATIM REQUIRED (include each at least once, word-for-word):")
+        lines.append(
+            "POSITIONING CLAIMS — convey these ideas in THIS piece, but in your OWN words. "
+            "Do NOT copy them verbatim and do NOT repeat any one of them more than once "
+            "(varied wording across pieces is what earns AI citations; identical sentences "
+            "read as spam and get removed):"
+        )
         lines.extend(f"  - {p}" for p in brief.canonical_phrasings)
     if brief.key_claims:
         lines.append("KEY CLAIMS:")

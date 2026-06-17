@@ -41,7 +41,7 @@ OUTPUT a single JSON object with these exact keys:
 {{
   "positioning": "<1-2 sentences — the angle this cluster takes>",
   "key_claims": ["<3-6 short claims the cluster supports>"],
-  "canonical_phrasings": ["<3-5 short phrases that should appear verbatim across pieces — these are the entity-binding strings>"],
+  "canonical_phrasings": ["<3-5 entity-binding CLAIMS the brand wants consistently conveyed (each piece expresses these in its OWN words — they are NOT pasted verbatim)>"],
   "stats": [{{"label": "<short>", "value": "<exact figure>", "source": "<where it comes from>"}}],
   "narrative_spine": "<1-3 sentences — the through-line that holds the cluster together>",
   "tone_notes": "<1-2 sentences derived from brand tone of voice + what not to say>"
@@ -49,7 +49,7 @@ OUTPUT a single JSON object with these exact keys:
 
 Rules:
 - Use only facts present in BRAND PROFILE. Never invent stats or claims.
-- canonical_phrasings must each be 6-14 words, neutral-voiced, must include {brand_name} or a clear noun phrase identifying it.
+- canonical_phrasings must each be a short, neutral-voiced CLAIM (6-14 words) identifying {brand_name} or its core value — these are the consistent IDEAS every piece conveys in its own wording, NOT verbatim strings to copy.
 - key_claims must be defensible from BRAND PROFILE alone.
 - Output strict JSON. No markdown fences. No commentary."""
 

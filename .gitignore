@@ -38,3 +38,7 @@ frontend/tsconfig.tsbuildinfo
 .github/workflows/
 .superpowers/
 .worktrees/
+
+
+# Generated PDF samples (regenerate from cockpit)
+pdf-samples/

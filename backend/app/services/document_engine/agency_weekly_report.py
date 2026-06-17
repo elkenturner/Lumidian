@@ -80,13 +80,23 @@ async def _model_scores(db: AsyncSession, run: TrackingRun | None) -> list[dict[
     )
     return [
         {
-            "model": s.model,
+            "model": _model_to_str(s.model),
             "score": s.score,
             "total_queries": s.total_queries,
             "total_mentions": s.total_mentions,
         }
         for s in q.scalars().all()
     ]
+
+
+def _model_to_str(m: Any) -> str:
+    """Coerce a model field to a clean lowercase string.
+
+    Handles both plain strings (from the DB column) and enum instances (if the
+    ORM lifts to ModelEnum). Strips ModelEnum.x repr prefix if present.
+    """
+    s = str(m)
+    return s.rsplit(".", 1)[-1].lower() if "." in s else s.lower()
 
 
 async def _per_prompt_scorecard(
@@ -299,6 +309,7 @@ async def fetch_data(db: AsyncSession, client: AgencyClient) -> dict[str, Any]:
     if brand is None:
         return {
             "client": {"name": client.name},
+            "brand": None,
             "period": _period(now, week_start),
             "this_week_run": None,
             "last_week_run": None,
@@ -324,6 +335,7 @@ async def fetch_data(db: AsyncSession, client: AgencyClient) -> dict[str, Any]:
 
     return {
         "client": {"name": client.name},
+        "brand": {"name": brand.name, "website_url": brand.website_url},
         "period": _period(now, week_start),
         "this_week_run": _run_summary(this_run),
         "last_week_run": _run_summary(last_run),

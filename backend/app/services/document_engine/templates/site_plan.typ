@@ -1,24 +1,21 @@
 #import "_tokens.typ": lumidian
-#import "_cover.typ": cover
+#import "_cover.typ": slim_header
 #import "_header_footer.typ": header_footer
-#import "_components.typ": h1, h2, h3, callout, bullet, score_card
+#import "_components.typ": h2, h3, callout, bullet, score_card
 
 #let data = json("data.json")
-
-#cover(
-  "briefing",
-  data.brand.name,
-  "Site plan",
-  data.generated_at,
-  data.at("generated_by", default: none),
-)
 
 #header_footer(data.brand.name, "Site plan")
 
 #set par(justify: true, leading: 0.65em)
 #set text(font: lumidian.body_font, size: lumidian.size_body, fill: lumidian.ink)
 
-#h1[Site optimization plan]
+#slim_header(
+  data.brand.name,
+  "Site plan",
+  data.generated_at,
+  data.at("generated_by", default: none),
+)
 
 #callout[#data.output.summary]
 

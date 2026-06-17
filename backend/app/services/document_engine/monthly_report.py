@@ -7,7 +7,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AgencyClient, Brand, ClientActivityEvent, ContentDraft, TrackingRun
+from app.models import AgencyClient, Brand, ClientActivityEvent, ContentDraft, RunModelScore, TrackingRun
 from app.services.document_engine.registry import Template, register
 
 
@@ -79,15 +79,29 @@ async def fetch_data(db: AsyncSession, client: AgencyClient) -> dict[str, Any]:
         for e in a_q.scalars().all()
     ]
 
+    this_run_model_scores = await _model_scores_for(db, this_run)
+    last_run_model_scores = await _model_scores_for(db, last_run)
+
     return {
         "client": {"name": client.name},
+        "brand": ({"name": brand.name, "website_url": brand.website_url} if brand else None),
         "period": {"start": month_start.isoformat(), "end": now.isoformat(), "label": now.strftime("%B %Y")},
         "this_month_run": (
-            {"overall_score": this_run.overall_score, "total_queries": this_run.total_queries}
+            {
+                "overall_score": this_run.overall_score,
+                "total_queries": this_run.total_queries,
+                "total_mentions": this_run.total_mentions,
+                "completed_at": this_run.completed_at.isoformat() if this_run.completed_at else None,
+                "model_scores": this_run_model_scores,
+            }
             if this_run else None
         ),
         "last_month_run": (
-            {"overall_score": last_run.overall_score, "total_queries": last_run.total_queries}
+            {
+                "overall_score": last_run.overall_score,
+                "total_queries": last_run.total_queries,
+                "model_scores": last_run_model_scores,
+            }
             if last_run else None
         ),
         "drafts_posted_this_month": drafts_posted_this_month,
@@ -96,6 +110,24 @@ async def fetch_data(db: AsyncSession, client: AgencyClient) -> dict[str, Any]:
         "activity_sample": activity[:20],
         "has_data": bool(this_run or drafts_posted_this_month or activity),
     }
+
+
+async def _model_scores_for(db: AsyncSession, run: TrackingRun | None) -> list[dict[str, Any]]:
+    """Per-model breakdown for a single run, with enum coerced to plain string."""
+    if run is None:
+        return []
+    q = await db.execute(select(RunModelScore).where(RunModelScore.tracking_run_id == run.id))
+    out: list[dict[str, Any]] = []
+    for s in q.scalars().all():
+        m = str(s.model)
+        m = m.rsplit(".", 1)[-1].lower() if "." in m else m.lower()
+        out.append({
+            "model": m,
+            "score": s.score,
+            "total_queries": s.total_queries,
+            "total_mentions": s.total_mentions,
+        })
+    return out
 
 
 SYSTEM_PROMPT = """You are writing the monthly visibility report for an AI-visibility agency client.

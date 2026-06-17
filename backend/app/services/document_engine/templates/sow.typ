@@ -5,8 +5,9 @@
 
 #let data = json("data.json")
 
-#cover("contract", data.brand.name, "Statement of work", data.generated_at, data.at("generated_by", default: none))
-#header_footer(data.brand.name, "Statement of work")
+// Contract: hero the legal entity (agency client), not the brand.
+#cover("contract", data.client.name, "Statement of work", data.generated_at, data.at("generated_by", default: none))
+#header_footer(data.client.name, "Statement of work")
 
 #set par(justify: true, leading: 0.65em)
 #set text(font: lumidian.body_font, size: lumidian.size_body, fill: lumidian.ink)
@@ -39,10 +40,12 @@
 #h2[6. Fees]
 #data.output.fees
 
-#h2[7. Acceptance & signatures]
+#block(breakable: false)[
+  #h2[7. Acceptance & signatures]
 
-#v(0.3in)
+  #v(0.3in)
 
-#signature_block(data.brand.name + " · Authorized signer", "Date")
-#v(0.2in)
-#signature_block("Lumidian · Authorized signer", "Date")
+  #signature_block(data.client.name + " · Authorized signer", "Date")
+  #v(0.2in)
+  #signature_block("Lumidian · Authorized signer", "Date")
+]

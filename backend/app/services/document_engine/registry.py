@@ -25,6 +25,10 @@ class Template:
     output_schema: Type[BaseModel] | None = None
     typst_template: str | None = None  # filename inside templates/ dir, e.g., "audit_initial.typ"
     chart_calls: tuple[Callable[[AsyncSession, AgencyClient, dict], Awaitable[bytes]], ...] = ()
+    # Optional hook to mutate the typst_input dict AFTER the LLM call but BEFORE typst compile.
+    # Used to inject deterministically-computed fields (e.g. kickoff pre_kickoff items) that
+    # we don't want the LLM to hallucinate.
+    post_process: Callable[[dict], dict] | None = None
 
 
 TEMPLATES: dict[str, Template] = {}

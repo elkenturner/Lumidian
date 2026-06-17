@@ -76,7 +76,7 @@ Per-field rules:
 - **deliverables**: 4-7 bullets. Each ≤ 20 words. Quantified per-month amounts ("8 LinkedIn drafts/month"). Sorted by client value. Imperative-verb start ("Produce," "Deliver," "Run").
 - **exclusions**: 3-5 bullets. Each ≤ 20 words. Name specific work that is OUT of scope (paid ads, direct outreach to publishers, web development, posting to client-controlled accounts on behalf of the client). Plain language.
 - **timeline**: 1 paragraph, ≤ 50 words. Monthly renewal, 30-day notice to terminate, no minimum term. State the start date.
-- **fees**: 1 paragraph, ≤ 50 words. Net-30, invoiced on the 1st of each month. If the retainer amount is provided, state it as `$N,NNN/month`; otherwise use `[retainer amount]` as a fill-in placeholder for Lumidian to complete by hand.
+- **fees**: 1 paragraph, ≤ 50 words. Net-30, invoiced on the 1st of each month. If the retainer amount is provided, state it as `$N,NNN/month`; otherwise use `[retainer amount]` as a fill-in placeholder for Lumidian to complete by hand. State late-payment terms as "1.5% monthly interest on overdue balances" — DO NOT reference a Master Services Agreement, schedule, exhibit, addendum, or any other document that does not appear in the input data.
 """
 
 

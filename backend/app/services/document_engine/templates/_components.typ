@@ -38,15 +38,20 @@
   )
 ]
 
-#let bullet(body) = grid(columns: (12pt, 1fr), gutter: lumidian.space_line,
+#let bullet(body) = block(below: lumidian.space_line, grid(columns: (12pt, 1fr), gutter: lumidian.space_line,
   text(fill: lumidian.primary)[•], body
-)
+))
 
-#let check_item(done, body) = grid(columns: (16pt, 1fr), gutter: lumidian.space_line,
+#let check_item(done, body) = block(below: lumidian.space_line, grid(columns: (16pt, 1fr), gutter: lumidian.space_line,
   if done {
     text(fill: lumidian.primary)[●]
   } else {
     text(fill: lumidian.muted)[○]
   },
   body
-)
+))
+
+#let numbered_item(n, body) = block(below: lumidian.space_line, grid(columns: (24pt, 1fr), gutter: lumidian.space_line,
+  text(font: lumidian.mono_font, fill: lumidian.primary)[#str(n).],
+  body
+))

@@ -47,13 +47,15 @@ async def generate_pdf(
         charts[chart_fn.__name__] = svg_bytes.decode("utf-8")
 
     generated_by = await _resolve_user_name(db, actor_user_id)
-    typst_input = {
+    typst_input = _title_case_brand_names({
         **data,
         "output": output.model_dump(),
         "charts": charts,
         "generated_at": _format_date_now(),
         "generated_by": generated_by,
-    }
+    })
+    if template.post_process is not None:
+        typst_input = template.post_process(typst_input)
     pdf_bytes = typst_render_pdf(
         template_path=_TEMPLATES_DIR / template.typst_template,
         data=typst_input,
@@ -90,3 +92,39 @@ async def _resolve_user_name(db, user_id: int | None) -> str | None:
     from app.models import User
     user = await db.get(User, user_id)
     return user.name if user else None
+
+
+def _smart_title_case(s: str) -> str:
+    """Title-case a brand/client name ONLY when the source string is all lowercase.
+
+    Source data sometimes stores names slug-style ('manhattan street capital'). For
+    display, we want 'Manhattan Street Capital'. But if the source has any uppercase
+    (e.g., 'StartEngine'), leave it alone — the input already reflects the brand's
+    intended casing.
+    """
+    if not isinstance(s, str) or not s:
+        return s
+    if any(ch.isupper() for ch in s):
+        return s
+    return s.title()
+
+
+def _title_case_brand_names(data: dict) -> dict:
+    """Apply _smart_title_case to known brand/client name fields used in templates.
+
+    Touches: data.client.name, data.brand.name, data.competitors[i].name,
+    data.candidates[i].title (Wikipedia article titles are already TitleCase, but
+    safe under the all-lowercase rule).
+    """
+    if not isinstance(data, dict):
+        return data
+    if isinstance(data.get("client"), dict) and "name" in data["client"]:
+        data["client"]["name"] = _smart_title_case(data["client"]["name"])
+    if isinstance(data.get("brand"), dict) and "name" in data["brand"]:
+        data["brand"]["name"] = _smart_title_case(data["brand"]["name"])
+    competitors = data.get("competitors")
+    if isinstance(competitors, list):
+        for entry in competitors:
+            if isinstance(entry, dict) and "name" in entry:
+                entry["name"] = _smart_title_case(entry["name"])
+    return data

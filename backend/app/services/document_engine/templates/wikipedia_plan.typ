@@ -1,24 +1,21 @@
 #import "_tokens.typ": lumidian
-#import "_cover.typ": cover
+#import "_cover.typ": slim_header
 #import "_header_footer.typ": header_footer
-#import "_components.typ": h1, h2, h3, callout, bullet
+#import "_components.typ": h2, h3, callout, bullet
 
 #let data = json("data.json")
-
-#cover(
-  "briefing",
-  data.brand.name,
-  "Wikipedia plan",
-  data.generated_at,
-  data.at("generated_by", default: none),
-)
 
 #header_footer(data.brand.name, "Wikipedia plan")
 
 #set par(justify: true, leading: 0.65em)
 #set text(font: lumidian.body_font, size: lumidian.size_body, fill: lumidian.ink)
 
-#h1[Wikipedia opportunity plan]
+#slim_header(
+  data.brand.name,
+  "Wikipedia plan",
+  data.generated_at,
+  data.at("generated_by", default: none),
+)
 
 #callout[#data.output.summary]
 

@@ -15,6 +15,8 @@ from datetime import UTC, datetime
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import AsyncSessionLocal
+
 from app.models import (
     Brand,
     BrandContentSettings,
@@ -441,18 +443,24 @@ async def regenerate_cluster(
         if target.get("brief_append"):
             ctx = ctx + "\n\n" + target["brief_append"]
         try:
-            title, body, q, citations, low_ev = await asyncio.wait_for(
-                _generate_piece_text(
-                    db, brand_id=cluster.brand_id, brand_name=brand_row.name,
-                    prompt_id=cluster.prompt_id, platform=platform,
-                    prompt_text=prompt_row.text, visibility_pct=visibility_pct,
-                    profile_context=profile_context,
-                    response_analysis=response_analysis,
-                    brief_context=ctx, tier=tier,
-                    opportunity_context=target.get("opportunity"),
-                ),
-                timeout=PIECE_TIMEOUT_SECONDS,
-            )
+            # Each piece runs in the asyncio.gather below, so it MUST use its own
+            # DB session — a single AsyncSession shared across concurrent coroutines
+            # raises "session is in 'prepared' state" (it's not concurrency-safe).
+            # The main `db` is used only for the single-threaded draft writes after
+            # the gather. Generation only reads from this per-piece session.
+            async with AsyncSessionLocal() as piece_db:
+                title, body, q, citations, low_ev = await asyncio.wait_for(
+                    _generate_piece_text(
+                        piece_db, brand_id=cluster.brand_id, brand_name=brand_row.name,
+                        prompt_id=cluster.prompt_id, platform=platform,
+                        prompt_text=prompt_row.text, visibility_pct=visibility_pct,
+                        profile_context=profile_context,
+                        response_analysis=response_analysis,
+                        brief_context=ctx, tier=tier,
+                        opportunity_context=target.get("opportunity"),
+                    ),
+                    timeout=PIECE_TIMEOUT_SECONDS,
+                )
             # NOTE: the citation SUPPORT CRITIC now runs INSIDE the pipeline
             # (drafting_service._verify_citations), BEFORE render, against the same
             # per-piece pack the [SN] markers map to. It used to run here on the

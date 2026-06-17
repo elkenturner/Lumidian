@@ -147,6 +147,7 @@ async def _generate_piece_text(
     response_analysis: str,
     brief_context: str,
     tier: str | None,
+    opportunity_context: str | None = None,
 ) -> tuple[str, str, float | None, list[RenderedCitation], bool]:
     """Generate one cluster piece via the full content-quality pipeline.
 
@@ -177,6 +178,7 @@ async def _generate_piece_text(
         tier=tier,
         db=db,
         brief_context=brief_context,
+        opportunity_context=opportunity_context,
     )
     # Final polish (same step the gap-draft path applies after the pipeline).
     raw_text = remove_hedging(raw_text)
@@ -188,20 +190,28 @@ async def _resolve_post_targets(
     db: AsyncSession,
     *,
     brand_id: int,
+    brand_name: str,
     prompt_id: int,
     prompt_text: str,
     enabled: list[str],
-) -> dict[str, str]:
-    """Resolve a concrete 'where to post this' target for reddit/quora pieces.
+) -> dict[str, dict]:
+    """Resolve a concrete post target AND writer context for reddit/quora pieces.
 
-    Reddit → a real, validated subreddit ("r/foo"); Quora → a real question URL.
-    Stored on the draft's content_brief so the operator knows exactly where to
-    publish. Fully best-effort and timeout-bounded — a failure (missing key,
-    network, LLM) just leaves the piece without a target, never blocks generation.
+    Reddit → a real validated subreddit, with that subreddit's promo strategy fed
+    into the writer so the post fits its rules. Quora → a real question, fed into
+    the writer so the piece is written to ANSWER that specific question (not just
+    linked to it). Each entry: ``{"brief": <stored on draft.content_brief>,
+    "opportunity"?: <opportunity_context>, "brief_append"?: <appended to brief_context>}``.
+    Fully best-effort + timeout-bounded — any failure leaves the piece untargeted,
+    never blocks generation.
     """
-    targets: dict[str, str] = {}
+    targets: dict[str, dict] = {}
     if "reddit" in enabled:
         try:
+            from app.services.drafting.platforms import (
+                build_subreddit_strategy,
+                classify_subreddit,
+            )
             from app.services.reddit_scanner_service import (
                 find_first_valid_subreddit,
                 get_relevant_subreddits,
@@ -222,7 +232,14 @@ async def _resolve_post_targets(
             )
             sub = await asyncio.wait_for(find_first_valid_subreddit(subs), timeout=8) if subs else None
             if sub:
-                targets["reddit"] = f"r/{sub}"
+                strategy = build_subreddit_strategy(sub, brand_name, classify_subreddit(sub))
+                targets["reddit"] = {
+                    "brief": f"r/{sub}",
+                    "brief_append": (
+                        f"SUBREDDIT TARGET: this post will be published in r/{sub}. "
+                        f"Write it to fit that community.\n{strategy}"
+                    ),
+                }
         except Exception as exc:
             logger.warning("cluster reddit target resolve skipped: %s", exc)
     if "quora" in enabled:
@@ -232,7 +249,17 @@ async def _resolve_post_targets(
                 search_quora_questions(prompt_text, cache_key=prompt_id), timeout=10,
             )
             if qs:
-                targets["quora"] = qs[0]["url"]
+                q = qs[0]
+                title, url, snippet = q.get("title", ""), q.get("url", ""), q.get("snippet", "")
+                targets["quora"] = {
+                    "brief": url,
+                    "opportunity": (
+                        f"QUESTION: {title}\nURL: {url}\n\n"
+                        + (f"QUESTION CONTEXT (excerpt):\n{snippet}\n\n" if snippet else "")
+                        + f"Write a Quora answer that directly addresses THIS specific question, "
+                        f"and naturally incorporates relevant information about {brand_name}."
+                    ),
+                }
         except Exception as exc:
             logger.warning("cluster quora target resolve skipped: %s", exc)
     return targets
@@ -391,8 +418,8 @@ async def regenerate_cluster(
     # Resolve concrete post targets (real subreddit / Quora question) so reddit &
     # quora pieces tell the operator exactly where to publish. Best-effort.
     post_targets = await _resolve_post_targets(
-        db, brand_id=cluster.brand_id, prompt_id=cluster.prompt_id,
-        prompt_text=prompt_row.text, enabled=enabled,
+        db, brand_id=cluster.brand_id, brand_name=brand_row.name,
+        prompt_id=cluster.prompt_id, prompt_text=prompt_row.text, enabled=enabled,
     )
 
     # Drop existing drafts before regen
@@ -403,6 +430,11 @@ async def regenerate_cluster(
 
     async def _gen(platform: str):
         ctx = _build_brief_context(brief, sibling_platforms=[])
+        target = post_targets.get(platform, {})
+        # Reddit: tailor the post to the resolved subreddit's rules (appended to
+        # the brief). Quora: write the answer TO the resolved real question.
+        if target.get("brief_append"):
+            ctx = ctx + "\n\n" + target["brief_append"]
         try:
             title, body, q, citations, low_ev = await asyncio.wait_for(
                 _generate_piece_text(
@@ -412,6 +444,7 @@ async def regenerate_cluster(
                     profile_context=profile_context,
                     response_analysis=response_analysis,
                     brief_context=ctx, tier=tier,
+                    opportunity_context=target.get("opportunity"),
                 ),
                 timeout=PIECE_TIMEOUT_SECONDS,
             )
@@ -466,7 +499,7 @@ async def regenerate_cluster(
             cluster_id=cluster.id, platform=platform,
             status="draft", title=title or "(untitled)",
             content_text=body, source="cluster",
-            content_brief=post_targets.get(platform),
+            content_brief=post_targets.get(platform, {}).get("brief"),
             quality_score=q, generation_state="done",
             low_evidence=low_ev,
         )

@@ -2478,6 +2478,14 @@ export interface ProspectAuditCreate {
   website_url: string;
   is_local: boolean;
   location?: string | null;
+  prompts?: string[] | null;
+}
+
+export interface ProspectPromptSuggestRequest {
+  business_name: string;
+  website_url: string;
+  is_local: boolean;
+  location?: string | null;
 }
 
 export interface ProspectAuditListItem {
@@ -2515,6 +2523,11 @@ export async function getProspectAudit(id: number): Promise<ProspectAuditOut> {
 export async function createProspectAudit(payload: ProspectAuditCreate): Promise<ProspectAuditOut> {
   const res = await api.post<ProspectAuditOut>("/agency/prospects", payload);
   return res.data;
+}
+
+export async function suggestProspectPrompts(payload: ProspectPromptSuggestRequest): Promise<string[]> {
+  const res = await api.post<{ prompts: string[] }>("/agency/prospects/suggest-prompts", payload);
+  return res.data.prompts;
 }
 
 export async function cancelProspectAudit(id: number): Promise<void> {

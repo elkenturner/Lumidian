@@ -14,8 +14,15 @@ from sqlalchemy import select
 
 from app.dependencies import DbDep, require_agency_staff
 from app.models import ProspectAudit, User
-from app.schemas import ProspectAuditCreate, ProspectAuditListItem, ProspectAuditOut
-from app.services.prospect_audit.runner import run_audit
+from app.schemas import (
+    ProspectAuditCreate,
+    ProspectAuditListItem,
+    ProspectAuditOut,
+    ProspectPromptSuggestRequest,
+    ProspectPromptSuggestResponse,
+)
+from app.services.prospect_audit.prompt_gen import generate_prompts
+from app.services.prospect_audit.runner import _scrape_homepage, run_audit
 from app.state import prospect_audit_cancel_events
 
 logger = logging.getLogger(__name__)
@@ -60,6 +67,30 @@ def _to_list_item(a: ProspectAudit) -> ProspectAuditListItem:
     )
 
 
+@router.post("/suggest-prompts", response_model=ProspectPromptSuggestResponse)
+async def suggest_prospect_prompts(
+    payload: ProspectPromptSuggestRequest,
+    user: User = Depends(require_agency_staff),
+) -> ProspectPromptSuggestResponse:
+    """Scrape the homepage and return AI-suggested audit prompts for staff to
+    review/edit before kicking off the full audit. No audit row is created."""
+    excerpt = await _scrape_homepage(payload.website_url)
+    try:
+        prompts = await generate_prompts(
+            business_name=payload.business_name,
+            website_url=payload.website_url,
+            homepage_excerpt=excerpt,
+            location=payload.location if payload.is_local else None,
+        )
+    except Exception as exc:
+        logger.warning("suggest_prospect_prompts failed for %s: %s", payload.website_url, exc)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Could not generate prompt suggestions: {exc!s}",
+        )
+    return ProspectPromptSuggestResponse(prompts=prompts)
+
+
 @router.post("", response_model=ProspectAuditOut, status_code=status.HTTP_201_CREATED)
 async def create_prospect_audit(
     payload: ProspectAuditCreate,
@@ -88,6 +119,7 @@ async def create_prospect_audit(
         website_url=payload.website_url,
         is_local=payload.is_local,
         location=payload.location,
+        prompts=payload.prompts,
         status="pending",
     )
     db.add(audit)

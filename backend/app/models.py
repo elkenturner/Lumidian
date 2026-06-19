@@ -1178,6 +1178,9 @@ class ProspectAudit(Base):
     is_local: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     location: Mapped[str | None] = mapped_column(String, nullable=True)
 
+    # Staff-selected audit prompts. NULL → runner auto-generates them.
+    prompts: Mapped[list | None] = mapped_column(JSON, nullable=True)
+
     status: Mapped[str] = mapped_column(String, nullable=False, default="pending", index=True)
     status_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)

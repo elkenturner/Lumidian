@@ -757,6 +757,16 @@ async def run_migrations():
             await conn.execute(text("ALTER TABLE content_draft_citations ADD COLUMN tier VARCHAR(4)"))
             logger.info("Migration applied: content_draft_citations.tier column")
 
+    # --- Migration: prospect_audits.prompts (2026-06-18) ---
+    # Stores the staff-selected audit prompts. NULL on existing rows → the audit
+    # runner falls back to auto-generating prompts as before.
+    async with engine.begin() as conn:
+        result = await conn.execute(text("PRAGMA table_info(prospect_audits)"))
+        cols = {row[1] for row in result.fetchall()}
+        if "prompts" not in cols:
+            await conn.execute(text("ALTER TABLE prospect_audits ADD COLUMN prompts JSON"))
+            logger.info("Migration applied: prospect_audits.prompts column")
+
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):
     """Mark tracking runs stuck in pending/running for > max_age_minutes as failed.

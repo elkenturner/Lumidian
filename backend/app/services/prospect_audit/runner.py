@@ -94,16 +94,21 @@ async def _run_audit_inner(audit_id: int, cancel_event: asyncio.Event) -> None:
         return await _mark_canceled(audit_id)
 
     # Step 2: prompts + competitors (need prompts first to compute is_subject for competitors)
-    await _persist_status(audit_id, status="generating_prompts")
-    try:
-        prompts = await generate_prompts(
-            business_name=audit.business_name,
-            website_url=audit.website_url,
-            homepage_excerpt=excerpt,
-            location=audit.location if audit.is_local else None,
-        )
-    except Exception as exc:
-        return await _persist_status(audit_id, status="failed", error_message=f"Failed to generate audit prompts: {exc!s}", completed_at=datetime.utcnow())
+    # Staff may have hand-picked the prompts at creation time; only auto-generate
+    # when none were supplied.
+    if audit.prompts:
+        prompts = list(audit.prompts)
+    else:
+        await _persist_status(audit_id, status="generating_prompts")
+        try:
+            prompts = await generate_prompts(
+                business_name=audit.business_name,
+                website_url=audit.website_url,
+                homepage_excerpt=excerpt,
+                location=audit.location if audit.is_local else None,
+            )
+        except Exception as exc:
+            return await _persist_status(audit_id, status="failed", error_message=f"Failed to generate audit prompts: {exc!s}", completed_at=datetime.utcnow())
 
     if cancel_event.is_set():
         return await _mark_canceled(audit_id)

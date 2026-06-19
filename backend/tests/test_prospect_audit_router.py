@@ -61,6 +61,62 @@ async def test_post_creates_audit_and_schedules_task(client: httpx.AsyncClient):
 
 
 @pytest.mark.asyncio
+async def test_post_stores_staff_selected_prompts(client: httpx.AsyncClient):
+    await _make_staff(client)
+    chosen = ["Best dentist in Austin?", "implant cost in austin"]  # 2nd missing "?" → coerced
+    with patch("app.routers.prospect_audit.run_audit"):
+        resp = await client.post(
+            "/api/agency/prospects",
+            json={"business_name": "Acme", "website_url": "https://acme.com", "is_local": False, "prompts": chosen},
+        )
+    assert resp.status_code == 201, resp.text
+    audit_id = resp.json()["id"]
+
+    from app.models import ProspectAudit
+    async with AsyncSessionLocal() as db:
+        a = (await db.execute(select(ProspectAudit).where(ProspectAudit.id == audit_id))).scalar_one()
+        assert a.prompts == ["Best dentist in Austin?", "implant cost in austin?"]
+
+
+@pytest.mark.asyncio
+async def test_post_rejects_empty_prompts_list(client: httpx.AsyncClient):
+    await _make_staff(client)
+    with patch("app.routers.prospect_audit.run_audit"):
+        resp = await client.post(
+            "/api/agency/prospects",
+            json={"business_name": "Acme", "website_url": "https://acme.com", "is_local": False, "prompts": ["   ", ""]},
+        )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_suggest_prompts_returns_list(client: httpx.AsyncClient):
+    from unittest.mock import AsyncMock
+
+    await _make_staff(client)
+    fake = [f"Question {i}?" for i in range(10)]
+    with patch("app.routers.prospect_audit._scrape_homepage", new=AsyncMock(return_value="excerpt")), \
+         patch("app.routers.prospect_audit.generate_prompts", new=AsyncMock(return_value=fake)):
+        resp = await client.post(
+            "/api/agency/prospects/suggest-prompts",
+            json={"business_name": "Acme", "website_url": "https://acme.com", "is_local": False},
+        )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["prompts"] == fake
+
+
+@pytest.mark.asyncio
+async def test_suggest_prompts_blocks_non_staff(client: httpx.AsyncClient):
+    client.cookies.clear()
+    await register_and_login(client, email="regular-suggest@example.com")
+    resp = await client.post(
+        "/api/agency/prospects/suggest-prompts",
+        json={"business_name": "Acme", "website_url": "https://acme.com", "is_local": False},
+    )
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
 async def test_post_requires_location_when_local(client: httpx.AsyncClient):
     await _make_staff(client)
     resp = await client.post(

@@ -1563,14 +1563,19 @@ class VideoUploadResponse(BaseModel):
 # ── Prospect audits ──────────────────────────────────────────────────────────
 
 
-class ProspectAuditCreate(BaseModel):
+_MAX_AUDIT_PROMPTS = 15
+_MAX_AUDIT_PROMPT_LEN = 300
+
+
+class ProspectPromptSuggestRequest(BaseModel):
+    """Inputs needed to generate suggested audit prompts (no audit row created)."""
     business_name: str = Field(min_length=1, max_length=200)
     website_url: str = Field(min_length=1, max_length=2048)
     is_local: bool = False
     location: str | None = Field(default=None, max_length=200)
 
     @model_validator(mode="after")
-    def _location_required_when_local(self) -> "ProspectAuditCreate":
+    def _location_required_when_local(self) -> "ProspectPromptSuggestRequest":
         if self.is_local and not (self.location and self.location.strip()):
             raise ValueError("location is required when is_local is true")
         if self.location:
@@ -1584,6 +1589,36 @@ class ProspectAuditCreate(BaseModel):
         if not v.startswith(("http://", "https://")):
             v = "https://" + v
         return v
+
+
+class ProspectPromptSuggestResponse(BaseModel):
+    prompts: list[str]
+
+
+class ProspectAuditCreate(ProspectPromptSuggestRequest):
+    # Staff-selected prompts. Omit/None → runner auto-generates them.
+    prompts: list[str] | None = None
+
+    @field_validator("prompts")
+    @classmethod
+    def _clean_prompts(cls, v):
+        if v is None:
+            return None
+        cleaned: list[str] = []
+        for s in v:
+            if not isinstance(s, str):
+                continue
+            s = s.strip()[:_MAX_AUDIT_PROMPT_LEN].strip()
+            if not s:
+                continue
+            if not s.endswith("?"):
+                s += "?"
+            cleaned.append(s)
+        if not cleaned:
+            raise ValueError("At least one non-empty prompt is required")
+        if len(cleaned) > _MAX_AUDIT_PROMPTS:
+            raise ValueError(f"At most {_MAX_AUDIT_PROMPTS} prompts allowed")
+        return cleaned
 
 
 class ProspectAuditListItem(BaseModel):

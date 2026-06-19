@@ -10,7 +10,7 @@ from app.models import ProspectAudit, User
 from app.services.prospect_audit.runner import run_audit
 
 
-async def _make_audit(business_name: str = "Acme", is_local: bool = False, location: str | None = None) -> int:
+async def _make_audit(business_name: str = "Acme", is_local: bool = False, location: str | None = None, prompts: list[str] | None = None) -> int:
     async with AsyncSessionLocal() as db:
         user = User(email=f"staff-{business_name}@x.com", password_hash="x", name="Staff", is_agency_staff=True, email_verified=True)
         db.add(user)
@@ -21,6 +21,7 @@ async def _make_audit(business_name: str = "Acme", is_local: bool = False, locat
             website_url="https://example.com",
             is_local=is_local,
             location=location,
+            prompts=prompts,
         )
         db.add(a)
         await db.commit()
@@ -60,6 +61,35 @@ async def test_run_audit_happy_path(tmp_path, monkeypatch):
     assert (tmp_path / a.pdf_path.split("/")[-1]).exists()
     assert a.completed_at is not None
     assert a.error_message is None
+
+
+@pytest.mark.asyncio
+async def test_run_audit_uses_staff_selected_prompts(tmp_path, monkeypatch):
+    """When the audit row carries staff-selected prompts, the runner must use
+    those verbatim and never auto-generate."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "fake")
+    monkeypatch.setattr("app.services.prospect_audit.runner.PROSPECT_AUDIT_PDF_DIR", tmp_path)
+
+    chosen = ["Best dentist in Austin, TX?", "Cheapest implants near downtown Austin?"]
+    audit_id = await _make_audit(prompts=chosen)
+
+    gen_mock = AsyncMock(return_value=[f"Q{i}?" for i in range(10)])
+    run_q_mock = AsyncMock(return_value=_fake_queries())
+
+    with patch("app.services.prospect_audit.runner._scrape_homepage", new=AsyncMock(return_value="excerpt")), \
+         patch("app.services.prospect_audit.runner.fetch_prospect_logo", new=AsyncMock(return_value="data:x")), \
+         patch("app.services.prospect_audit.runner.generate_prompts", new=gen_mock), \
+         patch("app.services.prospect_audit.runner.detect_competitors", new=AsyncMock(return_value=_fake_competitors())), \
+         patch("app.services.prospect_audit.runner.run_queries_for_audit", new=run_q_mock), \
+         patch("app.services.prospect_audit.runner.draft_recommendations", new=AsyncMock(return_value="1. **Do X**")), \
+         patch("app.services.prospect_audit.runner.render_prospect_pdf", new=AsyncMock(return_value=b"%PDF")):
+        await run_audit(audit_id)
+
+    gen_mock.assert_not_called()
+    assert run_q_mock.call_args.kwargs["prompts"] == chosen
+
+    a = await _reload(audit_id)
+    assert a.status == "completed"
 
 
 @pytest.mark.asyncio

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -315,6 +315,13 @@ class ContentDraftSchema(BaseModel):
     created_at: datetime
     updated_at: datetime
     low_evidence: bool = False
+
+    @field_validator("low_evidence", mode="before")
+    @classmethod
+    def _low_evidence_none_to_false(cls, v: Any) -> bool:
+        # ORM rows from before the low_evidence column existed surface None
+        # through from_attributes — treat as the column default (False).
+        return False if v is None else bool(v)
 
     model_config = {"from_attributes": True}
 
@@ -1296,6 +1303,11 @@ class ClusterPieceSummary(BaseModel):
     excerpt: str | None  # first 140 chars of content_text
     low_evidence: bool = False  # thin sourcing — writer cited nothing real
 
+    @field_validator("low_evidence", mode="before")
+    @classmethod
+    def _low_evidence_none_to_false(cls, v: Any) -> bool:
+        return False if v is None else bool(v)
+
 
 class ContentClusterSummary(BaseModel):
     """Compact representation for the cluster list view."""
@@ -1346,6 +1358,11 @@ class ContentClusterDraft(BaseModel):
     attribution_delta: float | None = None
     # Thin sourcing — writer cited nothing real / empty evidence pack
     low_evidence: bool = False
+
+    @field_validator("low_evidence", mode="before")
+    @classmethod
+    def _low_evidence_none_to_false(cls, v: Any) -> bool:
+        return False if v is None else bool(v)
 
     model_config = ConfigDict(from_attributes=True)
 

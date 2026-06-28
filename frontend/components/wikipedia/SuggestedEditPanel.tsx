@@ -7,14 +7,17 @@ import {
   type WikipediaCandidate,
   type WikipediaCandidateStatusUpdate,
 } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   brandId: number;
   candidate: WikipediaCandidate;
   onUpdated: (c: WikipediaCandidate) => void;
+  onRegenerate?: () => void;
+  regenerating?: boolean;
 }
 
-export function SuggestedEditPanel({ brandId, candidate, onUpdated }: Props) {
+export function SuggestedEditPanel({ brandId, candidate, onUpdated, onRegenerate, regenerating }: Props) {
   const [copied, setCopied] = useState(false);
   const [updating, setUpdating] = useState(false);
 
@@ -37,140 +40,101 @@ export function SuggestedEditPanel({ brandId, candidate, onUpdated }: Props) {
     }
   }
 
-  const mono = { fontFamily: 'var(--font-geist-mono)' } as const;
+  const canRegenerate =
+    onRegenerate && (candidate.status === 'drafted' || candidate.status === 'reverted');
 
   return (
-    <div className="border-l border-[var(--border-subtle)] pl-5">
-      {/* Manuscript meta */}
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-5 gap-y-1">
+    <div className="space-y-4">
+      {/* Meta */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         <MetaItem label="Section" value={candidate.suggested_section ?? '—'} />
         {candidate.suggested_insert_location && (
           <MetaItem label="Position" value={candidate.suggested_insert_location} />
         )}
       </div>
 
-      {/* Wikitext manuscript */}
-      <div className="relative rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)]">
-        <div
-          className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2"
-          style={mono}
-        >
-          <span className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]">
+      {/* Wikitext draft */}
+      <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--bg-base)]">
+        <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2">
+          <span className="text-[11px] uppercase tracking-wider font-semibold text-[var(--text-faint)]">
             Wikitext draft
           </span>
           <button
             type="button"
             onClick={copyText}
-            className="group inline-flex cursor-pointer items-center gap-1.5 text-[11px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)] active:scale-[0.97] [transition:transform_160ms_cubic-bezier(0.23,1,0.32,1),color_0.15s_ease]"
+            className="inline-flex cursor-pointer items-center gap-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
           >
-            <span className="relative inline-flex h-3.5 w-3.5 items-center justify-center">
-              <Copy
-                className={`absolute h-3.5 w-3.5 transition-[opacity,transform] duration-150 ${
-                  copied ? 'opacity-0 scale-75' : 'opacity-100 scale-100'
-                }`}
-              />
-              <Check
-                className={`absolute h-3.5 w-3.5 text-[#4ade80] transition-[opacity,transform] duration-150 ${
-                  copied ? 'opacity-100 scale-100' : 'opacity-0 scale-75'
-                }`}
-              />
-            </span>
-            <span className="min-w-[3rem]">{copied ? 'Copied' : 'Copy'}</span>
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-[var(--success-text)]" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+            {copied ? 'Copied' : 'Copy'}
           </button>
         </div>
-        <pre
-          className="overflow-x-auto whitespace-pre-wrap break-words px-4 py-3.5 text-[12.5px] leading-[1.65] text-[var(--text-primary)]"
-          style={mono}
-        >
+        <pre className="overflow-x-auto whitespace-pre-wrap break-words px-4 py-3.5 font-mono text-xs leading-relaxed text-[var(--text-primary)]">
           {candidate.suggested_wikitext}
         </pre>
       </div>
 
-      {/* Actions row */}
-      <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
-        <a
-          href={candidate.article_url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group inline-flex cursor-pointer items-center gap-1.5 text-[13px] font-medium text-[var(--accent-foreground)] transition-colors hover:text-[var(--text-primary)]"
-        >
-          Open Wikipedia to edit
-          <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-        </a>
+      {/* Actions */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild variant="secondary" size="sm">
+          <a href={candidate.article_url} target="_blank" rel="noopener noreferrer">
+            Open Wikipedia to edit
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          </a>
+        </Button>
 
-        <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-2">
+        {canRegenerate && (
+          <Button variant="ghost" size="sm" onClick={onRegenerate} disabled={regenerating}>
+            {regenerating && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {regenerating ? 'Regenerating…' : 'Regenerate'}
+          </Button>
+        )}
+
+        <div className="ml-auto flex flex-wrap items-center gap-2">
           {candidate.status === 'drafted' && (
-            <button
-              type="button"
-              onClick={() => updateStatus('submitted')}
-              disabled={updating}
-              className="inline-flex cursor-pointer items-center gap-1.5 text-[12px] font-medium text-[var(--accent-foreground)] transition-colors hover:text-[var(--text-primary)] disabled:opacity-50"
-            >
+            <Button variant="secondary" size="sm" onClick={() => updateStatus('submitted')} disabled={updating}>
               {updating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
               Mark submitted
-            </button>
+            </Button>
           )}
 
           {candidate.status === 'submitted' && (
             <>
-              <button
-                type="button"
-                onClick={() => updateStatus('accepted')}
-                disabled={updating}
-                className="inline-flex cursor-pointer items-center gap-1.5 text-[12px] font-medium text-[#4ade80] transition-colors hover:text-[#86efac] disabled:opacity-50"
-              >
+              <Button variant="success" size="sm" onClick={() => updateStatus('accepted')} disabled={updating}>
                 <Check className="h-3 w-3" />
                 Accepted
-              </button>
-              <button
-                type="button"
-                onClick={() => updateStatus('reverted')}
-                disabled={updating}
-                className="cursor-pointer text-[12px] font-medium text-[#fb7185] transition-colors hover:text-[#fda4af] disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => updateStatus('reverted')} disabled={updating}>
                 Reverted
-              </button>
+              </Button>
             </>
           )}
 
           {candidate.status !== 'dismissed' && (
-            <button
-              type="button"
-              onClick={() => updateStatus('dismissed')}
-              disabled={updating}
-              className="cursor-pointer text-[12px] text-[var(--text-faint)] transition-colors hover:text-[var(--text-muted)] disabled:opacity-50"
-            >
+            <Button variant="ghost" size="sm" onClick={() => updateStatus('dismissed')} disabled={updating}>
               Dismiss
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
-      {/* COI as quiet editorial note, no colored callout */}
-      <p
-        className="mt-5 max-w-[58ch] border-t border-[var(--border-subtle)] pt-4 text-[11.5px] leading-[1.65] text-[var(--text-faint)]"
-      >
-        <span
-          className="mr-2 font-medium uppercase tracking-[0.2em] text-[var(--text-muted)]"
-          style={mono}
-        >
-          Note
-        </span>
-        Disclose your affiliation on the article&apos;s talk page before editing. Lumidian does
-        not post to Wikipedia for you.
+      {/* COI note */}
+      <p className="border-t border-[var(--border-subtle)] pt-3 text-xs leading-relaxed text-[var(--text-faint)]">
+        <span className="mr-1.5 font-semibold uppercase tracking-wider text-[var(--text-muted)]">Note</span>
+        Disclose your affiliation on the article&apos;s talk page before editing. Lumidian does not
+        post to Wikipedia for you.
       </p>
     </div>
   );
 }
 
 function MetaItem({ label, value }: { label: string; value: string }) {
-  const mono = { fontFamily: 'var(--font-geist-mono)' } as const;
   return (
-    <div className="text-[12px]">
-      <span
-        className="mr-1.5 text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
-        style={mono}
-      >
+    <div>
+      <span className="mr-1.5 uppercase tracking-wider font-semibold text-[var(--text-faint)]">
         {label}
       </span>
       <span className="text-[var(--text-secondary)]">{value}</span>

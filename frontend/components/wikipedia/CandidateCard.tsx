@@ -1,39 +1,35 @@
 'use client';
 
 import { useState } from 'react';
-import { Loader2, ArrowUpRight } from 'lucide-react';
+import { Loader2, ArrowUpRight, ChevronDown } from 'lucide-react';
 import { draftWikipediaCandidate, type WikipediaCandidate } from '@/lib/api';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { SuggestedEditPanel } from './SuggestedEditPanel';
 
 interface Props {
-  index: number;
   brandId: number;
   candidate: WikipediaCandidate;
+  expanded: boolean;
+  onToggleExpand: (open: boolean) => void;
   onUpdated: (c: WikipediaCandidate) => void;
 }
 
-const STATUS_LABEL: Record<WikipediaCandidate['status'], string> = {
-  new: 'New',
-  drafted: 'Drafted',
-  submitted: 'Submitted',
-  accepted: 'Accepted',
-  reverted: 'Reverted',
-  dismissed: 'Dismissed',
+type BadgeVariant = 'default' | 'secondary' | 'destructive' | 'success' | 'warning' | 'outline';
+
+const STATUS_BADGE: Record<WikipediaCandidate['status'], { label: string; variant: BadgeVariant }> = {
+  new: { label: 'New', variant: 'secondary' },
+  drafted: { label: 'Drafted', variant: 'default' },
+  submitted: { label: 'Submitted', variant: 'warning' },
+  accepted: { label: 'Accepted', variant: 'success' },
+  reverted: { label: 'Reverted', variant: 'destructive' },
+  dismissed: { label: 'Dismissed', variant: 'outline' },
 };
 
-const STATUS_DOT: Record<WikipediaCandidate['status'], string> = {
-  new: 'bg-[var(--text-muted)]',
-  drafted: 'bg-[#7dd3fc]',
-  submitted: 'bg-[#fbbf24]',
-  accepted: 'bg-[#4ade80]',
-  reverted: 'bg-[#fb7185]',
-  dismissed: 'bg-[var(--text-faint)]',
-};
-
-function scoreColor(score: number) {
-  if (score >= 80) return 'text-[#4ade80]';
-  if (score >= 65) return 'text-[#fbbf24]';
-  return 'text-[var(--text-muted)]';
+function scoreVariant(score: number): BadgeVariant {
+  if (score >= 80) return 'success';
+  if (score >= 65) return 'warning';
+  return 'secondary';
 }
 
 function articlePath(url: string) {
@@ -45,11 +41,8 @@ function articlePath(url: string) {
   }
 }
 
-const MONO = { fontFamily: 'var(--font-geist-mono)' } as const;
-
-export function CandidateCard({ index, brandId, candidate, onUpdated }: Props) {
+export function CandidateCard({ brandId, candidate, expanded, onToggleExpand, onUpdated }: Props) {
   const [drafting, setDrafting] = useState(false);
-  const [expanded, setExpanded] = useState(candidate.status !== 'new');
   const [error, setError] = useState<string | null>(null);
 
   async function generateDraft() {
@@ -58,7 +51,7 @@ export function CandidateCard({ index, brandId, candidate, onUpdated }: Props) {
     try {
       const updated = await draftWikipediaCandidate(brandId, candidate.id);
       onUpdated(updated);
-      setExpanded(true);
+      onToggleExpand(true);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to generate draft';
       setError(msg);
@@ -69,140 +62,96 @@ export function CandidateCard({ index, brandId, candidate, onUpdated }: Props) {
 
   const score = Math.round(candidate.legitimacy_score * 100);
   const isLocked = candidate.status === 'accepted' || candidate.status === 'dismissed';
+  const status = STATUS_BADGE[candidate.status];
   const { host, path } = articlePath(candidate.article_url);
+  const hasDraft = Boolean(candidate.suggested_wikitext);
 
   return (
-    <article className={`relative grid grid-cols-[2.25rem_1fr] gap-5 py-8 transition-opacity ${isLocked ? 'opacity-55' : ''}`}>
-      {/* Index */}
-      <div
-        className="pt-[5px] text-[11px] font-medium tabular-nums text-[var(--text-faint)] tracking-[0.08em]"
-        style={MONO}
-      >
-        {index.toString().padStart(2, '0')}
+    <article
+      className={`card ${expanded ? '' : 'card-hover'} flex h-full flex-col gap-3 ${
+        isLocked ? 'opacity-60' : ''
+      }`}
+    >
+      {/* Title row + score */}
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="min-w-0 text-base font-semibold leading-snug text-[var(--text-primary)]">
+          <a
+            href={candidate.article_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group inline-flex items-baseline gap-1.5 hover:text-[var(--accent-foreground)] transition-colors"
+          >
+            <span className="line-clamp-2">{candidate.article_title}</span>
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 self-center text-[var(--text-faint)] transition-colors group-hover:text-[var(--accent-foreground)]" />
+          </a>
+        </h3>
+        <Badge variant={scoreVariant(score)} className="shrink-0 tabular-nums" title="Legitimacy score">
+          {score}
+        </Badge>
       </div>
 
-      {/* Body */}
-      <div className="min-w-0">
-        {/* Title row with score meta */}
-        <div className="flex items-start justify-between gap-6">
-          <h2 className="min-w-0 text-[19px] font-semibold leading-[1.3] tracking-[-0.01em] text-[var(--text-primary)]">
-            <a
-              href={candidate.article_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="group inline-flex items-baseline gap-2 hover:text-[var(--accent-foreground)] transition-colors"
-            >
-              <span>{candidate.article_title}</span>
-              <ArrowUpRight className="h-3.5 w-3.5 shrink-0 self-center text-[var(--text-faint)] transition-colors group-hover:text-[var(--accent-foreground)]" />
-            </a>
-          </h2>
-          <div
-            className="shrink-0 pt-[3px] text-[11px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
-            style={MONO}
-            title="Legitimacy score"
-          >
-            <span className="mr-1.5">Score</span>
-            <span className={`text-[14px] tracking-[0.02em] ${scoreColor(score)}`}>{score}</span>
-          </div>
-        </div>
+      {/* URL */}
+      <div className="truncate text-xs text-[var(--text-faint)]">
+        {host}
+        <span className="text-[var(--text-muted)]">{path}</span>
+      </div>
 
-        {/* URL */}
-        <div
-          className="mt-1.5 truncate text-[12px] text-[var(--text-faint)]"
-          style={MONO}
-        >
-          {host}
-          <span className="text-[var(--text-secondary)]">{path}</span>
-        </div>
+      {/* Summary */}
+      <p className={`text-sm leading-relaxed text-[var(--text-secondary)] ${expanded ? '' : 'line-clamp-3'}`}>
+        {candidate.article_summary}
+      </p>
 
-        {/* Summary */}
-        <p className="mt-4 max-w-[64ch] text-[14.5px] leading-[1.6] text-[var(--text-secondary)]">
-          {candidate.article_summary}
-        </p>
-
-        {/* Reasoning — quiet editorial annotation */}
-        <p className="mt-3 max-w-[64ch] text-[13px] leading-[1.65] italic text-[var(--text-muted)]">
+      {/* Reasoning */}
+      {candidate.legitimacy_reasoning && (
+        <p className={`text-xs leading-relaxed text-[var(--text-muted)] ${expanded ? '' : 'line-clamp-2'}`}>
           {candidate.legitimacy_reasoning}
         </p>
+      )}
 
-        {/* Status + action footer */}
-        <div className="mt-6 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <span className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[candidate.status]}`} />
-            <span
-              className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-secondary)]"
-              style={MONO}
-            >
-              {STATUS_LABEL[candidate.status]}
-            </span>
-          </div>
+      {error && <p className="text-xs text-[var(--danger-text)]">{error}</p>}
 
-          {!candidate.suggested_wikitext && candidate.status === 'new' && (
-            <button
-              type="button"
-              onClick={generateDraft}
-              disabled={drafting}
-              className="group inline-flex cursor-pointer items-center gap-1.5 text-[13px] font-medium text-[var(--accent-foreground)] transition-colors hover:text-[var(--text-primary)] disabled:cursor-wait disabled:opacity-60 active:scale-[0.98] [transition:transform_160ms_cubic-bezier(0.23,1,0.32,1),color_0.15s_ease]"
-            >
-              {drafting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {drafting ? 'Drafting' : 'Draft suggested edit'}
-              <span className="transition-transform group-hover:translate-x-0.5">→</span>
-            </button>
-          )}
+      {/* Footer: status + action */}
+      <div className="mt-auto flex items-center justify-between gap-3 pt-2">
+        <Badge variant={status.variant}>{status.label}</Badge>
 
-          {candidate.suggested_wikitext && !expanded && (
-            <button
-              type="button"
-              onClick={() => setExpanded(true)}
-              className="cursor-pointer text-[13px] font-medium text-[var(--accent-foreground)] transition-colors hover:text-[var(--text-primary)]"
-            >
-              View suggested edit ↓
-            </button>
-          )}
-
-          {candidate.suggested_wikitext && expanded && (
-            <div className="flex items-center gap-4">
-              {(candidate.status === 'drafted' || candidate.status === 'reverted') && (
-                <button
-                  type="button"
-                  onClick={generateDraft}
-                  disabled={drafting}
-                  className="cursor-pointer text-[12px] text-[var(--text-muted)] transition-colors hover:text-[var(--text-secondary)] disabled:opacity-50"
-                >
-                  {drafting ? 'Regenerating…' : 'Regenerate'}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => setExpanded(false)}
-                className="cursor-pointer text-[13px] font-medium text-[var(--text-muted)] transition-colors hover:text-[var(--text-primary)]"
-              >
-                Collapse ↑
-              </button>
-            </div>
-          )}
-        </div>
-
-        {error && (
-          <p className="mt-3 text-[12px] text-[var(--danger-text)]">{error}</p>
+        {!hasDraft && candidate.status === 'new' && (
+          <Button variant="secondary" size="sm" onClick={generateDraft} disabled={drafting}>
+            {drafting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            {drafting ? 'Drafting…' : 'Draft suggested edit'}
+          </Button>
         )}
 
-        {/* Expanding panel via grid-template-rows */}
-        <div
-          className="grid transition-[grid-template-rows] duration-300"
-          style={{
-            gridTemplateRows: expanded && candidate.suggested_wikitext ? '1fr' : '0fr',
-            transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)',
-          }}
-          aria-hidden={!expanded}
-        >
-          <div className="overflow-hidden">
-            {candidate.suggested_wikitext && (
-              <div className="pt-6">
-                <SuggestedEditPanel brandId={brandId} candidate={candidate} onUpdated={onUpdated} />
-              </div>
-            )}
-          </div>
+        {hasDraft && (
+          <Button variant="ghost" size="sm" onClick={() => onToggleExpand(!expanded)}>
+            {expanded ? 'Collapse' : 'View suggested edit'}
+            <ChevronDown
+              className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`}
+            />
+          </Button>
+        )}
+      </div>
+
+      {/* Expanding panel */}
+      <div
+        className="grid transition-[grid-template-rows] duration-300"
+        style={{
+          gridTemplateRows: expanded && hasDraft ? '1fr' : '0fr',
+          transitionTimingFunction: 'cubic-bezier(0.23, 1, 0.32, 1)',
+        }}
+        aria-hidden={!expanded}
+      >
+        <div className="overflow-hidden">
+          {hasDraft && (
+            <div className="border-t border-[var(--border-subtle)] pt-4">
+              <SuggestedEditPanel
+                brandId={brandId}
+                candidate={candidate}
+                onUpdated={onUpdated}
+                onRegenerate={generateDraft}
+                regenerating={drafting}
+              />
+            </div>
+          )}
         </div>
       </div>
     </article>

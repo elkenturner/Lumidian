@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { getLatestWikipediaScan, scanWikipedia, type WikipediaScan } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   brandId: number;
@@ -58,28 +59,19 @@ export function ScanButton({ brandId, onScanCompleted }: Props) {
   }
 
   const isRunning = scan?.status === 'running' || triggering;
-  const mono = { fontFamily: 'var(--font-geist-mono)' } as const;
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <button
-        type="button"
-        onClick={trigger}
-        disabled={isRunning}
-        className="group inline-flex cursor-pointer items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(255,255,255,0.04)] px-4 py-2 text-[13px] font-medium text-[var(--text-primary)] transition-colors hover:border-[var(--border-strong)] hover:bg-[var(--border-faint)] disabled:cursor-wait disabled:opacity-60 active:scale-[0.98] [transition:transform_160ms_cubic-bezier(0.23,1,0.32,1),background-color_0.15s_ease,border-color_0.15s_ease]"
-      >
+    <div className="flex flex-col items-start gap-2 sm:items-end">
+      <Button type="button" variant="secondary" onClick={trigger} disabled={isRunning} className="group">
         {isRunning ? (
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent-foreground)]" />
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
         ) : (
-          <RefreshCw className="h-3.5 w-3.5 text-[var(--accent-foreground)] transition-transform group-hover:rotate-180 duration-500" />
+          <RefreshCw className="h-3.5 w-3.5 transition-transform group-hover:rotate-180 duration-500" />
         )}
-        {isRunning ? 'Scanning' : 'Run scan'}
-      </button>
+        {isRunning ? 'Scanning…' : 'Run scan'}
+      </Button>
 
-      <div
-        className="text-[10.5px] uppercase tracking-[0.18em] text-[var(--text-faint)]"
-        style={mono}
-      >
+      <div className="text-xs text-[var(--text-faint)]">
         {scan?.status === 'running' && (
           <>Searching · {scan.prompts_searched ?? 0} prompts</>
         )}
@@ -92,16 +84,14 @@ export function ScanButton({ brandId, onScanCompleted }: Props) {
           </>
         )}
         {scan?.status === 'failed' && (
-          <span className="text-[#fb7185] normal-case tracking-normal">
+          <span className="text-[var(--danger-text)]">
             Last scan failed{scan.error_message ? ` — ${scan.error_message}` : ''}
           </span>
         )}
         {!scan && <>No scans yet</>}
       </div>
 
-      {error && (
-        <span className="text-[11px] text-[#fb7185]">{error}</span>
-      )}
+      {error && <span className="text-xs text-[var(--danger-text)]">{error}</span>}
     </div>
   );
 }

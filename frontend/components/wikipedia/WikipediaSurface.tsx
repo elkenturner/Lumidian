@@ -27,6 +27,7 @@ export function WikipediaSurface({ brandId }: Props) {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
   const [showDismissed, setShowDismissed] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -64,122 +65,108 @@ export function WikipediaSurface({ brandId }: Props) {
   });
 
   return (
-    <div className="mx-auto max-w-4xl px-6 pt-14 pb-24">
-      {/* Editorial masthead */}
-      <header className="mb-10">
-        <div className="flex items-start justify-between gap-8">
-          <div className="min-w-0 flex-1">
-            <div
-              className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
-              style={{ fontFamily: 'var(--font-geist-mono)' }}
-            >
-              Wikipedia
-            </div>
-            <h1 className="mt-3 text-[2.25rem] leading-[1.05] font-semibold tracking-[-0.025em] text-[var(--text-primary)]">
-              Citation opportunities
-            </h1>
-            <p className="mt-4 max-w-[58ch] text-[15px] leading-[1.6] text-[var(--text-muted)]">
-              Existing articles where your brand can be cited authoritatively. We surface
-              candidates and draft the edit — you decide what gets submitted.
-            </p>
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] space-y-6">
+      {/* Header */}
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-1.5">
+            Wikipedia
           </div>
-          <div className="shrink-0 pt-1">
-            <ScanButton brandId={brandId} onScanCompleted={refresh} />
-          </div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] leading-tight">
+            Citation opportunities
+          </h1>
+          <p className="mt-1.5 max-w-2xl text-sm text-[var(--text-secondary)]">
+            Existing articles where your brand can be cited authoritatively. We surface candidates
+            and draft the edit — you decide what gets submitted.
+          </p>
+        </div>
+        <div className="shrink-0">
+          <ScanButton brandId={brandId} onScanCompleted={refresh} />
         </div>
       </header>
 
-      {/* Filter strip */}
-      <div className="mb-6 flex flex-wrap items-baseline gap-x-5 gap-y-2 border-y border-[var(--border-subtle)] py-3">
-        {FILTERS.map((f) => {
-          const active = filter === f.key;
-          const count = counts[f.key] ?? 0;
-          return (
-            <button
-              key={f.key}
-              onClick={() => setFilter(f.key)}
-              className={`cursor-pointer text-[13px] tracking-tight transition-colors ${
-                active
-                  ? 'text-[var(--text-primary)] font-medium'
-                  : 'text-[var(--text-muted)] hover:text-[var(--text-secondary)]'
-              }`}
-            >
-              {f.label}
-              <span
-                className={`ml-1.5 text-[11px] tabular-nums ${
-                  active ? 'text-[var(--accent-foreground)]' : 'text-[var(--text-faint)]'
+      {/* Filter toolbar */}
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <div className="flex flex-wrap items-center gap-1.5 text-[var(--text-faint)]">
+          <span>Filter:</span>
+          {FILTERS.map((f) => {
+            const active = filter === f.key;
+            const count = counts[f.key] ?? 0;
+            return (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setFilter(f.key)}
+                className={`px-2 py-1 rounded ${
+                  active
+                    ? 'bg-[var(--bg-card)] text-[var(--text-primary)] font-medium'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
-                style={{ fontFamily: 'var(--font-geist-mono)' }}
               >
-                {count}
-              </span>
-            </button>
-          );
-        })}
-        <label className="ml-auto flex cursor-pointer select-none items-center gap-2 text-[13px] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
+                {f.label}
+                <span className="ml-1.5 tabular-nums text-[var(--text-faint)]">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <label className="ml-auto flex cursor-pointer select-none items-center gap-2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors">
           <input
             type="checkbox"
             checked={showDismissed}
             onChange={(e) => setShowDismissed(e.target.checked)}
             className="h-3.5 w-3.5 cursor-pointer accent-[var(--accent)]"
           />
-          Dismissed
-          <span
-            className="text-[11px] tabular-nums text-[var(--text-faint)]"
-            style={{ fontFamily: 'var(--font-geist-mono)' }}
-          >
-            {counts.dismissed}
-          </span>
+          Show dismissed
+          <span className="tabular-nums text-[var(--text-faint)]">{counts.dismissed}</span>
         </label>
       </div>
 
-      {/* Index */}
+      {/* Grid */}
       {loading ? (
-        <SkeletonIndex />
+        <SkeletonGrid />
       ) : visible.length === 0 ? (
         <EmptyState hasCandidates={candidates.length > 0} />
       ) : (
-        <motion.ol
+        <motion.div
           variants={staggerContainer}
           initial="hidden"
           animate="visible"
-          className="-mx-1"
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
         >
-          {visible.map((c, i) => (
-            <motion.li
-              key={c.id}
-              variants={staggerChild}
-              className="border-t border-[var(--border-subtle)] first:border-t-0"
-            >
-              <CandidateCard
-                index={i + 1}
-                brandId={brandId}
-                candidate={c}
-                onUpdated={onCandidateUpdated}
-              />
-            </motion.li>
-          ))}
-        </motion.ol>
+          {visible.map((c) => {
+            const expanded = expandedId === c.id;
+            return (
+              <motion.div
+                key={c.id}
+                variants={staggerChild}
+                className={expanded ? 'sm:col-span-2 lg:col-span-3' : ''}
+              >
+                <CandidateCard
+                  brandId={brandId}
+                  candidate={c}
+                  expanded={expanded}
+                  onToggleExpand={(open) => setExpandedId(open ? c.id : null)}
+                  onUpdated={onCandidateUpdated}
+                />
+              </motion.div>
+            );
+          })}
+        </motion.div>
       )}
     </div>
   );
 }
 
-function SkeletonIndex() {
+function SkeletonGrid() {
   return (
-    <div className="space-y-px">
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="flex gap-6 border-t border-[var(--border-subtle)] py-7 first:border-t-0"
-        >
-          <div className="h-3 w-6 rounded skeleton" />
-          <div className="flex-1 space-y-3">
-            <div className="h-4 w-2/3 rounded skeleton" />
-            <div className="h-3 w-1/3 rounded skeleton" />
-            <div className="h-3 w-full rounded skeleton" />
-            <div className="h-3 w-5/6 rounded skeleton" />
-          </div>
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="card space-y-3">
+          <div className="h-4 w-2/3 rounded skeleton" />
+          <div className="h-3 w-1/3 rounded skeleton" />
+          <div className="h-3 w-full rounded skeleton" />
+          <div className="h-3 w-5/6 rounded skeleton" />
+          <div className="h-5 w-20 rounded skeleton" />
         </div>
       ))}
     </div>
@@ -188,20 +175,15 @@ function SkeletonIndex() {
 
 function EmptyState({ hasCandidates }: { hasCandidates: boolean }) {
   return (
-    <div className="border-t border-[var(--border-subtle)] py-20">
-      <div className="max-w-[42ch]">
-        <div
-          className="text-[10.5px] font-medium uppercase tracking-[0.22em] text-[var(--text-faint)]"
-          style={{ fontFamily: 'var(--font-geist-mono)' }}
-        >
-          {hasCandidates ? 'No results' : 'Awaiting first scan'}
-        </div>
-        <p className="mt-3 text-[17px] leading-[1.5] text-[var(--text-secondary)]">
-          {hasCandidates
-            ? 'No candidates match this filter. Try a different status or run another scan.'
-            : 'Run a scan to find articles where your brand belongs in the citation list.'}
-        </p>
+    <div className="card-elevated flex flex-col items-center justify-center py-16 text-center">
+      <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
+        {hasCandidates ? 'No results' : 'Awaiting first scan'}
       </div>
+      <p className="mt-2 max-w-md text-sm leading-relaxed text-[var(--text-secondary)]">
+        {hasCandidates
+          ? 'No candidates match this filter. Try a different status or run another scan.'
+          : 'Run a scan to find articles where your brand belongs in the citation list.'}
+      </p>
     </div>
   );
 }

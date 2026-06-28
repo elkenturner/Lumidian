@@ -420,15 +420,12 @@ function FeaturesSection() {
 
 function HowItWorksSection() {
   return (
-    <section className="py-16 border-y border-[var(--border-subtle)]">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-20 sm:py-28 border-y border-[var(--border-subtle)]">
+      <Container width="content">
         <FadeUp>
-          <h2
-            className="text-3xl sm:text-4xl font-bold text-center text-[var(--text-primary)] mb-16"
-            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
-          >
+          <Heading level={2} className="text-center mb-16">
             How it works
-          </h2>
+          </Heading>
         </FadeUp>
 
         <div className="space-y-12">
@@ -447,7 +444,7 @@ function HowItWorksSection() {
 
                 {/* Content */}
                 <div className="pt-2">
-                  <div className="inline-flex items-center gap-2 bg-[rgba(95,126,166,0.1)] border border-[rgba(95,126,166,0.2)] rounded-full px-3 py-1 mb-3">
+                  <div className="inline-flex items-center gap-2 bg-[var(--accent-10)] border border-[var(--accent-20)] rounded-full px-3 py-1 mb-3">
                     <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)]" />
                     <span className="text-xs font-semibold text-[var(--accent)]">Step {step.n}</span>
                   </div>
@@ -463,7 +460,7 @@ function HowItWorksSection() {
             </FadeUp>
           ))}
         </div>
-      </div>
+      </Container>
     </section>
   );
 }

@@ -71,6 +71,14 @@
   --accent-muted: oklch(0.58 0.06 235 / 0.15);
   --accent-border: oklch(0.58 0.06 235 / 0.20);
 
+  /* Accent alpha ladder — replaces ~10 ad-hoc rgba(95,126,166,X) shades */
+  --accent-06: oklch(0.58 0.06 235 / 0.06);  /* faint tint / hover wash */
+  --accent-10: oklch(0.58 0.06 235 / 0.10);  /* badge / step-number bg */
+  --accent-12: oklch(0.58 0.06 235 / 0.12);  /* input hover */
+  --accent-15: oklch(0.58 0.06 235 / 0.15);  /* icon bg / focus ring */
+  --accent-20: oklch(0.58 0.06 235 / 0.20);  /* border */
+  --accent-30: oklch(0.58 0.06 235 / 0.30);  /* strong border / highlight */
+
   /* Radius */
   --radius-sm: 6px;
   --radius-md: 8px;

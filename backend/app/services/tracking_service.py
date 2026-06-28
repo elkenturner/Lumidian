@@ -186,6 +186,75 @@ def _compute_overall_score(model_stats: dict[str, dict]) -> float:
     return sum(per_model_scores) / len(per_model_scores)
 
 
+async def finalize_run(run_id: int, *, error_message: str | None = None) -> bool:
+    """Compute scores from the persisted QueryResult rows for run_id, write
+    RunModelScore + PromptRunScore, and mark the run completed.
+
+    Reads from the DB (not an in-memory list) so it works both for a normal
+    finish and for a partially-completed run recovered after a restart.
+    Idempotent: clears any existing RunModelScore/PromptRunScore for the run
+    before re-adding. Returns True if finalized as completed (>=1 result),
+    False if the run had zero results (caller decides how to handle).
+    """
+    from sqlalchemy import delete
+    from app.models import PromptRunScore
+
+    async with AsyncSessionLocal() as db:
+        run = await db.get(TrackingRun, run_id)
+        if run is None:
+            return False
+
+        qr_rows = (await db.execute(
+            select(QueryResult).where(QueryResult.tracking_run_id == run_id)
+        )).scalars().all()
+
+        if not qr_rows:
+            return False
+
+        # Idempotency: remove prior score rows for this run before recomputing.
+        await db.execute(delete(RunModelScore).where(RunModelScore.tracking_run_id == run_id))
+        await db.execute(delete(PromptRunScore).where(PromptRunScore.tracking_run_id == run_id))
+
+        model_stats: dict[str, dict] = {}
+        for qr in qr_rows:
+            if qr.error:
+                continue
+            stats = model_stats.setdefault(qr.model, {"total_queries": 0, "total_mentions": 0})
+            stats["total_queries"] += 1
+            if qr.mentioned:
+                stats["total_mentions"] += 1
+
+        overall_queries = 0
+        overall_mentions = 0
+        for model_name, stats in model_stats.items():
+            tq = stats["total_queries"]
+            tm = stats["total_mentions"]
+            score = (tm / tq * 100.0) if tq > 0 else 0.0
+            db.add(RunModelScore(
+                tracking_run_id=run_id, model=model_name,
+                total_queries=tq, total_mentions=tm, score=round(score, 2),
+            ))
+            overall_queries += tq
+            overall_mentions += tm
+
+        overall_score = _compute_overall_score(model_stats)
+
+        run.status = "completed"
+        run.completed_at = _utcnow()
+        run.overall_score = round(overall_score, 2)
+        run.total_queries = overall_queries
+        run.total_mentions = overall_mentions
+        if error_message:
+            run.error_message = error_message
+
+        await _persist_prompt_run_scores(db, run_id, run.brand_id, qr_rows)
+        await db.commit()
+
+    logger.info("finalize_run %d: completed score=%.2f%% (%d/%d)",
+                run_id, overall_score, overall_mentions, overall_queries)
+    return True
+
+
 async def run_tracking(
     brand_id: int,
     run_type: str = "manual",
@@ -320,89 +389,36 @@ async def run_tracking(
         raise
 
     # ── 4 & 5. Persist results and compute scores ────────────────────────────
-    async with AsyncSessionLocal() as db:
-        try:
-            # Bulk-insert query results
+    try:
+        async with AsyncSessionLocal() as db:
             for qr in query_results:
                 db.add(qr)
-            await db.flush()
-
-            # Aggregate per-model stats
-            model_stats: dict[str, dict] = {
-                m: {"total_queries": 0, "total_mentions": 0}
-                for m in active_models
-            }
-            for qr in query_results:
-                if qr.error:
-                    continue
-                stats = model_stats[qr.model]
-                stats["total_queries"] += 1
-                if qr.mentioned:
-                    stats["total_mentions"] += 1
-
-            overall_queries = 0
-            overall_mentions = 0
-            for model_name, stats in model_stats.items():
-                tq = stats["total_queries"]
-                tm = stats["total_mentions"]
-                score = (tm / tq * 100.0) if tq > 0 else 0.0
-                db.add(
-                    RunModelScore(
-                        tracking_run_id=run_id,
-                        model=model_name,
-                        total_queries=tq,
-                        total_mentions=tm,
-                        score=round(score, 2),
-                    )
-                )
-                overall_queries += tq
-                overall_mentions += tm
-
-            overall_score = _compute_overall_score(model_stats)
-
-            # Update the TrackingRun
-            run = await db.get(TrackingRun, run_id)
-            if run:
-                run.status = "completed"
-                run.completed_at = _utcnow()
-                run.overall_score = round(overall_score, 2)
-                run.total_queries = overall_queries
-                run.total_mentions = overall_mentions
-
-            # Persist per-prompt per-model scores for impact timelines
-            await _persist_prompt_run_scores(db, run_id, brand_id, query_results)
-
             await db.commit()
-            logger.info(
-                "Tracking run %d completed. Score=%.2f%% (%d/%d)",
-                run_id,
-                overall_score,
-                overall_mentions,
-                overall_queries,
+    except Exception as exc:
+        logger.exception("Error persisting results for run %d", run_id)
+        try:
+            async with AsyncSessionLocal() as err_db:
+                run = await err_db.get(TrackingRun, run_id)
+                if run:
+                    run.status = "failed"
+                    run.error_message = f"DB error: {exc}"
+                    run.completed_at = _utcnow()
+                    await err_db.commit()
+        except Exception as inner_exc:
+            logger.critical(
+                "CRITICAL: Failed to mark run %d as failed — run may be stuck. "
+                "Original: %s, Cleanup: %s", run_id, exc, inner_exc,
             )
-        except Exception as exc:
-            try:
-                await db.rollback()
-            except Exception:
-                logger.warning("Rollback also failed for run %d", run_id)
-            logger.exception("Error persisting results for run %d", run_id)
-            # Mark run as failed in a clean session — wrap in its own
-            # try/except so the run never stays stuck in "running" state.
-            try:
-                async with AsyncSessionLocal() as err_db:
-                    run = await err_db.get(TrackingRun, run_id)
-                    if run:
-                        run.status = "failed"
-                        run.error_message = f"DB error: {exc}"
-                        run.completed_at = _utcnow()
-                        await err_db.commit()
-            except Exception as inner_exc:
-                logger.critical(
-                    "CRITICAL: Failed to mark run %d as failed — run may be stuck in 'running' state. "
-                    "Original error: %s, Cleanup error: %s",
-                    run_id, exc, inner_exc,
-                )
-            raise
+        raise
+
+    await finalize_run(run_id)
+
+    # Read back aggregate values written by finalize_run for use in notifications/email
+    async with AsyncSessionLocal() as db:
+        _run = await db.get(TrackingRun, run_id)
+        overall_score: float = _run.overall_score if _run and _run.overall_score is not None else 0.0
+        overall_queries: int = _run.total_queries if _run and _run.total_queries is not None else 0
+        overall_mentions: int = _run.total_mentions if _run and _run.total_mentions is not None else 0
 
     # ── 6. Classify sentiment for mentioned responses ────────────────────────
     _post_processing_warnings: list[str] = []

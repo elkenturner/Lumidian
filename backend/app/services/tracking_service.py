@@ -361,57 +361,42 @@ async def run_tracking(
             citations=result.get("citations"),
         )
 
-    tasks = [
-        _bounded_query(pid, ptext, model, run_number)
-        for pid, ptext in prompt_data
-        for model in active_models
-        for run_number in range(1, runs_per_prompt + 1)
-    ]
-
-    try:
-        query_results: list[QueryResult] = await asyncio.gather(*tasks)
-    except Exception as exc:
-        logger.exception("Fatal error during query gathering for run %d", run_id)
-        try:
-            async with AsyncSessionLocal() as db:
-                run = await db.get(TrackingRun, run_id)
-                if run:
-                    run.status = "failed"
-                    run.error_message = str(exc)
-                    run.completed_at = _utcnow()
-                    await db.commit()
-        except Exception as inner_exc:
-            logger.critical(
-                "CRITICAL: Failed to mark run %d as failed after query gathering error — "
-                "run may be stuck in 'running' state. Original error: %s, Cleanup error: %s",
-                run_id, exc, inner_exc,
-            )
-        raise
-
-    # ── 4 & 5. Persist results and compute scores ────────────────────────────
-    try:
+    async def _run_one_prompt(prompt_id: int, prompt_text: str) -> list[QueryResult]:
+        """Execute every model × run_number query for one prompt, then commit
+        that prompt's QueryResult rows in their own session. Returns the rows."""
+        sub_tasks = [
+            _bounded_query(prompt_id, prompt_text, model, run_number)
+            for model in active_models
+            for run_number in range(1, runs_per_prompt + 1)
+        ]
+        prompt_results = await asyncio.gather(*sub_tasks)
         async with AsyncSessionLocal() as db:
-            for qr in query_results:
+            for qr in prompt_results:
                 db.add(qr)
-            await db.commit()
-    except Exception as exc:
-        logger.exception("Error persisting results for run %d", run_id)
-        try:
-            async with AsyncSessionLocal() as err_db:
-                run = await err_db.get(TrackingRun, run_id)
-                if run:
-                    run.status = "failed"
-                    run.error_message = f"DB error: {exc}"
-                    run.completed_at = _utcnow()
-                    await err_db.commit()
-        except Exception as inner_exc:
-            logger.critical(
-                "CRITICAL: Failed to mark run %d as failed — run may be stuck. "
-                "Original: %s, Cleanup: %s", run_id, exc, inner_exc,
-            )
-        raise
+            await db.commit()  # expire_on_commit=False → qr attrs stay usable below
+        return list(prompt_results)
 
-    await finalize_run(run_id)
+    prompt_tasks = [_run_one_prompt(pid, ptext) for pid, ptext in prompt_data]
+    settled = await asyncio.gather(*prompt_tasks, return_exceptions=True)
+
+    query_results: list[QueryResult] = []
+    for outcome in settled:
+        if isinstance(outcome, Exception):
+            logger.warning("[tracking] a prompt failed for run %d (non-fatal): %s", run_id, outcome)
+            continue
+        query_results.extend(outcome)
+
+    # finalize from whatever persisted; if nothing persisted, mark failed.
+    finalized = await finalize_run(run_id)
+    if not finalized:
+        async with AsyncSessionLocal() as db:
+            run = await db.get(TrackingRun, run_id)
+            if run:
+                run.status = "failed"
+                run.error_message = "No query results were produced"
+                run.completed_at = _utcnow()
+                await db.commit()
+        return run_id
 
     # Read back aggregate values written by finalize_run for use in notifications/email
     async with AsyncSessionLocal() as db:

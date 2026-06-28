@@ -3,7 +3,7 @@ import { type ReactNode, type ElementType } from 'react';
 type HeadingLevel = 'display' | 1 | 2 | 3;
 
 const SIZE_CLASS: Record<HeadingLevel, string> = {
-  display: 'text-[3rem] tracking-[-0.06em] leading-[1.05]',
+  display: 'text-[2.5rem] sm:text-[3rem] lg:text-[3.75rem] tracking-[-0.04em] leading-[1.05]',
   1: 'text-[2rem] tracking-[-0.03em] leading-[1.15]',
   2: 'text-[1.5rem] tracking-[-0.02em] leading-[1.25]',
   3: 'text-[1.125rem] leading-[1.35]',

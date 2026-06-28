@@ -22,6 +22,9 @@ import {
 import LumidianLogo from '@/components/LumidianLogo';
 import { TIER_DISPLAY_NAMES, TIER_PRICES } from '@/lib/tiers';
 import { useInView, FadeUp, ScaleIn } from '@/lib/motion';
+import { Container } from '@/components/ui/container';
+import { Heading } from '@/components/ui/heading';
+import { Card } from '@/components/ui/card';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ANIMATION HOOKS
@@ -199,7 +202,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
           : 'max-md:bg-[rgba(2,6,23,0.85)] max-md:backdrop-blur-lg bg-transparent'
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <Container width="wide">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex items-center">
@@ -262,7 +265,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
             </nav>
           </div>
         )}
-      </div>
+      </Container>
     </header>
   );
 }
@@ -958,8 +961,8 @@ function CTASection() {
 
 function Footer() {
   return (
-    <footer className="py-16 border-t border-[var(--border-subtle)]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <footer className="py-20 sm:py-28 border-t border-[var(--border-subtle)]">
+      <Container width="wide">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mb-12">
           {/* Logo & tagline */}
           <div className="col-span-2 md:col-span-1">
@@ -1004,7 +1007,7 @@ function Footer() {
             &copy; {new Date().getFullYear()} Lumidian. All rights reserved.
           </p>
         </div>
-      </div>
+      </Container>
     </footer>
   );
 }

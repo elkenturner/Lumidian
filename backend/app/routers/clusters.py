@@ -47,6 +47,48 @@ from app.services.drafting_service import _get_prompt_visibility
 router = APIRouter(prefix="/clusters", tags=["clusters"])
 
 
+async def _cluster_lift_for_prompt(
+    db: AsyncSession, prompt_id: int, brand_id: int,
+) -> float | None:
+    """Cluster lift = current visibility for the prompt minus the visibility
+    at the time the FIRST posted draft for this prompt went live.
+
+    Keyed on prompt_id (not cluster_id) so every posted draft for the prompt
+    contributes — cluster-sourced, legacy gap-driven, Wikipedia surface.
+    Returns None if no posted drafts exist for the prompt.
+    """
+    from app.models import DraftAttribution as _DA
+    first_attr = (await db.execute(
+        select(_DA)
+        .join(ContentDraft, ContentDraft.id == _DA.draft_id)
+        .where(
+            ContentDraft.prompt_id == prompt_id,
+            ContentDraft.brand_id == brand_id,
+            ContentDraft.status == "posted",
+        )
+        .order_by(_DA.id.asc())
+        .limit(1)
+    )).scalar_one_or_none()
+    if first_attr is None:
+        return None
+    current = await _get_prompt_visibility(db, prompt_id)
+    return round(float(current) - float(first_attr.score_at_posting), 2)
+
+
+async def _posted_count_for_prompt(
+    db: AsyncSession, prompt_id: int, brand_id: int,
+) -> int:
+    from sqlalchemy import func as _func
+    n = (await db.execute(
+        select(_func.count(ContentDraft.id)).where(
+            ContentDraft.prompt_id == prompt_id,
+            ContentDraft.brand_id == brand_id,
+            ContentDraft.status == "posted",
+        )
+    )).scalar_one()
+    return int(n or 0)
+
+
 async def _ensure_brand_owned(db: AsyncSession, brand_id: int, user_id: int) -> Brand:
     brand = (await db.execute(
         select(Brand).where(Brand.id == brand_id, Brand.user_id == user_id)
@@ -82,19 +124,11 @@ async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dic
         drafts = (await db.execute(
             select(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
         )).scalars().all()
-        posted_drafts = [d for d in drafts if d.status == "posted"]
-        posted_count = len(posted_drafts)
 
-        cluster_delta: float | None = None
-        if posted_drafts:
-            attribution_rows = (await db.execute(
-                select(DraftAttribution).where(
-                    DraftAttribution.draft_id.in_([d.id for d in posted_drafts])
-                )
-            )).scalars().all()
-            deltas = [a.delta for a in attribution_rows if a.delta is not None]
-            if deltas:
-                cluster_delta = float(sum(deltas))
+        # Lift + posted count keyed on prompt_id so legacy + Wikipedia
+        # posted drafts (cluster_id=NULL) also contribute to the cluster card.
+        cluster_delta = await _cluster_lift_for_prompt(db, cluster.prompt_id, cluster.brand_id)
+        posted_count = await _posted_count_for_prompt(db, cluster.prompt_id, cluster.brand_id)
 
         out.append({
             "id": cluster.id,
@@ -174,20 +208,14 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
             "failure_reason": d.failure_reason,
             "citations": cites_by_draft.get(d.id, []),
             "attribution_delta": delta_by_draft.get(d.id),
+            "posted_url": d.posted_url,
+            "brief_version": d.brief_version,
         })
 
-    # Aggregate cluster-level attribution from posted drafts only.
-    posted_drafts = [d for d in drafts if d.status == "posted"]
-    posted_count = len(posted_drafts)
-    cluster_delta: float | None = None
-    if posted_drafts:
-        posted_deltas = [
-            delta_by_draft[d.id]
-            for d in posted_drafts
-            if delta_by_draft.get(d.id) is not None
-        ]
-        if posted_deltas:
-            cluster_delta = float(sum(posted_deltas))
+    # Lift + posted count keyed on prompt_id so legacy + Wikipedia
+    # posted drafts (cluster_id=NULL) also contribute to the cluster card.
+    cluster_delta = await _cluster_lift_for_prompt(db, cluster.prompt_id, cluster.brand_id)
+    posted_count = await _posted_count_for_prompt(db, cluster.prompt_id, cluster.brand_id)
 
     return {
         "id": cluster.id,
@@ -231,6 +259,20 @@ async def regenerate_piece_endpoint(
     brand = await _ensure_brand_owned(db, brand_id, user.id)
     if request.platform not in CLUSTER_PLATFORMS:
         raise HTTPException(400, f"Platform {request.platform} not in cluster set")
+    # Honor BrandContentSettings: a platform disabled at the brand level cannot
+    # have its working draft regenerated.
+    from app.models import BrandContentSettings
+    bcs = (await db.execute(
+        select(BrandContentSettings).where(
+            BrandContentSettings.brand_id == brand.id,
+            BrandContentSettings.platform == request.platform,
+        )
+    )).scalar_one_or_none()
+    if bcs is not None and not bcs.enabled:
+        raise HTTPException(
+            400,
+            f"Platform {request.platform} is disabled in brand settings. Enable it before regenerating.",
+        )
     cluster = (await db.execute(
         select(ContentCluster).where(ContentCluster.id == cluster_id, ContentCluster.brand_id == brand.id)
     )).scalar_one_or_none()

@@ -328,9 +328,8 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     from sqlalchemy import select
 
     from app.database import AsyncSessionLocal
-    from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
+    from app.models import Brand, Prompt, QueryResult, TrackingRun
     from app.services.llm_service import models_for_tier, is_pro_for_brand, runs_per_prompt_for_brand, query_model
-    from app.services.tracking_service import _compute_overall_score, _persist_prompt_run_scores
 
     def utcnow():
         return datetime.now(UTC).replace(tzinfo=None)
@@ -404,92 +403,27 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
             error=result.get("error"),
         )
 
-    tasks = [
-        _bounded_query(pid, ptext, model, rn)
-        for pid, ptext in prompt_data
-        for model in active_models
-        for rn in range(1, runs_per_prompt + 1)
-    ]
+    # Incremental per-prompt persistence + finalize via the shared resilience
+    # core in tracking_service, so a mid-run restart keeps completed prompts'
+    # data instead of losing everything in an end-of-run bulk insert.
+    from app.services.tracking_service import (
+        finalize_or_mark_failed,
+        run_queries_per_prompt,
+    )
 
-    try:
-        query_results = await asyncio.gather(*tasks)
-    except Exception as exc:
-        async with AsyncSessionLocal() as err_db:
-            run = await err_db.get(TrackingRun, run_id)
-            if run:
-                run.status = "failed"
-                run.error_message = str(exc)
-                run.completed_at = utcnow()
-                await err_db.commit()
+    query_results = await run_queries_per_prompt(
+        run_id, prompt_data, active_models, runs_per_prompt, _bounded_query,
+    )
+
+    if not await finalize_or_mark_failed(run_id):
         return
 
-    async with AsyncSessionLocal() as db:
-        try:
-            for qr in query_results:
-                db.add(qr)
-            await db.flush()
-
-            model_stats = {
-                m: {"total_queries": 0, "total_mentions": 0} for m in active_models
-            }
-            for qr in query_results:
-                if qr.error:
-                    continue
-                model_stats[qr.model]["total_queries"] += 1
-                if qr.mentioned:
-                    model_stats[qr.model]["total_mentions"] += 1
-
-            overall_queries = 0
-            overall_mentions = 0
-            for model_name, stats in model_stats.items():
-                tq = stats["total_queries"]
-                tm = stats["total_mentions"]
-                score = (tm / tq * 100.0) if tq > 0 else 0.0
-                db.add(RunModelScore(
-                    tracking_run_id=run_id,
-                    model=model_name,
-                    total_queries=tq,
-                    total_mentions=tm,
-                    score=round(score, 2),
-                ))
-                overall_queries += tq
-                overall_mentions += tm
-
-            overall_score = _compute_overall_score(model_stats)
-
-            await _persist_prompt_run_scores(db, run_id, brand_id, query_results)
-
-            run = await db.get(TrackingRun, run_id)
-            if run:
-                run.status = "completed"
-                run.completed_at = utcnow()
-                run.overall_score = round(overall_score, 2)
-                run.total_queries = overall_queries
-                run.total_mentions = overall_mentions
-
-            await db.commit()
-        except Exception as exc:
-            try:
-                await db.rollback()
-            except Exception:
-                logger.warning("Rollback also failed for manual run %d", run_id)
-            # Mark run as failed in a clean session — wrap in its own
-            # try/except so the run never stays stuck in "running" state.
-            try:
-                async with AsyncSessionLocal() as err_db:
-                    run = await err_db.get(TrackingRun, run_id)
-                    if run:
-                        run.status = "failed"
-                        run.error_message = f"DB error: {exc}"
-                        run.completed_at = utcnow()
-                        await err_db.commit()
-            except Exception as inner_exc:
-                logger.critical(
-                    "CRITICAL: Failed to mark manual run %d as failed — run may be stuck in 'running' state. "
-                    "Original error: %s, Cleanup error: %s",
-                    run_id, exc, inner_exc,
-                )
-            return
+    # Read aggregate values written by finalize_run for downstream analytics/email.
+    async with AsyncSessionLocal() as _db:
+        _run = await _db.get(TrackingRun, run_id)
+        overall_score = _run.overall_score if _run and _run.overall_score is not None else 0.0
+        overall_queries = _run.total_queries if _run and _run.total_queries is not None else 0
+        overall_mentions = _run.total_mentions if _run and _run.total_mentions is not None else 0
 
     # Classify sentiment after the main commit (non-fatal)
     logger.info("Manual run %d complete — starting sentiment classification", run_id)
@@ -713,10 +647,9 @@ async def _background_prompt_run(
     from datetime import datetime
 
     from app.database import AsyncSessionLocal
-    from app.models import QueryResult, RunModelScore
+    from app.models import QueryResult
     from app.models import TrackingRun as TR
     from app.services.llm_service import is_pro_for_brand, models_for_tier, runs_per_prompt_for_brand, query_model
-    from app.services.tracking_service import _compute_overall_score, _persist_prompt_run_scores
 
     active_models = models_for_tier(brand_type, tier)
     is_paid = is_pro_for_brand(brand_type, tier)
@@ -749,100 +682,29 @@ async def _background_prompt_run(
             error=result.get("error"),
         )
 
-    tasks = [
-        _bounded_query(model, rn)
-        for model in active_models
-        for rn in range(1, runs_per_prompt + 1)
-    ]
-
     logger.info(
-        "Prompt run %d — brand=%r prompt_id=%d tasks=%d",
-        run_id, brand_name, prompt_id, len(tasks),
+        "Prompt run %d — brand=%r prompt_id=%d models=%d runs=%d",
+        run_id, brand_name, prompt_id, len(active_models), runs_per_prompt,
     )
 
-    try:
-        query_results = await _asyncio.gather(*tasks)
-    except Exception as exc:
-        async with AsyncSessionLocal() as err_db:
-            run = await err_db.get(TR, run_id)
-            if run:
-                run.status = "failed"
-                run.error_message = str(exc)
-                run.completed_at = utcnow()
-                await err_db.commit()
-        logger.exception("Prompt run %d failed during query phase", run_id)
+    # Incremental persistence + finalize via the shared resilience core.
+    from app.services.tracking_service import (
+        finalize_or_mark_failed,
+        run_queries_per_prompt,
+    )
+
+    async def _bq(_prompt_id, _prompt_text, model, run_number):
+        return await _bounded_query(model, run_number)
+
+    query_results = await run_queries_per_prompt(
+        run_id, [(prompt_id, prompt_text)], active_models, runs_per_prompt, _bq,
+    )
+
+    if not await finalize_or_mark_failed(run_id):
+        logger.warning("Prompt run %d produced no results", run_id)
         return
 
-    async with AsyncSessionLocal() as db:
-        try:
-            for qr in query_results:
-                db.add(qr)
-            await db.flush()
-
-            model_stats = {m: {"total_queries": 0, "total_mentions": 0} for m in active_models}
-            for qr in query_results:
-                if qr.error:
-                    continue
-                model_stats[qr.model]["total_queries"] += 1
-                if qr.mentioned:
-                    model_stats[qr.model]["total_mentions"] += 1
-
-            overall_queries = 0
-            overall_mentions = 0
-            for model_name, stats in model_stats.items():
-                tq = stats["total_queries"]
-                tm = stats["total_mentions"]
-                score = (tm / tq * 100.0) if tq > 0 else 0.0
-                db.add(RunModelScore(
-                    tracking_run_id=run_id,
-                    model=model_name,
-                    total_queries=tq,
-                    total_mentions=tm,
-                    score=round(score, 2),
-                ))
-                overall_queries += tq
-                overall_mentions += tm
-
-            overall_score = _compute_overall_score(model_stats)
-
-            await _persist_prompt_run_scores(db, run_id, brand_id, query_results)
-
-            run = await db.get(TR, run_id)
-            if run:
-                run.status = "completed"
-                run.completed_at = utcnow()
-                run.overall_score = round(overall_score, 2)
-                run.total_queries = overall_queries
-                run.total_mentions = overall_mentions
-
-            await db.commit()
-            logger.info(
-                "Prompt run %d complete — prompt_id=%d score=%.1f%%",
-                run_id, prompt_id, overall_score,
-            )
-        except Exception as exc:
-            try:
-                await db.rollback()
-            except Exception:
-                logger.warning("Rollback also failed for prompt run %d", run_id)
-            # Mark run as failed in a clean session — wrap in its own
-            # try/except so the run never stays stuck in "running" state.
-            try:
-                async with AsyncSessionLocal() as err_db:
-                    run = await err_db.get(TR, run_id)
-                    if run:
-                        run.status = "failed"
-                        run.error_message = f"DB error: {exc}"
-                        run.completed_at = utcnow()
-                        await err_db.commit()
-            except Exception as inner_exc:
-                logger.critical(
-                    "CRITICAL: Failed to mark prompt run %d as failed — run may be stuck in 'running' state. "
-                    "Original error: %s, Cleanup error: %s",
-                    run_id, exc, inner_exc,
-                )
-            logger.exception("Prompt run %d failed during DB write", run_id)
-            return
+    logger.info("Prompt run %d complete — prompt_id=%d", run_id, prompt_id)
 
     # Classify sentiment (non-fatal)
     try:

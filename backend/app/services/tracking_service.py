@@ -255,6 +255,80 @@ async def finalize_run(run_id: int, *, error_message: str | None = None) -> bool
     return True
 
 
+async def run_queries_per_prompt(
+    run_id: int,
+    prompt_data: list[tuple[int, str]],
+    active_models: list[str],
+    runs_per_prompt: int,
+    bounded_query,
+) -> list["QueryResult"]:
+    """Execute every model × run_number query for each prompt, committing each
+    prompt's QueryResult rows in their own session as that prompt finishes.
+
+    This is the resilience core shared by all run paths (scheduled run_tracking
+    and the manual/single-prompt endpoints): incremental per-prompt persistence
+    means a mid-run interruption keeps the prompts that already completed,
+    instead of losing everything in a single end-of-run bulk insert.
+
+    `bounded_query(prompt_id, prompt_text, model, run_number)` is an async
+    callable returning a QueryResult. Callers pass their own so per-query
+    semantics (mention detection, the concurrency semaphore) stay path-specific.
+    Returns the flat list of QueryResults from prompts that succeeded; a prompt
+    that raises is logged non-fatally and skipped (its siblings are unaffected).
+    """
+    async def _one(prompt_id: int, prompt_text: str) -> list["QueryResult"]:
+        sub_tasks = [
+            bounded_query(prompt_id, prompt_text, model, run_number)
+            for model in active_models
+            for run_number in range(1, runs_per_prompt + 1)
+        ]
+        rows = await asyncio.gather(*sub_tasks)
+        async with AsyncSessionLocal() as db:
+            for qr in rows:
+                db.add(qr)
+            await db.commit()  # expire_on_commit=False → qr attrs stay usable
+        return list(rows)
+
+    settled = await asyncio.gather(
+        *[_one(pid, ptext) for pid, ptext in prompt_data],
+        return_exceptions=True,
+    )
+    results: list["QueryResult"] = []
+    for outcome in settled:
+        if isinstance(outcome, BaseException):
+            # return_exceptions=True can surface BaseException (e.g. CancelledError),
+            # which is NOT an Exception — catch it here so it can't fall through to
+            # .extend() and crash the caller, leaving the run stuck in 'running'.
+            logger.warning(
+                "[tracking] a prompt failed for run %d (non-fatal): %s",
+                run_id, outcome, exc_info=outcome,
+            )
+            continue
+        results.extend(outcome)
+    return results
+
+
+async def finalize_or_mark_failed(run_id: int) -> bool:
+    """Finalize a run from its persisted results; if nothing persisted OR
+    finalize_run raises, mark the run failed so it never stays stuck in
+    'running'. Returns True if the run was finalized as completed.
+    """
+    try:
+        finalized = await finalize_run(run_id)
+    except Exception:
+        logger.exception("finalize_run raised for run %d; marking failed", run_id)
+        finalized = False
+    if not finalized:
+        async with AsyncSessionLocal() as db:
+            run = await db.get(TrackingRun, run_id)
+            if run and run.status not in ("completed", "failed"):
+                run.status = "failed"
+                run.error_message = run.error_message or "No query results were produced"
+                run.completed_at = _utcnow()
+                await db.commit()
+    return finalized
+
+
 async def run_tracking(
     brand_id: int,
     run_type: str = "manual",
@@ -360,47 +434,14 @@ async def run_tracking(
             error=error,
         )
 
-    async def _run_one_prompt(prompt_id: int, prompt_text: str) -> list[QueryResult]:
-        """Execute every model × run_number query for one prompt, then commit
-        that prompt's QueryResult rows in their own session. Returns the rows."""
-        sub_tasks = [
-            _bounded_query(prompt_id, prompt_text, model, run_number)
-            for model in active_models
-            for run_number in range(1, runs_per_prompt + 1)
-        ]
-        prompt_results = await asyncio.gather(*sub_tasks)
-        async with AsyncSessionLocal() as db:
-            for qr in prompt_results:
-                db.add(qr)
-            await db.commit()  # expire_on_commit=False → qr attrs stay usable below
-        return list(prompt_results)
+    # Incremental per-prompt persistence via the shared resilience core.
+    query_results: list[QueryResult] = await run_queries_per_prompt(
+        run_id, prompt_data, active_models, runs_per_prompt, _bounded_query,
+    )
 
-    prompt_tasks = [_run_one_prompt(pid, ptext) for pid, ptext in prompt_data]
-    settled = await asyncio.gather(*prompt_tasks, return_exceptions=True)
-
-    query_results: list[QueryResult] = []
-    for outcome in settled:
-        if isinstance(outcome, BaseException):
-            # return_exceptions=True can surface BaseException (e.g. CancelledError),
-            # which is NOT an Exception — catch it here so it can't fall through to
-            # .extend() and crash the run, leaving it stuck in 'running'.
-            logger.warning(
-                "[tracking] a prompt failed for run %d (non-fatal): %s",
-                run_id, outcome, exc_info=outcome,
-            )
-            continue
-        query_results.extend(outcome)
-
-    # finalize from whatever persisted; if nothing persisted, mark failed.
-    finalized = await finalize_run(run_id)
-    if not finalized:
-        async with AsyncSessionLocal() as db:
-            run = await db.get(TrackingRun, run_id)
-            if run:
-                run.status = "failed"
-                run.error_message = "No query results were produced"
-                run.completed_at = _utcnow()
-                await db.commit()
+    # finalize from whatever persisted; if nothing persisted (or finalize
+    # raises), mark failed and skip post-processing.
+    if not await finalize_or_mark_failed(run_id):
         return run_id
 
     # Read back aggregate values written by finalize_run for use in notifications/email

@@ -103,10 +103,10 @@ const FEATURES = [
 ];
 
 const AI_MODELS = [
-  { name: 'ChatGPT', color: '#10a37f' },
-  { name: 'Claude', color: '#f97316' },
-  { name: 'Perplexity', color: '#8b5cf6' },
-  { name: 'Gemini', color: '#3b82f6' },
+  { name: 'ChatGPT', color: 'var(--color-chatgpt)' },
+  { name: 'Claude', color: 'var(--color-claude)' },
+  { name: 'Perplexity', color: 'var(--color-perplexity)' },
+  { name: 'Gemini', color: 'var(--color-gemini)' },
 ];
 
 const HOW_STEPS = [
@@ -341,8 +341,8 @@ function HeroSection() {
 
 function ModelsBar() {
   return (
-    <section className="py-12 border-y border-[var(--border-subtle)]">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section className="py-20 sm:py-28 border-y border-[var(--border-subtle)]">
+      <Container width="default">
         <FadeUp>
           <p className="text-center text-sm text-[var(--text-muted)] mb-6">Tracking visibility across</p>
         </FadeUp>
@@ -370,7 +370,7 @@ function ModelsBar() {
             </FadeUp>
           ))}
         </div>
-      </div>
+      </Container>
     </section>
   );
 }

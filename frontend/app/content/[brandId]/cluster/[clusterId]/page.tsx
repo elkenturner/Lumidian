@@ -25,8 +25,9 @@ import { PillarCard } from "@/components/content/cluster/PillarCard";
 import { SourceSpinePanel } from "@/components/content/cluster/SourceSpinePanel";
 import PlatformBadge from "@/components/PlatformBadge";
 import { useClusterStatus } from "@/hooks/useClusterStatus";
+import { CLUSTER_PLATFORMS } from "@/lib/clusterPlatforms";
 
-const PLATFORMS = ["linkedin", "medium", "reddit", "quora", "x"] as const;
+const PLATFORMS = CLUSTER_PLATFORMS;
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",

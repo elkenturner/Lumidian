@@ -718,6 +718,84 @@ async def run_migrations():
         await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_prospect_audits_created_at ON prospect_audits(created_at)"))
         logger.info("Migration applied: prospect_audits table + indexes")
 
+    # --- Migration: cluster lifecycle flow (2026-06-28) ---
+    # Two-pool model: posted drafts immutable, working pool guarded by partial
+    # unique index. Eager cluster shells per Prompt. See
+    # docs/superpowers/specs/2026-06-28-cluster-lifecycle-flow-design.md
+    async with engine.begin() as conn:
+        for col_sql in (
+            "ALTER TABLE content_drafts ADD COLUMN posted_url VARCHAR(1024)",
+            "ALTER TABLE content_drafts ADD COLUMN brief_version INTEGER",
+        ):
+            try:
+                await conn.execute(text(col_sql))
+            except Exception as exc:
+                if "duplicate column" not in str(exc).lower():
+                    raise
+
+        # Dedupe working drafts before adding the unique index — keep highest id.
+        await conn.execute(text("""
+            DELETE FROM content_drafts
+            WHERE id IN (
+                SELECT cd.id FROM content_drafts cd
+                WHERE cd.cluster_id IS NOT NULL
+                  AND cd.status IN ('draft','approved','failed')
+                  AND cd.id < (
+                    SELECT MAX(cd2.id) FROM content_drafts cd2
+                    WHERE cd2.cluster_id = cd.cluster_id
+                      AND cd2.platform = cd.platform
+                      AND cd2.status IN ('draft','approved','failed')
+                  )
+            )
+        """))
+
+        # Drop working drafts on currently-disabled platforms (posted untouched).
+        await conn.execute(text("""
+            DELETE FROM content_drafts
+            WHERE cluster_id IS NOT NULL
+              AND status IN ('draft','approved','failed')
+              AND id IN (
+                SELECT cd.id FROM content_drafts cd
+                JOIN content_clusters cc ON cc.id = cd.cluster_id
+                JOIN brand_content_settings bcs
+                  ON bcs.brand_id = cc.brand_id AND bcs.platform = cd.platform
+                WHERE bcs.enabled = 0
+              )
+        """))
+
+        await conn.execute(text("""
+            CREATE UNIQUE INDEX IF NOT EXISTS uq_cluster_platform_working
+              ON content_drafts(cluster_id, platform)
+              WHERE status IN ('draft','approved','failed') AND cluster_id IS NOT NULL
+        """))
+
+        # Backfill posted_url from latest ContentPost per draft.
+        await conn.execute(text("""
+            UPDATE content_drafts
+            SET posted_url = (
+                SELECT cp.post_url FROM content_posts cp
+                WHERE cp.draft_id = content_drafts.id AND cp.post_url IS NOT NULL
+                ORDER BY cp.posted_at DESC LIMIT 1
+            )
+            WHERE status = 'posted' AND posted_url IS NULL
+        """))
+
+        # Eager cluster shells for every Prompt without one.
+        await conn.execute(text("""
+            INSERT INTO content_clusters (brand_id, prompt_id, status, pillar_mode, version, created_at)
+            SELECT p.brand_id, p.id, 'pending', 'none', 0, CURRENT_TIMESTAMP
+            FROM prompts p
+            LEFT JOIN content_clusters cc ON cc.prompt_id = p.id
+            WHERE cc.id IS NULL
+        """))
+
+        # Drop legacy partial_failed status.
+        await conn.execute(text(
+            "UPDATE content_clusters SET status = 'generation_partial' WHERE status = 'partial_failed'"
+        ))
+
+        logger.info("Migration applied: cluster lifecycle flow")
+
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):
     """On startup, resolve tracking runs stuck in pending/running.

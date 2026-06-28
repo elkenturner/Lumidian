@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { ArrowUpRight, MoreHorizontal, RefreshCw } from "lucide-react";
 import { useState } from "react";
-import PlatformBadge from "@/components/PlatformBadge";
 import type { ContentClusterSummary } from "@/lib/api";
 
 interface Props {
@@ -13,26 +12,13 @@ interface Props {
   regenerating: boolean;
 }
 
-const PIECE_TONE: Record<string, string> = {
-  draft: "bg-[rgba(148,163,184,0.10)] text-[var(--text-secondary)] border-[rgba(148,163,184,0.18)]",
-  approved: "bg-[rgba(34,197,94,0.10)] text-[#4ade80] border-[rgba(34,197,94,0.22)]",
-  posted: "bg-[rgba(56,189,248,0.10)] text-[#7dd3fc] border-[rgba(56,189,248,0.22)]",
-  failed: "bg-[rgba(244,63,94,0.10)] text-[#fb7185] border-[rgba(244,63,94,0.22)]",
-  missing:
-    "bg-transparent text-[var(--text-faint)] border-dashed border-[var(--border-subtle)]",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: "Pending",
-  briefing: "Briefing",
-  generating: "Generating",
-  ready: "Ready",
-  partial_failed: "Partial failure",
-};
-
 export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Props) {
-  const totalEnabled = cluster.pieces.length || 5;
+  // Derived: 1 card per prompt always — pending shells get a Generate CTA
+  const isShell = cluster.status === "pending" && cluster.pieces.length === 0;
+  const enabledPlatformCount = cluster.pieces.length;
   const postedCount = cluster.posted_count;
+  const isFullyLive = enabledPlatformCount > 0 && postedCount >= enabledPlatformCount;
+  const isPartial = postedCount > 0 && postedCount < enabledPlatformCount;
   const delta = cluster.cluster_delta;
   const hasDelta = delta !== null && delta !== undefined;
   const deltaTone = !hasDelta
@@ -42,75 +28,89 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
     : "text-[#fb7185]";
   const deltaLabel = !hasDelta
     ? "—"
-    : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)}pp`;
-  const statusLabel = STATUS_LABEL[cluster.status] ?? cluster.status.replace("_", " ");
+    : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)} pts`;
 
   return (
     <div className="card card-hover flex flex-col gap-4">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <h3 className="text-base font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
-            {cluster.prompt_text}
-          </h3>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--text-faint)]">
-            <span>
-              <span className="text-[var(--text-muted)]">Status</span>{" "}
-              <span className="text-[var(--text-secondary)] font-medium">{statusLabel}</span>
-            </span>
-            <span className="text-[var(--text-faint)]">·</span>
-            <span>Posted {postedCount} of {totalEnabled}</span>
-            {cluster.pillar_mode === "attached" && (
-              <>
-                <span className="text-[var(--text-faint)]">·</span>
-                <span className="text-[#4ade80] font-medium">Pillar attached</span>
-              </>
-            )}
-            {cluster.pillar_mode === "proposed" && (
-              <>
-                <span className="text-[var(--text-faint)]">·</span>
-                <span className="text-[#fbbf24] font-medium">Pillar proposed</span>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <div className={`flex items-center justify-end gap-1 text-xl font-bold ${deltaTone}`}>
-            {deltaLabel}
-          </div>
+        <h3 className="text-base font-semibold text-[var(--text-primary)] leading-snug line-clamp-2 min-w-0 flex-1">
+          {cluster.prompt_text}
+        </h3>
+        <div
+          className="shrink-0 text-right"
+          title="Cluster lift = current visibility minus the visibility at the time the first post for this prompt went live. Includes Wikipedia and legacy posts."
+        >
+          <div className={`text-xl font-bold ${deltaTone}`}>{deltaLabel}</div>
           <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
-            Cluster lift
+            AI visibility lift
           </div>
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-1.5">
-        {cluster.pieces.map((piece) => {
-          const tone = PIECE_TONE[piece.status] ?? PIECE_TONE.missing;
-          return (
-            <span
-              key={piece.platform}
-              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium border ${tone}`}
-              title={`${piece.platform} — ${piece.status}`}
-            >
-              <PlatformBadge platform={piece.platform} size="sm" />
-              <span className="opacity-70">·</span>
-              <span className="capitalize">{piece.status}</span>
+      {/* Composed progress bar */}
+      {isShell ? (
+        <div className="text-sm text-[var(--text-secondary)]">
+          No drafts yet for this prompt.
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-1 text-[var(--text-secondary)]">
+            {Array.from({ length: enabledPlatformCount }).map((_, i) => (
+              <span
+                key={i}
+                className={`inline-block h-2 w-2 rounded-full ${
+                  i < postedCount
+                    ? "bg-[#4ade80]"
+                    : "border border-[var(--border-subtle)]"
+                }`}
+              />
+            ))}
+            <span className="ml-1 text-[var(--text-faint)]">
+              {postedCount} of {enabledPlatformCount} posts live
             </span>
-          );
-        })}
-      </div>
+          </div>
+          <span className="text-[var(--text-faint)]">·</span>
+          <span className="text-[var(--text-secondary)]">
+            {cluster.pieces.length - postedCount} drafts to review
+          </span>
+        </div>
+      )}
 
+      {/* Partial-coverage one-liner */}
+      {isPartial && (
+        <p className="text-[11px] text-[var(--text-faint)]">
+          Lift only counts what&apos;s posted. Publish the remaining platforms to capture full impact.
+        </p>
+      )}
+
+      {/* Footer: View link + Push v2 / Generate CTA */}
       <div className="flex items-center justify-between pt-1 border-t border-[var(--border-subtle)]">
         <Link
           href={`/content/${brandId}/cluster/${cluster.id}`}
           className="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-foreground)] hover:text-[var(--text-primary)]"
         >
-          View cluster <ArrowUpRight className="h-3.5 w-3.5" />
+          {isShell ? "Generate cluster" : "View cluster"}{" "}
+          <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
-        <ClusterCardKebab
-          regenerating={regenerating}
-          onRegenerate={() => onRegenerate(cluster.id)}
-        />
+        {isFullyLive && (
+          <button
+            type="button"
+            disabled={regenerating}
+            onClick={() => onRegenerate(cluster.id)}
+            className="inline-flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Generate a fresh round of drafts (v2). Old posts stay live and keep their lift attribution."
+          >
+            <RefreshCw className={`h-3 w-3 ${regenerating ? "animate-spin" : ""}`} />
+            {regenerating ? "Drafting v2…" : "Push v2"}
+          </button>
+        )}
+        {!isFullyLive && !isShell && (
+          <ClusterCardKebab
+            regenerating={regenerating}
+            onRegenerate={() => onRegenerate(cluster.id)}
+          />
+        )}
       </div>
     </div>
   );

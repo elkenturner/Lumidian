@@ -19,10 +19,16 @@ async def test_edit_brief_creates_new_version_does_not_promote(client):
     assert len(prompts) >= 1, "Brand should have a default prompt"
     prompt_id = prompts[0]["id"]
 
-    # Seed a cluster with an initial brief manually
+    # Seed a cluster with an initial brief manually. The brand creation flow
+    # auto-creates a `pending` ContentCluster shell per prompt (eager-shell
+    # invariant from the 2026-06-28 cluster lifecycle redesign); fetch that
+    # shell and mutate it instead of inserting a duplicate row.
     async with AsyncSessionLocal() as db:
-        cluster = ContentCluster(brand_id=brand["id"], prompt_id=prompt_id, status="ready")
-        db.add(cluster); await db.flush()
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "ready"
+        await db.flush()
         brief_v1 = ContentBrief(
             cluster_id=cluster.id, version=1, positioning="v1",
             canonical_phrasings=[], key_claims=[], stats=[],

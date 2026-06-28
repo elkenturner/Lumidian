@@ -700,15 +700,12 @@ function PricingSection() {
   };
 
   return (
-    <section id="pricing" className="py-16 scroll-mt-20">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="pricing" className="py-20 sm:py-28 scroll-mt-20">
+      <Container width="content">
         <FadeUp>
-          <h2
-            className="text-3xl sm:text-4xl font-bold text-center text-[var(--text-primary)] mb-4"
-            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
-          >
+          <Heading level={2} className="text-center mb-4">
             Simple, transparent pricing
-          </h2>
+          </Heading>
         </FadeUp>
         <FadeUp delay={100}>
           <p className="text-center text-[var(--text-secondary)] mb-12">
@@ -726,7 +723,7 @@ function PricingSection() {
                   <th className="text-center text-sm font-semibold text-[var(--text-primary)] p-4">Free</th>
                   <th className="text-center text-sm font-semibold text-[var(--text-primary)] p-4">Starter</th>
                   <th className="text-center text-sm font-semibold text-[var(--text-primary)] p-4">Growth</th>
-                  <th className="text-center text-sm font-semibold text-[var(--text-primary)] p-4 rounded-tr-xl bg-[rgba(95,126,166,0.2)] border-b-2 border-[var(--accent)]">
+                  <th className="text-center text-sm font-semibold text-[var(--text-primary)] p-4 rounded-tr-xl bg-[var(--accent-20)] border-b-2 border-[var(--accent)]">
                     Pro
                   </th>
                 </tr>
@@ -735,13 +732,13 @@ function PricingSection() {
                 {COMPARISON_FEATURES.map((row, i) => (
                   <tr
                     key={row.label}
-                    className={`${i % 2 === 0 ? 'bg-[var(--bg-raised)]' : 'bg-[var(--bg-base)]'} hover:bg-[rgba(95,126,166,0.05)] transition-colors`}
+                    className={`${i % 2 === 0 ? 'bg-[var(--bg-raised)]' : 'bg-[var(--bg-base)]'} hover:bg-[var(--accent-06)] transition-colors`}
                   >
                     <td className="text-sm text-[var(--text-primary)] p-3 md:p-4 sticky left-0 z-10" style={{ background: i % 2 === 0 ? 'var(--bg-raised)' : 'var(--bg-base)' }}>{row.label}</td>
                     <td className="text-center p-4"><PricingCell value={row.free} /></td>
                     <td className="text-center p-4"><PricingCell value={row.basic} /></td>
                     <td className="text-center p-4"><PricingCell value={row.starter} /></td>
-                    <td className="text-center p-4 bg-[rgba(95,126,166,0.05)] border-l border-r border-[rgba(95,126,166,0.2)]">
+                    <td className="text-center p-4 bg-[var(--accent-06)] border-l border-r border-[var(--accent-20)]">
                       <PricingCell value={row.pro} />
                     </td>
                   </tr>
@@ -827,7 +824,7 @@ function PricingSection() {
             </Link>
           </div>
         </FadeUp>
-      </div>
+      </Container>
     </section>
   );
 }

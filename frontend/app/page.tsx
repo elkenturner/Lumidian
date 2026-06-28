@@ -843,7 +843,7 @@ function FAQItem({
   return (
     <FadeUp delay={delay}>
       <div
-        className={`border-b border-[var(--border-subtle)] transition-[background-color,padding] ${isOpen ? 'bg-[rgba(95,126,166,0.04)] pl-4' : ''}`}
+        className={`border-b border-[var(--border-subtle)] transition-[background-color,padding] ${isOpen ? 'bg-[var(--accent-06)] pl-4' : ''}`}
       >
         <button
           onClick={onToggle}
@@ -869,15 +869,12 @@ function FAQSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <section id="faq" className="py-16 border-t border-[var(--border-subtle)] scroll-mt-20">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="faq" className="py-20 sm:py-28 border-t border-[var(--border-subtle)] scroll-mt-20">
+      <Container width="narrow">
         <FadeUp>
-          <h2
-            className="text-3xl sm:text-4xl font-bold text-center text-[var(--text-primary)] mb-12"
-            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
-          >
+          <Heading level={2} className="text-center mb-12">
             Frequently asked questions
-          </h2>
+          </Heading>
         </FadeUp>
 
         <div>
@@ -891,7 +888,7 @@ function FAQSection() {
             />
           ))}
         </div>
-      </div>
+      </Container>
     </section>
   );
 }

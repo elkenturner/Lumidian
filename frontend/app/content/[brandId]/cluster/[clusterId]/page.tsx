@@ -23,6 +23,7 @@ import { InputsZone } from "@/components/content/cluster/InputsZone";
 import { PieceCard } from "@/components/content/cluster/PieceCard";
 import { PillarCard } from "@/components/content/cluster/PillarCard";
 import { SourceSpinePanel } from "@/components/content/cluster/SourceSpinePanel";
+import PlatformBadge from "@/components/PlatformBadge";
 import { useClusterStatus } from "@/hooks/useClusterStatus";
 
 const PLATFORMS = ["linkedin", "medium", "reddit", "quora", "x"] as const;
@@ -265,6 +266,38 @@ export default function ClusterDetailPage() {
           ))}
         </div>
       </div>
+
+      {cluster.drafts.some(d => d.status === "posted") && (
+        <div>
+          <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-3">
+            Posted history
+          </div>
+          <div className="space-y-2">
+            {cluster.drafts
+              .filter(d => d.status === "posted")
+              .sort((a, b) => (b.posted_at ?? "").localeCompare(a.posted_at ?? ""))
+              .map(d => (
+                <div key={d.id} className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
+                  <PlatformBadge platform={d.platform} size="sm" />
+                  <span>{new Date(d.posted_at!).toLocaleDateString()}</span>
+                  {d.posted_url && (
+                    <a href={d.posted_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-foreground)] hover:underline">
+                      View ↗
+                    </a>
+                  )}
+                  {d.brief_version != null && (
+                    <span className="text-[var(--text-faint)]">from brief v{d.brief_version}</span>
+                  )}
+                  {d.attribution_delta != null && (
+                    <span className={d.attribution_delta >= 0 ? "text-[#4ade80]" : "text-[#fb7185]"}>
+                      {d.attribution_delta >= 0 ? "+" : ""}{d.attribution_delta.toFixed(1)}pts
+                    </span>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* ZONE 2 — Brief + Source spine (supporting context, collapsed by default) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

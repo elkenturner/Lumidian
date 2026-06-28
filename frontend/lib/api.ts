@@ -242,6 +242,8 @@ export interface ContentDraft {
     position_marker: number | null;
   }>;
   attribution_delta?: number | null;
+  posted_url?: string | null;
+  brief_version?: number | null;
 }
 
 export interface ContentOpportunity {

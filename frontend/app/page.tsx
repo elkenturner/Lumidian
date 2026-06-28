@@ -898,7 +898,7 @@ function CTASection() {
     <section
       className="py-32 text-center relative"
       style={{
-        background: 'radial-gradient(ellipse at 50% 100%, rgba(95,126,166,0.15) 0%, transparent 60%)',
+        background: 'radial-gradient(ellipse at 50% 100%, var(--accent-15) 0%, transparent 60%)',
       }}
     >
       {/* Animated gradient orb */}
@@ -916,14 +916,11 @@ function CTASection() {
           }}
         />
       </div>
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+      <Container width="narrow">
         <FadeUp>
-          <h2
-            className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] mb-4"
-            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
-          >
+          <Heading level={1} as="h1" className="mb-4">
             Start tracking your AI visibility
-          </h2>
+          </Heading>
         </FadeUp>
         <FadeUp delay={100}>
           <p className="text-[var(--text-secondary)] mb-8">
@@ -939,7 +936,7 @@ function CTASection() {
             <ArrowRight size={18} />
           </Link>
         </FadeUp>
-      </div>
+      </Container>
     </section>
   );
 }

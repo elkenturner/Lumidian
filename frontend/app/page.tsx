@@ -377,15 +377,12 @@ function ModelsBar() {
 
 function FeaturesSection() {
   return (
-    <section id="features" className="py-16 scroll-mt-20">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <section id="features" className="py-20 sm:py-28 scroll-mt-20">
+      <Container width="wide">
         <FadeUp>
-          <h2
-            className="text-3xl sm:text-4xl font-bold text-center text-[var(--text-primary)] mb-4"
-            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
-          >
+          <Heading level={2} className="text-center mb-4">
             Everything you need to dominate AI visibility
-          </h2>
+          </Heading>
         </FadeUp>
         <FadeUp delay={100}>
           <p className="text-center text-[var(--text-secondary)] mb-16 max-w-2xl mx-auto">
@@ -398,8 +395,8 @@ function FeaturesSection() {
             const Icon = feature.icon;
             return (
               <FadeUp key={feature.title} delay={i * 80}>
-                <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-2xl p-5 md:p-7 h-full transition-[transform,border-color,box-shadow] duration-200 hover:-translate-y-1 hover:border-[rgba(95,126,166,0.3)] hover:shadow-[0_0_24px_rgba(95,126,166,0.15),0_8px_32px_rgba(0,0,0,0.3)]">
-                  <div className="w-11 h-11 rounded-xl bg-[rgba(95,126,166,0.15)] flex items-center justify-center mb-4">
+                <Card tone="default" hover className="h-full">
+                  <div className="w-11 h-11 rounded-xl bg-[var(--accent-15)] flex items-center justify-center mb-4">
                     <Icon size={20} className="text-[var(--accent)]" />
                   </div>
                   <h3
@@ -411,12 +408,12 @@ function FeaturesSection() {
                   <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
                     {feature.desc}
                   </p>
-                </div>
+                </Card>
               </FadeUp>
             );
           })}
         </div>
-      </div>
+      </Container>
     </section>
   );
 }

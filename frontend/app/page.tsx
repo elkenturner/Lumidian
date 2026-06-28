@@ -277,15 +277,15 @@ function HeroSection() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(95,126,166,0.15) 0%, transparent 60%)',
+          background: 'radial-gradient(ellipse at 50% 0%, var(--accent-15) 0%, transparent 60%)',
         }}
       />
 
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <Container width="default" className="relative z-10 text-center">
         {/* Badge */}
         <FadeUp>
-          <div className="inline-flex items-center gap-2 bg-[var(--bg-raised)] border border-[rgba(95,126,166,0.3)] rounded-full px-4 py-1.5 mb-8">
+          <div className="inline-flex items-center gap-2 bg-[var(--bg-raised)] border border-[var(--accent-30)] rounded-full px-4 py-1.5 mb-8">
             <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
             <span className="text-sm text-[var(--text-secondary)]">Now tracking 4 AI models</span>
           </div>
@@ -293,17 +293,14 @@ function HeroSection() {
 
         {/* Headline */}
         <FadeUp delay={100}>
-          <h1
-            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight"
-            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif', letterSpacing: '-0.03em', lineHeight: 1.05 }}
-          >
+          <Heading level="display" as="h1">
             Track Your Brand&apos;s
             <br />
             <span className="text-[var(--accent)]">
               Visibility in AI
             </span>
             {' — Then Fix It'}
-          </h1>
+          </Heading>
         </FadeUp>
 
         {/* Subhead */}
@@ -337,7 +334,7 @@ function HeroSection() {
         <ScaleIn delay={400} className="mt-16 hidden sm:block">
           <DashboardMockup />
         </ScaleIn>
-      </div>
+      </Container>
     </section>
   );
 }

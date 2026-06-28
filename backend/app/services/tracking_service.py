@@ -380,8 +380,14 @@ async def run_tracking(
 
     query_results: list[QueryResult] = []
     for outcome in settled:
-        if isinstance(outcome, Exception):
-            logger.warning("[tracking] a prompt failed for run %d (non-fatal): %s", run_id, outcome)
+        if isinstance(outcome, BaseException):
+            # return_exceptions=True can surface BaseException (e.g. CancelledError),
+            # which is NOT an Exception — catch it here so it can't fall through to
+            # .extend() and crash the run, leaving it stuck in 'running'.
+            logger.warning(
+                "[tracking] a prompt failed for run %d (non-fatal): %s",
+                run_id, outcome, exc_info=outcome,
+            )
             continue
         query_results.extend(outcome)
 

@@ -4,9 +4,9 @@ type CardPadding = 'sm' | 'md' | 'lg';
 type CardTone = 'default' | 'elevated' | 'tinted';
 
 const PADDING_CLASS: Record<CardPadding, string> = {
-  sm: 'p-3',
-  md: 'p-5',
-  lg: 'p-7',
+  sm: 'p-4',
+  md: 'p-6',
+  lg: 'p-8',
 };
 
 const TONE_STYLE: Record<CardTone, string> = {

@@ -150,7 +150,7 @@ body {
   background: var(--bg-raised);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 24px;
   box-shadow: var(--shadow-card);
 }
 .card-hover:hover {
@@ -162,7 +162,7 @@ body {
   background: linear-gradient(135deg, rgba(15,23,42,0.8) 0%, rgba(30,41,59,0.4) 100%);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  padding: 20px;
+  padding: 24px;
   box-shadow: var(--shadow-elevated);
 }
 
@@ -411,10 +411,10 @@ body {
 /* Reduce card padding on mobile */
 @media (max-width: 767px) {
   .card {
-    padding: 16px;
+    padding: 18px;
   }
   .card-elevated {
-    padding: 16px;
+    padding: 18px;
   }
 }
 

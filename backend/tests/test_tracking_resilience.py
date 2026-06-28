@@ -1,9 +1,10 @@
 # backend/tests/test_tracking_resilience.py
 import pytest
+from datetime import datetime, timedelta, UTC
 from unittest.mock import patch
 from sqlalchemy import select
 
-from app.database import AsyncSessionLocal
+from app.database import AsyncSessionLocal, cleanup_stale_runs
 from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun, User
 from app.services.tracking_service import finalize_run, run_tracking
 
@@ -104,3 +105,37 @@ async def test_incremental_persistence_survives_one_prompt_failure():
         run = (await db.execute(_select(TrackingRun).where(TrackingRun.brand_id == brand_id))).scalars().first()
         assert run.status == "completed"
         assert run.total_queries > 0
+
+
+async def test_cleanup_finalizes_partial_run_with_results():
+    run_id, _ = await _seed_run_with_results([True, False, True])  # 2/3
+    # backdate created_at so it's past the 15-min cutoff
+    async with AsyncSessionLocal() as db:
+        run = await db.get(TrackingRun, run_id)
+        run.created_at = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=20)
+        await db.commit()
+
+    await cleanup_stale_runs()
+
+    async with AsyncSessionLocal() as db:
+        run = await db.get(TrackingRun, run_id)
+        assert run.status == "completed"        # recovered, not failed
+        assert run.total_queries == 3
+        assert run.overall_score is not None
+
+
+async def test_cleanup_fails_empty_stale_run():
+    async with AsyncSessionLocal() as db:
+        brand = Brand(name="EmptyStale", slug="empty-stale", brand_type="pro")
+        db.add(brand); await db.flush()
+        run = TrackingRun(brand_id=brand.id, status="running", run_type="manual",
+                          created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=20))
+        db.add(run); await db.commit()
+        run_id = run.id
+
+    await cleanup_stale_runs()
+
+    async with AsyncSessionLocal() as db:
+        run = await db.get(TrackingRun, run_id)
+        assert run.status == "failed"
+        assert "startup cleanup" in (run.error_message or "")

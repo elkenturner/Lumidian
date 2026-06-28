@@ -39,7 +39,7 @@ export function CompetitiveGapCard({
   // ── Loading
   if (loading) {
     return (
-      <div className="card p-5 flex flex-col gap-3">
+      <div className="card p-6 flex flex-col gap-3">
         <div className="h-4 w-32 bg-[var(--bg-tinted)] rounded animate-pulse" />
         <div className="h-10 w-24 bg-[var(--bg-tinted)] rounded animate-pulse" />
         <div className="h-12 w-full bg-[var(--bg-tinted)] rounded animate-pulse" />
@@ -50,7 +50,7 @@ export function CompetitiveGapCard({
   // ── No competitors
   if (data && !data.has_competitors) {
     return (
-      <div className="card p-5 flex flex-col">
+      <div className="card p-6 flex flex-col">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
             Competitive Gap
@@ -79,7 +79,7 @@ export function CompetitiveGapCard({
   // ── No data yet
   if (data && !data.has_data) {
     return (
-      <div className="card p-5 flex flex-col">
+      <div className="card p-6 flex flex-col">
         <CardHeader window={window} onWindowChange={onWindowChange} />
         <p className="text-3xl font-bold text-[var(--text-primary)] mt-2">—</p>
         <p className="text-xs text-[var(--text-faint)] mt-1">
@@ -94,7 +94,7 @@ export function CompetitiveGapCard({
   // ── Window has no data (has competitors + has_data was false handled above)
   if (data && data.trend.length === 0) {
     return (
-      <div className="card p-5 flex flex-col">
+      <div className="card p-6 flex flex-col">
         <CardHeader window={window} onWindowChange={onWindowChange} />
         <p className="text-3xl font-bold text-[var(--text-primary)] mt-2">—</p>
         <p className="text-xs text-[var(--text-faint)] mt-1">
@@ -120,7 +120,7 @@ export function CompetitiveGapCard({
     <button
       type="button"
       onClick={onExpand}
-      className="card p-5 flex flex-col text-left hover:border-[var(--accent-border)] transition-colors group relative"
+      className="card p-6 flex flex-col text-left hover:border-[var(--accent-border)] transition-colors group relative"
     >
       <ArrowRight
         size={14}

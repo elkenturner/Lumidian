@@ -487,7 +487,7 @@ export default function DashboardPage() {
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="px-3 sm:px-8 py-4 sm:py-8 max-w-7xl"
+      className="px-3 sm:px-8 py-4 sm:py-8 max-w-7xl mx-auto"
       style={isMobile ? { overflowY: 'auto', minHeight: '100vh' } : undefined}
     >
       {/* Pull-to-refresh indicator */}
@@ -768,7 +768,7 @@ export default function DashboardPage() {
                   <BestPromptCard responses={responses} loading={loadingAnalytics} />
 
                   {/* Sentiment */}
-                  <div className="card p-5">
+                  <div className="card p-6">
                     <div className="flex items-start justify-between mb-2">
                       <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
                         Sentiment
@@ -804,7 +804,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* SOV */}
-                <div className="card p-5">
+                <div className="card p-6">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
                       Share of Voice
@@ -883,7 +883,7 @@ export default function DashboardPage() {
               {/* Row 3 (was Row 2): Avg Position + Top Domains */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
                 {/* Avg Position */}
-                <div className="card p-5">
+                <div className="card p-6">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
                       Avg Position
@@ -918,7 +918,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Top Domains */}
-                <div className="lg:col-span-2 card p-5 flex flex-col">
+                <div className="lg:col-span-2 card p-6 flex flex-col">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
                       Top Cited Domains (across all tracked prompts)
@@ -942,7 +942,7 @@ export default function DashboardPage() {
 
               {/* Row 4: Model breakdown */}
               <div className="mb-4">
-                <div className="card p-5">
+                <div className="card p-6">
                   <div className="flex items-center gap-2 mb-4">
                     <BarChart2 size={15} className="text-[var(--accent)]" />
                     <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Performance by Model</h3>
@@ -968,7 +968,7 @@ export default function DashboardPage() {
               {/* Row 5: Sources you're missing from */}
               {analytics && analytics.total_responses_analyzed > 0 && selectedBrand && (
                 <div className="mb-4">
-                  <div className="card p-5">
+                  <div className="card p-6">
                     <div className="flex items-center gap-2 mb-4">
                       <Link2 size={15} className="text-[var(--accent)]" />
                       <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Sources you&apos;re missing from</h3>

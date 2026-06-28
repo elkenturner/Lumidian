@@ -503,7 +503,7 @@ function DashboardMockup() {
       }}
     >
       <div
-        className="bg-[var(--bg-raised)] border border-[rgba(95,126,166,0.2)] rounded-2xl overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.5),0_0_0_1px_rgba(95,126,166,0.1)]"
+        className="bg-[var(--bg-raised)] border border-[var(--accent-20)] rounded-2xl overflow-hidden shadow-[0_32px_64px_rgba(0,0,0,0.5),0_0_0_1px_var(--accent-10)]"
         style={{
           transform: 'rotateX(2deg)',
         }}
@@ -759,7 +759,7 @@ function PricingSection() {
                   onClick={() => setMobileTier(tier)}
                   className={`flex-1 py-2.5 text-sm font-semibold rounded-full transition-[background-color,color,box-shadow] ${
                     mobileTier === tier
-                      ? 'bg-[var(--accent)] text-white shadow-[0_0_12px_rgba(95,126,166,0.4)]'
+                      ? 'bg-[var(--accent)] text-white shadow-[0_0_12px_var(--accent-40)]'
                       : 'text-[var(--text-secondary)] hover:text-white'
                   }`}
                 >
@@ -804,7 +804,7 @@ function PricingSection() {
 
               <Link
                 href="/register"
-                className="mt-6 w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white py-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-[0_0_24px_rgba(95,126,166,0.4)]"
+                className="mt-6 w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white py-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-[0_0_24px_var(--accent-40)]"
               >
                 Get started free
                 <ArrowRight size={16} />
@@ -817,7 +817,7 @@ function PricingSection() {
           <div className="mt-8 text-center hidden md:block">
             <Link
               href="/register"
-              className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-[0_0_24px_rgba(95,126,166,0.4)]"
+              className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-[0_0_24px_var(--accent-40)]"
             >
               Get started free
               <ArrowRight size={16} />

@@ -78,6 +78,7 @@
   --accent-15: oklch(0.58 0.06 235 / 0.15);  /* icon bg / focus ring */
   --accent-20: oklch(0.58 0.06 235 / 0.20);  /* border */
   --accent-30: oklch(0.58 0.06 235 / 0.30);  /* strong border / highlight */
+  --accent-40: oklch(0.58 0.06 235 / 0.40);  /* glow shadow on accent buttons */
 
   /* Radius */
   --radius-sm: 6px;

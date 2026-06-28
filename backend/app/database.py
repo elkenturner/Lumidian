@@ -720,37 +720,59 @@ async def run_migrations():
 
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):
-    """Mark tracking runs stuck in pending/running for > max_age_minutes as failed.
+    """On startup, resolve tracking runs stuck in pending/running.
 
-    Called on startup to clear runs that never completed (e.g., server crash).
+    The in-process task is gone after a restart, so these runs are dead. If a
+    run already has partial QueryResult rows (incremental persistence), finalize
+    it as 'completed' with whatever was gathered; otherwise mark it 'failed'.
     """
     from datetime import datetime, timedelta
 
-    from sqlalchemy import and_, update
+    from sqlalchemy import and_, func, select
 
-    from app.models import TrackingRun
+    from app.models import QueryResult, TrackingRun
+    from app.services.tracking_service import finalize_run  # lazy: avoid circular import
 
     cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(minutes=max_age_minutes)
 
     async with AsyncSessionLocal() as db:
-        result = await db.execute(
-            update(TrackingRun)
-            .where(
+        stale = (await db.execute(
+            select(TrackingRun.id).where(
                 and_(
                     TrackingRun.status.in_(["pending", "running"]),
                     TrackingRun.created_at < cutoff,
                 )
             )
-            .values(
-                status="failed",
-                error_message=f"Auto-failed by startup cleanup: run exceeded {max_age_minutes} minute threshold without completing",
+        )).scalars().all()
+
+    finalized_ids: list[int] = []
+    failed_ids: list[int] = []
+    for run_id in stale:
+        async with AsyncSessionLocal() as db:
+            result_count = (await db.execute(
+                select(func.count(QueryResult.id)).where(QueryResult.tracking_run_id == run_id)
+            )).scalar_one()
+
+        if result_count > 0:
+            ok = await finalize_run(
+                run_id,
+                error_message="Recovered partial run after restart (startup cleanup)",
             )
-            .returning(TrackingRun.id)
-        )
-        stale_ids = result.scalars().all()
-        await db.commit()
-        if stale_ids:
-            logger.info("Marked %d stale tracking runs as failed: %s", len(stale_ids), stale_ids)
+            (finalized_ids if ok else failed_ids).append(run_id)
+        else:
+            async with AsyncSessionLocal() as db:
+                run = await db.get(TrackingRun, run_id)
+                if run:
+                    run.status = "failed"
+                    run.error_message = (
+                        f"Auto-failed by startup cleanup: run exceeded {max_age_minutes} "
+                        f"minute threshold without completing"
+                    )
+                    await db.commit()
+            failed_ids.append(run_id)
+
+    if finalized_ids or failed_ids:
+        logger.info("Startup cleanup: finalized %s, failed %s", finalized_ids, failed_ids)
 
 
 async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_minutes: int | None = None) -> None:

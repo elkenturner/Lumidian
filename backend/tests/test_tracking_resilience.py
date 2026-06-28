@@ -1,10 +1,11 @@
 # backend/tests/test_tracking_resilience.py
 import pytest
+from unittest.mock import patch
 from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun, User
-from app.services.tracking_service import finalize_run
+from app.services.tracking_service import finalize_run, run_tracking
 
 
 async def _seed_run_with_results(mentioned_pattern: list[bool], model: str = "gemini") -> tuple[int, int]:
@@ -63,3 +64,43 @@ async def test_finalize_run_returns_false_for_empty_run():
         run_id = run.id
     ok = await finalize_run(run_id)
     assert ok is False
+
+
+async def _make_pro_brand_with_prompts(n_prompts: int) -> int:
+    async with AsyncSessionLocal() as db:
+        user = User(email="inc@example.com", password_hash="x", subscription_tier="pro",
+                    subscription_status="active", email_verified=True)
+        db.add(user); await db.flush()
+        brand = Brand(name="Inc Brand", slug="inc-brand", user_id=user.id, brand_type="pro")
+        db.add(brand); await db.flush()
+        for i in range(n_prompts):
+            db.add(Prompt(brand_id=brand.id, text=f"prompt {i}", prompt_type="standard"))
+        await db.commit()
+        return brand.id
+
+
+async def test_incremental_persistence_survives_one_prompt_failure():
+    """If every query for one prompt raises, the other prompts' results still persist."""
+    brand_id = await _make_pro_brand_with_prompts(3)
+
+    async def fake_query_model(model, prompt_text, brand_name, **kwargs):
+        if "prompt 1" in prompt_text:
+            raise RuntimeError("simulated provider blowup")
+        return {"response_text": f"{brand_name} is great", "error": None, "latency_ms": 5, "citations": None}
+
+    with patch("app.services.tracking_service.query_model", side_effect=fake_query_model):
+        await run_tracking(brand_id, run_type="manual")
+
+    async with AsyncSessionLocal() as db:
+        from sqlalchemy import select as _select
+        prompts = (await db.execute(_select(Prompt).where(Prompt.brand_id == brand_id))).scalars().all()
+        pid_by_text = {p.text: p.id for p in prompts}
+        rows = (await db.execute(_select(QueryResult))).scalars().all()
+        persisted_pids = {r.prompt_id for r in rows}
+        # prompt 0 and prompt 2 persisted; prompt 1 (failed) did not lose 0 and 2
+        assert pid_by_text["prompt 0"] in persisted_pids
+        assert pid_by_text["prompt 2"] in persisted_pids
+        # the run still finalized as completed with the surviving data
+        run = (await db.execute(_select(TrackingRun).where(TrackingRun.brand_id == brand_id))).scalars().first()
+        assert run.status == "completed"
+        assert run.total_queries > 0

@@ -29,28 +29,39 @@ export default function SiteAuditIndexPage() {
     })()
   }, [router])
 
-  if (brands === null) return <div className="p-8 text-muted-foreground">Loading…</div>
+  if (brands === null)
+    return (
+      <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] text-sm text-[var(--text-secondary)]">
+        Loading…
+      </div>
+    )
 
   return (
-    <div className="p-8 max-w-4xl">
-      <h1 className="text-2xl font-semibold mb-2">Site Audit</h1>
-      <p className="text-sm text-muted-foreground mb-6">
-        Pick a brand to audit. Each audit crawls the site for AI-search visibility — semantic
-        structure, schema, AI-bot accessibility, and which competitor pages are winning the prompts
-        you lose on.
-      </p>
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] space-y-6">
+      <header>
+        <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-1.5">
+          Site Audit
+        </div>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] leading-tight">
+          Pick a brand to audit
+        </h1>
+        <p className="mt-1.5 max-w-2xl text-sm text-[var(--text-secondary)]">
+          Each audit crawls the site for AI-search visibility — semantic structure, schema, AI-bot
+          accessibility, and which competitor pages are winning the prompts you lose on.
+        </p>
+      </header>
 
-      <ul className="grid gap-3 sm:grid-cols-2">
+      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {brands.map(b => (
           <li key={b.id}>
             <button
               onClick={() => router.push(`/site-audit/${b.id}`)}
-              className="w-full text-left border rounded-lg p-4 hover:border-primary transition-colors flex items-start gap-3"
+              className="card card-hover flex w-full items-start gap-3 text-left"
             >
-              <ShieldCheck className="mt-0.5 h-5 w-5 text-muted-foreground shrink-0" />
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[var(--accent-light)]" />
               <div className="min-w-0">
-                <div className="font-medium truncate">{b.name}</div>
-                <div className="text-xs text-muted-foreground truncate">
+                <div className="font-medium text-[var(--text-primary)] truncate">{b.name}</div>
+                <div className="text-xs text-[var(--text-muted)] truncate">
                   {b.website_url || 'No website set'}
                 </div>
               </div>

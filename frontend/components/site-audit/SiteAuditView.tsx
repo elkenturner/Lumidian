@@ -76,7 +76,7 @@ export function SiteAuditView({ brandId }: Props) {
   // Loading state
   if (audit === undefined) {
     return (
-      <div className="p-8 max-w-6xl">
+      <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px]">
         <div className="card h-24 animate-pulse" style={{ background: 'rgba(255,255,255,0.02)' }} />
       </div>
     );
@@ -85,10 +85,17 @@ export function SiteAuditView({ brandId }: Props) {
   // First-run empty state
   if (audit === null) {
     return (
-      <div className="p-8 max-w-3xl">
-        <div className="card-elevated">
-          <h1 className="text-2xl font-semibold text-[var(--text-primary)]">Site Audit</h1>
-          <p className="text-sm text-[var(--text-secondary)] mt-2 leading-relaxed">
+      <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] space-y-6">
+        <header>
+          <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-1.5">
+            Site Audit
+          </div>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] leading-tight">
+            Audit your site
+          </h1>
+        </header>
+        <div className="card-elevated max-w-2xl">
+          <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
             Audit your site for AI-search visibility — semantic structure, schema markup,
             AI-bot accessibility, and which competitor pages are winning the prompts you lose
             on. Each finding turns into a draftable, paste-ready artifact you can apply in
@@ -111,7 +118,7 @@ export function SiteAuditView({ brandId }: Props) {
 
   return (
     <AuditMetaProvider promptsById={promptsById} cmsPlatform={audit.cms_platform ?? null}>
-    <div className="p-6 sm:p-8 max-w-6xl">
+    <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px]">
       <AuditHeader
         audit={audit}
         brandUrl={brand?.website_url ?? null}

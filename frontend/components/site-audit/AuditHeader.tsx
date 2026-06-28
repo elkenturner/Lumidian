@@ -57,10 +57,10 @@ export function AuditHeader({ audit, brandUrl, inFlight, onRunNewAudit, onCancel
   return (
     <header className="card-elevated flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
       <div className="min-w-0">
-        <p className="text-[11px] uppercase tracking-wider text-[var(--text-muted)]">
+        <p className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
           Site Audit
         </p>
-        <h1 className="text-xl font-semibold text-[var(--text-primary)] mt-1 truncate">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)] mt-1 leading-tight truncate">
           {brandUrl ? (
             new URL(brandUrl).host
           ) : (
@@ -108,7 +108,7 @@ export function AuditHeader({ audit, brandUrl, inFlight, onRunNewAudit, onCancel
           )}
         </p>
         {pdfError && (
-          <p className="text-xs text-red-400 mt-1">{pdfError}</p>
+          <p className="text-xs text-[var(--danger-text)] mt-1">{pdfError}</p>
         )}
       </div>
       <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">

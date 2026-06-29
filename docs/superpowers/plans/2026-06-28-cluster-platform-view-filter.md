@@ -12,6 +12,30 @@
 
 ---
 
+## Implementation status (actual — 2026-06-28)
+
+**Re-scoped to view-filter only.** While executing, a concurrent "two-pool / eager-shell"
+cluster redesign landed on `fix/resilient-tracking-runs`: `brands.py` now eagerly creates a
+shell `ContentCluster` per prompt, so the cluster list already shows every prompt with a
+"Generate cluster" CTA via the existing `ClusterCard` shell branch. That **delivers the
+prompt-driven list (Option B) on its own**, so the following were dropped as redundant:
+- **Task 4 (`PromptShellCard`)** — not built.
+- **Task 6 prompt-merge** — only the platform-filter parts were built (PlatformFilter render +
+  piece filtering); no `ungeneratedPrompts`/shell-card rendering.
+
+**Shipped (commits on `fix/resilient-tracking-runs`):**
+- `e856f70` — Task 1 (shared `clusterPlatforms.ts` constant; detail page uses local name `PLATFORMS`).
+- `98c4337` — Tasks 2, 3, 5, and view-filter parts of 6 + 7.
+- `778e2db` — fix: `useHiddenPlatforms` must be called **before** the cluster detail page's
+  `loading`/`!cluster` early returns (Rules of Hooks). The plan's Task 7 placed it after them,
+  which crashed the detail page once data loaded. Caught via live browser verification.
+
+**Verified live** (Playwright, brand 2): filter chips render and toggle; hiding Reddit removes its
+`PieceCard` on the detail page (5→4) and restores it (4→5); state persists in
+`localStorage["cluster-hidden-platforms:2"]` and syncs across the list and detail surfaces.
+
+---
+
 ## File Structure
 
 **Create:**

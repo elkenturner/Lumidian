@@ -77,6 +77,8 @@ export default function ClusterDetailPage() {
   // Live-poll while the cluster is in an active phase. When it becomes
   // terminal we refetch the full detail so drafts/brief reflect the new state.
   const { data: liveStatus } = useClusterStatus(brandId, clusterId);
+  // View-only platform filter (must be called before any early return — Rules of Hooks).
+  const { isVisible } = useHiddenPlatforms(brandId);
   useEffect(() => {
     if (!liveStatus || !cluster) return;
     if (cluster.status === liveStatus.status) return;
@@ -105,7 +107,6 @@ export default function ClusterDetailPage() {
   const isActive = ACTIVE_STATUSES.has(effectiveStatus);
   const isFailed = effectiveStatus === "briefing_failed";
 
-  const { isVisible } = useHiddenPlatforms(brandId);
   const draftsByPlatform = new Map(cluster.drafts.map((d) => [d.platform, d]));
   // Merge any per-piece live state (generation_state, failure_reason) into the
   // detail-page drafts so PieceCard can show pulse pills mid-generation.

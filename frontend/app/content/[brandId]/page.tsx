@@ -11,6 +11,8 @@ import {
   type ContentClusterSummary,
 } from "@/lib/api";
 import { ClusterCard } from "@/components/content/cluster/ClusterCard";
+import { PlatformFilter } from "@/components/content/cluster/PlatformFilter";
+import { useHiddenPlatforms } from "@/lib/useHiddenPlatforms";
 
 type SortKey = "visibility" | "updated" | "version";
 type FilterKey = "all" | "needs_attention" | "ready" | "in_progress" | "failed";
@@ -44,6 +46,7 @@ export default function ContentBrandPage() {
   const [sortBy, setSortBy] = useState<SortKey>("visibility");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [regeneratingPromptId, setRegeneratingPromptId] = useState<number | null>(null);
+  const { hidden, toggle, isVisible } = useHiddenPlatforms(brandId);
 
   useEffect(() => {
     if (!Number.isFinite(brandId)) return;
@@ -155,6 +158,7 @@ export default function ContentBrandPage() {
             </button>
           ))}
         </div>
+        <PlatformFilter hidden={hidden} onToggle={toggle} />
       </div>
 
       {visible.length === 0 ? (
@@ -169,7 +173,7 @@ export default function ContentBrandPage() {
             <ClusterCard
               key={c.id}
               brandId={brandId}
-              cluster={c}
+              cluster={{ ...c, pieces: c.pieces.filter((p) => isVisible(p.platform)) }}
               onRegenerate={onRegenerate}
               regenerating={regeneratingPromptId === c.prompt_id}
             />

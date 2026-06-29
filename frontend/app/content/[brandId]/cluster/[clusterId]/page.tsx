@@ -26,6 +26,7 @@ import { SourceSpinePanel } from "@/components/content/cluster/SourceSpinePanel"
 import PlatformBadge from "@/components/PlatformBadge";
 import { useClusterStatus } from "@/hooks/useClusterStatus";
 import { CLUSTER_PLATFORMS } from "@/lib/clusterPlatforms";
+import { useHiddenPlatforms } from "@/lib/useHiddenPlatforms";
 
 const PLATFORMS = CLUSTER_PLATFORMS;
 
@@ -104,6 +105,7 @@ export default function ClusterDetailPage() {
   const isActive = ACTIVE_STATUSES.has(effectiveStatus);
   const isFailed = effectiveStatus === "briefing_failed";
 
+  const { isVisible } = useHiddenPlatforms(brandId);
   const draftsByPlatform = new Map(cluster.drafts.map((d) => [d.platform, d]));
   // Merge any per-piece live state (generation_state, failure_reason) into the
   // detail-page drafts so PieceCard can show pulse pills mid-generation.
@@ -255,7 +257,7 @@ export default function ClusterDetailPage() {
           Pieces
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {PLATFORMS.map((platform) => (
+          {PLATFORMS.filter((p) => isVisible(p)).map((platform) => (
             <PieceCard
               key={platform}
               brandId={brandId}
@@ -268,14 +270,14 @@ export default function ClusterDetailPage() {
         </div>
       </div>
 
-      {cluster.drafts.some(d => d.status === "posted") && (
+      {cluster.drafts.some(d => d.status === "posted" && isVisible(d.platform)) && (
         <div>
           <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-3">
             Posted history
           </div>
           <div className="space-y-2">
             {cluster.drafts
-              .filter(d => d.status === "posted")
+              .filter(d => d.status === "posted" && isVisible(d.platform))
               .sort((a, b) => (b.posted_at ?? "").localeCompare(a.posted_at ?? ""))
               .map(d => (
                 <div key={d.id} className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">

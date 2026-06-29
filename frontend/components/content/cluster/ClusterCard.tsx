@@ -17,6 +17,10 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
   const isShell = cluster.status === "pending" && cluster.pieces.length === 0;
   const enabledPlatformCount = cluster.pieces.length;
   const postedCount = cluster.posted_count;
+  // Clamp green dots to the number of visible pieces. No-op when nothing is
+  // hidden; prevents rendering more "posted" dots than pieces once the list
+  // view filters a platform out.
+  const postedDots = Math.min(postedCount, enabledPlatformCount);
   const isFullyLive = enabledPlatformCount > 0 && postedCount >= enabledPlatformCount;
   const isPartial = postedCount > 0 && postedCount < enabledPlatformCount;
   const delta = cluster.cluster_delta;
@@ -60,7 +64,7 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
               <span
                 key={i}
                 className={`inline-block h-2 w-2 rounded-full ${
-                  i < postedCount
+                  i < postedDots
                     ? "bg-[#4ade80]"
                     : "border border-[var(--border-subtle)]"
                 }`}

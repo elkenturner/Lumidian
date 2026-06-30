@@ -119,7 +119,7 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
     ...(user?.subscription_tier
       ? [{ label: 'Site Audit', href: '/site-audit', icon: ShieldCheck }]
       : []),
-    { label: 'Content Hub', href: '/content',   icon: PenLine },
+    { label: 'Content', href: '/content',   icon: PenLine },
     ...(user?.subscription_tier === 'starter' || user?.subscription_tier === 'pro'
       ? [{ label: 'Wikipedia', href: '/wiki', icon: BookOpen }]
       : []),

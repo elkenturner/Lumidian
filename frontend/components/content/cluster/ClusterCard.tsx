@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowUpRight, MoreHorizontal, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import type { ContentClusterSummary } from "@/lib/api";
+import { CHIP_CLASSES, clusterChip } from "@/lib/clusterStatus";
 
 interface Props {
   cluster: ContentClusterSummary;
@@ -30,34 +31,47 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
     : delta! >= 0
     ? "text-[#4ade80]"
     : "text-[#fb7185]";
+  // Textual +/- is the non-color cue (accessibility): never rely on colour alone.
   const deltaLabel = !hasDelta
     ? "—"
     : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)} pts`;
+  const chip = clusterChip(cluster);
 
   return (
-    <div className="card card-hover flex flex-col gap-4">
+    <div
+      className="card card-hover flex flex-col gap-4"
+      aria-label={`${cluster.prompt_text} — ${chip.label}`}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <h3 className="text-base font-semibold text-[var(--text-primary)] leading-snug line-clamp-2 min-w-0 flex-1">
-          {cluster.prompt_text}
-        </h3>
-        <div
-          className="shrink-0 text-right"
-          title="Cluster lift = current visibility minus the visibility at the time the first post for this prompt went live. Includes Wikipedia and legacy posts."
-        >
-          <div className={`text-xl font-bold ${deltaTone}`}>{deltaLabel}</div>
-          <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
-            AI visibility lift
-          </div>
+        <div className="min-w-0 flex-1">
+          <span
+            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${CHIP_CLASSES[chip.tone]}`}
+          >
+            {chip.label}
+          </span>
+          <h3 className="mt-2 text-base font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
+            {cluster.prompt_text}
+          </h3>
         </div>
+        {/* Lift only shows once it means something (a post has gone live). On
+            unstarted/never-posted clusters the slot would read "—" forever, so
+            we hide it rather than emphasise a dash. */}
+        {hasDelta && (
+          <div
+            className="shrink-0 text-right"
+            title="Change in this brand's AI-visibility score for this question since the first post went live. Includes Wikipedia and legacy posts."
+          >
+            <div className={`text-xl font-bold ${deltaTone}`}>{deltaLabel}</div>
+            <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
+              AI visibility lift
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Composed progress bar */}
-      {isShell ? (
-        <div className="text-sm text-[var(--text-secondary)]">
-          No drafts yet for this prompt.
-        </div>
-      ) : (
+      {isShell ? null : (
         <div className="flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1 text-[var(--text-secondary)]">
             {Array.from({ length: enabledPlatformCount }).map((_, i) => (
@@ -94,7 +108,7 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
           href={`/content/${brandId}/cluster/${cluster.id}`}
           className="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-foreground)] hover:text-[var(--text-primary)]"
         >
-          {isShell ? "Generate cluster" : "View cluster"}{" "}
+          {isShell ? "Generate posts" : "View posts"}{" "}
           <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
         {isFullyLive && (

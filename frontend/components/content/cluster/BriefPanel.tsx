@@ -38,7 +38,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
     return (
       <div className="card border-dashed flex items-center gap-3 text-sm text-[var(--text-secondary)]">
         <FileText className="h-4 w-4 text-[var(--text-faint)] shrink-0" />
-        No brief yet. Regenerate this cluster to produce one.
+        No strategy yet — generate posts for this question to create one.
       </div>
     );
   }
@@ -130,7 +130,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
           {draftVersion > effectiveCurrentVersion && (
             <div className="rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-200">
               Brief is at v{draftVersion}; pieces below were generated from v{effectiveCurrentVersion}.
-              Click <strong>Regenerate pieces</strong> on the cluster page to apply the new brief.
+              Click <strong>Rewrite all posts</strong> above to apply the new strategy.
             </div>
           )}
           {!editing ? (

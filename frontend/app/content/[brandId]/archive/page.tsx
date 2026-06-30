@@ -5,9 +5,17 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { getDrafts, type ContentDraft } from "@/lib/api";
 
+const STATUS_PILL: Record<string, string> = {
+  posted: "border-sky-500/30 bg-sky-500/10 text-sky-200",
+  approved: "border-amber-500/30 bg-amber-500/10 text-amber-200",
+  draft: "border-[var(--border-subtle)] bg-[var(--bg-card)] text-[var(--text-secondary)]",
+  failed: "border-rose-500/30 bg-rose-500/10 text-rose-200",
+};
+
 /**
- * Legacy archive — drafts that were posted before the content cluster
- * redesign and never had a cluster attached (cluster_id is null). Read-only.
+ * Earlier drafts — content not attached to any cluster (cluster_id is null):
+ * onboarding drafts and anything created before the cluster redesign. Read-only.
+ * Includes draft/approved/posted so generated content is never silently lost.
  */
 export default function ContentArchivePage() {
   const params = useParams<{ brandId: string }>();
@@ -20,11 +28,22 @@ export default function ContentArchivePage() {
   useEffect(() => {
     if (!Number.isFinite(brandId)) return;
     let cancelled = false;
-    getDrafts(brandId, undefined, "posted", 200)
+    // No status filter: surface draft/approved/posted orphans alike. Clusters'
+    // own drafts (cluster_id set) live in the cluster and are excluded here.
+    getDrafts(brandId, undefined, undefined, 200)
       .then((rows) => {
         if (!cancelled) {
-          // Only the orphans — clusters' own posted drafts live in the cluster.
-          setDrafts(rows.filter((d) => d.cluster_id == null));
+          const orphans = rows.filter((d) => d.cluster_id == null);
+          orphans.sort((a, b) => {
+            // Posted first (most recently posted), then the rest by id desc.
+            const ap = a.posted_at ?? "";
+            const bp = b.posted_at ?? "";
+            if (ap && bp) return bp.localeCompare(ap);
+            if (ap) return -1;
+            if (bp) return 1;
+            return b.id - a.id;
+          });
+          setDrafts(orphans);
         }
       })
       .finally(() => !cancelled && setLoading(false));
@@ -53,15 +72,16 @@ export default function ContentArchivePage() {
       </button>
 
       <header>
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Legacy posted drafts</h1>
+        <h1 className="text-xl font-bold text-[var(--text-primary)]">Earlier drafts</h1>
         <p className="mt-1.5 text-sm text-[var(--text-secondary)]">
-          Drafts posted before the content cluster redesign. Read-only — they are not part of any cluster.
+          Drafts created during onboarding or before the cluster redesign. Read-only — they aren&apos;t
+          attached to any question.
         </p>
       </header>
 
       {drafts.length === 0 ? (
         <div className="card border-dashed text-sm text-[var(--text-secondary)] text-center py-10">
-          No legacy drafts.
+          No earlier drafts.
         </div>
       ) : (
         <ul className="divide-y divide-[var(--border-subtle)]">
@@ -70,6 +90,11 @@ export default function ContentArchivePage() {
               <div className="flex items-center gap-3 text-sm">
                 <span className="uppercase text-[10px] text-[var(--text-faint)] font-semibold tracking-wide">
                   {d.platform}
+                </span>
+                <span
+                  className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${STATUS_PILL[d.status] ?? STATUS_PILL.draft}`}
+                >
+                  {d.status}
                 </span>
                 <span className="font-medium text-[var(--text-primary)] truncate">
                   {d.title || "(untitled)"}

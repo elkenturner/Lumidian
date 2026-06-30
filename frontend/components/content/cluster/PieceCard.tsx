@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
 import { regenerateClusterPiece, updateDraft, type ContentDraft } from "@/lib/api";
@@ -270,19 +270,27 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               disabled={regenerating}
               className="!px-2"
               title={
-                draft?.status === "posted"
+                !draft
+                  ? "Write this post for the first time"
+                  : draft.status === "posted"
                   ? "Generate a fresh working draft. The posted version stays live and keeps its attribution."
                   : "Rewrite this post from scratch"
               }
             >
               {regenerating ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
+              ) : !draft ? (
+                <Sparkles className="h-3 w-3" />
               ) : (
                 <RefreshCw className="h-3 w-3" />
               )}
               {regenerating
-                ? "Regenerating…"
-                : draft?.status === "posted"
+                ? draft
+                  ? "Regenerating…"
+                  : "Generating…"
+                : !draft
+                ? "Generate"
+                : draft.status === "posted"
                 ? "Generate new draft"
                 : "Rewrite"}
             </Button>

@@ -14,8 +14,8 @@ interface Props {
 export function PlatformFilter({ hidden, onToggle }: Props) {
   return (
     <div className="flex items-center gap-1.5 text-[var(--text-faint)]">
-      <span title="Show or hide platforms across all clusters. Does not affect generation.">
-        Show:
+      <span title="Show or hide platforms across all questions. Does not affect what gets generated.">
+        View:
       </span>
       {CLUSTER_PLATFORMS.map((platform) => {
         const on = !hidden.has(platform);
@@ -35,6 +35,7 @@ export function PlatformFilter({ hidden, onToggle }: Props) {
           </button>
         );
       })}
+      <span className="ml-1 text-[10px] text-[var(--text-faint)]/70 italic">(view only)</span>
     </div>
   );
 }

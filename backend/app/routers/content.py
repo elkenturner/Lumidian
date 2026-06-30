@@ -83,13 +83,21 @@ from app import state as _state
 CLUSTER_TIMEOUT_SECONDS = 900.0
 
 
-async def _bg_generate_drafts(brand_id: int, max_gaps: int, source: str) -> None:
+async def _bg_generate_drafts(
+    brand_id: int, max_gaps: int, source: str, skip_ready: bool = False
+) -> None:
     """Background coroutine: regenerate clusters per prompt for this brand.
 
     Routes through the cluster pipeline so each prompt's drafts are generated
     as a coordinated 5-piece set from a shared ContentBrief. The ``max_gaps``
     arg now bounds the number of prompts processed (was: top gaps to draft).
     The legacy ``auto_draft_top_gaps`` path is bypassed.
+
+    When ``skip_ready`` is set, clusters that already have content
+    (status ``ready`` / ``ready_low_evidence`` / ``generation_partial``) are
+    left untouched — only pending or failed clusters are generated. This backs
+    the "Generate all posts" sweep on the content surface so it never clobbers
+    a returning user's existing work.
     """
     import asyncio
     from sqlalchemy import select
@@ -115,6 +123,12 @@ async def _bg_generate_drafts(brand_id: int, max_gaps: int, source: str) -> None
             for prompt in prompts[:max_gaps]:
                 try:
                     cluster = await get_or_create_cluster(db, brand_id=brand_id, prompt_id=prompt.id)
+                    if skip_ready and cluster.status in {
+                        "ready",
+                        "ready_low_evidence",
+                        "generation_partial",
+                    }:
+                        continue
                     await asyncio.wait_for(
                         regenerate_cluster(db, cluster_id=cluster.id, tier=tier),
                         timeout=CLUSTER_TIMEOUT_SECONDS,
@@ -770,6 +784,7 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
             brand_id=brand_id,
             max_gaps=remaining,
             source="manual",
+            skip_ready=request.skip_ready,
         )
     )
     logger.info("generate_now: background task started for brand_id=%d max_gaps=%d", brand_id, remaining)

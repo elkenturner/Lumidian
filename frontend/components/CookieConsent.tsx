@@ -24,27 +24,32 @@ export default function CookieConsent() {
 
   if (!visible) return null;
 
+  // Full-width bottom bar rather than a floating corner card — a corner card
+  // overlaps and clips page content (e.g. the cluster Sources panel). A flush
+  // bottom bar reads as chrome and never sits on top of a content panel.
   return (
-    <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:w-80 z-50 rounded-xl border border-[var(--bg-card)] bg-[var(--bg-base)] p-4 shadow-lg">
-      <p className="text-sm text-[var(--text-secondary)] mb-3">
-        We use cookies to keep you signed in and the app running.{' '}
-        <a href="/privacy" className="underline hover:text-[var(--text-primary)] transition-colors">
-          Privacy Policy
-        </a>
-      </p>
-      <div className="flex gap-2">
-        <button
-          onClick={handleDecline}
-          className="flex-1 rounded-md border border-[var(--bg-card)] px-3 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
-        >
-          Decline
-        </button>
-        <button
-          onClick={handleAccept}
-          className="flex-1 rounded-md bg-[var(--accent)] px-3 py-1.5 text-sm text-white transition-colors hover:bg-[var(--accent-hover)]"
-        >
-          Accept
-        </button>
+    <div className="fixed bottom-0 inset-x-0 z-50 border-t border-[var(--border-subtle)] bg-[var(--bg-base)]/95 backdrop-blur px-4 py-3 shadow-lg">
+      <div className="mx-auto max-w-[1400px] flex flex-col gap-3 sm:flex-row sm:items-center">
+        <p className="text-sm text-[var(--text-secondary)] flex-1">
+          We use cookies to keep you signed in and the app running.{' '}
+          <a href="/privacy" className="underline hover:text-[var(--text-primary)] transition-colors">
+            Privacy Policy
+          </a>
+        </p>
+        <div className="flex gap-2 shrink-0">
+          <button
+            onClick={handleDecline}
+            className="rounded-md border border-[var(--bg-card)] px-4 py-1.5 text-sm text-[var(--text-secondary)] transition-colors hover:border-[var(--bg-elevated)] hover:text-[var(--text-primary)]"
+          >
+            Decline
+          </button>
+          <button
+            onClick={handleAccept}
+            className="rounded-md bg-[var(--accent)] px-4 py-1.5 text-sm text-white transition-colors hover:bg-[var(--accent-hover)]"
+          >
+            Accept
+          </button>
+        </div>
       </div>
     </div>
   );

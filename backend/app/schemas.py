@@ -393,6 +393,11 @@ class CreateDraftRequest(BaseModel):
 
 class GenerateNowRequest(BaseModel):
     max_gaps: int = Field(20, ge=1, le=50)
+    # When true, only (re)generate clusters that have no content yet — pending
+    # or failed. Protects a returning user's already-generated clusters from
+    # being overwritten by a "Generate all" sweep. Default false preserves the
+    # legacy "Regenerate Drafts" behaviour.
+    skip_ready: bool = False
 
 
 class UpdateDraftRequest(BaseModel):

@@ -202,6 +202,63 @@ async def test_generate_now_endpoint_exists(client: httpx.AsyncClient):
     assert data["brand_id"] == brand_id
 
 
+async def test_generate_now_passes_skip_ready(client: httpx.AsyncClient):
+    """generate-now accepts skip_ready and threads it to the background task."""
+    await register_and_login(client, email="skipthru@example.com")
+    brand = await create_brand(client, name="SkipThru", prompts=["Test prompt?"])
+    brand_id = brand["id"]
+
+    async def _noop(*args, **kwargs):
+        pass
+
+    with patch("app.routers.content._bg_generate_drafts", side_effect=_noop) as m:
+        resp = await client.post(
+            f"/api/content/{brand_id}/generate-now",
+            json={"max_gaps": 5, "skip_ready": True},
+        )
+
+    assert resp.status_code == 202
+    assert m.call_args.kwargs.get("skip_ready") is True
+
+
+async def test_bg_generate_drafts_skip_ready_skips_generated_clusters():
+    """_bg_generate_drafts(skip_ready=True) only (re)generates clusters that are
+    not already generated — protects a returning user's good clusters."""
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, ContentCluster, Prompt, User
+    from app.routers.content import _bg_generate_drafts
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="skipready@p.com", password_hash="x", name="t", subscription_tier="pro")
+        db.add(user)
+        await db.flush()
+        brand = Brand(name="SR", slug="skip-ready-brand", user_id=user.id)
+        db.add(brand)
+        await db.flush()
+        p_ready = Prompt(brand_id=brand.id, text="ready prompt", prompt_type="standard")
+        p_pending = Prompt(brand_id=brand.id, text="pending prompt", prompt_type="standard")
+        db.add_all([p_ready, p_pending])
+        await db.flush()
+        c_ready = ContentCluster(brand_id=brand.id, prompt_id=p_ready.id, status="ready")
+        c_pending = ContentCluster(brand_id=brand.id, prompt_id=p_pending.id, status="pending")
+        db.add_all([c_ready, c_pending])
+        await db.commit()
+        brand_id = brand.id
+        ready_cluster_id = c_ready.id
+        pending_cluster_id = c_pending.id
+
+    called_ids: list[int] = []
+
+    async def _fake_regen(db, *, cluster_id, tier, **kwargs):
+        called_ids.append(cluster_id)
+
+    with patch("app.services.clustering_service.regenerate_cluster", side_effect=_fake_regen):
+        await _bg_generate_drafts(brand_id, max_gaps=10, source="manual", skip_ready=True)
+
+    assert pending_cluster_id in called_ids
+    assert ready_cluster_id not in called_ids
+
+
 async def test_draft_cap_constant():
     """DRAFT_CAP should be 20 as documented."""
     from app.services.drafting_service import DRAFT_CAP

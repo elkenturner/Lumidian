@@ -7,6 +7,7 @@ import {
   Loader2,
   RefreshCw,
   RotateCw,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -124,6 +125,9 @@ export default function ClusterDetailPage() {
   const failureReason = liveStatus?.failure_reason ?? null;
   const isActive = ACTIVE_STATUSES.has(effectiveStatus);
   const isFailed = effectiveStatus === "briefing_failed";
+  // Has this cluster ever been generated? Drives "Generate" vs "Rewrite" copy
+  // and whether regeneration is destructive (needs a confirm).
+  const hasContent = cluster.drafts.length > 0 || !!cluster.brief;
 
   const draftsByPlatform = new Map(cluster.drafts.map((d) => [d.platform, d]));
   // Merge any per-piece live state (generation_state, failure_reason) into the
@@ -179,6 +183,12 @@ export default function ClusterDetailPage() {
   }
 
   async function onRegeneratePieces() {
+    if (
+      hasContent &&
+      !window.confirm("This replaces the current posts with fresh versions. Continue?")
+    ) {
+      return;
+    }
     setRegenAction("pieces");
     try {
       const updated = await regenerateClusterPieces(brandId, clusterId);
@@ -189,6 +199,14 @@ export default function ClusterDetailPage() {
   }
 
   async function onRebuild() {
+    if (
+      hasContent &&
+      !window.confirm(
+        "Start fresh rebuilds the strategy and sources, then replaces every post. Continue?",
+      )
+    ) {
+      return;
+    }
     setRegenAction("rebuild");
     try {
       const updated = await rebuildCluster(brandId, clusterId);
@@ -238,52 +256,71 @@ export default function ClusterDetailPage() {
             )}
           </div>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              onClick={onRegeneratePieces}
-              disabled={isActive || regenAction !== null}
-              className="gap-1.5"
-              title="Keep the same strategy and sources; rewrite all 5 posts"
-            >
-              {regenAction === "pieces" ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <RefreshCw className="h-3 w-3" />
-              )}
-              Rewrite all posts
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onRebuild}
-              disabled={isActive || regenAction !== null}
-              className="gap-1.5"
-              title="Start over: rebuild the strategy and sources from scratch, then rewrite all 5 posts"
-            >
-              {regenAction === "rebuild" ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <RotateCw className="h-3 w-3" />
-              )}
-              Start fresh
-            </Button>
+            {hasContent ? (
+              <>
+                <Button
+                  size="sm"
+                  onClick={onRegeneratePieces}
+                  disabled={isActive || regenAction !== null}
+                  className="gap-1.5"
+                  title="Keep the same strategy and sources; rewrite all posts"
+                >
+                  {regenAction === "pieces" ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-3 w-3" />
+                  )}
+                  Rewrite all posts
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onRebuild}
+                  disabled={isActive || regenAction !== null}
+                  className="gap-1.5"
+                  title="Start over: rebuild the strategy and sources from scratch, then rewrite all posts"
+                >
+                  {regenAction === "rebuild" ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RotateCw className="h-3 w-3" />
+                  )}
+                  Start fresh
+                </Button>
+              </>
+            ) : (
+              <Button
+                size="sm"
+                onClick={onRebuild}
+                disabled={isActive || regenAction !== null}
+                className="gap-1.5"
+                title="Write a strategy, gather sources, and draft all posts for this question"
+              >
+                {regenAction !== null ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                Generate posts
+              </Button>
+            )}
           </div>
         </div>
-        <div
-          className="shrink-0 text-right"
-          title={
-            hasDelta
-              ? "Change in this brand's AI-visibility score for this question since these posts went live"
-              : "No posts measured yet — mark a post as posted and run tracking to see the impact"
-          }
-        >
-          <div className={`flex items-center justify-end gap-1.5 text-3xl font-bold ${deltaTone}`}>
-            {deltaLabel}
+        {/* Lift only appears once a post has gone live and been measured —
+            otherwise it reads "—" forever. Mirrors the cluster card. */}
+        {hasDelta && (
+          <div
+            className="shrink-0 text-right"
+            title="Change in this brand's AI-visibility score for this question since these posts went live"
+          >
+            <div className={`flex items-center justify-end gap-1.5 text-3xl font-bold ${deltaTone}`}>
+              {deltaLabel}
+            </div>
+            <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
+              AI visibility lift
+            </div>
           </div>
-          <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
-            AI visibility lift
-          </div>
-        </div>
+        )}
       </header>
 
       {isFailed && failureReason && (

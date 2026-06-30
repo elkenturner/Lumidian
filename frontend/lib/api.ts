@@ -552,8 +552,15 @@ export async function getAttribution(brandId: number): Promise<ContentAttributio
   return res.data;
 }
 
-export async function generateNow(brandId: number, maxGaps = 20): Promise<void> {
-  await api.post(`/content/${brandId}/generate-now`, { max_gaps: maxGaps });
+export async function generateNow(
+  brandId: number,
+  maxGaps = 20,
+  skipReady = false,
+): Promise<void> {
+  await api.post(`/content/${brandId}/generate-now`, {
+    max_gaps: maxGaps,
+    skip_ready: skipReady,
+  });
 }
 
 export interface DraftQueueStatus {

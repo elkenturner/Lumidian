@@ -255,6 +255,56 @@ async def finalize_run(run_id: int, *, error_message: str | None = None) -> bool
     return True
 
 
+async def run_one_query(
+    *,
+    run_id: int,
+    prompt_id: int,
+    prompt_text: str,
+    model: str,
+    run_number: int,
+    brand_name: str,
+    is_paid: bool,
+    brand_type: str,
+    semaphore: asyncio.Semaphore,
+    cancel_event: asyncio.Event | None = None,
+) -> QueryResult:
+    """Run one model query (semaphore-bounded) and build its QueryResult.
+
+    The single source of truth for per-query behaviour across all run paths
+    (scheduled run_tracking + manual endpoints): canonical mention detection
+    via _detect_mention (strips URL citations, adds fuzzy normalized match),
+    citation capture, and consistent error logging. Callers must not
+    re-implement this — pass their own semaphore / brand context here.
+    """
+    async with semaphore:
+        result = await query_model(
+            model, prompt_text, brand_name,
+            pro=is_paid, brand_type=brand_type, cancel_event=cancel_event,
+        )
+    response_text = result.get("response_text")
+    error = result.get("error")
+
+    # Log every non-configuration error so nothing is silently swallowed.
+    if error and error != "api_key_not_configured":
+        logger.warning(
+            "[tracking] model=%s run_number=%d prompt=%r error=%s",
+            model, run_number, prompt_text[:120], error,
+        )
+
+    mentioned = _detect_mention(brand_name, response_text, error, model)
+    return QueryResult(
+        tracking_run_id=run_id,
+        prompt_id=prompt_id,
+        model=model,
+        run_number=run_number,
+        response_text=response_text,
+        mentioned=mentioned,
+        latency_ms=result.get("latency_ms"),
+        error=error,
+        citations=result.get("citations"),
+    )
+
+
 async def run_queries_per_prompt(
     run_id: int,
     prompt_data: list[tuple[int, str]],
@@ -404,35 +454,12 @@ async def run_tracking(
     except Exception:
         cancel_evt = None
 
-    async def _bounded_query(
-        prompt_id: int,
-        prompt_text: str,
-        model: str,
-        run_number: int,
-    ) -> QueryResult:
-        async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_paid, brand_type=brand_type, cancel_event=cancel_evt)
-        response_text = result.get("response_text")
-        error = result.get("error")
-
-        # Log every non-configuration error so nothing is silently swallowed
-        if error and error != "api_key_not_configured":
-            logger.warning(
-                "[tracking] model=%s run_number=%d prompt=%r error=%s",
-                model, run_number, prompt_text[:120], error,
-            )
-
-        mentioned = _detect_mention(brand_name, response_text, error, model)
-        return QueryResult(
-            tracking_run_id=run_id,
-            prompt_id=prompt_id,
-            model=model,
-            run_number=run_number,
-            response_text=response_text,
-            mentioned=mentioned,
-            latency_ms=result.get("latency_ms"),
-            error=error,
-            citations=result.get("citations"),
+    def _bounded_query(prompt_id, prompt_text, model, run_number):
+        return run_one_query(
+            run_id=run_id, prompt_id=prompt_id, prompt_text=prompt_text,
+            model=model, run_number=run_number, brand_name=brand_name,
+            is_paid=is_paid, brand_type=brand_type,
+            semaphore=semaphore, cancel_event=cancel_evt,
         )
 
     # Incremental per-prompt persistence via the shared resilience core.

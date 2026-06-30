@@ -328,8 +328,8 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     from sqlalchemy import select
 
     from app.database import AsyncSessionLocal
-    from app.models import Brand, Prompt, QueryResult, TrackingRun
-    from app.services.llm_service import models_for_tier, is_pro_for_brand, runs_per_prompt_for_brand, query_model
+    from app.models import Brand, Prompt, TrackingRun
+    from app.services.llm_service import models_for_tier, is_pro_for_brand, runs_per_prompt_for_brand
 
     def utcnow():
         return datetime.now(UTC).replace(tzinfo=None)
@@ -389,18 +389,14 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     semaphore = asyncio.Semaphore(10)
     cancel_evt = get_cancel_event(run_id)
 
-    async def _bounded_query(prompt_id: int, prompt_text: str, model: str, run_number: int):
-        async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_paid, brand_type=brand_type, cancel_event=cancel_evt)
-        return QueryResult(
-            tracking_run_id=run_id,
-            prompt_id=prompt_id,
-            model=model,
-            run_number=run_number,
-            response_text=result.get("response_text"),
-            mentioned=result.get("mentioned", False),
-            latency_ms=result.get("latency_ms"),
-            error=result.get("error"),
+    from app.services.tracking_service import run_one_query
+
+    def _bounded_query(prompt_id, prompt_text, model, run_number):
+        return run_one_query(
+            run_id=run_id, prompt_id=prompt_id, prompt_text=prompt_text,
+            model=model, run_number=run_number, brand_name=brand_name,
+            is_paid=is_paid, brand_type=brand_type,
+            semaphore=semaphore, cancel_event=cancel_evt,
         )
 
     # Incremental per-prompt persistence + finalize via the shared resilience
@@ -647,9 +643,8 @@ async def _background_prompt_run(
     from datetime import datetime
 
     from app.database import AsyncSessionLocal
-    from app.models import QueryResult
     from app.models import TrackingRun as TR
-    from app.services.llm_service import is_pro_for_brand, models_for_tier, runs_per_prompt_for_brand, query_model
+    from app.services.llm_service import is_pro_for_brand, models_for_tier, runs_per_prompt_for_brand
 
     active_models = models_for_tier(brand_type, tier)
     is_paid = is_pro_for_brand(brand_type, tier)
@@ -668,20 +663,6 @@ async def _background_prompt_run(
     runs_per_prompt = runs_per_prompt_for_brand(brand_type)
     semaphore = _asyncio.Semaphore(10)
 
-    async def _bounded_query(model: str, run_number: int):
-        async with semaphore:
-            result = await query_model(model, prompt_text, brand_name, pro=is_paid, brand_type=brand_type)
-        return QueryResult(
-            tracking_run_id=run_id,
-            prompt_id=prompt_id,
-            model=model,
-            run_number=run_number,
-            response_text=result.get("response_text"),
-            mentioned=result.get("mentioned", False),
-            latency_ms=result.get("latency_ms"),
-            error=result.get("error"),
-        )
-
     logger.info(
         "Prompt run %d — brand=%r prompt_id=%d models=%d runs=%d",
         run_id, brand_name, prompt_id, len(active_models), runs_per_prompt,
@@ -690,11 +671,17 @@ async def _background_prompt_run(
     # Incremental persistence + finalize via the shared resilience core.
     from app.services.tracking_service import (
         finalize_or_mark_failed,
+        run_one_query,
         run_queries_per_prompt,
     )
 
-    async def _bq(_prompt_id, _prompt_text, model, run_number):
-        return await _bounded_query(model, run_number)
+    def _bq(pid, ptext, model, run_number):
+        return run_one_query(
+            run_id=run_id, prompt_id=pid, prompt_text=ptext,
+            model=model, run_number=run_number, brand_name=brand_name,
+            is_paid=is_paid, brand_type=brand_type,
+            semaphore=semaphore, cancel_event=None,
+        )
 
     query_results = await run_queries_per_prompt(
         run_id, [(prompt_id, prompt_text)], active_models, runs_per_prompt, _bq,

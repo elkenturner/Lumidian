@@ -163,7 +163,7 @@ async def test_manual_run_incremental_persistence_survives_one_prompt_failure():
         return {"response_text": f"{brand_name} is great", "error": None,
                 "latency_ms": 5, "mentioned": True, "citations": None}
 
-    with patch("app.services.llm_service.query_model", side_effect=fake_query_model):
+    with patch("app.services.tracking_service.query_model", side_effect=fake_query_model):
         await _execute_run_with_id(run_id=run_id, brand_id=brand_id)
 
     async with AsyncSessionLocal() as db:

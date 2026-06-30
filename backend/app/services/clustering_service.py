@@ -43,6 +43,23 @@ CLUSTER_PLATFORMS: tuple[str, ...] = ("linkedin", "medium", "reddit", "quora", "
 # (see SpotitEarly halt-at-prompt-#42 regression).
 PIECE_TIMEOUT_SECONDS = 180.0
 
+
+def _derive_title_fallback(body: str, *, prompt_text: str, platform: str) -> str:
+    """Title fallback for platforms whose body has no h1 (x/reddit/quora).
+
+    Order: first sentence of body trimmed to 80 chars → "<platform> draft for <prompt>".
+    Never returns "(untitled)".
+    """
+    import re
+    body_clean = (body or "").strip()
+    if body_clean:
+        parts = re.split(r"(?<=[.!?])\s+|\n", body_clean, maxsplit=1)
+        first = (parts[0] if parts else body_clean).strip()
+        if first:
+            return first[:80].rstrip()
+    label = platform.replace("_", " ").title()
+    return f"{label} draft for {prompt_text}"[:80].rstrip()
+
 # Platforms that get a soft "further reading" reference to the cluster's
 # Medium piece (or own-site pillar). Asymmetric — Medium/Wikipedia get nothing.
 _APPENDS_PILLAR_REF = {
@@ -190,7 +207,8 @@ async def _generate_piece_text(
     # Final polish (same step the gap-draft path applies after the pipeline).
     raw_text = remove_hedging(raw_text)
     title, body = extract_title_and_body(raw_text, platform_key)
-    return (title or "(untitled)"), body, quality_score, citations, low_evidence
+    final_title = title or _derive_title_fallback(body, prompt_text=prompt_text, platform=platform)
+    return final_title, body, quality_score, citations, low_evidence
 
 
 async def _resolve_post_targets(
@@ -429,9 +447,13 @@ async def regenerate_cluster(
         prompt_id=cluster.prompt_id, prompt_text=prompt_row.text, enabled=enabled,
     )
 
-    # Drop existing drafts before regen
+    # Drop ONLY working drafts before regen. Posted drafts are immutable
+    # historical record — never deleted by any regen path.
     await db.execute(
-        delete(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
+        delete(ContentDraft).where(
+            ContentDraft.cluster_id == cluster.id,
+            ContentDraft.status.in_(["draft", "approved", "failed"]),
+        )
     )
     await db.flush()
 
@@ -510,7 +532,7 @@ async def regenerate_cluster(
         draft = ContentDraft(
             brand_id=cluster.brand_id, prompt_id=cluster.prompt_id,
             cluster_id=cluster.id, platform=platform,
-            status="draft", title=title or "(untitled)",
+            status="draft", title=title,  # already non-empty via _derive_title_fallback
             content_text=body, source="cluster",
             content_brief=post_targets.get(platform, {}).get("brief"),
             quality_score=q, generation_state="done",

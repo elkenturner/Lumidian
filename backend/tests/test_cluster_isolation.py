@@ -6,6 +6,7 @@ endpoint (_ensure_brand_owned) is the gate — these tests verify it works
 for every new endpoint added in the 2026-05-20 redesign.
 """
 import pytest
+from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models import (
@@ -32,11 +33,17 @@ async def _seed_two_brands_two_users(client) -> tuple[int, int, int, int]:
     r = await client.get(f"/api/brands/{brand_b['id']}")
     prompt_b_id = r.json()["prompts"][0]["id"]
 
-    # Seed clusters for both
+    # Seed clusters for both — eager shells from create_brand already exist,
+    # so fetch and mutate rather than insert.
     async with AsyncSessionLocal() as db:
-        cluster_a = ContentCluster(brand_id=brand_a["id"], prompt_id=prompt_a_id, status="ready")
-        cluster_b = ContentCluster(brand_id=brand_b["id"], prompt_id=prompt_b_id, status="ready")
-        db.add_all([cluster_a, cluster_b])
+        cluster_a = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_a_id)
+        )).scalar_one()
+        cluster_a.status = "ready"
+        cluster_b = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_b_id)
+        )).scalar_one()
+        cluster_b.status = "ready"
         await db.flush()
 
         for c in (cluster_a, cluster_b):

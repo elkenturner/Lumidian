@@ -15,10 +15,12 @@ async def test_status_endpoint_returns_lightweight_payload(client):
     r = await client.get(f"/api/brands/{brand['id']}")
     prompt_id = r.json()["prompts"][0]["id"]
     async with AsyncSessionLocal() as db:
-        cluster = ContentCluster(
-            brand_id=brand["id"], prompt_id=prompt_id, status="generating",
-        )
-        db.add(cluster); await db.commit(); await db.refresh(cluster)
+        # Eager shell from create_brand already exists — mutate it.
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "generating"
+        await db.commit(); await db.refresh(cluster)
         cluster_id = cluster.id
 
     r = await client.get(f"/api/clusters/{brand['id']}/{cluster_id}/status")
@@ -36,8 +38,12 @@ async def test_regenerate_pieces_endpoint_reuses_brief(client, monkeypatch):
     r = await client.get(f"/api/brands/{brand['id']}")
     prompt_id = r.json()["prompts"][0]["id"]
     async with AsyncSessionLocal() as db:
-        cluster = ContentCluster(brand_id=brand["id"], prompt_id=prompt_id, status="ready")
-        db.add(cluster); await db.flush()
+        # Eager shell from create_brand already exists — mutate it.
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "ready"
+        await db.flush()
         brief = ContentBrief(
             cluster_id=cluster.id, version=1, positioning="p", canonical_phrasings=[],
             key_claims=[], stats=[], competitor_context={}, narrative_spine="", tone_notes="",
@@ -65,8 +71,12 @@ async def test_sources_endpoint_returns_spine(client):
     r = await client.get(f"/api/brands/{brand['id']}")
     prompt_id = r.json()["prompts"][0]["id"]
     async with AsyncSessionLocal() as db:
-        cluster = ContentCluster(brand_id=brand["id"], prompt_id=prompt_id, status="ready")
-        db.add(cluster); await db.flush()
+        # Eager shell from create_brand already exists — mutate it.
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "ready"
+        await db.flush()
         pack = ContentEvidencePack(
             cluster_id=cluster.id, version=1, sources=[],
             total_t1=1, total_t2=1, total_t3=0,
@@ -101,8 +111,12 @@ async def test_brief_history_endpoint(client):
     r = await client.get(f"/api/brands/{brand['id']}")
     prompt_id = r.json()["prompts"][0]["id"]
     async with AsyncSessionLocal() as db:
-        cluster = ContentCluster(brand_id=brand["id"], prompt_id=prompt_id, status="ready")
-        db.add(cluster); await db.flush()
+        # Eager shell from create_brand already exists — mutate it.
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "ready"
+        await db.flush()
         for v in (1, 2, 3):
             db.add(ContentBrief(
                 cluster_id=cluster.id, version=v, positioning=f"v{v}",

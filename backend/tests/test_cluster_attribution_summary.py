@@ -1,6 +1,7 @@
 """Tests for cluster_delta and posted_count fields on the cluster list endpoint."""
 import pytest
 from datetime import datetime, timezone
+from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models import (
@@ -22,10 +23,12 @@ async def test_cluster_summary_includes_zero_delta_when_no_posted_drafts(client,
     prompt_id = r.json()["prompts"][0]["id"]
 
     async with AsyncSessionLocal() as db:
-        cluster = ContentCluster(
-            brand_id=brand["id"], prompt_id=prompt_id, status="ready", pillar_mode="none",
-        )
-        db.add(cluster)
+        # Eager shell from create_brand already exists — mutate it.
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "ready"
+        cluster.pillar_mode = "none"
         await db.commit()
 
     resp = await client.get(f"/api/clusters/{brand['id']}")
@@ -45,10 +48,12 @@ async def test_cluster_summary_sums_attribution_delta_across_posted_pieces(clien
     prompt_id = r.json()["prompts"][0]["id"]
 
     async with AsyncSessionLocal() as db:
-        cluster = ContentCluster(
-            brand_id=brand["id"], prompt_id=prompt_id, status="ready", pillar_mode="none",
-        )
-        db.add(cluster)
+        # Eager shell from create_brand already exists — mutate it.
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "ready"
+        cluster.pillar_mode = "none"
         await db.flush()
 
         # Two posted pieces, one with delta +5.0, one with delta +3.5
@@ -76,7 +81,12 @@ async def test_cluster_summary_sums_attribution_delta_across_posted_pieces(clien
     assert resp.status_code == 200
     summary = resp.json()[0]
     assert summary["posted_count"] == 2
-    assert summary["cluster_delta"] == pytest.approx(8.5)
+    # cluster_delta semantic changed: it is now
+    #   current_prompt_visibility − score_at_posting of the FIRST posted draft
+    # (not the sum of per-draft deltas). With no completed tracking runs in
+    # this test, current visibility is 0.0; first posted draft was at score 20.0,
+    # so the lift is 0.0 - 20.0 = -20.0.
+    assert summary["cluster_delta"] == pytest.approx(-20.0)
 
 
 @pytest.mark.asyncio
@@ -89,10 +99,12 @@ async def test_cluster_summary_delta_null_when_posted_but_no_attribution(client,
     prompt_id = r.json()["prompts"][0]["id"]
 
     async with AsyncSessionLocal() as db:
-        cluster = ContentCluster(
-            brand_id=brand["id"], prompt_id=prompt_id, status="ready", pillar_mode="none",
-        )
-        db.add(cluster)
+        # Eager shell from create_brand already exists — mutate it.
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "ready"
+        cluster.pillar_mode = "none"
         await db.flush()
         db.add(ContentDraft(
             brand_id=brand["id"], prompt_id=prompt_id, cluster_id=cluster.id,
@@ -140,7 +152,13 @@ async def test_cluster_detail_includes_cluster_delta_and_posted_count(client, db
     )
     assert resp.status_code == 200
     detail = resp.json()
-    assert detail["cluster_delta"] == pytest.approx(4.0)
+    # cluster_delta semantic changed: it is now
+    #   current_prompt_visibility − score_at_posting of the FIRST posted draft
+    # (not the per-draft delta). With no completed tracking runs in this test,
+    # current visibility is 0.0; first posted draft was at score 20.0,
+    # so the lift is 0.0 - 20.0 = -20.0. The per-draft attribution_delta
+    # column is unchanged (still 4.0).
+    assert detail["cluster_delta"] == pytest.approx(-20.0)
     assert detail["posted_count"] == 1
     assert len(detail["drafts"]) == 1
     assert detail["drafts"][0]["attribution_delta"] == pytest.approx(4.0)

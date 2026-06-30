@@ -494,6 +494,16 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
             latest_run = latest_run_res.scalar_one_or_none()
             if latest_run and latest_run.overall_score is not None:
                 draft.visibility_at_post = round(latest_run.overall_score, 1)
+            # NEW: capture posted URL + snapshot brief version for cluster drafts
+            if request.posted_url is not None:
+                draft.posted_url = request.posted_url
+            if draft.cluster_id is not None:
+                from app.models import ContentBrief, ContentCluster
+                cluster_row = await db.get(ContentCluster, draft.cluster_id)
+                if cluster_row is not None and cluster_row.last_brief_id is not None:
+                    brief_row = await db.get(ContentBrief, cluster_row.last_brief_id)
+                    if brief_row is not None:
+                        draft.brief_version = brief_row.version
 
     draft.updated_at = utcnow()
     await db.commit()

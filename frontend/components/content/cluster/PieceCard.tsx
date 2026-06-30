@@ -157,16 +157,40 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
         )}
 
         {draft ? (
-          <>
-            {draft.title && draft.title !== "(untitled)" && (
-              <h4 className="font-semibold text-[var(--text-primary)] leading-snug line-clamp-2 mb-1.5">
-                {draft.title}
-              </h4>
-            )}
-            <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-[10] flex-1 whitespace-pre-wrap">
-              {draft.content_text}
-            </p>
-          </>
+          draft.status === "posted" ? (
+            <div className="flex-1 flex flex-col justify-center gap-2 py-2">
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                Posted on{" "}
+                {draft.posted_at
+                  ? new Date(draft.posted_at).toLocaleDateString()
+                  : "—"}
+                {draft.posted_url && (
+                  <>
+                    {" · "}
+                    <a
+                      href={draft.posted_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[var(--accent-foreground)] hover:underline"
+                    >
+                      View live post ↗
+                    </a>
+                  </>
+                )}
+              </p>
+            </div>
+          ) : (
+            <>
+              {draft.title && (
+                <h4 className="font-semibold text-[var(--text-primary)] leading-snug line-clamp-2 mb-1.5">
+                  {draft.title}
+                </h4>
+              )}
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-[10] flex-1 whitespace-pre-wrap">
+                {draft.content_text}
+              </p>
+            </>
+          )
         ) : (
           <p className="text-sm text-[var(--text-faint)] italic flex-1">
             Not generated yet.
@@ -191,7 +215,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
 
         <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2">
           <div className="flex items-center gap-1">
-            {draft && (
+            {draft && draft.status !== "posted" && (
               <>
                 <Button
                   variant="ghost"
@@ -239,33 +263,28 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 Mark posted
               </Button>
             )}
-            {draft && draft.status === "posted" && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setStatus("draft")}
-                disabled={updatingStatus}
-                className="!px-2 text-[#7dd3fc]"
-                title="Undo — mark as not yet posted"
-              >
-                <CheckCircle2 className="h-3 w-3" />
-                Posted
-              </Button>
-            )}
             <Button
               variant="ghost"
               size="sm"
               onClick={regenerate}
               disabled={regenerating}
               className="!px-2"
-              title="Rewrite this post from scratch"
+              title={
+                draft?.status === "posted"
+                  ? "Generate a fresh working draft. The posted version stays live and keeps its attribution."
+                  : "Rewrite this post from scratch"
+              }
             >
               {regenerating ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
                 <RefreshCw className="h-3 w-3" />
               )}
-              Rewrite
+              {regenerating
+                ? "Regenerating…"
+                : draft?.status === "posted"
+                ? "Generate new draft"
+                : "Rewrite"}
             </Button>
           </div>
         </div>

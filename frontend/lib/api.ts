@@ -244,6 +244,8 @@ export interface ContentDraft {
   }>;
   attribution_delta?: number | null;
   low_evidence?: boolean;
+  posted_url?: string | null;
+  brief_version?: number | null;
 }
 
 export interface ContentOpportunity {

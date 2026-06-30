@@ -29,12 +29,16 @@ import { OpportunitiesInput } from "@/components/content/cluster/OpportunitiesIn
 import { PieceCard } from "@/components/content/cluster/PieceCard";
 import { PillarCard } from "@/components/content/cluster/PillarCard";
 import { SourceSpinePanel } from "@/components/content/cluster/SourceSpinePanel";
+import PlatformBadge from "@/components/PlatformBadge";
 import { useClusterStatus } from "@/hooks/useClusterStatus";
+import { CLUSTER_PLATFORMS } from "@/lib/clusterPlatforms";
+import { useHiddenPlatforms } from "@/lib/useHiddenPlatforms";
 
-// Display order only. The actual set of platforms shown is derived at runtime
-// from the cluster's live status + drafts, so a platform added server-side
-// (e.g. owned_site) renders without a frontend change.
-const PLATFORM_ORDER = ["linkedin", "medium", "reddit", "quora", "x"];
+// Display order. Actual set of platforms shown is derived at runtime from
+// the cluster's live status + drafts, then filtered by the user's hidden-
+// platform preferences. Uses the shared CLUSTER_PLATFORMS constant so the
+// canonical order matches other cluster views.
+const PLATFORM_ORDER = CLUSTER_PLATFORMS;
 
 const STATUS_LABEL: Record<string, string> = {
   pending: "Pending",
@@ -91,6 +95,8 @@ export default function ClusterDetailPage() {
   // Live-poll while the cluster is in an active phase. When it becomes
   // terminal we refetch the full detail so drafts/brief reflect the new state.
   const { data: liveStatus } = useClusterStatus(brandId, clusterId);
+  // View-only platform filter (must be called before any early return — Rules of Hooks).
+  const { isVisible } = useHiddenPlatforms(brandId);
   useEffect(() => {
     if (!liveStatus || !cluster) return;
     if (cluster.status === liveStatus.status) return;
@@ -292,7 +298,7 @@ export default function ClusterDetailPage() {
           Posts
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {platforms.map((platform) => (
+          {platforms.filter((p) => isVisible(p)).map((platform) => (
             <PieceCard
               key={platform}
               brandId={brandId}
@@ -304,6 +310,38 @@ export default function ClusterDetailPage() {
           ))}
         </div>
       </div>
+
+      {cluster.drafts.some(d => d.status === "posted" && isVisible(d.platform)) && (
+        <div>
+          <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-3">
+            Posted history
+          </div>
+          <div className="space-y-2">
+            {cluster.drafts
+              .filter(d => d.status === "posted" && isVisible(d.platform))
+              .sort((a, b) => (b.posted_at ?? "").localeCompare(a.posted_at ?? ""))
+              .map(d => (
+                <div key={d.id} className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
+                  <PlatformBadge platform={d.platform} size="sm" />
+                  <span>{new Date(d.posted_at!).toLocaleDateString()}</span>
+                  {d.posted_url && (
+                    <a href={d.posted_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-foreground)] hover:underline">
+                      View ↗
+                    </a>
+                  )}
+                  {d.brief_version != null && (
+                    <span className="text-[var(--text-faint)]">from brief v{d.brief_version}</span>
+                  )}
+                  {d.attribution_delta != null && (
+                    <span className={d.attribution_delta >= 0 ? "text-[#4ade80]" : "text-[#fb7185]"}>
+                      {d.attribution_delta >= 0 ? "+" : ""}{d.attribution_delta.toFixed(1)}pts
+                    </span>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* ZONE 2 — Brief + Source spine (supporting context, collapsed by default) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

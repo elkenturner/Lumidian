@@ -346,6 +346,23 @@ async def create_brand(payload: BrandCreate, db: DbDep, user: CurrentUser):
             prompt_type = "pitch" if payload.brand_type == "pitch" else "standard"
             db.add(Prompt(brand_id=brand.id, text=text, prompt_type=prompt_type))
 
+    # Eagerly create a ContentCluster shell per prompt so the cluster grid
+    # always shows 1 card per tracked prompt (no orphans).
+    await db.flush()
+    from app.models import ContentCluster as _CC
+    inserted_prompts = (await db.execute(
+        select(Prompt).where(Prompt.brand_id == brand.id)
+    )).scalars().all()
+    for p in inserted_prompts:
+        existing = (await db.execute(
+            select(_CC).where(_CC.prompt_id == p.id)
+        )).scalar_one_or_none()
+        if existing is None:
+            db.add(_CC(
+                brand_id=brand.id, prompt_id=p.id,
+                status="pending", pillar_mode="none", version=0,
+            ))
+
     await db.commit()
     await db.refresh(brand)
 
@@ -506,6 +523,13 @@ async def add_prompt(
     prompt_type = "pitch" if brand_obj.brand_type == "pitch" else "standard"
     prompt = Prompt(brand_id=brand_id, text=text, prompt_type=prompt_type)
     db.add(prompt)
+    await db.flush()
+    # Eager ContentCluster shell — keeps 1 prompt = 1 cluster card invariant.
+    from app.models import ContentCluster as _CC
+    db.add(_CC(
+        brand_id=brand_id, prompt_id=prompt.id,
+        status="pending", pillar_mode="none", version=0,
+    ))
     await db.commit()
     await db.refresh(prompt)
 

@@ -117,10 +117,15 @@ export function CompetitiveGapCard({
   const remaining = data.competitors.filter((c) => c.has_data).length - topThree.length;
 
   return (
-    <button
-      type="button"
+    // Not a <button>: it contains the window-toggle buttons, and a button
+    // inside a button is invalid HTML (hydration error). A div with the
+    // button role keeps click + keyboard activation without nesting.
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onExpand}
-      className="card p-5 flex flex-col text-left hover:border-[var(--accent-border)] transition-colors group relative"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExpand(); } }}
+      className="card p-5 flex flex-col text-left hover:border-[var(--accent-border)] transition-colors group relative cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
     >
       <ArrowRight
         size={14}
@@ -182,7 +187,7 @@ export function CompetitiveGapCard({
           {remaining > 0 && <span className="ml-1">…and {remaining} more</span>}
         </p>
       )}
-    </button>
+    </div>
   );
 }
 

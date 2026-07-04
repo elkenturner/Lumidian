@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { fadeIn, slideIn } from '@/lib/motion';
 import Link from 'next/link';
 import { useEffect, useState, useRef, useCallback } from 'react';
@@ -393,9 +393,8 @@ export default function ReportsPage() {
               </TabsTrigger>
             </TabsList>
 
-            <AnimatePresence mode="wait">
             <TabsContent key="prompts" value="prompts" className="mt-0">
-              <motion.div variants={slideIn} initial="hidden" animate="visible" exit="exit">
+              <motion.div variants={slideIn} initial="hidden" animate="visible">
           {/* Search + sort controls */}
           {!loading && responses.length > 0 && (
             <div className={`flex ${isMobile ? 'flex-col' : 'flex-wrap items-center'} gap-2 mb-3`}>
@@ -612,7 +611,7 @@ export default function ReportsPage() {
             </TabsContent>
 
             <TabsContent key="competitors" value="competitors" className="mt-0">
-              <motion.div variants={slideIn} initial="hidden" animate="visible" exit="exit">
+              <motion.div variants={slideIn} initial="hidden" animate="visible">
           {/* Competitors section */}
           {!loading && (!competitorAnalysis || !competitorAnalysis.has_data) && (
             <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-xl p-8 text-center shadow-[0_4px_24px_rgba(0,0,0,0.30)]">
@@ -730,7 +729,6 @@ export default function ReportsPage() {
               )}
               </motion.div>
             </TabsContent>
-            </AnimatePresence>
           </Tabs>
         </>
       )}

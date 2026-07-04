@@ -1,10 +1,12 @@
+import * as Sentry from '@sentry/nextjs';
+
 /**
- * Log an error with context. In production, this would send to Sentry.
+ * Log an error with context, and report it to Sentry (which is configured).
  */
 export function logError(error: unknown, context?: string): void {
   const message = error instanceof Error ? error.message : String(error);
   console.error(`[${context ?? 'Error'}]`, message, error);
-  // TODO: When Sentry is configured, add: Sentry.captureException(error, { extra: { context } });
+  Sentry.captureException(error, context ? { extra: { context } } : undefined);
 }
 
 /**

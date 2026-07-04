@@ -989,7 +989,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           setReportRunning(status.report_running);
           setDraftsGenerating(status.drafts_generating);
           setScanning(status.scanning);
-          setModelScores(status.model_scores || []);
+          // Only replace the array when it actually changed — a fresh array
+          // identity every tick re-renders every BrandContext consumer (the
+          // whole dashboard + charts) up to every 3s during a run.
+          const nextScores = status.model_scores || [];
+          setModelScores((prev) =>
+            prev.length === nextScores.length &&
+            prev.every((s, i) => s.model === nextScores[i]?.model && s.score === nextScores[i]?.score)
+              ? prev
+              : nextScores,
+          );
           setPromptCount(status.prompt_count || 0);
           active = status.report_running || status.drafts_generating || status.scanning;
           try {

@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react';
 import { getBrands, Brand, parseApiError } from '@/lib/api';
 
 const STORAGE_KEY = 'clarity_active_brand_id';
@@ -70,8 +70,13 @@ export function BrandProvider({ children }: { children: ReactNode }) {
 
   const activeBrand = brands.find((b) => b.id === activeBrandId) ?? null;
 
+  const value = useMemo(
+    () => ({ brands, activeBrandId, activeBrand, setActiveBrandId, loading, error, refetch: fetchBrands }),
+    [brands, activeBrandId, activeBrand, loading, error, fetchBrands],
+  );
+
   return (
-    <BrandContext.Provider value={{ brands, activeBrandId, activeBrand, setActiveBrandId, loading, error, refetch: fetchBrands }}>
+    <BrandContext.Provider value={value}>
       {children}
     </BrandContext.Provider>
   );

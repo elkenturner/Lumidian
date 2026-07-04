@@ -124,8 +124,7 @@ export default function OnboardingPage() {
 
       // 3. Trigger tracking run
       try {
-        const runResult = await triggerRun(brand.id);
-        console.info('[Onboarding] Auto-run triggered — brand_id=%d run_id=%d', brand.id, runResult.run_id);
+        await triggerRun(brand.id);
       } catch (err) {
         console.warn('[Onboarding] Auto-run failed (non-fatal):', err);
       }

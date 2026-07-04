@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { AuthUser, authMe, authLogin, authRegister, authLogout } from '@/lib/api';
 
@@ -96,8 +96,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearSessionCookie();
   }
 
+  // Memoize so consumers don't re-render on every provider render (e.g. route
+  // changes). The handlers don't close over changing state, so [user, loading]
+  // deps are sufficient.
+  const value = useMemo(
+    () => ({ user, loading, login, register, logout, refresh }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [user, loading],
+  );
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refresh }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

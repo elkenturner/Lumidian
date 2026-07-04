@@ -168,7 +168,9 @@ def _is_serper_rate_limit(resp: object, body_text: str | None = None) -> bool:
 SERPER_RETRY_DELAYS = (1.0, 2.0, 4.0)  # exponential backoff between attempts
 
 
-async def _serper_search(query: str, num: int = 10) -> list[dict]:
+async def _serper_search(
+    query: str, num: int = 10, raise_on_rate_limit: bool = False,
+) -> list[dict]:
     """
     General-web Serper search (not site-scoped). Returns a list of dicts each
     containing at minimum ``link`` (or ``url``), ``title``, ``snippet`` and
@@ -178,6 +180,13 @@ async def _serper_search(query: str, num: int = 10) -> list[dict]:
     rate-limit signal; non-rate-limit errors are returned as an empty list
     after a single attempt (preserving the prior swallow-and-continue behavior
     for genuine no-results / transient outages).
+
+    ``raise_on_rate_limit`` (default False, preserving System B's — i.e.
+    per-piece drafting's — silent-empty-on-throttle behavior): when True, once
+    every retry is exhausted and the failure was a rate limit, re-raise the
+    ``SerperRateLimitError`` instead of swallowing it as ``[]``. Used by the
+    cluster evidence path so a provider outage is distinguishable from a
+    genuine "no authoritative sources exist" result.
     """
     import asyncio
     import os
@@ -219,6 +228,8 @@ async def _serper_search(query: str, num: int = 10) -> list[dict]:
                     "Serper rate-limited for %r after %d attempts — returning empty",
                     query, attempt + 1,
                 )
+                if raise_on_rate_limit:
+                    raise last_rate_limit
                 return []
             resp.raise_for_status()
             data = resp.json()
@@ -231,6 +242,8 @@ async def _serper_search(query: str, num: int = 10) -> list[dict]:
 
     if last_rate_limit is not None:
         logger.warning("Serper exhausted retries for %r: %s", query, last_rate_limit)
+        if raise_on_rate_limit:
+            raise last_rate_limit
     return []
 
 

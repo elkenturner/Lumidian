@@ -18,12 +18,28 @@ import os
 from typing import Any
 from urllib.parse import urlparse
 
-from app.services.drafting.evidence import _serper_search  # reuse existing client
+from app.services.drafting.evidence import (  # reuse existing client
+    SerperRateLimitError,
+    _serper_search,
+)
 
 logger = logging.getLogger(__name__)
 
 MAX_QUERIES = 5
 PER_QUERY_LIMIT = 10
+
+
+class SearchUnavailableError(Exception):
+    """Raised when Serper is rate-limited across every cluster search query and
+    returns no results at all.
+
+    Distinct from a genuine "no authoritative sources exist" outcome — a
+    provider throttling incident is retryable and should never be recorded as
+    the same failure_reason as a real content gap. Only raised when the search
+    came back completely empty; if even one query returned real results
+    (partial success), those results still flow through to the authority
+    gate rather than aborting the pack.
+    """
 
 
 def expand_queries(*, prompt_text: str, key_claims: list[str]) -> list[str]:
@@ -58,11 +74,24 @@ def _normalize_url(url: str) -> str:
 
 
 async def fetch_and_dedupe(queries: list[str]) -> list[dict[str, Any]]:
-    """Run Serper for each query, merge, dedup by normalized URL."""
+    """Run Serper for each query, merge, dedup by normalized URL.
+
+    Requests rate-limit errors be raised (rather than swallowed to ``[]``) so
+    this function can tell "Serper is throttled" apart from "Serper legitimately
+    found nothing". If every query is rate-limited AND nothing was found at
+    all, raise SearchUnavailableError so the caller can mark the cluster
+    retryable instead of recording a misleading no-authority failure. Partial
+    results (some queries rate-limited, others succeeded) still flow through
+    to the gate as before.
+    """
     seen: dict[str, dict[str, Any]] = {}
+    rate_limited = 0
     for q in queries:
         try:
-            results = await _serper_search(q, num=PER_QUERY_LIMIT)
+            results = await _serper_search(q, num=PER_QUERY_LIMIT, raise_on_rate_limit=True)
+        except SerperRateLimitError:
+            rate_limited += 1
+            continue
         except Exception as exc:
             logger.warning("Serper failed for cluster query %r: %s", q, exc)
             continue
@@ -78,6 +107,10 @@ async def fetch_and_dedupe(queries: list[str]) -> list[dict[str, Any]]:
                 "title": r.get("title") or "",
                 "snippet": r.get("snippet") or "",
             }
+    if rate_limited and not seen:
+        raise SearchUnavailableError(
+            f"search_unavailable: Serper rate-limited on {rate_limited}/{len(queries)} queries"
+        )
     return list(seen.values())
 
 

@@ -373,6 +373,7 @@ async def regenerate_cluster(
         build_cluster_pack_ungated,
         pack_meets_gate,
         PackGateError,
+        SearchUnavailableError,
     )
     prompt_row = (await db.execute(
         select(Prompt).where(Prompt.id == cluster.prompt_id)
@@ -391,6 +392,20 @@ async def regenerate_cluster(
             )
             brief.evidence_pack_id = pack.id
             await db.commit()
+        except SearchUnavailableError as exc:
+            # Serper was throttled on every query and returned nothing at
+            # all — distinct from a genuine no-authority result. Retryable
+            # via the sweep's retry_failed mode, so don't fall through to the
+            # brand-authority chain; a retry once the provider recovers is
+            # more useful than a synthesized low-evidence pack.
+            logger.info(
+                "cluster %d: search provider unavailable (%s) — marking retryable",
+                cluster.id, exc,
+            )
+            cluster.status = "briefing_failed"
+            cluster.failure_reason = str(exc)
+            await db.commit()
+            return cluster
         except PackGateError as exc:
             # Citations + Serper both failed authority gate. For niche
             # commercial prompts (no neutral third-party authority exists),

@@ -39,7 +39,7 @@ async def test_fetch_and_dedupe_drops_dupes_across_queries():
         ],
     }
 
-    async def fake_serper(query: str, num: int = 10):
+    async def fake_serper(query: str, num: int = 10, raise_on_rate_limit: bool = False):
         return fake_results[query]
 
     with patch("app.services.cluster_evidence._serper_search", side_effect=fake_serper):

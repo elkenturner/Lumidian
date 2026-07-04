@@ -281,8 +281,10 @@ WRITING RULES (evidence-backed — these drive whether AI engines cite the conte
   - Lead with the answer: the first sentence directly answers the target query — no preamble, no scene-setting.
   - Back every factual claim with the Brand Profile or Evidence Sources above — never invent data, never approximate a statistic.
   - Prefer concrete specifics (exact numbers, names, dates) over vague claims, and place key statistics where they stand out — concrete, well-sourced claims are what get cited.
+  - When you cite a source, name it in the same sentence as the claim ("per a 2026 Ahrefs study, ...") so the claim and its source travel together — a footnote alone is not attribution.
   - No hedging language ("may", "might", "could potentially", "perhaps", "it seems").
   - Mention {brand_name} only where it fits as a concrete fact in context — never forced, never promotional.
+  - NEVER write as a satisfied customer or user of {brand_name} ("I've been using it and love it") when writing on the brand's behalf — undisclosed insider testimonials are an FTC violation. First-person experience is fine only in an openly affiliated voice.
   - Write in a genuine human voice: vary sentence length, and avoid AI clichés (no "delve", "tapestry", em dashes, "in conclusion", "it's not just X — it's Y"). Drafts that read as AI-written are automatically rejected, so this is not optional.
   - No meta-commentary about the content itself ("This post addresses...", "This answer explains...").
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { Loader2, ChevronDown } from "lucide-react";
 import {
   getBrand,
   listClusters,
@@ -11,8 +11,17 @@ import {
   type ContentClusterSummary,
 } from "@/lib/api";
 import { ClusterCard } from "@/components/content/cluster/ClusterCard";
-import { PlatformFilter } from "@/components/content/cluster/PlatformFilter";
 import { useHiddenPlatforms } from "@/lib/useHiddenPlatforms";
+import { CLUSTER_PLATFORMS, CLUSTER_PLATFORM_LABELS } from "@/lib/clusterPlatforms";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuCheckboxItem,
+} from "@/components/ui/dropdown-menu";
 
 type SortKey = "visibility" | "updated" | "version";
 type FilterKey = "all" | "needs_attention" | "ready" | "in_progress" | "failed";
@@ -24,6 +33,20 @@ const FILTER_LABEL: Record<FilterKey, string> = {
   in_progress: "In progress",
   failed: "Failed",
 };
+
+const SORT_LABEL: Record<SortKey, string> = {
+  visibility: "Visibility ↑",
+  updated: "Last updated",
+  version: "Latest version",
+};
+
+// Shared trigger styling for the toolbar dropdowns.
+const TOOLBAR_TRIGGER =
+  "inline-flex items-center gap-1.5 rounded-md border border-[var(--border-subtle)] " +
+  "px-2.5 py-1.5 text-xs text-[var(--text-secondary)] transition-colors " +
+  "hover:text-[var(--text-primary)] hover:border-[var(--text-faint)] cursor-pointer " +
+  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-faint)]/40 " +
+  "data-[state=open]:border-[var(--text-faint)] data-[state=open]:text-[var(--text-primary)]";
 
 function filterPredicate(cluster: ContentClusterSummary, f: FilterKey): boolean {
   if (f === "all") return true;
@@ -47,6 +70,7 @@ export default function ContentBrandPage() {
   const [filter, setFilter] = useState<FilterKey>("all");
   const [regeneratingPromptId, setRegeneratingPromptId] = useState<number | null>(null);
   const { hidden, toggle, isVisible } = useHiddenPlatforms(brandId);
+  const platformsVisible = CLUSTER_PLATFORMS.filter((p) => !hidden.has(p)).length;
 
   useEffect(() => {
     if (!Number.isFinite(brandId)) return;
@@ -131,34 +155,70 @@ export default function ContentBrandPage() {
         </p>
       </header>
 
-      <div className="flex flex-wrap items-center gap-3 text-xs">
-        <div className="flex items-center gap-1.5 text-[var(--text-faint)]">
-          <span>Sort:</span>
-          {(["visibility", "updated", "version"] as SortKey[]).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setSortBy(k)}
-              className={`px-2 py-1 rounded ${sortBy === k ? "bg-[var(--bg-card)] text-[var(--text-primary)] font-medium" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}
-            >
-              {k === "visibility" ? "Visibility ↑" : k === "updated" ? "Last updated" : "Latest version"}
-            </button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1.5 text-[var(--text-faint)]">
-          <span>Filter:</span>
-          {(Object.keys(FILTER_LABEL) as FilterKey[]).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setFilter(k)}
-              className={`px-2 py-1 rounded ${filter === k ? "bg-[var(--bg-card)] text-[var(--text-primary)] font-medium" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"}`}
-            >
-              {FILTER_LABEL[k]}
-            </button>
-          ))}
-        </div>
-        <PlatformFilter hidden={hidden} onToggle={toggle} />
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Sort */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className={TOOLBAR_TRIGGER}>
+            <span className="text-[var(--text-faint)]">Sort</span>
+            <span className="font-medium text-[var(--text-primary)]">{SORT_LABEL[sortBy]}</span>
+            <ChevronDown className="h-3.5 w-3.5 text-[var(--text-faint)]" aria-hidden />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[9rem]">
+            <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+              {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+                <DropdownMenuRadioItem key={k} value={k}>
+                  {SORT_LABEL[k]}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Status filter */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className={TOOLBAR_TRIGGER}>
+            <span className="text-[var(--text-faint)]">Status</span>
+            <span className="font-medium text-[var(--text-primary)]">{FILTER_LABEL[filter]}</span>
+            <ChevronDown className="h-3.5 w-3.5 text-[var(--text-faint)]" aria-hidden />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[10rem]">
+            <DropdownMenuRadioGroup value={filter} onValueChange={(v) => setFilter(v as FilterKey)}>
+              {(Object.keys(FILTER_LABEL) as FilterKey[]).map((k) => (
+                <DropdownMenuRadioItem key={k} value={k}>
+                  {FILTER_LABEL[k]}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Platform visibility — view only, hides pieces inside cards */}
+        <DropdownMenu>
+          <DropdownMenuTrigger className={TOOLBAR_TRIGGER}>
+            <span className="text-[var(--text-faint)]">Platforms</span>
+            <span className="font-medium text-[var(--text-primary)]">
+              {platformsVisible === CLUSTER_PLATFORMS.length
+                ? "All"
+                : `${platformsVisible}/${CLUSTER_PLATFORMS.length}`}
+            </span>
+            <ChevronDown className="h-3.5 w-3.5 text-[var(--text-faint)]" aria-hidden />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="min-w-[10rem]">
+            <DropdownMenuLabel className="text-[10px] font-normal uppercase tracking-wider text-[var(--text-faint)]">
+              Show in cards
+            </DropdownMenuLabel>
+            {CLUSTER_PLATFORMS.map((p) => (
+              <DropdownMenuCheckboxItem
+                key={p}
+                checked={!hidden.has(p)}
+                onCheckedChange={() => toggle(p)}
+                onSelect={(e) => e.preventDefault()}
+              >
+                {CLUSTER_PLATFORM_LABELS[p]}
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {visible.length === 0 ? (

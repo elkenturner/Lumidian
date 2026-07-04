@@ -5,6 +5,7 @@ import { fadeIn } from '@/lib/motion';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import {
+  AlertTriangle,
   Plus,
   BarChart2,
   TrendingUp,
@@ -726,6 +727,20 @@ export default function DashboardPage() {
           {/* Overview */}
           {!isFirstRun && !(isMobile && loadingAnalytics && !analytics) && (
           <>
+              {/* Degraded-run warning: most/many queries errored, so the score
+                  and analytics below are built from a thin slice of data. */}
+              {latestRun?.status === 'completed' && (latestRun.failed_queries ?? 0) > 0 && (
+                <div className="flex items-start gap-2.5 bg-[rgba(120,53,15,0.18)] border border-[rgba(146,64,14,0.35)] rounded-lg px-4 py-3 mb-4">
+                  <AlertTriangle size={15} className="text-[var(--warning)] flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-[var(--warning)] leading-relaxed">
+                    Your last report was degraded — {latestRun.failed_queries} of{' '}
+                    {(latestRun.failed_queries ?? 0) + (latestRun.total_queries ?? 0)} queries failed
+                    (provider errors or timeouts). The score and analytics below reflect only the{' '}
+                    {latestRun.total_queries ?? 0} responses that succeeded.
+                  </p>
+                </div>
+              )}
+
               {/* Brand profile completeness notification */}
               {brandProfile && brandProfile.completion_pct < 100 && (
                 <Callout
@@ -814,7 +829,16 @@ export default function DashboardPage() {
                     ) : (
                       <>
                         <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">&mdash;</p>
-                        <p className="text-xs text-[var(--text-faint)] mt-1">No mentions to analyze</p>
+                        <p className="text-xs text-[var(--text-faint)] mt-1">
+                          {(sentData?.unclassified_mentions ?? 0) > 0
+                            ? 'Sentiment unavailable for this run'
+                            : 'No mentions to analyze'}
+                        </p>
+                        {(sentData?.unclassified_mentions ?? 0) > 0 && (
+                          <p className="text-[10px] text-[var(--text-faint)] mt-0.5">
+                            {`${sentData!.unclassified_mentions} mention${sentData!.unclassified_mentions !== 1 ? 's' : ''} found, but classification didn't complete.`}
+                          </p>
+                        )}
                       </>
                     )}
                   </div>
@@ -870,7 +894,7 @@ export default function DashboardPage() {
                           return (
                             <div key={s.name} className="flex flex-col gap-1.5">
                               <div className="flex items-center justify-between">
-                                <span className={`text-xs font-medium truncate ${s.is_primary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{s.name}</span>
+                                <span className={`text-xs font-medium truncate capitalize ${s.is_primary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{s.name}</span>
                                 <span className="text-xs font-semibold tabular-nums ml-2 flex-shrink-0" style={{ color: textColor }}>{pct}%</span>
                               </div>
                               <div className="h-1.5 rounded-full bg-[var(--bg-tinted)] overflow-hidden">

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { logError } from '@/lib/utils/errors';
 import {
+  AlertTriangle,
   BarChart2,
   ChevronDown,
   ChevronRight,
@@ -118,6 +119,9 @@ export default function ReportsPage() {
   const [trends, setTrends] = useState<(TrendPoint & { formattedDate: string; score: number })[]>([]);
   const [responses, setResponses] = useState<QueryResult[]>([]);
   const [prevResponses, setPrevResponses] = useState<QueryResult[]>([]);
+  // Prompts whose queries all errored in the latest run — they were tracked,
+  // just yielded no data, and must not be labeled "Not yet tracked".
+  const [failedPromptIds, setFailedPromptIds] = useState<Set<number>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortBy>('visibility');
   const [loading, setLoading] = useState(false);
@@ -143,6 +147,7 @@ export default function ReportsPage() {
     setTrends([]);
     setResponses([]);
     setPrevResponses([]);
+    setFailedPromptIds(new Set());
     setExpandedPromptId(null);
     setBrandDetail(null);
     setCompetitorAnalysis(null);
@@ -191,7 +196,11 @@ export default function ReportsPage() {
         prevResps: QueryResult[];
         compAnalysis: CompetitorAnalysis | null;
       };
-      setResponses(Array.isArray(resps) ? resps.filter((r: QueryResult) => r.response_text) : []);
+      const rawResps: QueryResult[] = Array.isArray(resps) ? resps : [];
+      setResponses(rawResps.filter((r: QueryResult) => r.response_text));
+      setFailedPromptIds(new Set(
+        rawResps.filter((r) => r.error || !r.response_text).map((r) => r.prompt_id)
+      ));
       setPrevResponses(Array.isArray(prevResps) ? prevResps.filter((r: QueryResult) => r.response_text) : []);
       if (compAnalysis?.has_data) setCompetitorAnalysis(compAnalysis);
     } catch { /* ignore */ } finally {
@@ -243,7 +252,7 @@ export default function ReportsPage() {
       rows.push([`"${g.promptText.replace(/"/g, '""')}"`, overallPct, ...modelCols].join(','));
     }
 
-    const csv = rows.join('\n');
+    const csv = rows.join('\n') + '\n';
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -280,10 +289,12 @@ export default function ReportsPage() {
     });
     return [g.promptId, modelMap] as const;
   }));
-  const trackedPromptIds = new Set(promptGroups.map((g) => g.promptId));
-  const untrackedPrompts: Prompt[] = (brandDetail?.prompts ?? []).filter(
-    (p) => !trackedPromptIds.has(p.id)
-  );
+  // Derive from the UNFILTERED groups — deriving from the search-filtered list
+  // made every non-matching tracked prompt show up as "Not yet tracked".
+  const trackedPromptIds = new Set(allPromptGroups.map((g) => g.promptId));
+  const untrackedPrompts: Prompt[] = (brandDetail?.prompts ?? [])
+    .filter((p) => !trackedPromptIds.has(p.id))
+    .filter((p) => !searchQuery || p.text.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
     <motion.div
@@ -298,11 +309,11 @@ export default function ReportsPage() {
           <h1 className="text-lg sm:text-2xl font-display text-[var(--text-primary)]">Reports</h1>
           <p className="hidden sm:block text-[13px] text-[var(--text-muted)] mt-1.5">Per-prompt visibility breakdown by AI model</p>
         </div>
-        <div className={`flex ${isMobile ? 'flex-col w-full' : 'items-center'} gap-2 md:gap-3`}>
+        <div className={`flex items-center ${isMobile ? 'w-full' : ''} gap-2 md:gap-3`}>
           {responses.length > 0 && (
             <button
               onClick={downloadCSV}
-              className={`flex items-center gap-2 bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-colors text-xs font-medium ${isMobile ? 'w-full justify-center min-h-[44px]' : ''}`}
+              className={`flex items-center gap-2 bg-[var(--bg-raised)] hover:bg-[var(--bg-card)] border border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 transition-colors text-xs font-medium ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
               title="Export as CSV"
             >
               <Download size={14} />
@@ -310,7 +321,7 @@ export default function ReportsPage() {
             </button>
           )}
           {selectedBrandId && (
-            <div className={`flex items-center gap-1 ${isMobile ? 'w-full' : ''}`}>
+            <div className={`flex items-center gap-1 ${isMobile ? 'flex-1' : ''}`}>
               <button
                 onClick={downloadPDF}
                 disabled={exportingPDF}
@@ -373,8 +384,24 @@ export default function ReportsPage() {
 
           {/* Schedule note */}
           <p className="text-xs text-[var(--text-faint)] mb-4 px-1">
+            {latestRun?.status === 'completed' && latestRun.completed_at
+              ? `Data below is from the report completed ${format(parseUTCISO(latestRun.completed_at), 'MMM d, yyyy')}. `
+              : ''}
             Reports update automatically once daily at 8:00 AM UTC.
           </p>
+
+          {/* Degraded-run warning */}
+          {latestRun?.status === 'completed' && (latestRun.failed_queries ?? 0) > 0 && (
+            <div className="flex items-start gap-2.5 bg-[rgba(120,53,15,0.18)] border border-[rgba(146,64,14,0.35)] rounded-lg px-4 py-3 mb-4">
+              <AlertTriangle size={15} className="text-[var(--warning)] flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-[var(--warning)] leading-relaxed">
+                This report was degraded — {latestRun.failed_queries} of{' '}
+                {(latestRun.failed_queries ?? 0) + (latestRun.total_queries ?? 0)} queries failed
+                (provider errors or timeouts). Prompt data below reflects only the{' '}
+                {latestRun.total_queries ?? 0} responses that succeeded.
+              </p>
+            </div>
+          )}
 
           {/* Tabs for Prompt Breakdown and Competitor Analysis */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'prompts' | 'competitors')} className="mt-4">
@@ -431,7 +458,9 @@ export default function ReportsPage() {
               <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Prompt Visibility</h3>
               {!loading && (promptGroups.length + untrackedPrompts.length) > 0 && (
                 <span className="text-xs text-[var(--text-muted)]">
-                  {searchQuery ? `${promptGroups.length} of ${allPromptGroups.length}` : `${promptGroups.length + untrackedPrompts.length}`} prompt{(promptGroups.length + untrackedPrompts.length) !== 1 ? 's' : ''}
+                  {searchQuery
+                    ? `${promptGroups.length} of ${allPromptGroups.length} prompt${allPromptGroups.length !== 1 ? 's' : ''}`
+                    : `${promptGroups.length + untrackedPrompts.length} prompt${(promptGroups.length + untrackedPrompts.length) !== 1 ? 's' : ''}`}
                 </span>
               )}
             </div>
@@ -588,22 +617,29 @@ export default function ReportsPage() {
                   );
                 })}
 
-                {/* Untracked prompts */}
-                {untrackedPrompts.map((p) => (
-                  <div key={`untracked-${p.id}`} className="px-5 py-4">
-                    <div className="flex items-start gap-3 mb-2">
-                      <p className="text-sm text-[var(--text-muted)] leading-snug font-medium flex-1">{p.text}</p>
-                      <Badge variant="secondary" className="flex-shrink-0">
-                        {latestRun?.status === 'running' || latestRun?.status === 'pending' ? 'Tracking now...' : 'Not yet tracked'}
-                      </Badge>
+                {/* Prompts with no data in the latest run: either their queries
+                    all errored (tracked, but degraded) or they're genuinely new. */}
+                {untrackedPrompts.map((p) => {
+                  const isRunning = latestRun?.status === 'running' || latestRun?.status === 'pending';
+                  const queriesFailed = !isRunning && failedPromptIds.has(p.id);
+                  return (
+                    <div key={`untracked-${p.id}`} className="px-5 py-4">
+                      <div className="flex items-start gap-3 mb-2">
+                        <p className="text-sm text-[var(--text-muted)] leading-snug font-medium flex-1">{p.text}</p>
+                        <Badge variant={queriesFailed ? 'warning' : 'secondary'} className="flex-shrink-0">
+                          {isRunning ? 'Tracking now...' : queriesFailed ? 'Queries failed' : 'Not yet tracked'}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-[var(--text-faint)]">
+                        {isRunning
+                          ? 'Currently being queried across AI models.'
+                          : queriesFailed
+                            ? 'Every query for this prompt failed in the latest report (provider errors). It will be retried in the next run.'
+                            : 'Will be included in your next report run.'}
+                      </p>
                     </div>
-                    <p className="text-xs text-[var(--text-faint)]">
-                      {latestRun?.status === 'running' || latestRun?.status === 'pending'
-                        ? 'Currently being queried across AI models.'
-                        : 'Will be included in your next report run.'}
-                    </p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -627,7 +663,7 @@ export default function ReportsPage() {
               <div className="px-5 py-3.5 border-b border-[var(--border-subtle)] bg-[rgba(255,255,255,0.02)] flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-semibold text-[var(--text-primary)]">Competitor Share of Voice</h3>
-                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5 capitalize">
                     Overall: {selectedBrand?.name} {competitorAnalysis.overall.brand_pct}%
                     {competitorAnalysis.overall.competitors.map((c) => ` · ${c.name} ${c.pct}%`).join('')}
                   </p>
@@ -660,11 +696,11 @@ export default function ReportsPage() {
                   <thead>
                     <tr className="border-b border-[var(--bg-tinted)]">
                       <th className="text-left px-5 py-2.5 text-[var(--text-muted)] font-medium w-1/2">Prompt</th>
-                      <th className="text-center px-3 py-2.5 text-[var(--accent)] font-medium whitespace-nowrap">
+                      <th className="text-center px-3 py-2.5 text-[var(--accent)] font-medium whitespace-nowrap capitalize">
                         {selectedBrand?.name ?? 'Your Brand'}
                       </th>
                       {competitorAnalysis.prompts[0]?.competitors.map((c) => (
-                        <th key={c.name} className="text-center px-3 py-2.5 text-[var(--text-muted)] font-medium whitespace-nowrap">
+                        <th key={c.name} className="text-center px-3 py-2.5 text-[var(--text-muted)] font-medium whitespace-nowrap capitalize">
                           {c.name}
                         </th>
                       ))}

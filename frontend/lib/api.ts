@@ -156,6 +156,7 @@ export interface TrackingRun {
   overall_score: number | null;
   total_queries: number;
   total_mentions: number;
+  failed_queries?: number | null;
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
@@ -669,6 +670,8 @@ export interface SentimentBreakdown {
   neutral_pct: number;
   negative_pct: number;
   has_data: boolean;
+  /** Mentions with no stored sentiment (classifier failed/skipped). */
+  unclassified_mentions: number;
 }
 
 export interface PositionData {

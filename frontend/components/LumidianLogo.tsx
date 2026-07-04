@@ -25,7 +25,7 @@ export default function LumidianLogo({
       alt="Lumidian"
       width={size}
       height={size}
-      style={{ objectFit: 'contain' }}
+      style={{ objectFit: 'contain', height: size, width: 'auto' }}
       priority
     />
   );

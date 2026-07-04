@@ -23,6 +23,7 @@ from app.models import (
     ContentCluster,
     ContentClusterSource,
     ContentDraft,
+    ContentDraftCitation,
     ContentEvidencePack,
     DraftAttribution,
     Prompt,
@@ -511,13 +512,32 @@ async def cluster_sources(brand_id: int, cluster_id: int, db: DbDep, user: Curre
             ContentClusterSource.cluster_id == cluster.id,
         )
     )).scalars().all()
+
+    # Compute real per-URL usage from citations attached to this cluster's
+    # drafts. ContentClusterSource.times_cited is written 0 at pack build and
+    # never incremented — the payload field is computed here instead.
+    from app.services.cluster_evidence import _normalize_url
+
+    cite_rows = (await db.execute(
+        select(ContentDraftCitation.url, ContentDraftCitation.draft_id)
+        .join(ContentDraft, ContentDraft.id == ContentDraftCitation.draft_id)
+        .where(ContentDraft.cluster_id == cluster.id)
+    )).all()
+    usage: dict[str, set[int]] = {}
+    for url, draft_id in cite_rows:
+        usage.setdefault(_normalize_url(url or ""), set()).add(draft_id)
+
     tier_order = {"T1": 0, "T2": 1, "T3": 2}
-    rows = sorted(rows, key=lambda r: (tier_order.get(r.tier, 3), -r.times_cited))
+
+    def _cited(r) -> int:
+        return len(usage.get(_normalize_url(r.url), set()))
+
+    rows = sorted(rows, key=lambda r: (-_cited(r), tier_order.get(r.tier, 3)))
     return ClusterSourcesPayload(
         total_t1=pack.total_t1, total_t2=pack.total_t2, total_t3=pack.total_t3,
         sources=[ClusterSourceItem(
             url=r.url, domain=r.domain, tier=r.tier, title=r.title,
-            times_cited=r.times_cited,
+            times_cited=_cited(r),
         ) for r in rows],
     )
 

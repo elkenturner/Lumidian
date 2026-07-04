@@ -3,7 +3,8 @@ from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models import (
-    ContentBrief, ContentCluster, ContentClusterSource, ContentEvidencePack,
+    ContentBrief, ContentCluster, ContentClusterSource, ContentDraft,
+    ContentDraftCitation, ContentEvidencePack,
 )
 from tests.conftest import register_and_login, create_brand
 
@@ -102,6 +103,66 @@ async def test_sources_endpoint_returns_spine(client):
     assert body["total_t2"] == 1
     assert len(body["sources"]) == 2
     assert body["sources"][0]["tier"] == "T1"  # T1 first
+
+
+@pytest.mark.asyncio
+async def test_sources_endpoint_reports_real_usage_counts(client):
+    """times_cited must be computed from ContentDraftCitation rows, not the dead column."""
+    await register_and_login(client, "srcusage@x.com")
+    brand = await create_brand(client, "SrcUsage")
+    r = await client.get(f"/api/brands/{brand['id']}")
+    prompt_id = r.json()["prompts"][0]["id"]
+    async with AsyncSessionLocal() as db:
+        # Eager shell from create_brand already exists — mutate it.
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "ready"
+        await db.flush()
+        pack = ContentEvidencePack(
+            cluster_id=cluster.id, version=1, sources=[],
+            total_t1=1, total_t2=1, total_t3=0,
+        )
+        db.add(pack); await db.flush()
+        # One source cited by 2 drafts, one uncited. Both seeded with a stale
+        # times_cited=0 column value that the endpoint must not trust.
+        db.add(ContentClusterSource(
+            cluster_id=cluster.id, evidence_pack_id=pack.id,
+            url="https://reuters.com/a", domain="reuters.com",
+            tier="T1", title="A", times_cited=0,
+        ))
+        db.add(ContentClusterSource(
+            cluster_id=cluster.id, evidence_pack_id=pack.id,
+            url="https://techcrunch.com/b", domain="techcrunch.com",
+            tier="T2", title="B", times_cited=0,
+        ))
+        d1 = ContentDraft(
+            brand_id=brand["id"], prompt_id=prompt_id, cluster_id=cluster.id,
+            platform="medium", status="draft", content_text="x", source="cluster",
+        )
+        d2 = ContentDraft(
+            brand_id=brand["id"], prompt_id=prompt_id, cluster_id=cluster.id,
+            platform="quora", status="draft", content_text="y", source="cluster",
+        )
+        db.add_all([d1, d2]); await db.flush()
+        for d in (d1, d2):
+            db.add(ContentDraftCitation(
+                draft_id=d.id, source_ref="S1",
+                url="https://www.techcrunch.com/b", title="B",
+                position_marker=0, tier="T2",
+            ))
+        await db.commit()
+        cluster_id = cluster.id
+
+    r = await client.get(f"/api/clusters/{brand['id']}/{cluster_id}/sources")
+    assert r.status_code == 200, r.text
+    sources = r.json()["sources"]
+    by_domain = {s["domain"]: s for s in sources}
+    # www. prefix must not defeat the URL match
+    assert by_domain["techcrunch.com"]["times_cited"] == 2
+    assert by_domain["reuters.com"]["times_cited"] == 0
+    # cited-first ordering beats tier ordering
+    assert sources[0]["domain"] == "techcrunch.com"
 
 
 @pytest.mark.asyncio

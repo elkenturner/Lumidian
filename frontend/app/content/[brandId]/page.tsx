@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Loader2, ChevronDown, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Loader2, ChevronDown, Sparkles, X } from "lucide-react";
 import {
   getBrand,
   generateNow,
@@ -14,7 +15,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ClusterCard } from "@/components/content/cluster/ClusterCard";
-import { clusterHasContent } from "@/lib/clusterStatus";
+import { clusterHasContent, translateFailureReason } from "@/lib/clusterStatus";
 import { useHiddenPlatforms } from "@/lib/useHiddenPlatforms";
 import { CLUSTER_PLATFORMS, CLUSTER_PLATFORM_LABELS } from "@/lib/clusterPlatforms";
 import {
@@ -65,6 +66,93 @@ function isReadyStatus(status: string): boolean {
   return status === "ready" || status === "ready_low_evidence";
 }
 
+// ── Sweep result summary (Task F2) ──────────────────────────────────────────
+// Populated either when a generation sweep finishes (kind "finished") or on
+// page load when a previous sweep left failures on the board (kind "recap").
+
+interface SweepSummary {
+  kind: "finished" | "recap";
+  total: number;
+  /** Questions with usable posts — ready/ready_low_evidence, plus partial
+   * clusters (they did produce at least one post, just not all platforms). */
+  gotPosts: number;
+  /** briefing_failed only — the brief itself never completed, so nothing was
+   * written for this question. */
+  failed: number;
+  /** generation_partial / partial_failed — counted in gotPosts above, but
+   * tracked separately since these are also eligible for retry. */
+  partial: number;
+  /** Never attempted (still "pending"). */
+  pending: number;
+  /** Most common translated failure reason among failed + partial clusters. */
+  dominantReason: string | null;
+}
+
+function computeSweepSummary(
+  clusters: ContentClusterSummary[],
+  kind: SweepSummary["kind"],
+): SweepSummary {
+  const total = clusters.length;
+  let succeeded = 0;
+  let failed = 0;
+  let partial = 0;
+  let pending = 0;
+  const reasonCounts = new Map<string, number>();
+
+  for (const c of clusters) {
+    if (isReadyStatus(c.status)) {
+      succeeded++;
+    } else if (c.status === "briefing_failed") {
+      failed++;
+    } else if (c.status === "generation_partial" || c.status === "partial_failed") {
+      partial++;
+    } else {
+      pending++;
+    }
+    if (isFailedStatus(c.status)) {
+      const translated = translateFailureReason(c.failure_reason);
+      if (translated) reasonCounts.set(translated, (reasonCounts.get(translated) ?? 0) + 1);
+    }
+  }
+
+  let dominantReason: string | null = null;
+  let dominantCount = 0;
+  Array.from(reasonCounts.entries()).forEach(([reason, count]) => {
+    if (count > dominantCount) {
+      dominantReason = reason;
+      dominantCount = count;
+    }
+  });
+
+  return {
+    kind,
+    total,
+    gotPosts: succeeded + partial,
+    failed,
+    partial,
+    pending,
+    dominantReason,
+  };
+}
+
+function sweepMessage(s: SweepSummary): string {
+  if (s.kind === "recap") {
+    const troubled = s.failed + s.partial;
+    return `${troubled} question${troubled === 1 ? "" : "s"} failed last time.`;
+  }
+  if (s.failed === 0 && s.partial === 0 && s.pending === 0) {
+    return `All ${s.total} questions have posts.`;
+  }
+  let msg = `${s.gotPosts} of ${s.total} questions got posts.`;
+  if (s.failed > 0) {
+    msg += ` ${s.failed} couldn't be written${s.dominantReason ? ` — most because ${s.dominantReason}` : ""}.`;
+  }
+  if (s.pending > 0) {
+    msg += ` ${s.pending} still queued.`;
+  }
+  return msg;
+}
+
 function filterPredicate(cluster: ContentClusterSummary, f: FilterKey): boolean {
   if (f === "all") return true;
   if (f === "not_started") return !clusterHasContent(cluster);
@@ -97,8 +185,17 @@ export default function ContentBrandPage() {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [sweepSummary, setSweepSummary] = useState<SweepSummary | null>(null);
+  const [sweepDismissed, setSweepDismissed] = useState(false);
+  // F3 (readiness preflight) isn't built yet — this stays null until that task
+  // lands and starts populating it. With null readiness we just omit the link.
+  const [readiness] = useState<{ profile_empty: boolean } | null>(null);
   const { hidden, toggle, isVisible } = useHiddenPlatforms(brandId);
   const platformsVisible = CLUSTER_PLATFORMS.filter((p) => !hidden.has(p)).length;
+  // True only once a poll has actually observed the backend mid-sweep. Guards
+  // against treating an immediate (pre-start) `generating: false` response as
+  // a finished sweep.
+  const observedGeneratingRef = useRef(false);
 
   useEffect(() => {
     if (!Number.isFinite(brandId)) return;
@@ -110,6 +207,12 @@ export default function ContentBrandPage() {
           setBrand(b);
           setClusters(cs);
           setLoadError(false);
+          // Recap failures left over from a previous sweep — don't claim one
+          // just finished, just surface the retry affordance.
+          if (cs.some((c) => isFailedStatus(c.status))) {
+            setSweepSummary(computeSweepSummary(cs, "recap"));
+            setSweepDismissed(false);
+          }
         }
       } catch {
         if (!cancelled) setLoadError(true);
@@ -127,7 +230,10 @@ export default function ContentBrandPage() {
   // cards flip Not started → Generating → Ready as each prompt finishes, and
   // stop once the backend clears its `generating` flag.
   useEffect(() => {
-    if (!generating) return;
+    if (!generating) {
+      observedGeneratingRef.current = false;
+      return;
+    }
     let cancelled = false;
     async function tick() {
       try {
@@ -137,7 +243,18 @@ export default function ContentBrandPage() {
         ]);
         if (cancelled) return;
         setClusters(cs);
-        if (!st.generating) setGenerating(false);
+        if (st.generating) {
+          observedGeneratingRef.current = true;
+        } else {
+          // Only treat this as a finished sweep if we actually saw it running
+          // at some point — an immediate false (e.g. before the backend job
+          // starts) isn't a completion.
+          if (observedGeneratingRef.current) {
+            setSweepSummary(computeSweepSummary(cs, "finished"));
+            setSweepDismissed(false);
+          }
+          setGenerating(false);
+        }
       } catch {
         // transient — keep polling
       }
@@ -200,9 +317,30 @@ export default function ContentBrandPage() {
     if (generating) return;
     setGenError(null);
     try {
-      // skip_ready=true → only pending/failed clusters are (re)generated, never
+      // skipReady=true → only pending/failed clusters are (re)generated, never
       // clobbering work the user already has. Backend clamps to the plan's cap.
-      await generateNow(brandId, Math.max(clusters.length, 1), true);
+      await generateNow(brandId, Math.max(clusters.length, 1), { skipReady: true });
+      setGenerating(true);
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 409) {
+        setGenerating(true); // already running — just watch it
+      } else if (status === 402 || status === 403) {
+        setGenError("Generating posts is available on paid plans.");
+      } else {
+        setGenError("Couldn't start generation. Please try again.");
+      }
+    }
+  }
+
+  async function retryFailed() {
+    if (generating) return;
+    setGenError(null);
+    setSweepDismissed(true);
+    try {
+      // retryFailed=true → only pending/briefing_failed/generation_partial
+      // clusters are processed; takes precedence over skipReady on the backend.
+      await generateNow(brandId, Math.max(clusters.length, 1), { retryFailed: true });
       setGenerating(true);
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
@@ -341,6 +479,47 @@ export default function ContentBrandPage() {
           Generating posts… this can take a few minutes. Cards update as each prompt finishes.
         </div>
       )}
+
+      {!generating && sweepSummary && !sweepDismissed && (() => {
+        const needsAttention = sweepSummary.failed + sweepSummary.partial > 0;
+        const showRetry = sweepSummary.failed + sweepSummary.partial + sweepSummary.pending > 0;
+        return (
+          <div
+            className={`relative rounded-md border px-4 py-3 pr-9 text-sm flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${
+              needsAttention
+                ? "border-rose-500/30 bg-rose-500/10 text-rose-200"
+                : "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
+            }`}
+          >
+            <span>{sweepMessage(sweepSummary)}</span>
+            {(showRetry || readiness?.profile_empty) && (
+              <div className="flex items-center gap-3 shrink-0">
+                {showRetry && (
+                  <Button size="sm" variant="outline" onClick={retryFailed} disabled={generating}>
+                    Retry failed
+                  </Button>
+                )}
+                {readiness?.profile_empty && (
+                  <Link
+                    href="/settings?tab=profile"
+                    className="text-xs underline underline-offset-2 hover:opacity-80"
+                  >
+                    Fix brand profile
+                  </Link>
+                )}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setSweepDismissed(true)}
+              aria-label="Dismiss"
+              className="absolute top-2.5 right-2.5 p-1 rounded-md hover:bg-black/10 transition-colors"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        );
+      })()}
 
       {loadError ? (
         <div className="card border-dashed text-sm text-[var(--text-secondary)] text-center py-10">

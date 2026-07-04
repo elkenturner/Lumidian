@@ -514,14 +514,23 @@ export async function getPromptSuggestions(draftId: number): Promise<PromptSugge
   return res.data;
 }
 
+export interface GenerateNowOptions {
+  /** Only (re)generate pending/failed clusters — never clobbers existing work. */
+  skipReady?: boolean;
+  /** Only process pending/briefing_failed/generation_partial clusters. Takes
+   * precedence over skipReady on the backend. */
+  retryFailed?: boolean;
+}
+
 export async function generateNow(
   brandId: number,
   maxGaps = 20,
-  skipReady = false,
+  options: GenerateNowOptions = {},
 ): Promise<void> {
   await api.post(`/content/${brandId}/generate-now`, {
     max_gaps: maxGaps,
-    skip_ready: skipReady,
+    skip_ready: options.skipReady ?? false,
+    retry_failed: options.retryFailed ?? false,
   });
 }
 
@@ -2070,7 +2079,7 @@ export interface ContentClusterSummary {
   last_generated_at: string | null;
   cluster_delta: number | null;
   posted_count: number;
-  failure_reason: string | null;
+  failure_reason?: string | null;
 }
 
 export interface ContentClusterDetail {

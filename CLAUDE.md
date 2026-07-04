@@ -75,7 +75,7 @@ Copy `backend/.env.example` → `backend/.env`. **`JWT_SECRET` (≥32 chars) is 
 
 ### Stack
 - **Backend:** Python 3.11+, FastAPI 0.115, SQLAlchemy 2.0 (async), SQLite + aiosqlite, APScheduler, bcrypt, PyJWT, Stripe, ReportLab, pyotp
-- **Frontend:** Next.js 15, React 18, TypeScript (strict), Tailwind CSS, Radix UI, Recharts, Axios, date-fns, lucide-react
+- **Frontend:** Next.js 16 (Turbopack), React 18, TypeScript (strict), Tailwind CSS, Radix UI, Recharts, Axios, date-fns, lucide-react
 - **LLM providers:** OpenAI (gpt-4.1-mini default, gpt-4o-mini + hosted web_search tool via Responses API for paid subscribers), Anthropic (claude-haiku-4-5-20251001 with web_search_20250305 — Pro tier only), Google GenAI (gemini-2.5-flash for all tiers), Perplexity (sonar default, sonar-pro for paid subscribers)
 
 ### Backend Layout
@@ -86,7 +86,7 @@ backend/app/
   models.py         # 20+ ORM models
   schemas.py        # Pydantic request/response validators
   scheduler.py      # APScheduler jobs
-  auth.py           # JWT helpers, get_current_user, AllowUnverifiedUser dependency
+  dependencies.py   # get_current_user, AllowUnverifiedUser, shared deps (JWT decode, rate limit)
   routers/          # 18 router modules
   services/         # 14 service modules
 tests/
@@ -129,7 +129,7 @@ frontend/
   components/       # Shared UI components
   contexts/         # AuthContext (user state, login/logout/refresh)
   lib/api.ts        # Typed Axios client with request deduplication
-  middleware.ts     # Cookie-based auth routing
+  proxy.ts          # Cookie-based auth routing (Next 16 middleware convention)
 ```
 
 ### Frontend Routes
@@ -213,9 +213,9 @@ All DB calls use `async/await` with `AsyncSessionLocal`. Never use sync SQLAlche
 All queries filter by `user_id`. Tests verify ownership isolation — users must not see each other's brands/runs/drafts.
 
 ### Authentication
-JWT issued with 7-day expiry, stored in httpOnly `clarity_token` cookie. Companion non-httpOnly `clarity_session=1` cookie for Next.js middleware detection. Cookie `secure` flag only set when `ENVIRONMENT=production`. The `AllowUnverifiedUser` dependency (in `auth.py`) allows unverified users through certain endpoints (e.g., `/auth/me`, `/verify-email`).
+JWT issued with 7-day expiry, stored in httpOnly `clarity_token` cookie. Companion non-httpOnly `clarity_session=1` cookie for Next.js middleware detection. Cookie `secure` flag only set when `ENVIRONMENT=production`. The `AllowUnverifiedUser` dependency (in `dependencies.py`) allows unverified users through certain endpoints (e.g., `/auth/me`, `/verify-email`).
 
-**Frontend middleware** (`middleware.ts`) reads the `clarity_session` cookie:
+**Frontend middleware** (`proxy.ts`) reads the `clarity_session` cookie:
 - Public paths: `/`, `/login`, `/register`, `/onboarding`, `/forgot-password`, `/reset-password`, `/team/accept`
 - Authenticated users on `/login` or `/register` → redirect `/dashboard`
 - Unauthenticated users on any other path → redirect `/login?from={path}`

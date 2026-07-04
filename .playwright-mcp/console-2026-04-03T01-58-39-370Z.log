@@ -1,3 +1,0 @@
-[     413ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:24503
-[     920ms] [ERROR] Failed to load resource: net::ERR_NAME_NOT_RESOLVED @ https://logo.clearbit.com/novamed.ai:0
-[    1097ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://novamed.ai&size=64:0

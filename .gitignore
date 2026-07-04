@@ -42,3 +42,7 @@ frontend/tsconfig.tsbuildinfo
 
 # Generated PDF samples (regenerate from cockpit)
 pdf-samples/
+
+# Local DB backups (large; never commit)
+backups/
+backend/backups/

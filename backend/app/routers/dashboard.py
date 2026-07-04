@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
-from app.models import Competitor, Prompt, QueryResult, RunModelScore, TrackingRun
+from app.models import CitationSource, Competitor, Prompt, QueryResult, RunModelScore, TrackingRun
 from app.services.competitive_gap import _mention_matches
 from app.schemas import (
     CitationGap,
@@ -323,9 +323,16 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
 
     # 6. Sentiment — read stored values from DB (set by sentiment_service at run time)
     sentiment_counts: dict[str, int] = {"positive": 0, "neutral": 0, "negative": 0}
+    unclassified_mentions = 0
     for qr, _ in rows:
-        if qr.mentioned and qr.sentiment in sentiment_counts:
+        if not qr.mentioned:
+            continue
+        if qr.sentiment in sentiment_counts:
             sentiment_counts[qr.sentiment] += 1
+        else:
+            # Mentioned but never classified (classifier failed/skipped) — the
+            # UI must not read this as "no mentions to analyze".
+            unclassified_mentions += 1
 
     sent_total = sum(sentiment_counts.values())
     if sent_total > 0:
@@ -341,6 +348,7 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         neutral_pct=round(neu_pct, 1),
         negative_pct=round(neg_pct, 1),
         has_data=has_data,
+        unclassified_mentions=unclassified_mentions,
     )
 
     # 7. Average position
@@ -362,22 +370,48 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
     else:
         position = PositionData(score=None, label="N/A", sample_count=len(position_scores))
 
-    # 8. Top domains
-    domain_counts: dict[str, int] = defaultdict(int)
-    for qr, _ in rows:
-        if qr.response_text:
-            for domain in _extract_domains(qr.response_text):
-                domain_counts[domain] += 1
-    top_domains_raw = sorted(domain_counts.items(), key=lambda x: x[1], reverse=True)[:_MAX_DOMAINS]
-    domain_stats = [
-        DomainStat(
-            domain=dom,
-            count=cnt,
-            pct=round(cnt / total * 100, 1) if total > 0 else 0.0,
-            domain_type=_classify_domain(dom),
-        )
-        for dom, cnt in top_domains_raw
-    ]
+    # 8. Top domains — primary source is the citation_sources table (real
+    # structured citations across all tracked prompts, matching the card
+    # title). Falls back to regex extraction from the window's response text
+    # for brands whose runs predate citation extraction.
+    citation_domain_rows = (await db.execute(
+        select(CitationSource.domain, sqlfunc.count(CitationSource.id).label("cnt"))
+        .where(CitationSource.brand_id == brand_id)
+        .group_by(CitationSource.domain)
+        .order_by(sqlfunc.count(CitationSource.id).desc())
+        .limit(_MAX_DOMAINS)
+    )).all()
+
+    if citation_domain_rows:
+        citation_total = (await db.execute(
+            select(sqlfunc.count(CitationSource.id))
+            .where(CitationSource.brand_id == brand_id)
+        )).scalar() or 0
+        domain_stats = [
+            DomainStat(
+                domain=dom,
+                count=cnt,
+                pct=round(cnt / citation_total * 100, 1) if citation_total > 0 else 0.0,
+                domain_type=_classify_domain(dom),
+            )
+            for dom, cnt in citation_domain_rows
+        ]
+    else:
+        domain_counts: dict[str, int] = defaultdict(int)
+        for qr, _ in rows:
+            if qr.response_text:
+                for domain in _extract_domains(qr.response_text):
+                    domain_counts[domain] += 1
+        top_domains_raw = sorted(domain_counts.items(), key=lambda x: x[1], reverse=True)[:_MAX_DOMAINS]
+        domain_stats = [
+            DomainStat(
+                domain=dom,
+                count=cnt,
+                pct=round(cnt / total * 100, 1) if total > 0 else 0.0,
+                domain_type=_classify_domain(dom),
+            )
+            for dom, cnt in top_domains_raw
+        ]
 
     # 9. Recent conversations — deduplicated by (prompt_id, model).
     # Sort mentioned results first so the dedup keeps the mentioned row

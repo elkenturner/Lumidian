@@ -25,6 +25,7 @@ async def _insert_run_with_result(
     response_text: str = "A response that mentions the brand.",
     mentioned: bool = True,
     model: str = "chatgpt",
+    sentiment: str | None = None,
 ) -> int:
     """Insert a completed TrackingRun with one QueryResult and one RunModelScore.
     Returns the run id."""
@@ -50,6 +51,7 @@ async def _insert_run_with_result(
             run_number=1,
             response_text=response_text,
             mentioned=mentioned,
+            sentiment=sentiment,
         )
         db.add(qr)
 
@@ -93,6 +95,108 @@ async def test_analytics_no_runs_with_competitor(client: httpx.AsyncClient):
     assert data["sov"]["percentage"] == 0.0
     assert data["sov"]["has_competitors"] is True
     assert data["total_responses_analyzed"] == 0
+
+
+# ── Sentiment ─────────────────────────────────────────────────────────────────
+
+async def test_analytics_sentiment_unclassified_mentions_flagged(client: httpx.AsyncClient):
+    """Mentions whose sentiment was never classified (e.g. the classifier
+    failed during a degraded run) must NOT read as "no mentions" — the UI needs
+    to distinguish 'no mentions' from 'sentiment unavailable'."""
+    await register_and_login(client, email="dash_sent_unclass@example.com")
+    brand = await create_brand(
+        client, name="Sent Unclass Brand", prompts=["Best AI visibility tools?"]
+    )
+    prompt_id = brand["prompts"][0]["id"]
+    await _insert_run_with_result(
+        brand["id"], prompt_id,
+        response_text="Sent Unclass Brand is great.",
+        mentioned=True,
+        sentiment=None,   # classifier never ran
+    )
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    assert resp.status_code == 200
+    sent = resp.json()["sentiment"]
+    assert sent["has_data"] is False
+    assert sent["unclassified_mentions"] == 1
+
+
+async def test_analytics_sentiment_classified_has_no_unclassified(client: httpx.AsyncClient):
+    await register_and_login(client, email="dash_sent_class@example.com")
+    brand = await create_brand(
+        client, name="Sent Class Brand", prompts=["Best AI visibility tools?"]
+    )
+    prompt_id = brand["prompts"][0]["id"]
+    await _insert_run_with_result(
+        brand["id"], prompt_id,
+        response_text="Sent Class Brand is great.",
+        mentioned=True,
+        sentiment="positive",
+    )
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    sent = resp.json()["sentiment"]
+    assert sent["has_data"] is True
+    assert sent["positive_pct"] == 100.0
+    assert sent["unclassified_mentions"] == 0
+
+
+# ── Top cited domains ─────────────────────────────────────────────────────────
+
+async def test_analytics_top_domains_from_citation_sources(client: httpx.AsyncClient):
+    """The card is titled "across all tracked prompts" and must read the
+    citation_sources table — not just regex-extract URLs from the latest
+    window's response text (which is empty when a run degrades)."""
+    from app.models import CitationSource
+
+    await register_and_login(client, email="dash_domains_cit@example.com")
+    brand = await create_brand(
+        client, name="Domains Cit Brand", prompts=["Best AI visibility tools?"]
+    )
+    prompt_id = brand["prompts"][0]["id"]
+    # Latest-window response contains NO urls...
+    run_id = await _insert_run_with_result(
+        brand["id"], prompt_id,
+        response_text="Domains Cit Brand is great. No links here.",
+        mentioned=True,
+    )
+    # ...but the brand has accumulated citation rows from tracking runs.
+    async with AsyncSessionLocal() as db:
+        for i in range(3):
+            db.add(CitationSource(
+                brand_id=brand["id"], tracking_run_id=run_id, prompt_id=prompt_id,
+                model="perplexity", url=f"https://techcrunch.com/article-{i}",
+                domain="techcrunch.com", kind="third_party",
+            ))
+        db.add(CitationSource(
+            brand_id=brand["id"], tracking_run_id=run_id, prompt_id=prompt_id,
+            model="gemini", url="https://wikipedia.org/wiki/Thing",
+            domain="wikipedia.org", kind="third_party",
+        ))
+        await db.commit()
+
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    assert resp.status_code == 200
+    domains = {d["domain"]: d for d in resp.json()["top_domains"]}
+    assert "techcrunch.com" in domains
+    assert domains["techcrunch.com"]["count"] == 3
+    assert "wikipedia.org" in domains
+
+
+async def test_analytics_top_domains_falls_back_to_response_text(client: httpx.AsyncClient):
+    """Brands with no citation_sources rows keep the legacy text-extraction."""
+    await register_and_login(client, email="dash_domains_txt@example.com")
+    brand = await create_brand(
+        client, name="Domains Txt Brand", prompts=["Best AI visibility tools?"]
+    )
+    prompt_id = brand["prompts"][0]["id"]
+    await _insert_run_with_result(
+        brand["id"], prompt_id,
+        response_text="See https://example.com/post for Domains Txt Brand.",
+        mentioned=True,
+    )
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    domains = {d["domain"] for d in resp.json()["top_domains"]}
+    assert "example.com" in domains
 
 
 # ── SOV ───────────────────────────────────────────────────────────────────────

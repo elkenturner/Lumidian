@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from 'framer-motion';
 import { fadeIn, slideIn } from '@/lib/motion';
-import { useEffect, useState, useRef, forwardRef, useImperativeHandle, useMemo } from 'react';
+import { useEffect, useState, useRef, forwardRef, useImperativeHandle, useMemo, useCallback } from 'react';
 import { logError } from '@/lib/utils/errors';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -246,6 +246,13 @@ const EditableList = forwardRef<EditableListHandle, {
 });
 
 // ── Completion bar ─────────────────────────────────────────────────────────────
+
+const AI_FILL_FIELD_LABELS: Record<string, string> = {
+  company_description: 'Company description',
+  tone_of_voice: 'Tone of voice',
+  key_stats: 'Key stats',
+  target_audience: 'Target audience',
+};
 
 function CompletionBar({ pct }: { pct: number }) {
   const color = pct >= 80 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--accent)';
@@ -817,16 +824,41 @@ export default function SettingsPage() {
   const [geography, setGeography] = useState('');
   const [approvedLanguage, setApprovedLanguage] = useState<string[]>([]);
   const [publications, setPublications] = useState<Publication[]>([]);
+  const [targetAudience, setTargetAudience] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileSaveError, setProfileSaveError] = useState<string | null>(null);
+  const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
+  const [retryingProfileLoad, setRetryingProfileLoad] = useState(false);
   const [aiFilling, setAiFilling] = useState(false);
   const [aiFillError, setAiFillError] = useState<string | null>(null);
+  const [aiFillPersistedFields, setAiFillPersistedFields] = useState<string[]>([]);
 
   // Refs to flush pending typed-but-not-committed input from EditableLists on save
   const keyStatsListRef = useRef<EditableListHandle>(null);
   const whatNotToSayListRef = useRef<EditableListHandle>(null);
   const approvedLanguageListRef = useRef<EditableListHandle>(null);
+
+  // Last-known-good server values for the loaded profile — used to compute
+  // `clear_fields` on save (a field is only wiped server-side if the user
+  // explicitly emptied a field that previously had a server value) and to
+  // restore form state on retry/refresh without ever wiping the form on a
+  // failed GET.
+  const profileServerRef = useRef<BrandProfile | null>(null);
+
+  const applyProfile = useCallback((prof: BrandProfile) => {
+    profileServerRef.current = prof;
+    setProfile(prof);
+    setCompanyDescription(prof.company_description ?? '');
+    setKeyStats(prof.key_stats ?? []);
+    setToneOfVoice(prof.tone_of_voice ?? '');
+    setWhatNotToSay(prof.what_not_to_say ?? []);
+    setMarketScope((prof.market_scope as 'local' | 'national' | 'global' | 'niche' | null) ?? '');
+    setGeography(prof.geography ?? '');
+    setApprovedLanguage(prof.approved_language ?? []);
+    setPublications(prof.publications ?? []);
+    setTargetAudience(prof.target_audience ?? '');
+  }, []);
 
   const hasUnsavedProfileChanges = useMemo(() => {
     if (!profile) {
@@ -834,6 +866,7 @@ export default function SettingsPage() {
       return Boolean(
         companyDescription.trim() ||
           toneOfVoice.trim() ||
+          targetAudience.trim() ||
           keyStats.length ||
           whatNotToSay.length ||
           approvedLanguage.length ||
@@ -843,6 +876,7 @@ export default function SettingsPage() {
     const norm = (s: string | null | undefined) => (s ?? '').trim();
     if (norm(companyDescription) !== norm(profile.company_description)) return true;
     if (norm(toneOfVoice) !== norm(profile.tone_of_voice)) return true;
+    if (norm(targetAudience) !== norm(profile.target_audience)) return true;
     if ((marketScope || null) !== (profile.market_scope ?? null)) return true;
     if (norm(geography) !== norm(profile.geography)) return true;
     if (JSON.stringify(keyStats) !== JSON.stringify(profile.key_stats)) return true;
@@ -850,7 +884,7 @@ export default function SettingsPage() {
     if (JSON.stringify(approvedLanguage) !== JSON.stringify(profile.approved_language)) return true;
     if (JSON.stringify(publications) !== JSON.stringify(profile.publications)) return true;
     return false;
-  }, [profile, companyDescription, toneOfVoice, marketScope, geography, keyStats, whatNotToSay, approvedLanguage, publications]);
+  }, [profile, companyDescription, toneOfVoice, targetAudience, marketScope, geography, keyStats, whatNotToSay, approvedLanguage, publications]);
 
   // Warn before navigating away with unsaved profile changes
   useEffect(() => {
@@ -942,27 +976,17 @@ export default function SettingsPage() {
         setCompetitors(comps);
 
         if (prof) {
-          setProfile(prof);
-          setCompanyDescription(prof.company_description ?? '');
-          setKeyStats(prof.key_stats ?? []);
-          setToneOfVoice(prof.tone_of_voice ?? '');
-          setWhatNotToSay(prof.what_not_to_say ?? []);
-          setMarketScope((prof.market_scope as 'local' | 'national' | 'global' | 'niche' | null) ?? '');
-          setGeography(prof.geography ?? '');
-          setApprovedLanguage(prof.approved_language ?? []);
-          setPublications(prof.publications ?? []);
+          setProfileLoadError(null);
+          applyProfile(prof);
         } else {
-          // Profile failed/absent for the new brand — clear the previous
-          // brand's fields so a Save can't write brand A's profile onto B.
-          setProfile(null);
-          setCompanyDescription('');
-          setKeyStats([]);
-          setToneOfVoice('');
-          setWhatNotToSay([]);
-          setMarketScope('');
-          setGeography('');
-          setApprovedLanguage([]);
-          setPublications([]);
+          // GET failed (getBrandProfile auto-creates server-side, so a null
+          // here always means the request errored, not "no profile yet").
+          // Never clear the form on a failed load — that's how a blank fetch
+          // used to precede a blank-overwrite. Keep whatever is on screen
+          // (the previous brand's values on a brand switch) and disable Save
+          // via profileLoadError instead, so nothing can be written to the
+          // wrong brand while the form is stale.
+          setProfileLoadError("Couldn't load the profile — saving is disabled to protect your data. Retry.");
         }
       } catch {
         // ignore
@@ -984,7 +1008,7 @@ export default function SettingsPage() {
 
     load();
     return () => { cancelled = true; };
-  }, [contextBrandId]);
+  }, [contextBrandId, applyProfile]);
 
   // Load team members when team tab is selected
   useEffect(() => {
@@ -1203,18 +1227,56 @@ export default function SettingsPage() {
 
   // ── Profile handlers ───────────────────────────────────────────────────��────
 
+  async function retryProfileLoad() {
+    if (!brandId) return;
+    setRetryingProfileLoad(true);
+    try {
+      const prof = await getBrandProfile(brandId);
+      applyProfile(prof);
+      setProfileLoadError(null);
+    } catch (err) {
+      logError(err, 'Settings: retry brand profile load');
+      setProfileLoadError("Couldn't load the profile — saving is disabled to protect your data. Retry.");
+    } finally {
+      setRetryingProfileLoad(false);
+    }
+  }
+
   async function handleAiFill() {
     if (!brandId) return;
     setAiFilling(true);
     setAiFillError(null);
+    setAiFillPersistedFields([]);
     try {
       const result = await aiFillProfile(brandId);
-      if (result.company_description) setCompanyDescription(result.company_description);
-      if (result.tone_of_voice) setToneOfVoice(result.tone_of_voice);
-      if (result.key_stats.length > 0) setKeyStats((prev) => {
-        const combined = [...prev, ...result.key_stats.filter((s) => !prev.includes(s))];
-        return combined;
-      });
+
+      // The backend now persists suggestions straight into whichever fields
+      // were empty server-side. Refresh from the server so the form reflects
+      // exactly what was saved, rather than guessing at it client-side.
+      try {
+        const refreshed = await getBrandProfile(brandId);
+        applyProfile(refreshed);
+      } catch (refreshErr) {
+        logError(refreshErr, 'Settings: refresh profile after ai-fill');
+      }
+
+      // Safety net in case the refresh above failed, or a suggestion wasn't
+      // persisted for some other reason: only ever populate a suggestion
+      // into a field that is still empty on the form — never overwrite.
+      if (result.company_description) {
+        setCompanyDescription((prev) => (prev.trim() ? prev : result.company_description!));
+      }
+      if (result.tone_of_voice) {
+        setToneOfVoice((prev) => (prev.trim() ? prev : result.tone_of_voice!));
+      }
+      if (result.target_audience) {
+        setTargetAudience((prev) => (prev.trim() ? prev : result.target_audience!));
+      }
+      if (result.key_stats.length > 0) {
+        setKeyStats((prev) => (prev.length > 0 ? prev : result.key_stats));
+      }
+
+      setAiFillPersistedFields(result.persisted_fields ?? []);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
       setAiFillError(e?.response?.data?.detail || 'AI fill failed. Please try again.');
@@ -1228,6 +1290,10 @@ export default function SettingsPage() {
       setProfileSaveError('Add a brand first before saving its profile.');
       return;
     }
+    if (profileLoadError) {
+      setProfileSaveError("Couldn't load the profile — saving is disabled to protect your data. Retry.");
+      return;
+    }
     setProfileSaving(true);
     setProfileSaveError(null);
 
@@ -1236,6 +1302,23 @@ export default function SettingsPage() {
     const finalKeyStats = keyStatsListRef.current?.flush() ?? keyStats;
     const finalWhatNotToSay = whatNotToSayListRef.current?.flush() ?? whatNotToSay;
     const finalApprovedLanguage = approvedLanguageListRef.current?.flush() ?? approvedLanguage;
+
+    // A field only gets wiped server-side if it's explicitly named in
+    // clear_fields — otherwise the backend guard ignores an empty incoming
+    // value when a non-empty one is already stored. Compute which fields the
+    // user actually emptied out (server had a value, form is now blank) so
+    // intentional clearing still works.
+    const server = profileServerRef.current;
+    const clearFields: string[] = [];
+    const wasNonEmptyString = (v: string | null | undefined) => Boolean((v ?? '').trim());
+    const wasNonEmptyList = (v: unknown[] | null | undefined) => Boolean(v && v.length > 0);
+    if (wasNonEmptyString(server?.company_description) && !companyDescription.trim()) clearFields.push('company_description');
+    if (wasNonEmptyString(server?.tone_of_voice) && !toneOfVoice.trim()) clearFields.push('tone_of_voice');
+    if (wasNonEmptyString(server?.target_audience) && !targetAudience.trim()) clearFields.push('target_audience');
+    if (wasNonEmptyList(server?.key_stats) && finalKeyStats.length === 0) clearFields.push('key_stats');
+    if (wasNonEmptyList(server?.what_not_to_say) && finalWhatNotToSay.length === 0) clearFields.push('what_not_to_say');
+    if (wasNonEmptyList(server?.approved_language) && finalApprovedLanguage.length === 0) clearFields.push('approved_language');
+    if (wasNonEmptyList(server?.publications) && publications.length === 0) clearFields.push('publications');
 
     try {
       const updated = await updateBrandProfile(brandId, {
@@ -1247,8 +1330,10 @@ export default function SettingsPage() {
         geography: geography.trim() || null,
         approved_language: finalApprovedLanguage,
         publications,
+        target_audience: targetAudience,
+        clear_fields: clearFields,
       });
-      setProfile(updated);
+      applyProfile(updated);
       setProfileSaved(true);
       setToast({ message: 'Profile saved', type: 'success' });
       setTimeout(() => setProfileSaved(false), 2500);
@@ -1657,6 +1742,20 @@ export default function SettingsPage() {
       )}
       {activeTab === 'profile' && brand && (
         <div>
+          {profileLoadError && (
+            <div className="mb-5 flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-[var(--danger)]/30 bg-[var(--danger)]/10">
+              <p className="text-xs text-[var(--danger)]">{profileLoadError}</p>
+              <button
+                onClick={retryProfileLoad}
+                disabled={retryingProfileLoad}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-[var(--danger)]/40 text-[var(--danger)] hover:bg-[var(--danger)]/10 disabled:opacity-50 transition-colors shrink-0"
+              >
+                {retryingProfileLoad ? <Loader2 size={12} className="animate-spin" /> : null}
+                Retry
+              </button>
+            </div>
+          )}
+
           {profile && (
             <div className="mb-5 card" style={{ padding: 16 }}>
               <div className="flex items-center justify-between mb-2">
@@ -1685,6 +1784,15 @@ export default function SettingsPage() {
             )}
             {aiFillError && <p className="text-xs text-[var(--danger)]">{aiFillError}</p>}
           </div>
+
+          {!aiFilling && aiFillPersistedFields.length > 0 && (
+            <div className="flex items-center gap-2 px-4 py-2.5 mb-4 rounded-xl bg-[var(--success)]/10 border border-[var(--success)]/25 text-[var(--success)] text-xs">
+              <CheckCircle size={13} className="flex-shrink-0" />
+              <span>
+                Auto-saved from your website: {aiFillPersistedFields.map((f) => AI_FILL_FIELD_LABELS[f] ?? f).join(', ')}
+              </span>
+            </div>
+          )}
 
           {aiFilling && (
             <div className="flex items-center gap-3 px-4 py-3 mb-4 rounded-xl bg-[var(--accent-muted)] border border-[var(--accent-muted)] text-[var(--accent-foreground)] text-sm">
@@ -1748,6 +1856,21 @@ export default function SettingsPage() {
                 onChange={setWhatNotToSay}
                 placeholder="Add a phrase or claim to avoid…"
                 maxLength={1000}
+              />
+            </SectionCard>
+
+            <SectionCard
+              icon={Users}
+              title="Target audience — who buys from you?"
+              description="Sharpens AI-fill suggestions and prompt targeting"
+            >
+              <AutoTextarea
+                value={targetAudience}
+                onChange={setTargetAudience}
+                placeholder="e.g. Mid-market SaaS finance teams evaluating spend-management tools…"
+                minRows={2}
+                maxLength={2000}
+                className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 resize-none"
               />
             </SectionCard>
 
@@ -1824,7 +1947,8 @@ export default function SettingsPage() {
             )}
             <button
               onClick={handleProfileSave}
-              disabled={profileSaving}
+              disabled={profileSaving || Boolean(profileLoadError)}
+              title={profileLoadError ?? undefined}
               className={clsx(
                 'flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-[color,background-color,border-color,box-shadow]',
                 profileSaved

@@ -863,6 +863,7 @@ export interface BrandProfile {
   website_context_last_fetched: string | null;
   market_scope: 'local' | 'national' | 'global' | 'niche' | null;
   geography: string | null;
+  target_audience: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -883,6 +884,8 @@ export async function updateBrandProfile(
     internal_brand_context: string;
     market_scope: 'local' | 'national' | 'global' | 'niche' | null;
     geography: string | null;
+    target_audience: string;
+    clear_fields: string[];
   }>
 ): Promise<BrandProfile> {
   const res = await api.put<BrandProfile>(`/brands/${brandId}/profile`, data);
@@ -894,6 +897,8 @@ export interface AiFillProfileResult {
   company_description: string | null;
   tone_of_voice: string | null;
   key_stats: string[];
+  target_audience?: string | null;
+  persisted_fields?: string[];
 }
 
 export async function aiFillProfile(brandId: number): Promise<AiFillProfileResult> {

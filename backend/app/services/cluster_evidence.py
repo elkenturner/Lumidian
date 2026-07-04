@@ -117,7 +117,13 @@ _TIER_ORDER = {"T1": 0, "T2": 1, "T3": 2}
 
 
 class PackGateError(Exception):
-    """Raised when the cluster pack doesn't meet authority requirements."""
+    """Raised when the cluster pack doesn't meet authority requirements.
+    Carries the rejected sources so callers can degrade instead of hard-failing.
+    """
+
+    def __init__(self, message: str, sources: list[dict] | None = None):
+        super().__init__(message)
+        self.sources = sources or []
 
 
 def _domain_of(url: str) -> str:
@@ -148,11 +154,13 @@ def gate_pack(pack: list[dict[str, Any]]) -> None:
     t2 = sum(1 for s in pack if s["tier"] == "T2")
     if t1 < min_t1:
         raise PackGateError(
-            f"insufficient_T1_sources: found {t1}, need at least {min_t1}"
+            f"insufficient_T1_sources: found {t1}, need at least {min_t1}",
+            sources=pack,
         )
     if t1 + t2 < min_t1_plus_t2:
         raise PackGateError(
-            f"insufficient_authority: T1+T2 = {t1 + t2}, need at least {min_t1_plus_t2}"
+            f"insufficient_authority: T1+T2 = {t1 + t2}, need at least {min_t1_plus_t2}",
+            sources=pack,
         )
 
 
@@ -417,4 +425,30 @@ async def build_cluster_pack_from_brand_authority(
 
     return await _persist_pack(
         db, cluster=cluster, pack_sources=sources, version=version,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Task 8: ungated low-evidence fallback — never hard-fail to nothing
+# ---------------------------------------------------------------------------
+
+
+async def build_cluster_pack_ungated(
+    db: AsyncSession,
+    *,
+    cluster: ContentCluster,
+    sources: list[dict],
+    version: int,
+) -> ContentEvidencePack:
+    """Persist a pack that failed the authority gate. The claim verifier +
+    ready_low_evidence status keep thin sourcing honest downstream.
+
+    Used only when the brand-authority soft-fail pack also came back empty
+    (no BrandProfile, no crawled site) but the web DID return sources — e.g.
+    a handful of low-authority (T3) blogs. Rather than hard-failing the
+    brief, we proceed ungated: the writer gets real, if thin, sourcing and
+    the claim verifier strips anything the sources don't actually support.
+    """
+    return await _persist_pack(
+        db, cluster=cluster, pack_sources=sources[:PACK_CAP], version=version,
     )

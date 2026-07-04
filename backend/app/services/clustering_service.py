@@ -370,6 +370,7 @@ async def regenerate_cluster(
     from app.services.cluster_evidence import (
         build_cluster_pack,
         build_cluster_pack_from_brand_authority,
+        build_cluster_pack_ungated,
         PackGateError,
     )
     prompt_row = (await db.execute(
@@ -402,11 +403,21 @@ async def regenerate_cluster(
             pack = await build_cluster_pack_from_brand_authority(
                 db, cluster=cluster, version=brief.version,
             )
+            if pack is None and exc.sources:
+                # No profile/crawl to lean on, but the web DID return sources —
+                # generate from them ungated rather than producing nothing.
+                # ready_low_evidence + claim verifier keep it honest.
+                logger.info(
+                    "cluster %d: proceeding ungated with %d low-authority sources",
+                    cluster.id, len(exc.sources),
+                )
+                pack = await build_cluster_pack_ungated(
+                    db, cluster=cluster, sources=exc.sources, version=brief.version,
+                )
             if pack is None:
-                # Even brand-authority pack is empty (no profile, no crawl) —
-                # genuinely nothing to ground the writer with.
+                # Truly nothing anywhere — no profile, no crawl, no sources at all.
                 cluster.status = "briefing_failed"
-                cluster.failure_reason = str(exc)
+                cluster.failure_reason = "no_sources_found"
                 await db.commit()
                 return cluster
             brief.evidence_pack_id = pack.id

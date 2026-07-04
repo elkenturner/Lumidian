@@ -196,3 +196,107 @@ async def test_brand_authority_pack_returns_none_when_profile_and_audit_missing(
             db, cluster=cluster, version=1,
         )
     assert pack is None
+
+
+# ---------------------------------------------------------------------------
+# Task 8: never hard-fail to nothing — ungated low-evidence fallback
+# ---------------------------------------------------------------------------
+
+
+def test_gate_error_carries_sources():
+    """gate_pack raises PackGateError with .sources == the pack it rejected."""
+    from app.services.cluster_evidence import PackGateError, gate_pack
+
+    pack = [
+        {"url": "https://techcrunch.com/c", "title": "t", "snippet": "s",
+         "domain": "techcrunch.com", "tier": "T2"},
+        {"url": "https://forbes.com/d", "title": "t", "snippet": "s",
+         "domain": "forbes.com", "tier": "T2"},
+    ]
+    with pytest.raises(PackGateError) as exc:
+        gate_pack(pack)
+    assert exc.value.sources == pack
+
+
+@pytest.mark.asyncio
+async def test_regenerate_falls_back_to_ungated_t3_pack(monkeypatch):
+    """Serper returns only T3 sources, no citations, no profile, no audit —
+    the cluster must NOT be briefing_failed. It proceeds to generation and
+    lands on ready_low_evidence once pieces succeed.
+    """
+    from app.services import cluster_evidence
+    from app.services.clustering_service import regenerate_cluster
+
+    async def fake_fetch(queries):
+        return [
+            {"url": "https://blog-a.example.com/1", "title": "A", "snippet": "..."},
+            {"url": "https://blog-b.example.com/2", "title": "B", "snippet": "..."},
+            {"url": "https://blog-c.example.com/3", "title": "C", "snippet": "..."},
+            {"url": "https://blog-d.example.com/4", "title": "D", "snippet": "..."},
+        ]
+    monkeypatch.setattr(cluster_evidence, "fetch_and_dedupe", fake_fetch)
+
+    async def fake_gen(*args, **kwargs):
+        return "Piece title", "Piece body [S1]", 0.9, [], False
+    monkeypatch.setattr(
+        "app.services.clustering_service._generate_piece_text", fake_gen,
+    )
+
+    async def fake_brief_call(prompt, tier):
+        import json
+        return json.dumps({
+            "positioning": "p", "key_claims": [], "canonical_phrasings": [],
+            "stats": [], "narrative_spine": "", "tone_notes": "",
+        })
+    monkeypatch.setattr("app.services.cluster_brief._call_llm", fake_brief_call)
+
+    async with AsyncSessionLocal() as db:
+        from tests.conftest import _seed_minimal_user_brand_prompt
+        cluster_id, _ = await _seed_minimal_user_brand_prompt(db, slug="ungated-t3")
+
+    async with AsyncSessionLocal() as db:
+        await regenerate_cluster(db, cluster_id=cluster_id, tier="basic")
+
+    async with AsyncSessionLocal() as db:
+        cluster = await db.get(ContentCluster, cluster_id)
+        assert cluster.status != "briefing_failed"
+        assert cluster.status == "ready_low_evidence"
+        pack_rows = (await db.execute(
+            select(ContentEvidencePack).where(ContentEvidencePack.cluster_id == cluster_id)
+        )).scalars().all()
+        assert len(pack_rows) == 1
+        domains = {s["domain"] for s in pack_rows[0].sources}
+        assert "blog-a.example.com" in domains
+
+
+@pytest.mark.asyncio
+async def test_truly_zero_sources_fails_with_no_sources_found(monkeypatch):
+    """Serper empty + no citations + no profile + no audit -> briefing_failed,
+    failure_reason == 'no_sources_found'.
+    """
+    from app.services import cluster_evidence
+    from app.services.clustering_service import regenerate_cluster
+
+    async def fake_fetch(queries):
+        return []
+    monkeypatch.setattr(cluster_evidence, "fetch_and_dedupe", fake_fetch)
+
+    async def fake_brief_call(prompt, tier):
+        import json
+        return json.dumps({
+            "positioning": "p", "key_claims": [], "canonical_phrasings": [],
+            "stats": [], "narrative_spine": "", "tone_notes": "",
+        })
+    monkeypatch.setattr("app.services.cluster_brief._call_llm", fake_brief_call)
+
+    async with AsyncSessionLocal() as db:
+        from tests.conftest import _seed_minimal_user_brand_prompt
+        cluster_id, _ = await _seed_minimal_user_brand_prompt(db, slug="zero-sources")
+
+    async with AsyncSessionLocal() as db:
+        await regenerate_cluster(db, cluster_id=cluster_id, tier="basic")
+
+    async with AsyncSessionLocal() as db:
+        cluster = await db.get(ContentCluster, cluster_id)
+        assert cluster.status == "briefing_failed"
+        assert cluster.failure_reason == "no_sources_found"

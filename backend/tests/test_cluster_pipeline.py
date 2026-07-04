@@ -60,15 +60,15 @@ async def test_regenerate_uses_shared_pack_and_sets_last_brief_id(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_regenerate_marks_briefing_failed_when_authority_too_low(monkeypatch):
+async def test_regenerate_marks_briefing_failed_when_no_sources_anywhere(monkeypatch):
+    # Since Task 8, low-authority (T3-only) sources no longer hard-fail — they
+    # degrade to an ungated low-evidence pack (see test_cluster_pack_fallback).
+    # A brief only fails when there are truly ZERO sources: Serper empty, no
+    # citations, no brand profile, no crawled site.
     from app.services import cluster_evidence
 
     async def fake_fetch(queries):
-        # Only T3
-        return [
-            {"url": "https://blog.example.com/a", "title": "A", "snippet": "..."},
-            {"url": "https://blog2.example.com/b", "title": "B", "snippet": "..."},
-        ]
+        return []
     monkeypatch.setattr(cluster_evidence, "fetch_and_dedupe", fake_fetch)
 
     async def fake_brief_call(prompt, tier):
@@ -87,7 +87,7 @@ async def test_regenerate_marks_briefing_failed_when_authority_too_low(monkeypat
     async with AsyncSessionLocal() as db:
         cluster = await db.get(ContentCluster, cluster_id)
         assert cluster.status == "briefing_failed"
-        assert "insufficient" in (cluster.failure_reason or "").lower()
+        assert cluster.failure_reason == "no_sources_found"
         # No drafts created
         drafts = (await db.execute(
             select(ContentDraft).where(ContentDraft.cluster_id == cluster_id)

@@ -830,7 +830,9 @@ function AppShellInner({
         {reportRunning && <ReportRunningBanner modelScores={modelScores} isMobile={isMobile} promptCount={promptCount} />}
         {draftsGenerating && <DraftsGeneratingBanner isMobile={isMobile} isPaid={!!user?.subscription_tier || !!user?.is_admin} />}
         {scanning && <ScanningBanner isMobile={isMobile} isPaid={!!user?.subscription_tier || !!user?.is_admin} />}
-        {children}
+        <div key={pathname} className="route-enter">
+          {children}
+        </div>
       </main>
 
       {/* Mobile bottom navigation */}

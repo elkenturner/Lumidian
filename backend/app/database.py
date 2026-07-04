@@ -39,7 +39,8 @@ if "sqlite" in DATABASE_URL:
         # tracking-run writes block every dashboard read on the shared file.
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA busy_timeout=5000")
+        # 5-way per-piece writer burst measured in 2026-07-04 incident; raise to 15s
+        cursor.execute("PRAGMA busy_timeout=15000")
         cursor.close()
 
 AsyncSessionLocal = async_sessionmaker(

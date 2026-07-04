@@ -272,3 +272,33 @@ async def test_build_evidence_pack_uses_cache_on_second_call(db_session):
             prompt_text="test query", db=db_session, use_cache=True,
         )
     assert m.call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_write_cache_swallows_operational_error(db_session, monkeypatch):
+    """A locked-DB commit inside write_cache must be swallowed and rolled back
+    so the caller's session remains usable."""
+    from sqlalchemy.exc import OperationalError
+    from app.services.drafting import evidence as ev
+
+    pack = ev.EvidencePack(sources=[], query="q", brand_name="B")
+
+    async def boom():
+        raise OperationalError("INSERT INTO evidence_cache", {}, Exception("database is locked"))
+    monkeypatch.setattr(db_session, "commit", boom)
+    rolled = {"n": 0}
+    real_rollback = db_session.rollback
+    async def spy_rollback():
+        rolled["n"] += 1
+        await real_rollback()
+    monkeypatch.setattr(db_session, "rollback", spy_rollback)
+
+    # Must not raise
+    await ev.write_cache(brand_id=1, prompt_id=1, pack=pack, db=db_session)
+    assert rolled["n"] == 1
+
+
+@pytest.mark.asyncio
+async def test_write_cache_serialized_by_lock():
+    from app.services.drafting import evidence as ev
+    assert isinstance(ev._CACHE_WRITE_LOCK, __import__("asyncio").Lock)

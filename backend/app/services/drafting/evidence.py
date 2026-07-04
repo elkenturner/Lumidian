@@ -10,6 +10,7 @@ The pack is injected into the drafting prompt as inline-citable sources [S1]..[S
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from dataclasses import dataclass, asdict
@@ -22,6 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import WebsiteAudit, WebsiteAuditPage, BrandSource, EvidenceCache
 
 logger = logging.getLogger(__name__)
+
+_CACHE_WRITE_LOCK = asyncio.Lock()  # serialize in-process evidence_cache writers
 
 PACK_CAP = 15
 BRAND_PAGE_LIMIT = 3
@@ -285,18 +288,29 @@ import json as _json
 
 
 async def write_cache(brand_id: int, prompt_id: int, pack: EvidencePack, db: AsyncSession) -> None:
+    """Best-effort cache write. NEVER raises and never leaves `db` poisoned —
+    a cache miss on the next call is strictly cheaper than a failed piece."""
     payload = _json.dumps(pack.to_dict())
     now = datetime.now(UTC).replace(tzinfo=None)
-    existing = await db.get(EvidenceCache, (brand_id, prompt_id))
-    if existing:
-        existing.pack_json = payload
-        existing.fetched_at = now
-    else:
-        db.add(EvidenceCache(
-            brand_id=brand_id, prompt_id=prompt_id,
-            pack_json=payload, fetched_at=now,
-        ))
-    await db.commit()
+    try:
+        async with _CACHE_WRITE_LOCK:
+            existing = await db.get(EvidenceCache, (brand_id, prompt_id))
+            if existing:
+                existing.pack_json = payload
+                existing.fetched_at = now
+            else:
+                db.add(EvidenceCache(
+                    brand_id=brand_id, prompt_id=prompt_id,
+                    pack_json=payload, fetched_at=now,
+                ))
+            await db.commit()
+    except Exception as exc:
+        logger.warning("evidence_cache write failed for brand %d prompt %d (non-fatal): %s",
+                       brand_id, prompt_id, exc)
+        try:
+            await db.rollback()
+        except Exception:
+            pass
 
 
 async def read_cache(brand_id: int, prompt_id: int, db: AsyncSession) -> EvidencePack | None:

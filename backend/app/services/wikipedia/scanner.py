@@ -71,14 +71,25 @@ async def run_scan(
     *,
     brand_id: int,
     triggered_by: int | None,
+    scan_id: int | None = None,
 ) -> WikipediaScan:
-    """Run a single scan: search per prompt -> pre-filter -> legitimacy gate -> upsert."""
-    scan = WikipediaScan(
-        brand_id=brand_id, status="running", triggered_by=triggered_by, started_at=datetime.now(UTC).replace(tzinfo=None)
-    )
-    db.add(scan)
-    await db.commit()
-    await db.refresh(scan)
+    """Run a single scan: search per prompt -> pre-filter -> legitimacy gate -> upsert.
+
+    If ``scan_id`` is given, reuse that already-persisted row instead of
+    creating a new one — the trigger endpoint pre-creates the row so it can
+    return the id immediately, and a second row would inflate the cap count.
+    """
+    if scan_id is not None:
+        scan = await db.get(WikipediaScan, scan_id)
+        if scan is None:
+            raise ValueError(f"WikipediaScan {scan_id} not found")
+    else:
+        scan = WikipediaScan(
+            brand_id=brand_id, status="running", triggered_by=triggered_by, started_at=datetime.now(UTC).replace(tzinfo=None)
+        )
+        db.add(scan)
+        await db.commit()
+        await db.refresh(scan)
 
     try:
         brand_name, profile_block = await _build_profile_block(db, brand_id)

@@ -40,14 +40,11 @@ DbDep = Annotated[AsyncSession, Depends(get_db)]
 router = APIRouter(prefix="/wikipedia", tags=["wikipedia"])
 
 
-async def _ensure_brand_owned(db: AsyncSession, brand_id: int, user_id: int) -> Brand:
-    """Load a brand and verify ownership. Returns 404 if not found or not owned."""
-    brand = (
-        await db.execute(select(Brand).where(Brand.id == brand_id, Brand.user_id == user_id))
-    ).scalar_one_or_none()
-    if brand is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Brand not found")
-    return brand
+async def _ensure_brand_owned(db: AsyncSession, brand_id: int, user) -> Brand:
+    # Delegate to the canonical check so admin bypass and team-owner
+    # resolution behave the same here as on every other surface.
+    from app.dependencies import get_brand_for_user
+    return await get_brand_for_user(brand_id, db, user)
 
 
 def _enforce_tier(user, brand: Brand) -> str | None:
@@ -66,7 +63,7 @@ async def list_candidates(
     status: str | None = None,
     min_score: float | None = None,
 ) -> list[WikipediaCandidate]:
-    brand = await _ensure_brand_owned(db, brand_id, user.id)
+    brand = await _ensure_brand_owned(db, brand_id, user)
     _enforce_tier(user, brand)
     stmt = select(WikipediaCandidate).where(WikipediaCandidate.brand_id == brand_id)
     if status:
@@ -84,7 +81,7 @@ async def get_candidate(
     db: DbDep,
     user: CurrentUser,
 ) -> WikipediaCandidate:
-    brand = await _ensure_brand_owned(db, brand_id, user.id)
+    brand = await _ensure_brand_owned(db, brand_id, user)
     _enforce_tier(user, brand)
     candidate = (
         await db.execute(
@@ -105,7 +102,7 @@ async def trigger_scan(
     user: CurrentUser,
     background: BackgroundTasks,
 ) -> WikipediaScan:
-    brand = await _ensure_brand_owned(db, brand_id, user.id)
+    brand = await _ensure_brand_owned(db, brand_id, user)
     tier = _enforce_tier(user, brand)
 
     remaining = await remaining_scans_in_window(
@@ -123,11 +120,12 @@ async def trigger_scan(
     db.add(scan)
     await db.commit()
     await db.refresh(scan)
+    scan_id = scan.id
 
     async def _bg() -> None:
         async with AsyncSessionLocal() as bg_db:
             try:
-                await run_scan(bg_db, brand_id=brand_id, triggered_by=user.id)
+                await run_scan(bg_db, brand_id=brand_id, triggered_by=user.id, scan_id=scan_id)
             except Exception:
                 logger.exception("background scan failed for brand %d", brand_id)
 
@@ -137,7 +135,7 @@ async def trigger_scan(
 
 @router.get("/{brand_id}/scans/latest", response_model=WikipediaScanSchema | None)
 async def get_latest_scan(brand_id: int, db: DbDep, user: CurrentUser) -> WikipediaScan | None:
-    brand = await _ensure_brand_owned(db, brand_id, user.id)
+    brand = await _ensure_brand_owned(db, brand_id, user)
     _enforce_tier(user, brand)
     return (
         await db.execute(
@@ -156,7 +154,7 @@ async def draft_endpoint(
     db: DbDep,
     user: CurrentUser,
 ) -> WikipediaCandidate:
-    brand = await _ensure_brand_owned(db, brand_id, user.id)
+    brand = await _ensure_brand_owned(db, brand_id, user)
     tier = _enforce_tier(user, brand)
     candidate = (
         await db.execute(
@@ -190,7 +188,7 @@ async def update_status_endpoint(
     db: DbDep,
     user: CurrentUser,
 ) -> WikipediaCandidate:
-    brand = await _ensure_brand_owned(db, brand_id, user.id)
+    brand = await _ensure_brand_owned(db, brand_id, user)
     _enforce_tier(user, brand)
     candidate = (
         await db.execute(

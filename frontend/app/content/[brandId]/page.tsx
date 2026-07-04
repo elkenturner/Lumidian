@@ -218,6 +218,12 @@ export default function ContentBrandPage() {
   // against treating an immediate (pre-start) `generating: false` response as
   // a finished sweep.
   const observedGeneratingRef = useRef(false);
+  // Synchronous in-flight guard for generateAll(): `generating` isn't set
+  // until after the awaited readiness preflight resolves, so a fast
+  // double-click could otherwise fire two concurrent preflights (and
+  // potentially two generateNow POSTs). Reset on every exit path that
+  // doesn't hand off to `generating` as the guard.
+  const preflightRef = useRef(false);
 
   useEffect(() => {
     if (!Number.isFinite(brandId)) return;
@@ -342,14 +348,18 @@ export default function ContentBrandPage() {
       // clobbering work the user already has. Backend clamps to the plan's cap.
       await generateNow(brandId, Math.max(clusters.length, 1), { skipReady: true });
       setGenerating(true);
+      preflightRef.current = false; // `generating` now guards further clicks
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
       if (status === 409) {
         setGenerating(true); // already running — just watch it
+        preflightRef.current = false;
       } else if (status === 402 || status === 403) {
         setGenError("Generating posts is available on paid plans.");
+        preflightRef.current = false;
       } else {
         setGenError("Couldn't start generation. Please try again.");
+        preflightRef.current = false;
       }
     }
   }
@@ -359,12 +369,16 @@ export default function ContentBrandPage() {
   // warnings, hold generation behind a confirm layer; if the preflight call
   // itself fails, don't let that block generation — just proceed.
   async function generateAll() {
-    if (generating) return;
+    if (preflightRef.current || generating) return;
+    preflightRef.current = true;
     try {
       const r = await getContentReadiness(brandId);
       setReadiness(r);
       if (r.warnings.length > 0) {
         setPendingWarnings(r.warnings);
+        // Flow hands off to the confirm dialog here — don't reset yet.
+        // cancelGenerate() resets on cancel; confirmGenerateAnyway()'s
+        // runGenerateNow() resets on every one of its own exit paths.
         return;
       }
     } catch (e) {
@@ -380,6 +394,7 @@ export default function ContentBrandPage() {
 
   function cancelGenerate() {
     setPendingWarnings(null);
+    preflightRef.current = false;
   }
 
   async function retryFailed() {

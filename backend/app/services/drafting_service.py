@@ -181,10 +181,14 @@ async def _load_voice_directive(db: AsyncSession, brand_id: int) -> str | None:
     every tier — rather than three lines buried in the profile blob. Returns None
     when the brand has no voice fields set (behavior unchanged for those brands).
     """
-    result = await db.execute(
-        select(BrandProfile).where(BrandProfile.brand_id == brand_id)
-    )
-    return _voice_directive_from_profile(result.scalar_one_or_none())
+    try:
+        result = await db.execute(
+            select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+        )
+        return _voice_directive_from_profile(result.scalar_one_or_none())
+    except Exception as exc:
+        logger.warning("Voice directive lookup failed for brand %d (non-fatal): %s", brand_id, exc)
+        return None
 
 
 def _voice_directive_from_profile(profile: BrandProfile | None) -> str | None:

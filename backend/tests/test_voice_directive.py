@@ -72,3 +72,14 @@ async def test_load_voice_directive_none_when_no_profile(db_session):
     await db_session.flush()
 
     assert await _load_voice_directive(db_session, brand.id) is None
+
+
+@pytest.mark.asyncio
+async def test_load_voice_directive_survives_poisoned_session(db_session, monkeypatch):
+    from app.services import drafting_service as ds
+    async def boom(*a, **k):
+        from sqlalchemy.exc import PendingRollbackError
+        raise PendingRollbackError("rolled back")
+    monkeypatch.setattr(db_session, "execute", boom)
+    result = await ds._load_voice_directive(db_session, brand_id=1)
+    assert result is None

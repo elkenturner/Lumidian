@@ -504,6 +504,10 @@ export default function ContentBrandPage() {
         </DropdownMenuContent>
       </DropdownMenu>
 
+      <Link href={`/content/${brandId}/sources`} className={pendingCount > 0 ? TOOLBAR_TRIGGER : `${TOOLBAR_TRIGGER} ml-auto`}>
+        Sources
+      </Link>
+
       {pendingCount > 0 && (
         <Button
           size="sm"

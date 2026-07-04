@@ -376,12 +376,6 @@ export async function triggerRun(brandId: number): Promise<{ run_id: number }> {
   return res.data;
 }
 
-export async function triggerPromptRun(brandId: number, promptId: number): Promise<{ run_id: number }> {
-  const res = await api.post<{ run_id: number }>(`/tracking/run-prompt/${brandId}/${promptId}`);
-  invalidateCache(`/tracking/runs/${brandId}`);
-  return res.data;
-}
-
 export async function getRunStatus(runId: number): Promise<TrackingRun> {
   const res = await api.get<TrackingRun>(`/tracking/run/${runId}/status`);
   // When a run completes/fails, bust all caches that depend on run results
@@ -489,14 +483,6 @@ export async function updateDraft(
   return res.data;
 }
 
-export async function postDraft(
-  draftId: number,
-  data: { post_url?: string }
-): Promise<{ id: number; draft_id: number; platform: string; post_url: string | null; posted_at: string | null }> {
-  const res = await api.post(`/content/draft/${draftId}/post`, data);
-  return res.data;
-}
-
 export async function deleteDraft(draftId: number): Promise<void> {
   await api.delete(`/content/draft/${draftId}`);
   invalidateCache('/content/');
@@ -511,44 +497,6 @@ export interface PromptSuggestion {
 
 export async function getPromptSuggestions(draftId: number): Promise<PromptSuggestion[]> {
   const res = await api.get<PromptSuggestion[]>(`/content/draft/${draftId}/prompt-suggestions`);
-  return res.data;
-}
-
-export async function approveAllDrafts(
-  brandId: number,
-  platform?: string
-): Promise<{ approved: number; skipped: number; reason: string | null }> {
-  const params: Record<string, string> = {};
-  if (platform && platform !== 'all') params.platform = platform;
-  const res = await api.post(`/content/${brandId}/drafts/approve-all`, null, { params });
-  invalidateCache('/content/');
-  return res.data;
-}
-
-export async function getContentSettings(brandId: number): Promise<BrandContentSettings[]> {
-  const res = await api.get<BrandContentSettings[]>(`/content/${brandId}/settings`);
-  return res.data;
-}
-
-export async function updateContentSettings(
-  brandId: number,
-  platform: string,
-  data: Partial<BrandContentSettings>
-): Promise<BrandContentSettings> {
-  const res = await api.put<BrandContentSettings>(
-    `/content/${brandId}/settings/${platform}`,
-    data
-  );
-  return res.data;
-}
-
-export async function getPlatformGuidelines(platform: string): Promise<PlatformGuidelines> {
-  const res = await api.get<PlatformGuidelines>(`/content/guidelines/${platform}`);
-  return res.data;
-}
-
-export async function getAttribution(brandId: number): Promise<ContentAttribution[]> {
-  const res = await api.get<ContentAttribution[]>(`/content/${brandId}/attribution`);
   return res.data;
 }
 
@@ -578,10 +526,6 @@ export interface DraftQueueStatus {
   show_upgrade?: boolean;
 }
 
-export async function getDraftStatus(brandId: number): Promise<DraftQueueStatus> {
-  return dedupedGet<DraftQueueStatus>(`/content/${brandId}/draft-status`);
-}
-
 /** Bypass cache — used during generation polling where fresh data is critical. */
 export async function getDraftStatusFresh(brandId: number): Promise<DraftQueueStatus> {
   invalidateCache(`/content/${brandId}/draft-status`);
@@ -595,25 +539,9 @@ export async function getOpportunities(brandId: number): Promise<ContentOpportun
   return dedupedGet<ContentOpportunity[]>(`/opportunities/${brandId}`);
 }
 
-export async function dismissOpportunity(opportunityId: number): Promise<void> {
-  await api.delete(`/opportunities/${opportunityId}/dismiss`);
-  invalidateCache('/opportunities/');
-}
-
-export async function draftOpportunity(opportunityId: number): Promise<ContentDraft> {
-  const res = await api.post<ContentDraft>(`/opportunities/${opportunityId}/draft`);
-  invalidateCache('/opportunities/');
-  return res.data;
-}
-
 export async function triggerScan(brandId: number): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>(`/opportunities/${brandId}/scan`);
   invalidateCache('/opportunities/');
-  return res.data;
-}
-
-export async function getApiKeyStatus(): Promise<ApiKeyStatus> {
-  const res = await api.get<ApiKeyStatus>('/settings/api-keys');
   return res.data;
 }
 
@@ -867,10 +795,6 @@ export interface BrandWithStats {
   updated_at: string;
 }
 
-export async function getBrandsWithStats(): Promise<BrandWithStats[]> {
-  return dedupedGet<BrandWithStats[]>('/brands/with-stats');
-}
-
 // ── Brand Profile functions ───────────────────────────────────────────────────
 
 export interface Publication {
@@ -1027,16 +951,6 @@ export async function getContentGaps(brandId: number): Promise<ContentGap[]> {
   return dedupedGet<ContentGap[]>(`/gaps/${brandId}`);
 }
 
-export async function getGapSummary(brandId: number): Promise<GapSummary> {
-  return dedupedGet<GapSummary>(`/gaps/${brandId}/summary`);
-}
-
-export async function refreshGaps(brandId: number): Promise<{ message: string; run_id: number }> {
-  const res = await api.post(`/gaps/${brandId}/refresh`);
-  invalidateCache(`/gaps/${brandId}`);
-  return res.data;
-}
-
 // ── Auth types & functions ────────────────────────────────────────────────────
 
 export interface AuthUser {
@@ -1104,10 +1018,6 @@ export async function agencyUpdateClient(
 ): Promise<AgencyClient> {
   const res = await api.patch<AgencyClient>(`/agency/clients/${id}`, body);
   return res.data;
-}
-
-export async function agencyDeleteClient(id: number): Promise<void> {
-  await api.delete(`/agency/clients/${id}`);
 }
 
 // ── Agency portal shell (2026-05-11) ─────────────────────────────────────────
@@ -1197,16 +1107,6 @@ export async function agencyGetVideoJobs(clientId: number): Promise<VideoMetadat
   return res.data;
 }
 
-export async function agencyGetVideoJob(
-  clientId: number,
-  jobId: number,
-): Promise<VideoMetadataJobOut> {
-  const res = await api.get<VideoMetadataJobOut>(
-    `/api/agency/clients/${clientId}/video/jobs/${jobId}`,
-  );
-  return res.data;
-}
-
 export async function agencyRegenerateVideoMetadata(
   clientId: number,
   jobId: number,
@@ -1215,10 +1115,6 @@ export async function agencyRegenerateVideoMetadata(
     `/api/agency/clients/${clientId}/video/jobs/${jobId}/regenerate-metadata`,
   );
   return res.data;
-}
-
-export async function agencyDeleteVideoJob(clientId: number, jobId: number): Promise<void> {
-  await api.delete(`/api/agency/clients/${clientId}/video/jobs/${jobId}`);
 }
 
 // ── Public review (no auth) ──────────────────────────────────────────────────
@@ -1234,11 +1130,6 @@ export interface ReviewDraft {
 export interface ReviewClientPage {
   client_name: string;
   drafts: ReviewDraft[];
-}
-
-export async function publicGetReviewPage(token: string): Promise<ReviewClientPage> {
-  const res = await api.get<ReviewClientPage>(`/public/review/${token}`);
-  return res.data;
 }
 
 export async function publicApproveDraft(token: string, draftId: number): Promise<void> {
@@ -1267,11 +1158,6 @@ export interface PublicDocumentSummary {
   title: string;
   generated_at: string;
   pdf_available: boolean;
-}
-
-export async function publicListDocuments(token: string): Promise<PublicDocumentSummary[]> {
-  const res = await api.get<PublicDocumentSummary[]>(`/public/review/${token}/documents`);
-  return res.data;
 }
 
 export async function publicGetDocumentHtml(token: string, docId: number): Promise<string> {
@@ -1340,11 +1226,6 @@ export async function authResendVerification(email: string): Promise<{ message: 
 
 export async function authMe(): Promise<AuthUser> {
   const res = await api.get<AuthUser>('/auth/me');
-  return res.data;
-}
-
-export async function authGoogle(idToken: string): Promise<AuthUser> {
-  const res = await api.post<AuthUser>('/auth/google', { id_token: idToken });
   return res.data;
 }
 
@@ -1717,11 +1598,6 @@ export interface InviteInfo {
   expires_at: string;
 }
 
-export async function getInviteInfo(token: string): Promise<InviteInfo> {
-  const res = await api.get<InviteInfo>(`/team/accept-info?token=${token}`);
-  return res.data;
-}
-
 // ── Notifications ─────────────────────────────────────────────────────────────
 
 export interface AppNotification {
@@ -1749,23 +1625,7 @@ export async function markAllNotificationsRead(): Promise<NotificationsResponse>
   return res.data;
 }
 
-export async function markNotificationRead(id: number): Promise<AppNotification> {
-  const res = await api.post<AppNotification>(`/notifications/${id}/read`);
-  return res.data;
-}
-
 // ── Quora question search ──────────────────────────────────────────────────────
-
-export async function getQuoraQuestions(
-  brandId: number,
-  promptId: number
-): Promise<QuoraQuestion[]> {
-  const res = await api.get<{ questions: QuoraQuestion[] }>(
-    `/brands/${brandId}/quora-questions`,
-    { params: { prompt_id: promptId } }
-  );
-  return res.data.questions;
-}
 
 // ── Support ────────────────────────────────────────────────────────────────────
 
@@ -1779,19 +1639,6 @@ export interface TotpSetupData {
   secret: string;
   otpauth_uri: string;
   qr_code: string;
-}
-
-export async function setup2fa(): Promise<TotpSetupData> {
-  const res = await api.post<TotpSetupData>('/auth/2fa/setup');
-  return res.data;
-}
-
-export async function enable2fa(code: string): Promise<void> {
-  await api.post('/auth/2fa/enable', { code });
-}
-
-export async function disable2fa(password: string): Promise<void> {
-  await api.post('/auth/2fa/disable', { password });
 }
 
 export async function verify2fa(challenge_token: string, code: string): Promise<AuthUser> {
@@ -1888,11 +1735,6 @@ export interface PromptDetailData {
   competitors: PromptCompetitorData[];
   insights: PromptInsightData[];
   recent_responses: PromptRecentResponseData[];
-}
-
-export async function getPromptTimeline(brandId: number, promptId: number, days?: number): Promise<PromptTimelineData> {
-  const params = days ? { days } : undefined;
-  return dedupedGet<PromptTimelineData>(`/results/${brandId}/prompt/${promptId}/timeline`, params);
 }
 
 export async function getPromptDetail(brandId: number, promptId: number): Promise<PromptDetailData> {
@@ -2099,11 +1941,6 @@ export async function agencyListDocuments(clientId: number, kind?: string): Prom
   const params: Record<string, string> = {};
   if (kind) params.kind = kind;
   const res = await api.get<AgencyDocument[]>(`/agency/clients/${clientId}/documents`, { params });
-  return res.data;
-}
-
-export async function agencyGetDocument(documentId: number): Promise<AgencyDocument> {
-  const res = await api.get<AgencyDocument>(`/agency/documents/${documentId}`);
   return res.data;
 }
 
@@ -2447,11 +2284,6 @@ export async function listWikipediaCandidates(
   if (opts?.status) params.status = opts.status;
   if (opts?.minScore != null) params.min_score = opts.minScore;
   const res = await api.get<WikipediaCandidate[]>(`/wikipedia/${brandId}/candidates`, { params });
-  return res.data;
-}
-
-export async function getWikipediaCandidate(brandId: number, candidateId: number): Promise<WikipediaCandidate> {
-  const res = await api.get<WikipediaCandidate>(`/wikipedia/${brandId}/candidates/${candidateId}`);
   return res.data;
 }
 

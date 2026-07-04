@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter, Geist_Mono } from 'next/font/google';
+import { Inter, Geist_Mono, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import AppShell from '@/components/AppShell';
@@ -15,6 +15,16 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
   variable: '--font-geist-mono',
   weight: ['400', '500', '600', '700'],
+  display: 'swap',
+});
+
+// Display face for headings — technical/geometric, pairs with Inter + Geist
+// Mono into one family. Exposed as --font-display; --font-syne aliases to it
+// in globals.css so existing references pick it up.
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-display',
+  weight: ['500', '600', '700'],
   display: 'swap',
 });
 
@@ -60,7 +70,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${inter.variable} ${geistMono.variable}`}>
+    <html lang="en" className={`${inter.variable} ${geistMono.variable} ${spaceGrotesk.variable}`}>
       <body suppressHydrationWarning className="bg-[var(--bg-base)] text-[var(--text-primary)] antialiased">
         <AuthProvider>
           <AppShell>{children}</AppShell>

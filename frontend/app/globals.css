@@ -98,10 +98,14 @@
   /* Signature gradient — recurring brand fingerprint */
   --gradient-signature: linear-gradient(135deg, oklch(0.58 0.06 235) 0%, oklch(0.50 0.08 235) 50%, transparent 100%);
 
+  /* Display face alias — Space Grotesk (loaded as --font-display in layout).
+     Legacy references use --font-syne, so point it at the same face. */
+  --font-syne: var(--font-display), 'Space Grotesk', system-ui, sans-serif;
+
   /* Typography scale (display = hero only; h1-h3 + body + caption) */
-  --text-display: 3rem;     /* 48px, Syne, -2px tracking */
-  --text-h1: 2rem;          /* 32px, Syne, -1px tracking */
-  --text-h2: 1.5rem;        /* 24px, Syne, -0.5px tracking */
+  --text-display: 3rem;     /* 48px, display, -2px tracking */
+  --text-h1: 2rem;          /* 32px, display, -1px tracking */
+  --text-h2: 1.5rem;        /* 24px, display, -0.5px tracking */
   --text-h3: 1.125rem;      /* 18px, Inter 600 */
   --text-body: 0.875rem;    /* 14px, Inter 400 */
   --text-caption: 0.75rem;  /* 12px, Inter 500 */
@@ -220,6 +224,30 @@ body {
   font-weight: 600;
   border: 1px solid;
   line-height: 1.5;
+}
+
+/* ── Route enter ───────────────────────────────────────────────────────────── */
+/* One product-wide entrance so every navigation resolves the same way. Pages
+   that stagger their own cards layer their motion on top of this. */
+@keyframes routeEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.route-enter {
+  animation: routeEnter 280ms var(--ease-out) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-enter { animation: none; }
+}
+
+/* ── Display heading utility ───────────────────────────────────────────────── */
+/* One cohesive treatment for page-level headings across every surface, so the
+   product speaks in one voice instead of Inter on most pages and the display
+   face on only two. */
+.font-display {
+  font-family: var(--font-display), 'Space Grotesk', system-ui, sans-serif;
+  font-weight: 600;
+  letter-spacing: -0.02em;
 }
 
 /* ── Section label ─────────────────────────────────────────────────────────── */

@@ -8,7 +8,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import CurrentUser
+from app import state as _state
+from app.dependencies import (
+    CurrentUser,
+    check_rate_limit,
+    require_active_subscription,
+)
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
@@ -89,13 +94,24 @@ async def _posted_count_for_prompt(
     return int(n or 0)
 
 
-async def _ensure_brand_owned(db: AsyncSession, brand_id: int, user_id: int) -> Brand:
-    brand = (await db.execute(
-        select(Brand).where(Brand.id == brand_id, Brand.user_id == user_id)
-    )).scalar_one_or_none()
-    if brand is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Brand not found")
-    return brand
+async def _ensure_brand_owned(db: AsyncSession, brand_id: int, user) -> Brand:
+    # Delegate to the canonical check so admin bypass and team-owner
+    # resolution behave the same here as on every other surface.
+    from app.dependencies import get_brand_for_user
+    return await get_brand_for_user(brand_id, db, user)
+
+
+async def _guard_regen(brand_id: int, user) -> None:
+    """Gate the synchronous LLM-heavy regeneration endpoints: block degraded
+    subscriptions, burst-limit, and refuse if a generation is already running
+    for the brand (mirrors content.generate_now)."""
+    require_active_subscription(user)
+    check_rate_limit(user.id, limit=2, scope="cluster_regen")
+    if brand_id in _state.generating_brands:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Content is already being generated for this brand. Please wait for it to finish.",
+        )
 
 
 def _summarize_pieces(drafts: list[ContentDraft]) -> list[dict]:
@@ -114,7 +130,7 @@ def _summarize_pieces(drafts: list[ContentDraft]) -> list[dict]:
 
 @router.get("/{brand_id}", response_model=list[ContentClusterSummary])
 async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dict]:
-    brand = await _ensure_brand_owned(db, brand_id, user.id)
+    brand = await _ensure_brand_owned(db, brand_id, user)
     rows = (await db.execute(
         select(ContentCluster).where(ContentCluster.brand_id == brand.id)
     )).scalars().all()
@@ -153,7 +169,7 @@ async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dic
 
 @router.get("/{brand_id}/{cluster_id}", response_model=ContentClusterDetail)
 async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser) -> dict:
-    await _ensure_brand_owned(db, brand_id, user.id)
+    await _ensure_brand_owned(db, brand_id, user)
     cluster = (await db.execute(
         select(ContentCluster).where(ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id)
     )).scalar_one_or_none()
@@ -240,14 +256,19 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
 
 @router.post("/{brand_id}/by-prompt/{prompt_id}/regenerate", response_model=ContentClusterDetail)
 async def regenerate_by_prompt(brand_id: int, prompt_id: int, db: DbDep, user: CurrentUser) -> dict:
-    brand = await _ensure_brand_owned(db, brand_id, user.id)
+    brand = await _ensure_brand_owned(db, brand_id, user)
     prompt = (await db.execute(
         select(Prompt).where(Prompt.id == prompt_id, Prompt.brand_id == brand.id)
     )).scalar_one_or_none()
     if prompt is None:
         raise HTTPException(404, "Prompt not found")
     cluster = await get_or_create_cluster(db, brand_id=brand.id, prompt_id=prompt.id)
-    await regenerate_cluster(db, cluster_id=cluster.id, tier=user.subscription_tier)
+    await _guard_regen(brand_id, user)
+    _state.generating_brands.add(brand_id)
+    try:
+        await regenerate_cluster(db, cluster_id=cluster.id, tier=user.subscription_tier)
+    finally:
+        _state.generating_brands.discard(brand_id)
     return await get_cluster(brand_id, cluster.id, db, user)  # type: ignore
 
 
@@ -259,7 +280,8 @@ async def regenerate_piece_endpoint(
     db: DbDep,
     user: CurrentUser,
 ) -> ContentDraft:
-    brand = await _ensure_brand_owned(db, brand_id, user.id)
+    brand = await _ensure_brand_owned(db, brand_id, user)
+    await _guard_regen(brand_id, user)
     if request.platform not in CLUSTER_PLATFORMS:
         raise HTTPException(400, f"Platform {request.platform} not in cluster set")
     # Honor BrandContentSettings: a platform disabled at the brand level cannot
@@ -281,12 +303,16 @@ async def regenerate_piece_endpoint(
     )).scalar_one_or_none()
     if cluster is None:
         raise HTTPException(404, "Cluster not found")
-    return await regenerate_piece(
-        db,
-        cluster_id=cluster.id,
-        platform=request.platform,
-        tier=user.subscription_tier,
-    )
+    _state.generating_brands.add(brand_id)
+    try:
+        return await regenerate_piece(
+            db,
+            cluster_id=cluster.id,
+            platform=request.platform,
+            tier=user.subscription_tier,
+        )
+    finally:
+        _state.generating_brands.discard(brand_id)
 
 
 @router.patch("/{brand_id}/{cluster_id}/brief", response_model=ContentBriefSchema)
@@ -302,7 +328,7 @@ async def edit_brief(
     (see regenerate_cluster). This is the 'draft brief' semantics: edits are
     persisted, but the cluster still reflects pieces generated from an earlier
     version until the user explicitly regenerates."""
-    await _ensure_brand_owned(db, brand_id, user.id)
+    await _ensure_brand_owned(db, brand_id, user)
     cluster = (await db.execute(
         select(ContentCluster).where(
             ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
@@ -339,7 +365,7 @@ async def edit_brief(
 
 @router.post("/{brand_id}/{cluster_id}/pillar/accept", response_model=ContentClusterDetail)
 async def accept_pillar(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser) -> dict:
-    await _ensure_brand_owned(db, brand_id, user.id)
+    await _ensure_brand_owned(db, brand_id, user)
     cluster = (await db.execute(
         select(ContentCluster).where(ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id)
     )).scalar_one_or_none()
@@ -354,7 +380,7 @@ async def accept_pillar(brand_id: int, cluster_id: int, db: DbDep, user: Current
 
 @router.post("/{brand_id}/{cluster_id}/pillar/reject", response_model=ContentClusterDetail)
 async def reject_pillar(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser) -> dict:
-    await _ensure_brand_owned(db, brand_id, user.id)
+    await _ensure_brand_owned(db, brand_id, user)
     cluster = (await db.execute(
         select(ContentCluster).where(ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id)
     )).scalar_one_or_none()
@@ -368,7 +394,7 @@ async def reject_pillar(brand_id: int, cluster_id: int, db: DbDep, user: Current
 
 @router.post("/{brand_id}/{cluster_id}/pillar/propose", response_model=PillarCandidateSchema | None)
 async def propose_pillar_endpoint(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser) -> PillarCandidateSchema | None:
-    await _ensure_brand_owned(db, brand_id, user.id)
+    await _ensure_brand_owned(db, brand_id, user)
     cluster = (await db.execute(
         select(ContentCluster).where(ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id)
     )).scalar_one_or_none()
@@ -388,7 +414,7 @@ async def propose_pillar_endpoint(brand_id: int, cluster_id: int, db: DbDep, use
 
 @router.get("/{brand_id}/{cluster_id}/status", response_model=ClusterStatusPayload)
 async def cluster_status(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
-    await _ensure_brand_owned(db, brand_id, user.id)
+    await _ensure_brand_owned(db, brand_id, user)
     cluster = (await db.execute(
         select(ContentCluster).where(
             ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
@@ -413,7 +439,7 @@ async def cluster_status(brand_id: int, cluster_id: int, db: DbDep, user: Curren
 
 @router.post("/{brand_id}/{cluster_id}/regenerate-pieces", response_model=ContentClusterDetail)
 async def regenerate_pieces(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
-    await _ensure_brand_owned(db, brand_id, user.id)
+    await _ensure_brand_owned(db, brand_id, user)
     cluster = (await db.execute(
         select(ContentCluster).where(
             ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
@@ -421,15 +447,20 @@ async def regenerate_pieces(brand_id: int, cluster_id: int, db: DbDep, user: Cur
     )).scalar_one_or_none()
     if cluster is None:
         raise HTTPException(404, "Cluster not found")
-    await regenerate_cluster(
-        db, cluster_id=cluster.id, tier=user.subscription_tier, rebuild_brief=False,
-    )
+    await _guard_regen(brand_id, user)
+    _state.generating_brands.add(brand_id)
+    try:
+        await regenerate_cluster(
+            db, cluster_id=cluster.id, tier=user.subscription_tier, rebuild_brief=False,
+        )
+    finally:
+        _state.generating_brands.discard(brand_id)
     return await get_cluster(brand_id, cluster.id, db, user)  # type: ignore
 
 
 @router.post("/{brand_id}/{cluster_id}/rebuild", response_model=ContentClusterDetail)
 async def rebuild_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
-    await _ensure_brand_owned(db, brand_id, user.id)
+    await _ensure_brand_owned(db, brand_id, user)
     cluster = (await db.execute(
         select(ContentCluster).where(
             ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
@@ -437,15 +468,20 @@ async def rebuild_cluster(brand_id: int, cluster_id: int, db: DbDep, user: Curre
     )).scalar_one_or_none()
     if cluster is None:
         raise HTTPException(404, "Cluster not found")
-    await regenerate_cluster(
-        db, cluster_id=cluster.id, tier=user.subscription_tier, rebuild_brief=True,
-    )
+    await _guard_regen(brand_id, user)
+    _state.generating_brands.add(brand_id)
+    try:
+        await regenerate_cluster(
+            db, cluster_id=cluster.id, tier=user.subscription_tier, rebuild_brief=True,
+        )
+    finally:
+        _state.generating_brands.discard(brand_id)
     return await get_cluster(brand_id, cluster.id, db, user)  # type: ignore
 
 
 @router.get("/{brand_id}/{cluster_id}/sources", response_model=ClusterSourcesPayload)
 async def cluster_sources(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
-    await _ensure_brand_owned(db, brand_id, user.id)
+    await _ensure_brand_owned(db, brand_id, user)
     cluster = (await db.execute(
         select(ContentCluster).where(
             ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
@@ -466,7 +502,7 @@ async def cluster_sources(brand_id: int, cluster_id: int, db: DbDep, user: Curre
         )
     )).scalars().all()
     tier_order = {"T1": 0, "T2": 1, "T3": 2}
-    rows = sorted(rows, key=lambda r: (tier_order[r.tier], -r.times_cited))
+    rows = sorted(rows, key=lambda r: (tier_order.get(r.tier, 3), -r.times_cited))
     return ClusterSourcesPayload(
         total_t1=pack.total_t1, total_t2=pack.total_t2, total_t3=pack.total_t3,
         sources=[ClusterSourceItem(
@@ -478,7 +514,7 @@ async def cluster_sources(brand_id: int, cluster_id: int, db: DbDep, user: Curre
 
 @router.get("/{brand_id}/{cluster_id}/briefs", response_model=list[ContentBriefSchema])
 async def brief_history(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
-    await _ensure_brand_owned(db, brand_id, user.id)
+    await _ensure_brand_owned(db, brand_id, user)
     cluster = (await db.execute(
         select(ContentCluster).where(
             ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,

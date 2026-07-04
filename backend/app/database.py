@@ -35,6 +35,11 @@ if "sqlite" in DATABASE_URL:
     def _set_sqlite_pragma(dbapi_conn, _connection_record):
         cursor = dbapi_conn.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        # WAL lets readers proceed while a write is in flight — without it,
+        # tracking-run writes block every dashboard read on the shared file.
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA busy_timeout=5000")
         cursor.close()
 
 AsyncSessionLocal = async_sessionmaker(

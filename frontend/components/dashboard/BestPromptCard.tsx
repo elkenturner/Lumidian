@@ -64,8 +64,12 @@ export default function BestPromptCard({ responses, loading }: BestPromptCardPro
         top = { text: p.text, total: p.total, mentioned: p.mentioned, models: Array.from(p.models) };
       }
     }
-    return top;
+    // A "best" prompt with zero mentions isn't a best performer — show the
+    // no-mentions empty state instead of a green 0%.
+    return top && top.mentioned > 0 ? top : null;
   })();
+
+  const hasResponses = responses.some((r) => !r.error);
 
   return (
     <div className="card p-5">
@@ -105,7 +109,9 @@ export default function BestPromptCard({ responses, loading }: BestPromptCardPro
       ) : (
         <>
           <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">&mdash;</p>
-          <p className="text-xs text-[var(--text-faint)] mt-1">No data yet</p>
+          <p className="text-xs text-[var(--text-faint)] mt-1">
+            {hasResponses ? 'No prompt has earned a mention yet' : 'No data yet'}
+          </p>
         </>
       )}
     </div>

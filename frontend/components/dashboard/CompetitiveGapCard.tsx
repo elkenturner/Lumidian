@@ -19,7 +19,7 @@ const WINDOWS: CompetitiveGapWindow[] = ['7d', '30d', '90d'];
 function formatGap(pp: number | null): string {
   if (pp === null) return '—';
   const sign = pp > 0 ? '+' : '';
-  return `${sign}${pp.toFixed(1)}pp`;
+  return `${sign}${pp.toFixed(1)} pts`;
 }
 
 function gapColor(pp: number | null): string {
@@ -167,7 +167,7 @@ export function CompetitiveGapCard({
       {delta !== null && delta !== undefined && (
         <p className="text-xs text-[var(--text-muted)] mt-2 tabular-nums">
           <span style={{ color: gapColor(delta) }}>
-            {delta > 0 ? '↑ +' : delta < 0 ? '↓ ' : ''}{delta.toFixed(1)}pp
+            {delta === 0 ? 'No change' : `${delta > 0 ? '↑' : '↓'}${Math.abs(delta).toFixed(1)} pts`}
           </span>{' '}
           vs prior {window}
         </p>

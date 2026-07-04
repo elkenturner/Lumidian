@@ -1761,7 +1761,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-[var(--text-secondary)]">Profile Completion</span>
                 <span className="text-xs text-[var(--text-muted)]">
-                  {completionPct >= 100 ? 'Complete — ready for drafting' : `${Math.round(100 - completionPct)}% remaining`}
+                  {Math.round(completionPct) >= 100 ? 'Complete — ready for drafting' : `${Math.round(100 - completionPct)}% remaining`}
                 </span>
               </div>
               <CompletionBar pct={completionPct} />

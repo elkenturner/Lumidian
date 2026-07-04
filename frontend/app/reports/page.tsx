@@ -507,7 +507,7 @@ export default function ReportsPage() {
                         const d = curPct - prevMs;
                         if (d === 0) return [];
                         const cfg = getModelCfg(mk);
-                        return [`${cfg.label} ${d > 0 ? '+' : ''}${d}%`];
+                        return [`${cfg.label} ${d > 0 ? '+' : ''}${d} pts`];
                       }).join(', ')
                     : '';
 
@@ -528,7 +528,7 @@ export default function ReportsPage() {
                                 className={`text-[10px] font-bold cursor-default ${delta > 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'}`}
                                 title={modelDeltaTooltip || undefined}
                               >
-                                {delta > 0 ? `+${delta}%` : `${delta}%`}
+                                {delta > 0 ? `+${delta} pts` : `${delta} pts`}
                               </span>
                             )}
                             <ChevronDown

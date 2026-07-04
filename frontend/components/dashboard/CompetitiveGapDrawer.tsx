@@ -24,7 +24,7 @@ type SortKey = 'gap_pp' | 'name' | 'competitor_pct';
 function formatPp(pp: number | null): string {
   if (pp === null) return '—';
   const sign = pp > 0 ? '+' : '';
-  return `${sign}${pp.toFixed(1)}pp`;
+  return `${sign}${pp.toFixed(1)} pts`;
 }
 
 function ppColor(pp: number | null): string {
@@ -96,8 +96,9 @@ export function CompetitiveGapDrawer({
           {data.headline_delta_pp !== null && (
             <p className="text-xs text-[var(--text-muted)] tabular-nums">
               <span style={{ color: ppColor(data.headline_delta_pp) }}>
-                {data.headline_delta_pp > 0 ? '↑ +' : data.headline_delta_pp < 0 ? '↓ ' : ''}
-                {data.headline_delta_pp.toFixed(1)}pp
+                {data.headline_delta_pp === 0
+                  ? 'No change'
+                  : `${data.headline_delta_pp > 0 ? '↑' : '↓'}${Math.abs(data.headline_delta_pp).toFixed(1)} pts`}
               </span>{' '}
               vs prior {window}
             </p>

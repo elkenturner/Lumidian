@@ -73,7 +73,7 @@ export function ScanButton({ brandId, onScanCompleted }: Props) {
 
       <div className="text-xs text-[var(--text-faint)]">
         {scan?.status === 'running' && (
-          <>Searching · {scan.prompts_searched ?? 0} prompts</>
+          <>Searching · {scan.prompts_searched ?? 0} prompt{(scan.prompts_searched ?? 0) !== 1 ? 's' : ''} searched</>
         )}
         {scan?.status === 'completed' && scan.completed_at && (
           <>

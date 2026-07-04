@@ -175,14 +175,18 @@ export default function ClusterDetailPage() {
 
   const delta = cluster.cluster_delta;
   const hasDelta = delta !== null && delta !== undefined;
-  const deltaTone = !hasDelta
+  // Round first so a 0.04 delta doesn't render as a green "+0.0 pts".
+  const deltaRounded = hasDelta ? Math.round(delta! * 10) / 10 : null;
+  const deltaTone = deltaRounded === null || deltaRounded === 0
     ? "text-[var(--text-faint)]"
-    : delta! >= 0
+    : deltaRounded > 0
     ? "text-[#4ade80]"
     : "text-[#fb7185]";
-  const deltaLabel = !hasDelta
+  const deltaLabel = deltaRounded === null
     ? "—"
-    : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)} pts`;
+    : deltaRounded === 0
+    ? "No change"
+    : `${deltaRounded > 0 ? "+" : ""}${deltaRounded.toFixed(1)} pts`;
   const statusLabel = clusterChip({ status: effectiveStatus, version: cluster.version, posted_count: cluster.posted_count, pieces: cluster.drafts.map((d) => ({ platform: d.platform })) }).label;
 
   function updateDraft(updated: ContentDraft) {
@@ -254,7 +258,7 @@ export default function ClusterDetailPage() {
             </span>
             <span>·</span>
             <span>
-              {completedDraftsCount} of {platforms.length} posts
+              {completedDraftsCount} of {platforms.length} post{platforms.length !== 1 ? 's' : ''}
             </span>
             {cluster.last_generated_at && (
               <>
@@ -422,11 +426,14 @@ export default function ClusterDetailPage() {
                   {d.brief_version != null && (
                     <span className="text-[var(--text-faint)]">from brief v{d.brief_version}</span>
                   )}
-                  {d.attribution_delta != null && (
-                    <span className={d.attribution_delta >= 0 ? "text-[#4ade80]" : "text-[#fb7185]"}>
-                      {d.attribution_delta >= 0 ? "+" : ""}{d.attribution_delta.toFixed(1)}pts
-                    </span>
-                  )}
+                  {d.attribution_delta != null && (() => {
+                    const r = Math.round(d.attribution_delta * 10) / 10;
+                    return (
+                      <span className={r === 0 ? "text-[var(--text-faint)]" : r > 0 ? "text-[#4ade80]" : "text-[#fb7185]"}>
+                        {r === 0 ? "no change" : `${r > 0 ? "+" : ""}${r.toFixed(1)} pts`}
+                      </span>
+                    );
+                  })()}
                 </div>
               ))}
           </div>

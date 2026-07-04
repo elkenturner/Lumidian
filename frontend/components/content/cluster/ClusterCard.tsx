@@ -34,15 +34,19 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
   const isPartial = postedCount > 0 && postedCount < enabledPlatformCount;
   const delta = cluster.cluster_delta;
   const hasDelta = delta !== null && delta !== undefined;
-  const deltaTone = !hasDelta
+  // Round first so a 0.04 delta doesn't render as a green "+0.0 pts".
+  const deltaRounded = hasDelta ? Math.round(delta! * 10) / 10 : null;
+  const deltaTone = deltaRounded === null || deltaRounded === 0
     ? "text-[var(--text-faint)]"
-    : delta! >= 0
+    : deltaRounded > 0
     ? "text-[#4ade80]"
     : "text-[#fb7185]";
   // Textual +/- is the non-color cue (accessibility): never rely on colour alone.
-  const deltaLabel = !hasDelta
+  const deltaLabel = deltaRounded === null
     ? "—"
-    : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)} pts`;
+    : deltaRounded === 0
+    ? "No change"
+    : `${deltaRounded > 0 ? "+" : ""}${deltaRounded.toFixed(1)} pts`;
   const chip = clusterChip(cluster);
 
   return (
@@ -101,12 +105,12 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
               />
             ))}
             <span className="ml-1 text-[var(--text-faint)]">
-              {postedCount} of {enabledPlatformCount} posts live
+              {postedCount} of {enabledPlatformCount} post{enabledPlatformCount !== 1 ? 's' : ''} live
             </span>
           </div>
           <span className="text-[var(--text-faint)]">·</span>
           <span className="text-[var(--text-secondary)]">
-            {cluster.pieces.length - postedCount} drafts to review
+            {cluster.pieces.length - postedCount} draft{cluster.pieces.length - postedCount !== 1 ? 's' : ''} to review
           </span>
         </div>
       )}

@@ -518,7 +518,7 @@ function DraftExpansionRow({ draft, showBorder }: { draft: PromptDraftSnapshot; 
               color: draft.score_snapshot.delta > 0 ? 'var(--success)' : 'var(--danger)',
             }}
           >
-            {draft.score_snapshot.delta > 0 ? '+' : ''}{Math.round(draft.score_snapshot.delta)}pp
+            {draft.score_snapshot.delta > 0 ? '+' : ''}{Math.round(draft.score_snapshot.delta)} pts
           </span>
         )}
         <ChevronDown

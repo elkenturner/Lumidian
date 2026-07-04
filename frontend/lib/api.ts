@@ -701,6 +701,8 @@ export interface SentimentBreakdown {
   has_data: boolean;
   /** Mentions with no stored sentiment (classifier failed/skipped). */
   unclassified_mentions: number;
+  /** How many classified mentions the percentages are based on. */
+  classified_mentions: number;
 }
 
 export interface PositionData {

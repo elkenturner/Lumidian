@@ -547,6 +547,9 @@ class SentimentBreakdown(BaseModel):
     # Mentions with no stored sentiment (classifier failed/skipped). Lets the
     # UI distinguish "no mentions to analyze" from "sentiment unavailable".
     unclassified_mentions: int = 0
+    # How many classified mentions the percentages are based on, so the UI
+    # can suppress confident-looking headlines built from 1-2 data points.
+    classified_mentions: int = 0
 
 
 class PositionData(BaseModel):

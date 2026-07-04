@@ -164,7 +164,7 @@ export function ManagePromptsModal({
           <div className="flex items-center justify-between">
             <DialogTitle>Manage Prompts</DialogTitle>
             <span className={`text-xs font-medium tabular-nums font-mono ${atLimit && promptLimit < 99999 ? 'text-[var(--danger)]' : localPrompts.length >= promptLimit * 0.8 && promptLimit < 99999 ? 'text-[var(--warning)]' : 'text-[var(--text-faint)]'}`}>
-              {promptLimit >= 99999 ? `${localPrompts.length} prompts` : `${localPrompts.length}/${promptLimit}`}
+              {promptLimit >= 99999 ? `${localPrompts.length} prompt${localPrompts.length !== 1 ? 's' : ''}` : `${localPrompts.length}/${promptLimit}`}
             </span>
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">Add or remove the prompts AI models are queried with</p>

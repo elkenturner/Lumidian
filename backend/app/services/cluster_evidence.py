@@ -14,6 +14,7 @@ Public entry points (added in this task):
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 from urllib.parse import urlparse
 
@@ -87,12 +88,30 @@ async def fetch_and_dedupe(queries: list[str]) -> list[dict[str, Any]]:
 from app.services.source_authority import classify_domain  # noqa: E402
 
 PACK_CAP = 10
-# Authority floor for the cluster pack. Lowered from (2, 4) — the strict floor
-# was rejecting prompts where Serper returned a single solid authoritative
-# result (SEC.gov, NIH.gov, etc.) plus several T2 trade-press hits, which was
-# enough to ground the brief.
-MIN_T1 = 1
-MIN_T1_PLUS_T2 = 3
+
+
+def _min_t1() -> int:
+    """Authority floor: minimum T1 sources required, env-tunable.
+
+    Defaults to 1 — the strict floor of 2 was rejecting prompts where Serper
+    returned a single solid authoritative result (SEC.gov, NIH.gov, etc.)
+    plus several T2 trade-press hits, which was enough to ground the brief.
+    """
+    return int(os.getenv("CLUSTER_GATE_MIN_T1", "1"))
+
+
+def _min_t1_plus_t2() -> int:
+    """Authority floor: minimum T1+T2 sources required, env-tunable."""
+    return int(os.getenv("CLUSTER_GATE_MIN_T1_PLUS_T2", "3"))
+
+
+# Deprecated: module-level snapshots of the above, computed at import time.
+# Prefer `_min_t1()` / `_min_t1_plus_t2()`, which re-read the env on every
+# call (needed so the gate can be tuned per-environment without a restart of
+# any caller that imports these constants directly). Kept for compatibility
+# with any external readers of the old constant names.
+MIN_T1 = _min_t1()
+MIN_T1_PLUS_T2 = _min_t1_plus_t2()
 
 _TIER_ORDER = {"T1": 0, "T2": 1, "T3": 2}
 
@@ -123,15 +142,17 @@ def rank_and_tier(raw_sources: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def gate_pack(pack: list[dict[str, Any]]) -> None:
     """Raise PackGateError if pack doesn't have enough authoritative sources."""
+    min_t1 = _min_t1()
+    min_t1_plus_t2 = _min_t1_plus_t2()
     t1 = sum(1 for s in pack if s["tier"] == "T1")
     t2 = sum(1 for s in pack if s["tier"] == "T2")
-    if t1 < MIN_T1:
+    if t1 < min_t1:
         raise PackGateError(
-            f"insufficient_T1_sources: found {t1}, need at least {MIN_T1}"
+            f"insufficient_T1_sources: found {t1}, need at least {min_t1}"
         )
-    if t1 + t2 < MIN_T1_PLUS_T2:
+    if t1 + t2 < min_t1_plus_t2:
         raise PackGateError(
-            f"insufficient_authority: T1+T2 = {t1 + t2}, need at least {MIN_T1_PLUS_T2}"
+            f"insufficient_authority: T1+T2 = {t1 + t2}, need at least {min_t1_plus_t2}"
         )
 
 

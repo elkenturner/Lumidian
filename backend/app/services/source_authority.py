@@ -58,6 +58,11 @@ T2_DOMAINS: set[str] = {
     "american-banker.com", "eweek.com", "infoworld.com", "vcnewsdaily.com",
     "builtin.com", "govtech.com", "edtechmagazine.com", "govdelivery.com",
     "federaltimes.com", "dealnews.com",
+    # Logistics / freight / supply-chain trade
+    "freightwaves.com", "ttnews.com", "joc.com", "supplychaindive.com",
+    "transportdive.com", "dcvelocity.com", "fleetowner.com", "logisticsmgmt.com",
+    "overdriveonline.com", "landline.media", "truckinginfo.com",
+    "commercialcarrierjournal.com",
 }
 
 
@@ -69,14 +74,24 @@ def _normalize(domain: str) -> str:
 
 
 def classify_domain(domain: str) -> Tier:
-    """Classify a bare domain (e.g. 'nytimes.com') into T1/T2/T3."""
+    """Classify a bare domain (e.g. 'nytimes.com') into T1/T2/T3.
+
+    Subdomains inherit their parent's tier (e.g. 'blog.reuters.com' -> T1)
+    via a suffix walk over dot-separated labels. This walks label
+    *boundaries* rather than doing a raw substring/endswith check, so a
+    domain that merely ends with a listed string (e.g. 'fakereuters.com')
+    is not misclassified as its lookalike.
+    """
     d = _normalize(domain)
     if not d:
         return "T3"
-    if d in T1_DOMAINS:
-        return "T1"
-    if d in T2_DOMAINS:
-        return "T2"
+    parts = d.split(".")
+    for i in range(len(parts) - 1):
+        candidate = ".".join(parts[i:])
+        if candidate in T1_DOMAINS:
+            return "T1"
+        if candidate in T2_DOMAINS:
+            return "T2"
     # Heuristics for the long tail
     if d.endswith(".gov") or d.endswith(".gov.uk"):
         return "T1"

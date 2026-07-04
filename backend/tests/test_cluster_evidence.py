@@ -129,6 +129,22 @@ def test_gate_fails_when_t1_plus_t2_under_threshold():
         gate_pack(pack)
 
 
+def test_gate_thresholds_env_overridable(monkeypatch):
+    """gate_pack must consult _min_t1()/_min_t1_plus_t2() helpers that read env."""
+    # A pack that fails the default gate (needs MIN_T1=1, MIN_T1_PLUS_T2=3)...
+    pack = [
+        _src("https://techcrunch.com/c") | {"tier": "T2", "domain": "techcrunch.com"},
+    ]
+    monkeypatch.setenv("CLUSTER_GATE_MIN_T1", "0")
+    monkeypatch.setenv("CLUSTER_GATE_MIN_T1_PLUS_T2", "1")
+    gate_pack(pack)  # ...passes once the env-configured thresholds are lowered
+
+    # Raising the env-configured threshold above the pack's content re-fails it.
+    monkeypatch.setenv("CLUSTER_GATE_MIN_T1", "1")
+    with pytest.raises(PackGateError):
+        gate_pack(pack)
+
+
 # ---------------------------------------------------------------------------
 # Task 7: build_cluster_pack — full builder + persistence
 # ---------------------------------------------------------------------------

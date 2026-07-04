@@ -158,6 +158,7 @@ class TrackingRunSummary(BaseModel):
     overall_score: float | None = None
     total_queries: int | None = None
     total_mentions: int | None = None
+    failed_queries: int | None = None
     error_message: str | None = None
     has_content_influence: bool = False
     created_at: datetime
@@ -176,6 +177,7 @@ class TrackingRunStatus(BaseModel):
     overall_score: float | None = None
     total_queries: int | None = None
     total_mentions: int | None = None
+    failed_queries: int | None = None
     error_message: str | None = None
     has_content_influence: bool = False
     created_at: datetime
@@ -529,6 +531,9 @@ class SentimentBreakdown(BaseModel):
     neutral_pct: float
     negative_pct: float
     has_data: bool = False
+    # Mentions with no stored sentiment (classifier failed/skipped). Lets the
+    # UI distinguish "no mentions to analyze" from "sentiment unavailable".
+    unclassified_mentions: int = 0
 
 
 class PositionData(BaseModel):
@@ -656,6 +661,9 @@ class BrandProfileUpdate(BaseModel):
     publications: list[Publication] | None = None
     market_scope: str | None = Field(None, max_length=20)
     geography: str | None = Field(None, max_length=200)
+    target_audience: str | None = Field(None, max_length=2000)
+    internal_brand_context: str | None = Field(None, max_length=20000)
+    clear_fields: list[str] | None = None
 
     @field_validator("market_scope")
     @classmethod
@@ -710,6 +718,7 @@ class BrandProfileResponse(BaseModel):
     publications: list[Publication] = []
     market_scope: str | None = None
     geography: str | None = None
+    target_audience: str | None = None
     completion_pct: float = 0.0
     internal_brand_context: str | None = None
     website_context_last_fetched: datetime | None = None

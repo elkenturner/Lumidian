@@ -180,7 +180,8 @@ async def test_completion_increases_with_fields(client):
     await register_and_login(client)
     brand = await create_brand(client)
 
-    # Fill 3 of 6 fields
+    # Fill 3 of 7 fields (company_description, tone_of_voice, key_stats,
+    # target_audience are counted; target_audience left blank here)
     await client.put(
         f"/api/brands/{brand['id']}/profile",
         json={
@@ -191,8 +192,8 @@ async def test_completion_increases_with_fields(client):
     )
     resp = await client.get(f"/api/brands/{brand['id']}/profile")
     pct = resp.json()["completion_pct"]
-    # 3/6 = 50.0%
-    assert pct == 50.0
+    # 3/7 = 42.9%
+    assert pct == 42.9
 
 
 async def test_completion_100_when_all_filled(client):
@@ -208,6 +209,7 @@ async def test_completion_100_when_all_filled(client):
             "what_not_to_say": ["nothing bad"],
             "approved_language": ["term1"],
             "publications": [{"url": "https://example.com", "title": "T", "publisher": "P", "date": "2024"}],
+            "target_audience": "mid-market trucking ops leaders",
         },
     )
     resp = await client.get(f"/api/brands/{brand['id']}/profile")
@@ -250,6 +252,80 @@ async def test_profile_response_shape(client):
         "tone_of_voice", "what_not_to_say",
         "approved_language", "publications", "completion_pct",
         "internal_brand_context", "website_context_last_fetched",
-        "created_at", "updated_at",
+        "created_at", "updated_at", "target_audience",
     }
     assert set(data.keys()) >= expected_keys
+
+
+# ── Blank-overwrite guard + clear_fields ─────────────────────────────────────
+
+async def test_put_empty_does_not_wipe_filled_field(client):
+    """Filling company_description via PUT, then PUTting an empty string,
+    must not wipe the stored value (2026-07-04 blank-overwrite incident)."""
+    await register_and_login(client)
+    brand = await create_brand(client)
+
+    await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"company_description": "We build AI tools."},
+    )
+    resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"company_description": ""},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["company_description"] == "We build AI tools."
+
+
+async def test_put_clear_fields_explicitly_wipes(client):
+    """When the client explicitly lists a field in clear_fields, an empty
+    incoming value DOES overwrite a non-empty stored value."""
+    await register_and_login(client)
+    brand = await create_brand(client)
+
+    await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"company_description": "We build AI tools."},
+    )
+    resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"company_description": "", "clear_fields": ["company_description"]},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["company_description"] == ""
+
+
+async def test_target_audience_roundtrip(client):
+    await register_and_login(client)
+    brand = await create_brand(client)
+
+    resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"target_audience": "mid-market trucking ops leaders"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["target_audience"] == "mid-market trucking ops leaders"
+
+    get_resp = await client.get(f"/api/brands/{brand['id']}/profile")
+    data = get_resp.json()
+    assert data["target_audience"] == "mid-market trucking ops leaders"
+    # 1 of 7 fields filled
+    assert data["completion_pct"] == 14.3
+
+
+async def test_internal_brand_context_writable(client):
+    """internal_brand_context is currently only ever written internally
+    (Jina fetch, ai-fill); the PUT handler must also accept it directly
+    (e.g. onboarding writes it explicitly)."""
+    await register_and_login(client)
+    brand = await create_brand(client)
+
+    resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"internal_brand_context": "Scraped homepage copy about the company."},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["internal_brand_context"] == "Scraped homepage copy about the company."
+
+    get_resp = await client.get(f"/api/brands/{brand['id']}/profile")
+    assert get_resp.json()["internal_brand_context"] == "Scraped homepage copy about the company."

@@ -46,6 +46,7 @@ ALL_FIELDS = [
     "what_not_to_say",
     "approved_language",
     "publications",
+    "target_audience",
 ]
 
 
@@ -83,6 +84,8 @@ def _compute_completion(profile: BrandProfile) -> float:
                 filled += 1
         except Exception:
             logger.warning("Failed to parse publications for brand_profile %d", profile.id)
+    if profile.target_audience and profile.target_audience.strip():
+        filled += 1
     return round((filled / len(ALL_FIELDS)) * 100, 1)
 
 
@@ -115,6 +118,7 @@ def _profile_to_response(profile: BrandProfile) -> BrandProfileResponse:
         publications=_parse_publications(profile.publications),
         market_scope=profile.market_scope,
         geography=profile.geography,
+        target_audience=profile.target_audience,
         completion_pct=_compute_completion(profile),
         internal_brand_context=profile.internal_brand_context,
         website_context_last_fetched=profile.website_context_last_fetched,
@@ -154,27 +158,74 @@ async def get_brand_profile(brand_id: int, db: DbDep, user: CurrentUser):
     return _profile_to_response(profile)
 
 
+def _parse_json_list(raw: str | None) -> list:
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+        return parsed if isinstance(parsed, list) else []
+    except Exception:
+        return []
+
+
 @router.put("/{brand_id}/profile", response_model=BrandProfileResponse)
 async def update_brand_profile(brand_id: int, payload: BrandProfileUpdate, db: DbDep, user: CurrentUser):
     await get_brand_for_user(brand_id, db, user)
     profile = await _get_or_create_profile(db, brand_id)
 
-    if payload.company_description is not None:
-        profile.company_description = payload.company_description
-    if payload.key_stats is not None:
-        profile.key_stats = json.dumps(payload.key_stats)
-    if payload.tone_of_voice is not None:
-        profile.tone_of_voice = payload.tone_of_voice
-    if payload.what_not_to_say is not None:
-        profile.what_not_to_say = json.dumps(payload.what_not_to_say)
-    if payload.approved_language is not None:
-        profile.approved_language = json.dumps(payload.approved_language)
-    if payload.publications is not None:
-        profile.publications = json.dumps([p.model_dump() for p in payload.publications])
+    def _apply(field: str, incoming, stored, setter) -> None:
+        """Write-through unless this would blank a non-empty stored value
+        without explicit clear_fields consent (2026-07-04 audit: an empty
+        Settings form could wipe a filled profile)."""
+        if incoming is None:
+            return
+        is_empty = (incoming == "" or incoming == [])
+        if is_empty and stored and field not in (payload.clear_fields or []):
+            return
+        setter(incoming)
+
+    _apply(
+        "company_description", payload.company_description, profile.company_description,
+        lambda v: setattr(profile, "company_description", v),
+    )
+    _apply(
+        "key_stats", payload.key_stats, _parse_json_list(profile.key_stats),
+        lambda v: setattr(profile, "key_stats", json.dumps(v)),
+    )
+    _apply(
+        "tone_of_voice", payload.tone_of_voice, profile.tone_of_voice,
+        lambda v: setattr(profile, "tone_of_voice", v),
+    )
+    _apply(
+        "what_not_to_say", payload.what_not_to_say, _parse_json_list(profile.what_not_to_say),
+        lambda v: setattr(profile, "what_not_to_say", json.dumps(v)),
+    )
+    _apply(
+        "approved_language", payload.approved_language, _parse_json_list(profile.approved_language),
+        lambda v: setattr(profile, "approved_language", json.dumps(v)),
+    )
+
+    publications_incoming = (
+        [p.model_dump() for p in payload.publications] if payload.publications is not None else None
+    )
+    _apply(
+        "publications", publications_incoming, _parse_json_list(profile.publications),
+        lambda v: setattr(profile, "publications", json.dumps(v)),
+    )
+
     if "market_scope" in payload.model_fields_set:
         profile.market_scope = payload.market_scope
     if payload.geography is not None:
         profile.geography = payload.geography.strip() or None
+
+    _apply(
+        "target_audience", payload.target_audience, profile.target_audience,
+        lambda v: setattr(profile, "target_audience", v),
+    )
+    _apply(
+        "internal_brand_context", payload.internal_brand_context, profile.internal_brand_context,
+        lambda v: setattr(profile, "internal_brand_context", v),
+    )
 
     try:
         await db.commit()

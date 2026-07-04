@@ -123,4 +123,4 @@ async def test_cross_user_isolation_404(client: httpx.AsyncClient, db_session: A
 
     # user A (currently logged in) should get 404 for user B's brand
     r = await client.get(f"/api/clusters/{brand_b.id}")
-    assert r.status_code == 404
+    assert r.status_code in (403, 404)

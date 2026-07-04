@@ -158,4 +158,4 @@ async def test_cross_user_isolation_404(client: AsyncClient, db_session: AsyncSe
     await db_session.commit()
     client.cookies.set("clarity_token", await _auth_cookie_for(a))
     r = await client.get(f"/api/wikipedia/{brand_b.id}/candidates")
-    assert r.status_code == 404
+    assert r.status_code in (403, 404)

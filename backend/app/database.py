@@ -515,6 +515,9 @@ async def run_migrations():
         "CREATE INDEX IF NOT EXISTS idx_agency_client_milestones_client ON agency_client_milestones(agency_client_id)",
         # 2026-05-27: Drop Peec column — tracking is in-house now
         "ALTER TABLE agency_clients DROP COLUMN peec_dashboard_url",
+        # 2026-07-03: Stripe webhooks look users up by customer id — avoid a
+        # full table scan per webhook.
+        "CREATE INDEX IF NOT EXISTS idx_users_stripe_customer_id ON users(stripe_customer_id)",
     ]
     from sqlalchemy.exc import OperationalError
     async with engine.begin() as conn:
@@ -522,9 +525,14 @@ async def run_migrations():
             try:
                 await conn.execute(text(stmt))
                 logger.info("Migration applied: %s", stmt)
-            except OperationalError:
-                # Column/table/index already exists — safe to ignore
-                pass
+            except OperationalError as exc:
+                # Expected for re-runs ("duplicate column name" etc.), but log
+                # it — a genuinely failing ALTER on prod would otherwise be
+                # silently skipped, leaving undetected schema drift.
+                if "duplicate" in str(exc).lower() or "already exists" in str(exc).lower() or "no such column" in str(exc).lower():
+                    pass
+                else:
+                    logger.warning("Migration skipped with unexpected error: %s -- %s", stmt, exc)
 
         # ── Website AIO module ─────────────────────────────────────────────────
         # (create_all in startup handles new tables; these are explicit indexes
@@ -971,4 +979,7 @@ async def fail_stale_runs_for_brand(db: AsyncSession, brand_id: int, max_age_min
         )
     )
     if result.rowcount > 0:
+        # Commit here: read-only callers (e.g. GET /tracking/background-status)
+        # never commit, which silently rolled the auto-fail back on close.
+        await db.commit()
         logger.warning("Auto-failed %d stale run(s) for brand %d (threshold: %d min)", result.rowcount, brand_id, max_age_minutes)

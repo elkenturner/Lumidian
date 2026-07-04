@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, datetime
-
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +24,7 @@ from app.models import (
     ContentDraft,
     ContentDraftCitation,
     Prompt,
+    utcnow,
 )
 from app.services.cluster_brief import build_brief
 from app.services.cluster_pillar import propose_pillar
@@ -106,7 +105,7 @@ async def get_or_create_cluster(db: AsyncSession, *, brand_id: int, prompt_id: i
         status="pending",
         pillar_mode="none",
         version=1,
-        created_at=datetime.now(UTC),
+        created_at=utcnow(),
     )
     db.add(cluster)
     await db.commit()
@@ -555,7 +554,7 @@ async def regenerate_cluster(
         cluster.status = "ready_low_evidence"
     else:
         cluster.status = "ready"
-    cluster.last_generated_at = datetime.now(UTC)
+    cluster.last_generated_at = utcnow()
     cluster.version += 1
     cluster.last_brief_id = brief.id  # promote brief (even on partial — brief succeeded)
     await db.commit()

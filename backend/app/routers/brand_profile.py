@@ -339,14 +339,23 @@ Return ONLY the JSON object, no markdown, no explanation. Never refuse or explai
     if suggestions.tone_of_voice and not (profile.tone_of_voice or "").strip():
         profile.tone_of_voice = suggestions.tone_of_voice
         persisted.append("tone_of_voice")
-    if suggestions.key_stats and not profile.key_stats:
+    if suggestions.key_stats and not _parse_json_list(profile.key_stats):
         profile.key_stats = json.dumps(suggestions.key_stats)
         persisted.append("key_stats")
     if suggestions.target_audience and not (profile.target_audience or "").strip():
         profile.target_audience = suggestions.target_audience
         persisted.append("target_audience")
     if persisted:
-        await db.commit()
+        try:
+            await db.commit()
+        except OperationalError as exc:
+            if "database is locked" in str(exc):
+                await db.rollback()
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="A background task is running. Please wait a moment and try again.",
+                ) from exc
+            raise
 
     suggestions.persisted_fields = persisted
     return suggestions

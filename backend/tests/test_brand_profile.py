@@ -399,6 +399,83 @@ async def test_ai_fill_never_overwrites_filled_fields(client):
     assert data["company_description"] == "We build AI tools for logistics."
 
 
+async def test_ai_fill_persists_key_stats_over_cleared_empty_list(client):
+    """A stored key_stats value of '[]' (from an explicit clear via PUT's
+    clear_fields path) must not block ai-fill from persisting newly
+    suggested key_stats. The raw-string truthiness check `not profile.key_stats`
+    treats the string '[]' as truthy (non-empty), incorrectly blocking writes."""
+    await register_and_login(client)
+    brand = await create_brand(client)
+
+    # Fill then explicitly clear key_stats, leaving the stored column == "[]"
+    await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"key_stats": ["old stat"]},
+    )
+    clear_resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"key_stats": [], "clear_fields": ["key_stats"]},
+    )
+    assert clear_resp.json()["key_stats"] == []
+
+    # Pre-seed cached website context so ai-fill skips the Jina fetch.
+    await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"internal_brand_context": "Scraped homepage copy about the company."},
+    )
+
+    fake_json = (
+        '{"company_description": null, '
+        '"tone_of_voice": null, '
+        '"key_stats": ["100K users", "$10M ARR"], '
+        '"target_audience": null}'
+    )
+    anth_patch, env_patch = _mock_anthropic_returning(fake_json)
+    with anth_patch, env_patch:
+        resp = await client.post(f"/api/brands/{brand['id']}/profile/ai-fill")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "key_stats" in body["persisted_fields"]
+    assert body["key_stats"] == ["100K users", "$10M ARR"]
+
+    get_resp = await client.get(f"/api/brands/{brand['id']}/profile")
+    assert get_resp.json()["key_stats"] == ["100K users", "$10M ARR"]
+
+
+async def test_ai_fill_locked_db_returns_503(client):
+    """A 'database is locked' OperationalError raised during ai-fill's
+    persistence commit must translate to HTTP 503 (mirroring the
+    update_brand_profile PUT handler), not propagate as an unhandled 500."""
+    await register_and_login(client)
+    brand = await create_brand(client)
+
+    # Pre-seed cached website context so ai-fill skips the Jina fetch, and
+    # ensure the profile row already exists so the only commit inside the
+    # request is the final persistence commit we're targeting.
+    await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"internal_brand_context": "Scraped homepage copy about the company."},
+    )
+
+    fake_json = (
+        '{"company_description": "We build AI tools for logistics.", '
+        '"tone_of_voice": "Confident and direct.", '
+        '"key_stats": ["100K users", "$10M ARR"], '
+        '"target_audience": "mid-market trucking ops leaders"}'
+    )
+    anth_patch, env_patch = _mock_anthropic_returning(fake_json)
+
+    from sqlalchemy.exc import OperationalError
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+    async def boom(self, *args, **kwargs):
+        raise OperationalError("COMMIT", {}, Exception("database is locked"))
+
+    with anth_patch, env_patch, patch.object(AsyncSession, "commit", boom):
+        resp = await client.post(f"/api/brands/{brand['id']}/profile/ai-fill")
+    assert resp.status_code == 503, resp.text
+
+
 async def test_internal_brand_context_writable(client):
     """internal_brand_context is currently only ever written internally
     (Jina fetch, ai-fill); the PUT handler must also accept it directly

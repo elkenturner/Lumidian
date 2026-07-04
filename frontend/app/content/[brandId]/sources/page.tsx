@@ -51,6 +51,7 @@ export default function ContentSourcesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!Number.isFinite(brandId)) return;
@@ -92,6 +93,7 @@ export default function ContentSourcesPage() {
       setTitle("");
       setSnippet("");
       setSourceType("article");
+      setDeleteError(null);
     } catch (e: unknown) {
       const err = e as { response?: { data?: { detail?: string } } };
       const detail = err?.response?.data?.detail;
@@ -102,12 +104,15 @@ export default function ContentSourcesPage() {
   }
 
   async function handleDelete(sourceId: number) {
+    if (!window.confirm("Remove this source? Posts will no longer use it for credibility.")) return;
     setDeletingId(sourceId);
+    setDeleteError(null);
     try {
       await deleteBrandSource(brandId, sourceId);
       setSources((prev) => prev.filter((s) => s.id !== sourceId));
     } catch (err) {
       logError(err, "ContentSourcesPage: delete");
+      setDeleteError("Couldn't remove the source — try again.");
     } finally {
       setDeletingId(null);
     }
@@ -156,6 +161,8 @@ export default function ContentSourcesPage() {
         </div>
       ) : (
         <>
+          {deleteError && <p className="text-xs text-[#fb7185]">{deleteError}</p>}
+
           {sources.length === 0 ? (
             <div className="card border-dashed text-sm text-[var(--text-secondary)] text-center py-10">
               No sources yet. Sources you add here count toward the credibility check when we

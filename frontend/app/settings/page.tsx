@@ -45,6 +45,7 @@ import {
   addCompetitor,
   removeCompetitor,
   getBrandProfile,
+  invalidateCache,
   updateBrandProfile,
   aiFillProfile,
   refreshWebsiteContext,
@@ -889,6 +890,7 @@ export default function SettingsPage() {
   useEffect(() => { document.title = 'Settings — Lumidian'; }, []);
 
   useEffect(() => {
+    let cancelled = false;
     async function load() {
       setLoading(true);
       try {
@@ -931,6 +933,9 @@ export default function SettingsPage() {
           getBrandProfile(targetBrandId).catch((err) => { logError(err, 'Settings: fetch brand profile fallback'); return null; }),
         ])) as [BrandDetail, Competitor[], BrandProfile | null];
 
+        // A stale (slower earlier) response must not overwrite the brand the
+        // user has since switched to.
+        if (cancelled) return;
         setBrand(brandDetail);
         setEditName(brandDetail.name);
         setEditWebsiteUrl(brandDetail.website_url ?? '');
@@ -946,6 +951,18 @@ export default function SettingsPage() {
           setGeography(prof.geography ?? '');
           setApprovedLanguage(prof.approved_language ?? []);
           setPublications(prof.publications ?? []);
+        } else {
+          // Profile failed/absent for the new brand — clear the previous
+          // brand's fields so a Save can't write brand A's profile onto B.
+          setProfile(null);
+          setCompanyDescription('');
+          setKeyStats([]);
+          setToneOfVoice('');
+          setWhatNotToSay([]);
+          setMarketScope('');
+          setGeography('');
+          setApprovedLanguage([]);
+          setPublications([]);
         }
       } catch {
         // ignore
@@ -966,6 +983,7 @@ export default function SettingsPage() {
     }
 
     load();
+    return () => { cancelled = true; };
   }, [contextBrandId]);
 
   // Load team members when team tab is selected
@@ -1051,6 +1069,9 @@ export default function SettingsPage() {
     const poll = setInterval(async () => {
       attempts++;
       try {
+        // Bypass the 45s GET cache — otherwise every poll after the first
+        // returns the same cached (stale) profile and we always time out.
+        invalidateCache(`/brands/${brandId}/profile`);
         const updated = await getBrandProfile(brandId);
         if (updated.website_context_last_fetched !== prevFetched) {
           clearInterval(poll);

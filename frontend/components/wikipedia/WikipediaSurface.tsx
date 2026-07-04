@@ -28,12 +28,21 @@ export function WikipediaSurface({ brandId }: Props) {
   const [filter, setFilter] = useState<Filter>('all');
   const [showDismissed, setShowDismissed] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const data = await listWikipediaCandidates(brandId);
       setCandidates(data);
+      setLoadError(null);
+    } catch (e: unknown) {
+      // A 402 (tier gate) or 429 (scan cap) rendered as "no candidates" — show
+      // the real reason instead of implying the scan found nothing.
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 402) setLoadError("Wikipedia opportunities are available on the Growth and Pro plans.");
+      else if (status === 429) setLoadError("You've reached your scan limit for this period.");
+      else setLoadError("Couldn't load Wikipedia candidates. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -124,6 +133,10 @@ export function WikipediaSurface({ brandId }: Props) {
       {/* Grid */}
       {loading ? (
         <SkeletonGrid />
+      ) : loadError ? (
+        <div className="card border-dashed text-sm text-[var(--text-secondary)] text-center py-10">
+          {loadError}
+        </div>
       ) : visible.length === 0 ? (
         <EmptyState hasCandidates={candidates.length > 0} />
       ) : (

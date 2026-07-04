@@ -212,6 +212,9 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!selectedBrandId) return;
+    // Drop any run we were tracking on the previous brand — otherwise the new
+    // brand shows "Running…" and its run button stays blocked.
+    setActiveRunId(null);
     loadAbortRef.current?.abort();
     const controller = new AbortController();
     loadAbortRef.current = controller;
@@ -415,17 +418,20 @@ export default function DashboardPage() {
   })() : null;
 
   const sentData = analytics?.sentiment;
+  // Lead with whichever sentiment actually dominates — previously any positive
+  // share won the headline, so 10% positive / 90% negative read "10% Positive".
+  const sentDominant = sentData?.has_data
+    ? (sentData.positive_pct >= sentData.negative_pct ? 'positive' : 'negative')
+    : null;
   const sentHeadline = sentData?.has_data
-    ? sentData.positive_pct > 0
-      ? `${Math.round(sentData.positive_pct)}% Positive`
-      : sentData.negative_pct > 0
-        ? `${Math.round(sentData.negative_pct)}% Negative`
-        : 'Neutral'
+    ? sentDominant === 'positive'
+      ? (sentData.positive_pct > 0 ? `${Math.round(sentData.positive_pct)}% Positive` : 'Neutral')
+      : `${Math.round(sentData.negative_pct)}% Negative`
     : null;
   const sentColor = sentData?.has_data
-    ? sentData.positive_pct > 0 ? 'var(--success)'
-    : sentData.negative_pct > 0 ? 'var(--danger)'
-    : 'var(--warning)'
+    ? sentDominant === 'positive'
+      ? (sentData.positive_pct > 0 ? 'var(--success)' : 'var(--warning)')
+      : 'var(--danger)'
     : 'var(--text-faint)';
 
   const promptGroups = useMemo(() => buildPromptGroups(responses).sort((a, b) => {

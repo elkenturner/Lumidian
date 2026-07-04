@@ -78,6 +78,7 @@ export default function ContentBrandPage() {
   const [regeneratingPromptId, setRegeneratingPromptId] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const { hidden, toggle, isVisible } = useHiddenPlatforms(brandId);
 
   useEffect(() => {
@@ -89,7 +90,10 @@ export default function ContentBrandPage() {
         if (!cancelled) {
           setBrand(b);
           setClusters(cs);
+          setLoadError(false);
         }
+      } catch {
+        if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -155,10 +159,17 @@ export default function ContentBrandPage() {
     const cluster = clusters.find((c) => c.id === clusterId);
     if (!cluster) return;
     setRegeneratingPromptId(cluster.prompt_id);
+    setGenError(null);
     try {
       await regenerateClusterByPrompt(brandId, cluster.prompt_id);
       const fresh = await listClusters(brandId);
       setClusters(fresh);
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status;
+      if (status === 402 || status === 403) setGenError("Regenerating posts is available on paid plans.");
+      else if (status === 429) setGenError("You've hit a regeneration limit. Please wait and try again.");
+      else if (status === 409) setGenError("Content is already generating for this brand.");
+      else setGenError("Couldn't regenerate. Please try again.");
     } finally {
       setRegeneratingPromptId(null);
     }
@@ -223,7 +234,14 @@ export default function ContentBrandPage() {
         </div>
       )}
 
-      {noPrompts ? (
+      {loadError ? (
+        <div className="card border-dashed text-sm text-[var(--text-secondary)] text-center py-10">
+          Couldn&apos;t load this brand&apos;s content.{" "}
+          <button onClick={() => { setLoading(true); setLoadError(false); location.reload(); }} className="text-[var(--accent)] underline underline-offset-2">
+            Try again
+          </button>
+        </div>
+      ) : noPrompts ? (
         <div className="card border-dashed text-sm text-[var(--text-secondary)] text-center py-10">
           No tracked questions yet. Add prompts in Settings to start creating content.
         </div>

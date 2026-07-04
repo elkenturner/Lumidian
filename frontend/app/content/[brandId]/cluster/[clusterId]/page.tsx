@@ -71,20 +71,26 @@ export default function ClusterDetailPage() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const [c, cand, opps, gapList] = await Promise.all([
-        getCluster(brandId, clusterId),
-        proposeClusterPillar(brandId, clusterId).catch(() => null),
-        getOpportunities(brandId).catch(() => [] as ContentOpportunity[]),
-        getContentGaps(brandId).catch(() => [] as ContentGap[]),
-      ]);
-      if (!cancelled) {
-        setCluster(c);
-        setCandidate(cand);
-        setOpportunities(
-          opps.filter((o) => o.prompt_id === c.prompt_id && o.status !== "dismissed"),
-        );
-        setGaps(gapList.filter((g) => g.prompt_id === c.prompt_id));
-        setLoading(false);
+      try {
+        const [c, cand, opps, gapList] = await Promise.all([
+          getCluster(brandId, clusterId),
+          proposeClusterPillar(brandId, clusterId).catch(() => null),
+          getOpportunities(brandId).catch(() => [] as ContentOpportunity[]),
+          getContentGaps(brandId).catch(() => [] as ContentGap[]),
+        ]);
+        if (!cancelled) {
+          setCluster(c);
+          setCandidate(cand);
+          setOpportunities(
+            opps.filter((o) => o.prompt_id === c.prompt_id && o.status !== "dismissed"),
+          );
+          setGaps(gapList.filter((g) => g.prompt_id === c.prompt_id));
+        }
+      } catch {
+        // Deleted cluster / stale bookmark / 500 — fall through to the
+        // "Cluster not found" state instead of spinning forever.
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
     load();
@@ -360,7 +366,7 @@ export default function ClusterDetailPage() {
               .map(d => (
                 <div key={d.id} className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
                   <PlatformBadge platform={d.platform} size="sm" />
-                  <span>{new Date(d.posted_at!).toLocaleDateString()}</span>
+                  <span>{d.posted_at ? new Date(d.posted_at).toLocaleDateString() : "—"}</span>
                   {d.posted_url && (
                     <a href={d.posted_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-foreground)] hover:underline">
                       View ↗

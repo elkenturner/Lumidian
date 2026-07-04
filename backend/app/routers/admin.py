@@ -329,7 +329,7 @@ async def admin_reset_password(
     _require_admin(user)
 
     # Import here to avoid circular import — admin.py → auth.py → admin.py
-    from app.routers.auth import _validate_password, hash_password
+    from app.routers.auth import _validate_password, hash_password_async
 
     _validate_password(request.new_password)
 
@@ -339,7 +339,7 @@ async def admin_reset_password(
     if not target:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    target.password_hash = hash_password(request.new_password)
+    target.password_hash = await hash_password_async(request.new_password)
     target.password_changed_at = datetime.now(UTC).replace(tzinfo=None)
     await db.commit()
 

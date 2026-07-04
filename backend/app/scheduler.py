@@ -375,7 +375,7 @@ async def _visibility_alert_sweep() -> None:
 
     from app.database import AsyncSessionLocal
     from app.models import Brand, SystemSetting, TrackingRun, User
-    from app.services.email_service import send_visibility_alert_email
+    from app.services.email_service import send_email_awaited, send_visibility_alert_email
 
     logger.info("Scheduler: starting visibility alert sweep")
     now = datetime.now(UTC).replace(tzinfo=None)
@@ -435,7 +435,8 @@ async def _visibility_alert_sweep() -> None:
                 continue
 
             try:
-                send_visibility_alert_email(
+                await send_email_awaited(
+                    send_visibility_alert_email,
                     email=user.email,
                     name=user.name,
                     brand_name=brand.name,
@@ -478,7 +479,7 @@ async def _pitch_expiry_sweep() -> None:
 
     from app.database import AsyncSessionLocal
     from app.models import Brand, User
-    from app.services.email_service import send_pitch_expiry_warning_email
+    from app.services.email_service import send_email_awaited, send_pitch_expiry_warning_email
 
     if await _is_scheduler_paused():
         logger.info("Scheduler paused — skipping pitch expiry sweep")
@@ -511,7 +512,8 @@ async def _pitch_expiry_sweep() -> None:
             if not getattr(user, "email_verified", True):
                 continue
             try:
-                send_pitch_expiry_warning_email(
+                await send_email_awaited(
+                    send_pitch_expiry_warning_email,
                     email=user.email,
                     name=user.name,
                     brand_name=brand.name,

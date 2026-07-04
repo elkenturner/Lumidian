@@ -1,6 +1,7 @@
 """Document generation — fetch data, validate, call LLM, render PDF, persist, emit event."""
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -56,7 +57,8 @@ async def generate_pdf(
     })
     if template.post_process is not None:
         typst_input = template.post_process(typst_input)
-    pdf_bytes = typst_render_pdf(
+    pdf_bytes = await asyncio.to_thread(
+        typst_render_pdf,
         template_path=_TEMPLATES_DIR / template.typst_template,
         data=typst_input,
     )

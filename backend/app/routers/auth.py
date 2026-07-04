@@ -13,6 +13,7 @@ POST /api/auth/google              — (legacy) exchange Google ID token for ses
 """
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -169,6 +170,15 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed: str) -> bool:
     return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
 
+
+# bcrypt blocks ~100-300ms per call; never run it on the event loop.
+async def hash_password_async(password: str) -> str:
+    return await asyncio.to_thread(hash_password, password)
+
+
+async def verify_password_async(password: str, hashed: str) -> bool:
+    return await asyncio.to_thread(verify_password, password, hashed)
+
 COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 
 from app.routers.billing import TIER_LIMITS  # noqa: E402 — single source of truth
@@ -313,10 +323,10 @@ async def register(body: RegisterRequest, http_req: Request, response: Response,
             )
 
     verification_code = f"{secrets.randbelow(100_000_000):08d}"
-    code_hash = hash_password(verification_code)
+    code_hash = await hash_password_async(verification_code)
     code_expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=24)
 
-    password_hash = hash_password(request.password)
+    password_hash = await hash_password_async(request.password)
     user = User(
         email=email,
         password_hash=password_hash,
@@ -367,7 +377,7 @@ async def login(body: LoginRequest, http_req: Request, response: Response, db: D
     email = request.email.strip().lower()
     result = await db.execute(select(User).where(User.email == email))
     user = result.scalar_one_or_none()
-    if not user or not user.password_hash or not verify_password(request.password, user.password_hash):
+    if not user or not user.password_hash or not await verify_password_async(request.password, user.password_hash):
         logger.warning("failed login attempt email=%s ip=%s", email, _get_client_ip(http_req))
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
 
@@ -827,7 +837,7 @@ async def reset_password(request: ResetPasswordRequest, http_req: Request, db: D
     if not user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="User not found")
 
-    user.password_hash = hash_password(request.new_password)
+    user.password_hash = await hash_password_async(request.new_password)
     user.password_changed_at = datetime.now(UTC).replace(tzinfo=None)
     reset_token.used = True
     await db.commit()
@@ -855,7 +865,7 @@ async def change_password(
             detail="Account uses social login. Set a password via the reset flow.",
         )
 
-    if not verify_password(body.current_password, current_user.password_hash):
+    if not await verify_password_async(body.current_password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Current password is incorrect.",
@@ -863,7 +873,7 @@ async def change_password(
 
     _validate_password(body.new_password)
 
-    current_user.password_hash = hash_password(body.new_password)
+    current_user.password_hash = await hash_password_async(body.new_password)
     current_user.password_changed_at = datetime.now(UTC).replace(tzinfo=None)
     await db.commit()
 
@@ -923,7 +933,7 @@ async def verify_email(
             detail="Code expired. Please request a new one.",
         )
 
-    if not verify_password(body.code.strip(), user.email_verification_code):
+    if not await verify_password_async(body.code.strip(), user.email_verification_code):
         # Track per-email failure
         prev_count, prev_first = _verify_email_failures.get(email, (0, 0.0))
         if prev_count == 0:
@@ -973,7 +983,7 @@ async def resend_verification(
         return {"message": "If that email is pending verification, a new code has been sent."}
 
     verification_code = f"{secrets.randbelow(100_000_000):08d}"
-    code_hash = hash_password(verification_code)
+    code_hash = await hash_password_async(verification_code)
     code_expires_at = datetime.now(UTC).replace(tzinfo=None) + timedelta(hours=24)
 
     user.email_verification_code = code_hash
@@ -1077,7 +1087,7 @@ async def disable_2fa(
     db: DbDep,
 ):
     """Verify the user's password and disable 2FA."""
-    if not current_user.password_hash or not verify_password(body.password, current_user.password_hash):
+    if not current_user.password_hash or not await verify_password_async(body.password, current_user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect password.",

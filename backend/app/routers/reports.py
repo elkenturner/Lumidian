@@ -7,6 +7,7 @@ GET /api/reports/{brand_id}/export   — download PDF visibility report
 """
 from __future__ import annotations
 
+import asyncio
 import io
 import logging
 from datetime import UTC, datetime
@@ -120,7 +121,8 @@ async def export_report(
     # ── Build PDF ─────────────────────────────────────────────────────────────
 
     try:
-        pdf_bytes = _build_pdf(
+        pdf_bytes = await asyncio.to_thread(
+            _build_pdf,
             brand_name=brand.name,
             overall_score=overall_score,
             completed_runs=completed_runs,

@@ -336,16 +336,17 @@ export default function ContentBrandPage() {
   async function retryFailed() {
     if (generating) return;
     setGenError(null);
-    setSweepDismissed(true);
     try {
       // retryFailed=true → only pending/briefing_failed/generation_partial
       // clusters are processed; takes precedence over skipReady on the backend.
       await generateNow(brandId, Math.max(clusters.length, 1), { retryFailed: true });
       setGenerating(true);
+      setSweepDismissed(true);
     } catch (e: unknown) {
       const status = (e as { response?: { status?: number } })?.response?.status;
       if (status === 409) {
         setGenerating(true); // already running — just watch it
+        setSweepDismissed(true);
       } else if (status === 402 || status === 403) {
         setGenError("Generating posts is available on paid plans.");
       } else {

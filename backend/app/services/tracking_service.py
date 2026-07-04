@@ -20,7 +20,7 @@ import asyncio
 import logging
 import re
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.database import AsyncSessionLocal
 from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun
@@ -137,22 +137,35 @@ async def _log_score_change_events(
 
     THRESHOLD = 5.0
 
+    if not new_scores:
+        return
+
     async with AsyncSessionLocal() as db:
-        for ns in new_scores:
-            result = await db.execute(
-                select(PromptRunScore)
-                .where(
-                    PromptRunScore.prompt_id == ns["prompt_id"],
-                    PromptRunScore.model == ns["model"],
-                    PromptRunScore.tracking_run_id != run_id,
-                )
-                .order_by(PromptRunScore.created_at.desc())
-                .limit(1)
+        # Fetch the latest prior score for every (prompt, model) in one query
+        # instead of one SELECT per pair (~100 per run).
+        prompt_ids = {ns["prompt_id"] for ns in new_scores}
+        rn = func.row_number().over(
+            partition_by=(PromptRunScore.prompt_id, PromptRunScore.model),
+            order_by=PromptRunScore.created_at.desc(),
+        ).label("rn")
+        subq = (
+            select(PromptRunScore.prompt_id, PromptRunScore.model,
+                   PromptRunScore.score, rn)
+            .where(
+                PromptRunScore.prompt_id.in_(prompt_ids),
+                PromptRunScore.tracking_run_id != run_id,
             )
-            prev = result.scalar_one_or_none()
-            if prev is None:
+        ).subquery()
+        prev_rows = (await db.execute(
+            select(subq.c.prompt_id, subq.c.model, subq.c.score).where(subq.c.rn == 1)
+        )).all()
+        prev_by_pair = {(r.prompt_id, r.model): r.score for r in prev_rows}
+
+        for ns in new_scores:
+            prev_score = prev_by_pair.get((ns["prompt_id"], ns["model"]))
+            if prev_score is None:
                 continue
-            delta = round(ns["score"] - prev.score, 2)
+            delta = round(ns["score"] - prev_score, 2)
             if abs(delta) >= THRESHOLD:
                 await log_content_event(
                     event_type="score_change",
@@ -161,7 +174,7 @@ async def _log_score_change_events(
                     data={
                         "prompt_id": ns["prompt_id"],
                         "model": ns["model"],
-                        "old_score": prev.score,
+                        "old_score": prev_score,
                         "new_score": ns["score"],
                         "delta": delta,
                         "tracking_run_id": run_id,

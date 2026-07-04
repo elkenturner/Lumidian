@@ -105,7 +105,7 @@ async def extract_for_run(tracking_run_id: int) -> int:
     Returns the number of NEW rows inserted.
     """
     from sqlalchemy import select
-    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
     from app.database import AsyncSessionLocal
     from app.models import (
@@ -135,6 +135,7 @@ async def extract_for_run(tracking_run_id: int) -> int:
             select(QueryResult).where(QueryResult.tracking_run_id == tracking_run_id)
         )).scalars().all()
 
+        rows: list[dict] = []
         for qr in qrs:
             # Combine URLs from response_text (ChatGPT/Claude inline links)
             # AND from structured citations (Perplexity citations array,
@@ -170,24 +171,39 @@ async def extract_for_run(tracking_run_id: int) -> int:
                     cls = classify_structured_citation(item, url, own, competitors_by_domain)
                 else:
                     cls = classify_url(url, own, competitors_by_domain)
-                row = CitationSource(
-                    brand_id=brand.id,
-                    tracking_run_id=run.id,
-                    prompt_id=qr.prompt_id,
-                    query_result_id=qr.id,
-                    model=qr.model,
-                    url=url,
-                    domain=cls.domain,
-                    kind=cls.kind,
-                    competitor_id=cls.competitor_id,
-                )
-                db.add(row)
-                try:
-                    await db.flush()
-                    inserted += 1
-                except IntegrityError:
-                    await db.rollback()
-                    continue
+                rows.append({
+                    "brand_id": brand.id,
+                    "tracking_run_id": run.id,
+                    "prompt_id": qr.prompt_id,
+                    "query_result_id": qr.id,
+                    "model": qr.model,
+                    "url": url,
+                    "domain": cls.domain,
+                    "kind": cls.kind,
+                    "competitor_id": cls.competitor_id,
+                })
 
+        if rows:
+            # Drop rows that already exist (re-runs) so we can insert in one
+            # statement and report an exact count — the previous per-row flush
+            # rolled the whole transaction back on the first duplicate,
+            # discarding every citation inserted before it.
+            qr_ids = {r["query_result_id"] for r in rows}
+            existing = set((await db.execute(
+                select(CitationSource.query_result_id, CitationSource.url)
+                .where(CitationSource.query_result_id.in_(qr_ids))
+            )).all())
+            # De-dupe within this batch too (same url from text + structured).
+            seen_keys: set = set()
+            new_rows = []
+            for r in rows:
+                key = (r["query_result_id"], r["url"])
+                if key in existing or key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                new_rows.append(r)
+            if new_rows:
+                await db.execute(sqlite_insert(CitationSource), new_rows)
+                inserted = len(new_rows)
         await db.commit()
     return inserted

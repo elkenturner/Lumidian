@@ -218,7 +218,10 @@ async def get_responses(
     rows_result = await db.execute(
         base_query
         .options(selectinload(QueryResult.prompt))
-        .order_by(QueryResult.created_at.desc())
+        # Sort by id (PK, monotonic ≈ created_at) rather than created_at:
+        # once the brand join spans many run_ids, created_at can't use its
+        # index and SQLite materializes+sorts the whole result set per page.
+        .order_by(QueryResult.id.desc())
         .offset(offset)
         .limit(page_size)
     )

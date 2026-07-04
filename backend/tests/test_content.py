@@ -379,3 +379,60 @@ def test_draft_attribution_table_name():
     """DraftAttribution must use 'draft_attributions' table, not 'content_attributions'."""
     from app.models import DraftAttribution
     assert DraftAttribution.__tablename__ == "draft_attributions"
+
+
+# ── GET /api/content/{brand_id}/readiness ────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_readiness_flags_empty_profile_and_no_sources(client: httpx.AsyncClient):
+    await register_and_login(client, email="readiness-empty@example.com")
+    brand = await create_brand(client, name="Readiness Empty Brand")
+
+    resp = await client.get(f"/api/content/{brand['id']}/readiness")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    assert data["profile_completion_pct"] == 0.0
+    assert data["profile_empty"] is True
+    assert data["source_count"] == 0
+    assert data["has_completed_run"] is False
+
+    codes = {w["code"] for w in data["warnings"]}
+    assert codes == {"profile_empty", "no_sources", "no_tracking_run"}
+
+
+@pytest.mark.asyncio
+async def test_readiness_clean_when_profile_filled_and_sources_exist(
+    client: httpx.AsyncClient, db_session
+):
+    await register_and_login(client, email="readiness-clean@example.com")
+    brand = await create_brand(client, name="Readiness Clean Brand")
+
+    # Fill enough profile fields to clear the 30% completion threshold.
+    profile_resp = await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={
+            "company_description": "We make widgets for everyone.",
+            "tone_of_voice": "Friendly and direct.",
+            "target_audience": "Small business owners.",
+        },
+    )
+    assert profile_resp.status_code == 200, profile_resp.text
+
+    from app.models import BrandSource, TrackingRun
+
+    db_session.add(
+        BrandSource(brand_id=brand["id"], title="Source 1", url="https://example.com/a")
+    )
+    db_session.add(TrackingRun(brand_id=brand["id"], status="completed", run_type="manual"))
+    await db_session.commit()
+
+    resp = await client.get(f"/api/content/{brand['id']}/readiness")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    assert data["profile_completion_pct"] >= 30
+    assert data["profile_empty"] is False
+    assert data["source_count"] == 1
+    assert data["has_completed_run"] is True
+    assert data["warnings"] == []

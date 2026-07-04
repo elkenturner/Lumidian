@@ -13,6 +13,7 @@ GET    /draft/{draft_id}/prompt-suggestions     - rank brand's prompts by simila
 GET  /api/content/{brand_id}/settings           — get all platform settings for brand
 PUT  /api/content/{brand_id}/settings/{platform} — update platform settings
 GET  /api/content/{brand_id}/attribution        — get all attribution records for brand
+GET  /api/content/{brand_id}/readiness          — preflight check before bulk draft generation
 GET  /api/content/guidelines/{platform}         — get platform guidelines + disclaimer
 """
 from __future__ import annotations
@@ -22,7 +23,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -33,16 +34,28 @@ from app.dependencies import (
     require_active_subscription,
     require_brand_active,
 )
-from app.models import Brand, BrandContentSettings, ContentAttribution, ContentDraft, Prompt, TrackingRun, utcnow
+from app.models import (
+    Brand,
+    BrandContentSettings,
+    BrandProfile,
+    BrandSource,
+    ContentAttribution,
+    ContentDraft,
+    Prompt,
+    TrackingRun,
+    utcnow,
+)
 from app.schemas import (
     BrandContentSettingsSchema,
     ContentAttributionSchema,
     ContentDraftSchema,
     ContentPostSchema,
+    ContentReadinessResponse,
     CreateDraftRequest,
     GenerateNowRequest,
     PostDraftRequest,
     PromptSuggestion,
+    ReadinessWarning,
     UpdateContentSettingsRequest,
     UpdateDraftRequest,
 )
@@ -1046,3 +1059,78 @@ async def get_attribution(brand_id: int, db: DbDep, user: CurrentUser):
     )
     attributions = result.scalars().all()
     return [ContentAttributionSchema.model_validate(a) for a in attributions]
+
+
+# ── Readiness preflight ───────────────────────────────────────────────────────
+
+@router.get("/{brand_id}/readiness", response_model=ContentReadinessResponse)
+async def get_content_readiness(brand_id: int, db: DbDep, user: CurrentUser):
+    """
+    Preflight check before bulk draft generation. Surfaces whether the brand
+    profile, source library, and tracking history are populated enough that
+    generated drafts are likely to be grounded rather than generic.
+    """
+    await get_brand_for_user(brand_id, db, user)
+
+    # Local import avoids a routers/brand_profile <-> routers/content import
+    # cycle at module load time (both import shared dependencies).
+    from app.routers.brand_profile import _compute_completion
+
+    profile = (
+        await db.execute(select(BrandProfile).where(BrandProfile.brand_id == brand_id))
+    ).scalar_one_or_none()
+    # A brand may not have a BrandProfile row yet (created lazily on first
+    # write) — treat that as 0% completion rather than creating one here.
+    profile_completion_pct = _compute_completion(profile) if profile is not None else 0.0
+
+    source_count = (
+        await db.execute(
+            select(func.count(BrandSource.id)).where(BrandSource.brand_id == brand_id)
+        )
+    ).scalar_one()
+
+    completed_run = (
+        await db.execute(
+            select(TrackingRun.id)
+            .where(TrackingRun.brand_id == brand_id, TrackingRun.status == "completed")
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+    has_completed_run = completed_run is not None
+
+    warnings: list[ReadinessWarning] = []
+    if profile_completion_pct < 30:
+        warnings.append(
+            ReadinessWarning(
+                code="profile_empty",
+                message=(
+                    "The brand profile is empty — posts will be generic and briefs "
+                    "are more likely to fail for lack of credible sources."
+                ),
+            )
+        )
+    if source_count == 0:
+        warnings.append(
+            ReadinessWarning(
+                code="no_sources",
+                message="No sources in the brand library — add links you trust to strengthen sourcing.",
+            )
+        )
+    if not has_completed_run:
+        warnings.append(
+            ReadinessWarning(
+                code="no_tracking_run",
+                message=(
+                    "No completed tracking run yet — drafts will lack citation evidence "
+                    "from prior visibility checks."
+                ),
+            )
+        )
+
+    return ContentReadinessResponse(
+        profile_completion_pct=profile_completion_pct,
+        profile_empty=profile_completion_pct < 30,
+        source_count=source_count,
+        has_completed_run=has_completed_run,
+        warnings=warnings,
+    )

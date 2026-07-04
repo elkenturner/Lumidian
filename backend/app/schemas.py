@@ -381,6 +381,19 @@ class PromptSuggestion(BaseModel):
     label: str  # "very_relevant" | "somewhat" | "loose"
 
 
+class ReadinessWarning(BaseModel):
+    code: str
+    message: str
+
+
+class ContentReadinessResponse(BaseModel):
+    profile_completion_pct: float
+    profile_empty: bool
+    source_count: int
+    has_completed_run: bool
+    warnings: list[ReadinessWarning]
+
+
 # ── Request schemas ───────────────────────────────────────────────────────────
 
 class CreateDraftRequest(BaseModel):

@@ -84,7 +84,11 @@ CLUSTER_TIMEOUT_SECONDS = 900.0
 
 
 async def _bg_generate_drafts(
-    brand_id: int, max_gaps: int, source: str, skip_ready: bool = False
+    brand_id: int,
+    max_gaps: int,
+    source: str,
+    skip_ready: bool = False,
+    retry_failed: bool = False,
 ) -> None:
     """Background coroutine: regenerate clusters per prompt for this brand.
 
@@ -98,6 +102,17 @@ async def _bg_generate_drafts(
     left untouched — only pending or failed clusters are generated. This backs
     the "Generate all posts" sweep on the content surface so it never clobbers
     a returning user's existing work.
+
+    When ``retry_failed`` is set, only clusters in ``pending``,
+    ``briefing_failed``, or ``generation_partial`` are processed — everything
+    else (including ``ready``) is left untouched. This backs a "Retry failed"
+    action on the content surface.
+
+    Each cluster is processed under its own fresh ``AsyncSessionLocal()``.
+    A single poisoned session (e.g. a "database is locked" error) must never
+    cascade into every remaining cluster silently staying pending — the
+    2026-07-04 incident this fixes came from reusing one session across the
+    whole sweep.
     """
     import asyncio
     from sqlalchemy import select
@@ -113,39 +128,53 @@ async def _bg_generate_drafts(
                 return
             owner = (await db.execute(select(User).where(User.id == brand.user_id))).scalar_one_or_none()
             tier = owner.subscription_tier if owner else None
-            prompts = (
-                await db.execute(
-                    select(Prompt)
-                    .where(Prompt.brand_id == brand_id, Prompt.prompt_type == "standard")
-                    .order_by(Prompt.id)
-                )
-            ).scalars().all()
-            for prompt in prompts[:max_gaps]:
-                try:
-                    cluster = await get_or_create_cluster(db, brand_id=brand_id, prompt_id=prompt.id)
+            prompt_ids = [
+                p.id
+                for p in (
+                    await db.execute(
+                        select(Prompt)
+                        .where(Prompt.brand_id == brand_id, Prompt.prompt_type == "standard")
+                        .order_by(Prompt.id)
+                    )
+                ).scalars().all()
+            ]
+
+        for prompt_id in prompt_ids[:max_gaps]:
+            try:
+                # Fresh session per cluster: one poisoned session must never
+                # cascade into "every remaining cluster silently stays pending"
+                # (2026-07-04 Roxstart incident).
+                async with AsyncSessionLocal() as cluster_db:
+                    cluster = await get_or_create_cluster(cluster_db, brand_id=brand_id, prompt_id=prompt_id)
                     if skip_ready and cluster.status in {
                         "ready",
                         "ready_low_evidence",
                         "generation_partial",
                     }:
                         continue
+                    if retry_failed and cluster.status not in {
+                        "pending",
+                        "briefing_failed",
+                        "generation_partial",
+                    }:
+                        continue
                     await asyncio.wait_for(
-                        regenerate_cluster(db, cluster_id=cluster.id, tier=tier),
+                        regenerate_cluster(cluster_db, cluster_id=cluster.id, tier=tier),
                         timeout=CLUSTER_TIMEOUT_SECONDS,
                     )
-                except asyncio.TimeoutError:
-                    logger.warning(
-                        "_bg_generate_drafts: cluster regen exceeded %ss for prompt %d (brand %d) — advancing",
-                        CLUSTER_TIMEOUT_SECONDS, prompt.id, brand_id,
-                    )
-                    continue
-                except Exception:
-                    logger.exception(
-                        "_bg_generate_drafts: cluster regen failed for prompt %d (brand %d)",
-                        prompt.id,
-                        brand_id,
-                    )
-                    continue
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "_bg_generate_drafts: cluster regen exceeded %ss for prompt %d (brand %d) — advancing",
+                    CLUSTER_TIMEOUT_SECONDS, prompt_id, brand_id,
+                )
+                continue
+            except Exception:
+                logger.exception(
+                    "_bg_generate_drafts: cluster regen failed for prompt %d (brand %d)",
+                    prompt_id,
+                    brand_id,
+                )
+                continue
     except Exception:
         logger.exception("generate_now background task failed for brand_id=%d", brand_id)
     finally:
@@ -785,6 +814,7 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
             max_gaps=remaining,
             source="manual",
             skip_ready=request.skip_ready,
+            retry_failed=request.retry_failed,
         )
     )
     logger.info("generate_now: background task started for brand_id=%d max_gaps=%d", brand_id, remaining)

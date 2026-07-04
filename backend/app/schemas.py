@@ -398,6 +398,10 @@ class GenerateNowRequest(BaseModel):
     # being overwritten by a "Generate all" sweep. Default false preserves the
     # legacy "Regenerate Drafts" behaviour.
     skip_ready: bool = False
+    # When true, only (re)generate clusters currently in pending,
+    # briefing_failed, or generation_partial — i.e. a "Retry failed" sweep
+    # that leaves already-ready clusters untouched.
+    retry_failed: bool = False
 
 
 class UpdateDraftRequest(BaseModel):

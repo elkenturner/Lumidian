@@ -1,7 +1,10 @@
-"""Tests for scheduler backup integrity check."""
+"""Tests for scheduler backup integrity check and stale-run cleanup tick."""
 import shutil
 import sqlite3
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import pytest
 
 
 def test_backup_integrity_check_passes_on_valid_db(tmp_path: Path):
@@ -50,3 +53,65 @@ def test_backup_integrity_check_detects_corruption(tmp_path: Path):
         assert result is not None and result[0] != "ok"
     except sqlite3.DatabaseError:
         pass  # Exception is also an acceptable signal of corruption
+
+
+@pytest.mark.asyncio
+async def test_stale_run_cleanup_tick_fails_stale_runs():
+    """The scheduler tick (not the polled endpoint) auto-fails stale runs.
+
+    This moves the write off the GET /tracking/background-status read path,
+    which was contending with content-generation sweeps for SQLite's single
+    writer during the 2026-07-04 incident.
+    """
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, TrackingRun, User
+    from app.scheduler import _stale_run_cleanup_tick
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="stale_run_tick@example.com", password_hash="x", name="t")
+        db.add(user)
+        await db.flush()
+        brand = Brand(user_id=user.id, name="Stale Tick Brand", slug="stale-tick-brand")
+        db.add(brand)
+        await db.flush()
+        run = TrackingRun(
+            brand_id=brand.id,
+            status="running",
+            run_type="manual",
+            created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=6),
+        )
+        db.add(run)
+        await db.commit()
+        run_id = run.id
+
+    await _stale_run_cleanup_tick()
+
+    async with AsyncSessionLocal() as db:
+        refreshed = await db.get(TrackingRun, run_id)
+        assert refreshed.status == "failed"
+
+
+@pytest.mark.asyncio
+async def test_stale_run_cleanup_tick_leaves_fresh_runs_alone():
+    """A recently-created running run is left untouched by the tick."""
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, TrackingRun, User
+    from app.scheduler import _stale_run_cleanup_tick
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="fresh_run_tick@example.com", password_hash="x", name="t")
+        db.add(user)
+        await db.flush()
+        brand = Brand(user_id=user.id, name="Fresh Tick Brand", slug="fresh-tick-brand")
+        db.add(brand)
+        await db.flush()
+        run = TrackingRun(brand_id=brand.id, status="running", run_type="manual")
+        db.add(run)
+        await db.commit()
+        run_id = run.id
+
+    await _stale_run_cleanup_tick()
+
+    async with AsyncSessionLocal() as db:
+        refreshed = await db.get(TrackingRun, run_id)
+        assert refreshed.status == "running"

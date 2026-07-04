@@ -7,6 +7,7 @@ Jobs:
   • 06:00 UTC        — Pitch brand expiry: warn users 24 h before expiry, delete expired brands
   • 08:00 UTC        — Morning tracking sweep (once daily)
   • 21:00 UTC        — Visibility drop alerts (email if score drops ≥ 15 pts vs previous run)
+  • every 5 min      — Auto-fail stale tracking runs (tracking_stale_run_cleanup)
 
 Pitch brand lifecycle:
   - Created with pitch_expires_at = now + 30 days
@@ -611,6 +612,34 @@ async def cleanup_stale_prospect_audits(retention_days: int = 60) -> int:
     return deleted
 
 
+async def _stale_run_cleanup_tick() -> None:
+    """Auto-fail tracking runs stuck in pending/running past their threshold.
+
+    Moved here (from an inline check on every GET /tracking/background-status
+    poll) because that endpoint is polled every few seconds by the frontend
+    banner — running an UPDATE+commit on each poll competed with other
+    writers for SQLite's single-writer lock and caused "database is locked"
+    500s during the 2026-07-04 incident. This tick runs independently every
+    5 minutes instead.
+    """
+    from sqlalchemy import select
+
+    from app.database import AsyncSessionLocal, fail_stale_runs_for_brand
+    from app.models import TrackingRun
+
+    async with AsyncSessionLocal() as db:
+        try:
+            brand_ids = (await db.execute(
+                select(TrackingRun.brand_id).where(
+                    TrackingRun.status.in_(["pending", "running"])
+                ).distinct()
+            )).scalars().all()
+            for bid in brand_ids:
+                await fail_stale_runs_for_brand(db, bid)
+        except Exception as exc:
+            logger.warning("stale run cleanup failed: %s", exc)
+
+
 def start_scheduler() -> None:
     """Register jobs and start the scheduler. Called from FastAPI lifespan."""
     scheduler.add_job(
@@ -682,6 +711,15 @@ def start_scheduler() -> None:
         trigger=IntervalTrigger(minutes=5),
         id="cluster_stale_cleanup",
         name="Auto-fail stuck content clusters (every 5 min)",
+        replace_existing=True,
+        misfire_grace_time=300,
+    )
+
+    scheduler.add_job(
+        _stale_run_cleanup_tick,
+        trigger=IntervalTrigger(minutes=5),
+        id="tracking_stale_run_cleanup",
+        name="Auto-fail stale tracking runs (every 5 min)",
         replace_existing=True,
         misfire_grace_time=300,
     )

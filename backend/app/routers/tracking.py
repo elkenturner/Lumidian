@@ -805,9 +805,9 @@ async def get_background_status(db: DbDep, user: CurrentUser):
     if not user_brand_ids:
         return {"report_running": False, "drafts_generating": False, "scanning": False, "model_scores": []}
 
-    # Auto-fail stale runs so the UI doesn't report phantom "running" state
-    for bid in user_brand_ids:
-        await fail_stale_runs_for_brand(db, bid)
+    # Stale-run auto-fail no longer runs here — it competed with other writers
+    # for SQLite's single-writer lock on every poll. It now runs on the
+    # scheduler job "tracking_stale_run_cleanup" (see app/scheduler.py).
 
     # Check for active tracking runs in the DB
     running_result = await db.execute(

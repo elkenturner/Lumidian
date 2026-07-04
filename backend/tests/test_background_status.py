@@ -97,6 +97,43 @@ async def test_background_status_scanning(client: httpx.AsyncClient):
         state.scanning_brands.discard(brand["id"])
 
 
+async def test_background_status_does_not_write(client: httpx.AsyncClient):
+    """The endpoint no longer auto-fails stale runs itself — it is read-only.
+
+    Cleanup of stuck pending/running runs now happens on the scheduler's
+    tracking_stale_run_cleanup job (see app/scheduler.py), not on every poll.
+    """
+    await register_and_login(client, email="bg_stale@example.com")
+    brand = await create_brand(client, name="Stale Brand")
+
+    from datetime import UTC, datetime, timedelta
+
+    from app.database import AsyncSessionLocal
+    from app.models import TrackingRun
+
+    async with AsyncSessionLocal() as db:
+        run = TrackingRun(
+            brand_id=brand["id"],
+            status="running",
+            run_type="manual",
+            created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=6),
+        )
+        db.add(run)
+        await db.commit()
+        await db.refresh(run)
+        run_id = run.id
+
+    resp = await client.get("/api/tracking/background-status")
+    assert resp.status_code == 200
+    # Endpoint still reports it as running (it hasn't been touched)...
+    assert resp.json()["report_running"] is True
+
+    # ...and critically, the row itself was NOT written by the poll.
+    async with AsyncSessionLocal() as db:
+        refreshed = await db.get(TrackingRun, run_id)
+        assert refreshed.status == "running"
+
+
 async def test_background_status_only_own_brands(client: httpx.AsyncClient):
     """State from another user's brand does not bleed into this user's status."""
     # User A owns the brand that is generating

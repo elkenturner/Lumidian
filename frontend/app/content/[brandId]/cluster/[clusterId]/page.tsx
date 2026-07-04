@@ -166,6 +166,13 @@ export default function ClusterDetailPage() {
       ]
     : PLATFORM_ORDER;
 
+  // Failed shells are placeholders, not posts — count only drafts that
+  // actually produced content so the header doesn't read e.g. "5 of 5 posts"
+  // for a cluster with 3 failed pieces.
+  const completedDraftsCount = Array.from(draftsByPlatform.values()).filter(
+    (d) => d.generation_state !== "failed",
+  ).length;
+
   const delta = cluster.cluster_delta;
   const hasDelta = delta !== null && delta !== undefined;
   const deltaTone = !hasDelta
@@ -247,7 +254,7 @@ export default function ClusterDetailPage() {
             </span>
             <span>·</span>
             <span>
-              {cluster.drafts.length} of {platforms.length} posts
+              {completedDraftsCount} of {platforms.length} posts
             </span>
             {cluster.last_generated_at && (
               <>

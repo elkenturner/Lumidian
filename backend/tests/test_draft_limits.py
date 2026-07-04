@@ -101,7 +101,7 @@ async def test_generate_now_pro_unlimited_weekly(client):
 
     captured = {}
 
-    async def _capture_bg(brand_id, max_gaps, source, skip_ready=False):
+    async def _capture_bg(brand_id, max_gaps, source, skip_ready=False, retry_failed=False):
         captured["max_gaps"] = max_gaps
 
     with patch("app.routers.content._bg_generate_drafts", side_effect=_capture_bg):
@@ -125,7 +125,7 @@ async def test_generate_now_starter_unlimited_weekly(client):
 
     captured = {}
 
-    async def _capture_bg(brand_id, max_gaps, source, skip_ready=False):
+    async def _capture_bg(brand_id, max_gaps, source, skip_ready=False, retry_failed=False):
         captured["max_gaps"] = max_gaps
 
     with patch("app.routers.content._bg_generate_drafts", side_effect=_capture_bg):

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -34,7 +35,7 @@ import PlatformBadge from "@/components/PlatformBadge";
 import { useClusterStatus } from "@/hooks/useClusterStatus";
 import { CLUSTER_PLATFORMS } from "@/lib/clusterPlatforms";
 import { useHiddenPlatforms } from "@/lib/useHiddenPlatforms";
-import { clusterChip } from "@/lib/clusterStatus";
+import { clusterChip, translateFailureReason } from "@/lib/clusterStatus";
 
 // Display order. Actual set of platforms shown is derived at runtime from
 // the cluster's live status + drafts, then filtered by the user's hidden-
@@ -118,8 +119,18 @@ export default function ClusterDetailPage() {
 
   const effectiveStatus = liveStatus?.status ?? cluster.status;
   const failureReason = liveStatus?.failure_reason ?? null;
+  const translatedFailureReason = translateFailureReason(failureReason);
   const isActive = ACTIVE_STATUSES.has(effectiveStatus);
   const isFailed = effectiveStatus === "briefing_failed";
+  // Remedy matched by raw machine-reason prefix (translated copy varies too
+  // much to match on) — determines which follow-up actions the failure
+  // banner offers alongside the always-present Retry.
+  const failureRemedy: "sources_or_profile" | "transient" | "generic" =
+    failureReason?.startsWith("insufficient_") || failureReason?.startsWith("no_sources_found")
+      ? "sources_or_profile"
+      : failureReason?.startsWith("search_unavailable")
+      ? "transient"
+      : "generic";
   // Has this cluster ever been generated? Drives "Generate" vs "Rewrite" copy
   // and whether regeneration is destructive (needs a confirm).
   const hasContent = cluster.drafts.length > 0 || !!cluster.brief;
@@ -233,9 +244,6 @@ export default function ClusterDetailPage() {
             <span>
               <span className="text-[var(--text-muted)]">Status</span>{" "}
               <span className="text-[var(--text-secondary)] font-medium">{statusLabel}</span>
-              {failureReason && (
-                <span className="ml-2 text-[#fb7185]">— {failureReason}</span>
-              )}
             </span>
             <span>·</span>
             <span>
@@ -318,9 +326,52 @@ export default function ClusterDetailPage() {
         )}
       </header>
 
-      {isFailed && failureReason && (
-        <div className="rounded-md border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-          <strong>Briefing failed:</strong> {failureReason}. Edit the brief or try rebuilding.
+      {isFailed && (
+        <div
+          className="rounded-md border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+          title={failureReason ?? undefined}
+        >
+          <span>
+            <strong>Generation failed:</strong>{" "}
+            {translatedFailureReason ?? "Something went wrong."}{" "}
+            {failureRemedy === "sources_or_profile"
+              ? "Add sources you trust or fill in your brand profile, then retry."
+              : failureRemedy === "transient"
+              ? "This usually clears in a few minutes."
+              : null}
+          </span>
+          <div className="flex items-center gap-3 shrink-0">
+            {failureRemedy === "sources_or_profile" && (
+              <>
+                <Link
+                  href={`/content/${brandId}/sources`}
+                  className="text-xs underline underline-offset-2 hover:opacity-80"
+                >
+                  Add sources
+                </Link>
+                <Link
+                  href="/settings?tab=profile"
+                  className="text-xs underline underline-offset-2 hover:opacity-80"
+                >
+                  Fix brand profile
+                </Link>
+              </>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onRebuild}
+              disabled={isActive || regenAction !== null}
+              className="gap-1.5"
+            >
+              {regenAction !== null ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <RotateCw className="h-3 w-3" />
+              )}
+              Retry
+            </Button>
+          </div>
         </div>
       )}
 

@@ -207,3 +207,66 @@ async def test_retry_failed_only_processes_failed_and_pending(
         )
 
     assert set(called_prompt_ids) == {prompts[1].id, prompts[2].id, prompts[3].id}
+
+
+@pytest.mark.asyncio
+async def test_retry_failed_takes_precedence_over_skip_ready(
+    db_session: AsyncSession,
+) -> None:
+    """When both skip_ready and retry_failed are set, retry_failed wins:
+    a generation_partial cluster IS processed and a ready cluster is NOT.
+    """
+    user = User(
+        email="both_flags@example.com",
+        password_hash="x",
+        name="BothFlags",
+        email_verified=True,
+        subscription_tier="starter",
+    )
+    db_session.add(user)
+    await db_session.flush()
+    brand = Brand(name="Acme", slug="acme-both-flags", user_id=user.id)
+    db_session.add(brand)
+    await db_session.flush()
+
+    statuses = ["ready", "generation_partial"]
+    prompts = []
+    for i, st in enumerate(statuses):
+        p = Prompt(brand_id=brand.id, text=f"Prompt {i}", prompt_type="standard")
+        db_session.add(p)
+        await db_session.flush()
+        prompts.append(p)
+        db_session.add(
+            ContentCluster(
+                brand_id=brand.id,
+                prompt_id=p.id,
+                status=st,
+                pillar_mode="none",
+                version=1,
+                created_at=utcnow(),
+            )
+        )
+    await db_session.commit()
+
+    called_prompt_ids: list[int] = []
+
+    async def fake_regenerate_cluster(db, *, cluster_id, tier, rebuild_brief=True):
+        cluster = (
+            await db.execute(select(ContentCluster).where(ContentCluster.id == cluster_id))
+        ).scalar_one()
+        called_prompt_ids.append(cluster.prompt_id)
+        return cluster
+
+    with patch(
+        "app.services.clustering_service.regenerate_cluster",
+        new=AsyncMock(side_effect=fake_regenerate_cluster),
+    ):
+        await _bg_generate_drafts(
+            brand_id=brand.id,
+            max_gaps=10,
+            source="manual",
+            skip_ready=True,
+            retry_failed=True,
+        )
+
+    assert called_prompt_ids == [prompts[1].id]

@@ -106,7 +106,8 @@ async def _bg_generate_drafts(
     When ``retry_failed`` is set, only clusters in ``pending``,
     ``briefing_failed``, or ``generation_partial`` are processed — everything
     else (including ``ready``) is left untouched. This backs a "Retry failed"
-    action on the content surface.
+    action on the content surface. If both ``skip_ready`` and ``retry_failed``
+    are set, ``retry_failed`` takes precedence.
 
     Each cluster is processed under its own fresh ``AsyncSessionLocal()``.
     A single poisoned session (e.g. a "database is locked" error) must never
@@ -146,15 +147,16 @@ async def _bg_generate_drafts(
                 # (2026-07-04 Roxstart incident).
                 async with AsyncSessionLocal() as cluster_db:
                     cluster = await get_or_create_cluster(cluster_db, brand_id=brand_id, prompt_id=prompt_id)
-                    if skip_ready and cluster.status in {
+                    if retry_failed:
+                        if cluster.status not in {
+                            "pending",
+                            "briefing_failed",
+                            "generation_partial",
+                        }:
+                            continue
+                    elif skip_ready and cluster.status in {
                         "ready",
                         "ready_low_evidence",
-                        "generation_partial",
-                    }:
-                        continue
-                    if retry_failed and cluster.status not in {
-                        "pending",
-                        "briefing_failed",
                         "generation_partial",
                     }:
                         continue

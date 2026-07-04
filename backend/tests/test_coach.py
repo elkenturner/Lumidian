@@ -168,6 +168,52 @@ async def test_get_score_breakdown_returns_per_model_and_per_prompt():
 
 
 @pytest.mark.asyncio
+async def test_get_score_breakdown_exposes_failed_queries():
+    """Lumi must see when a run was degraded so it doesn't present a
+    thin-sample score as healthy."""
+    user_id = await _create_user("sbf@example.com")
+    brand = await _create_brand(user_id, "Brand SBF")
+
+    async with AsyncSessionLocal() as db:
+        from app.models import Prompt, TrackingRun, RunModelScore, QueryResult
+        prompt = Prompt(brand_id=brand["id"], text="best CRMs", prompt_type="standard")
+        db.add(prompt)
+        await db.flush()
+        run = TrackingRun(brand_id=brand["id"], status="completed", overall_score=75.0,
+                          total_queries=7, total_mentions=4, failed_queries=83)
+        db.add(run)
+        await db.flush()
+        db.add(RunModelScore(tracking_run_id=run.id, model="gemini", total_queries=1, total_mentions=1, score=100.0))
+        db.add(QueryResult(tracking_run_id=run.id, prompt_id=prompt.id, model="gemini", run_number=1, response_text="...", mentioned=True))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_score_breakdown", tool_args={})
+
+    assert result["failed_queries"] == 83
+
+
+@pytest.mark.asyncio
+async def test_get_brand_overview_exposes_latest_run_health():
+    user_id = await _create_user("ovh@example.com")
+    brand = await _create_brand(user_id, "Brand OVH")
+
+    async with AsyncSessionLocal() as db:
+        from datetime import datetime, timezone
+        from app.models import TrackingRun
+        db.add(TrackingRun(brand_id=brand["id"], status="completed", overall_score=75.0,
+                           total_queries=7, total_mentions=4, failed_queries=83,
+                           completed_at=datetime.now(timezone.utc).replace(tzinfo=None)))
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        result = await dispatch_tool(db, user_id=user_id, brand_id=brand["id"], tool_name="get_brand_overview", tool_args={})
+
+    assert result["latest_run_failed_queries"] == 83
+    assert result["latest_run_total_queries"] == 7
+
+
+@pytest.mark.asyncio
 async def test_get_score_trend_returns_runs_in_descending_order():
     user_id = await _create_user("st@example.com")
     brand = await _create_brand(user_id, "Brand ST")
@@ -349,6 +395,16 @@ def test_build_system_prompt_pro_tier_mentions_claude():
     from app.services.coach_prompt import build_system_prompt
     prompt = build_system_prompt(brand_name="Acme", tier_display="Pro", brand_type="standard")
     assert "Claude" in prompt
+
+
+def test_build_system_prompt_describes_avg_of_model_scoring():
+    """The dashboard headline is the AVERAGE of per-model scores. If Lumi is
+    taught the raw pooled formula it recomputes a different number and tells
+    the user the dashboard is wrong."""
+    from app.services.coach_prompt import build_system_prompt
+    prompt = build_system_prompt(brand_name="Acme", tier_display="Free", brand_type="standard")
+    assert "average of the per-model scores" in prompt.lower()
+    assert "failed_queries" in prompt
 
 
 @pytest.mark.asyncio

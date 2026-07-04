@@ -120,7 +120,9 @@ async def get_brand_overview(db: AsyncSession, user_id: int, brand_id: int) -> d
         .order_by(TrackingRun.completed_at.desc())
     )).scalars().all()
 
-    now = datetime.now(timezone.utc)
+    # DB datetimes are stored naive-UTC; an aware `now` makes the comparison
+    # below raise TypeError for any brand with completed runs.
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
 
     def _score_at(cutoff_days: int) -> float | None:
         cutoff = now - timedelta(days=cutoff_days)
@@ -139,6 +141,8 @@ async def get_brand_overview(db: AsyncSession, user_id: int, brand_id: int) -> d
         "prompt_count": len(prompts),
         "prompts": [{"id": p.id, "text": p.text} for p in prompts],
         "latest_score": latest.overall_score if latest else None,
+        "latest_run_total_queries": latest.total_queries if latest else None,
+        "latest_run_failed_queries": latest.failed_queries if latest else None,
         "score_7d_ago": _score_at(7),
         "score_30d_ago": _score_at(30),
         "total_runs": len(runs),
@@ -216,6 +220,7 @@ async def get_score_breakdown(db: AsyncSession, user_id: int, brand_id: int, run
         "overall_score": run.overall_score,
         "total_queries": run.total_queries,
         "total_mentions": run.total_mentions,
+        "failed_queries": run.failed_queries,
         "per_model": [
             {"model": ms.model, "queries": ms.total_queries, "mentions": ms.total_mentions, "score": ms.score}
             for ms in model_scores

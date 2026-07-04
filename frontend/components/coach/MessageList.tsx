@@ -1,7 +1,20 @@
 "use client";
 import { useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { useCoach } from "@/contexts/CoachContext";
 import { SuggestedQuestionChips } from "./SuggestedQuestionChips";
+
+/** Render the light markdown Lumi emits (bold only) — without this, `**text**`
+ * shows up as literal asterisks in the chat bubble. */
+function renderCoachText(text: string): ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={i} className="font-semibold">{part.slice(2, -2)}</strong>
+    ) : (
+      part
+    )
+  );
+}
 
 export function MessageList() {
   const { state } = useCoach();
@@ -35,7 +48,7 @@ export function MessageList() {
                 ))}
               </div>
             )}
-            {m.text || (m.inProgress ? "…" : "")}
+            {m.text ? renderCoachText(m.text) : (m.inProgress ? "…" : "")}
           </div>
         </div>
       ))}

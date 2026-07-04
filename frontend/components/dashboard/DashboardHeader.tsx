@@ -64,7 +64,7 @@ export default function DashboardHeader({
           />
         )}
         <div>
-          <h1 className="text-lg sm:text-2xl font-bold text-[var(--text-primary)]" style={{ fontFamily: 'var(--font-syne)', fontWeight: 800, letterSpacing: '-0.3px' }}>
+          <h1 className="text-lg sm:text-2xl font-bold text-[var(--text-primary)] capitalize" style={{ fontFamily: 'var(--font-syne)', fontWeight: 800, letterSpacing: '-0.3px' }}>
             {selectedBrand ? selectedBrand.name : 'Dashboard'}
           </h1>
           <p className="hidden sm:block text-[13px] text-[var(--text-muted)] mt-1.5">AI visibility analytics</p>

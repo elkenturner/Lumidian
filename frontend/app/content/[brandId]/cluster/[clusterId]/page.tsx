@@ -34,24 +34,13 @@ import PlatformBadge from "@/components/PlatformBadge";
 import { useClusterStatus } from "@/hooks/useClusterStatus";
 import { CLUSTER_PLATFORMS } from "@/lib/clusterPlatforms";
 import { useHiddenPlatforms } from "@/lib/useHiddenPlatforms";
+import { clusterChip } from "@/lib/clusterStatus";
 
 // Display order. Actual set of platforms shown is derived at runtime from
 // the cluster's live status + drafts, then filtered by the user's hidden-
 // platform preferences. Uses the shared CLUSTER_PLATFORMS constant so the
 // canonical order matches other cluster views.
 const PLATFORM_ORDER = CLUSTER_PLATFORMS;
-
-const STATUS_LABEL: Record<string, string> = {
-  pending: "Pending",
-  briefing: "Briefing",
-  briefing_failed: "Briefing failed",
-  generating: "Generating",
-  generation_partial: "Partial generation",
-  ready: "Ready",
-  // Legacy — superseded by `generation_partial`. Kept for one release of
-  // grace until any in-flight clusters from before the migration drain.
-  partial_failed: "Partial failure",
-};
 
 const ACTIVE_STATUSES = new Set(["briefing", "generating"]);
 
@@ -176,7 +165,7 @@ export default function ClusterDetailPage() {
   const deltaLabel = !hasDelta
     ? "—"
     : `${delta! >= 0 ? "+" : ""}${delta!.toFixed(1)} pts`;
-  const statusLabel = STATUS_LABEL[effectiveStatus] ?? effectiveStatus.replace("_", " ");
+  const statusLabel = clusterChip({ status: effectiveStatus, version: cluster.version, posted_count: cluster.posted_count, pieces: cluster.drafts.map((d) => ({ platform: d.platform })) }).label;
 
   function updateDraft(updated: ContentDraft) {
     setCluster((prev) => {

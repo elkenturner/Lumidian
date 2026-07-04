@@ -19,7 +19,7 @@ const TIER_FEATURES: Record<string, string[]> = {
     'LinkedIn & X content drafts',
     '5 manual opportunity scans per week',
     '3 competitors tracked per brand',
-    '4 AI models tracked (with ChatGPT web search)',
+    '3 AI models tracked (ChatGPT web search, Perplexity, Gemini)',
     'Email support',
   ],
   starter: [
@@ -31,7 +31,7 @@ const TIER_FEATURES: Record<string, string[]> = {
     '10 manual opportunity scans per week',
     '5 competitors tracked per brand',
     '1 additional team member',
-    '4 AI models tracked',
+    '3 AI models tracked (enhanced Perplexity search)',
     'Email support',
   ],
   pro: [
@@ -43,7 +43,7 @@ const TIER_FEATURES: Record<string, string[]> = {
     '25 manual opportunity scans per week',
     '15 competitors tracked per brand',
     '3 additional team members',
-    '4 AI models tracked (enhanced)',
+    '4 AI models tracked (adds Claude)',
     'Priority support',
   ],
 };

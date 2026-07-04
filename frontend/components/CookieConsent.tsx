@@ -6,8 +6,11 @@ export default function CookieConsent() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
+    // Don't show it to signed-in users — they've accepted at signup, and the
+    // fixed bottom bar overlaps in-app chrome (support button, toasts).
+    const isAuthed = document.cookie.includes('clarity_session=1');
     const consent = localStorage.getItem('cookie_consent');
-    if (!consent) {
+    if (!consent && !isAuthed) {
       setVisible(true);
     }
   }, []);

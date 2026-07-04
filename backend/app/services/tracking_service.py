@@ -204,6 +204,11 @@ async def finalize_run(run_id: int, *, error_message: str | None = None) -> bool
         if run is None:
             return False
 
+        # A cancelled or auto-failed run must stay failed — the background
+        # task that outlived it must not resurrect it as "completed".
+        if run.status not in ("pending", "running"):
+            return False
+
         qr_rows = (await db.execute(
             select(QueryResult).where(QueryResult.tracking_run_id == run_id)
         )).scalars().all()
@@ -238,6 +243,15 @@ async def finalize_run(run_id: int, *, error_message: str | None = None) -> bool
             overall_mentions += tm
 
         overall_score = _compute_overall_score(model_stats)
+
+        # Every query errored (outage / bad keys): a 0.0 "completed" score
+        # would poison trends and can trigger the visibility-drop alert.
+        if not model_stats:
+            run.status = "failed"
+            run.completed_at = _utcnow()
+            run.error_message = error_message or "All queries failed"
+            await db.commit()
+            return False
 
         run.status = "completed"
         run.completed_at = _utcnow()

@@ -143,6 +143,25 @@ async def _safe_run(brand_id: int, schedule_slot: str) -> None:
     from app.services.tracking_service import run_tracking
 
     async with _run_semaphore:
+        # A manual run may already be in flight — don't double-run the brand
+        # (double LLM spend + interleaved score rows).
+        from sqlalchemy import func, select
+
+        from app.database import AsyncSessionLocal
+        from app.models import TrackingRun
+        async with AsyncSessionLocal() as db:
+            active = (await db.execute(
+                select(func.count(TrackingRun.id)).where(
+                    TrackingRun.brand_id == brand_id,
+                    TrackingRun.status.in_(["pending", "running"]),
+                )
+            )).scalar_one()
+        if active:
+            logger.info(
+                "Scheduler: skipping brand %d [%s] — a run is already active",
+                brand_id, schedule_slot,
+            )
+            return
         try:
             run_id = await run_tracking(
                 brand_id=brand_id,

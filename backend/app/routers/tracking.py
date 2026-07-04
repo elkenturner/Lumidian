@@ -27,7 +27,7 @@ from app.dependencies import (
     require_active_subscription,
     require_brand_active,
 )
-from app.models import Brand, Prompt, TrackingRun
+from app.models import Brand, Prompt, TrackingRun, User
 from app.routers.billing import DAILY_RUN_LIMITS, TIER_DISPLAY_NAMES
 from app.schemas import ManualRunResponse, TrackingRunStatus, TrackingRunSummary
 
@@ -75,7 +75,7 @@ def _get_brand_lock(brand_id: int) -> asyncio.Lock:
 )
 async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDep, user: CurrentUser):
     require_active_subscription(user)
-    check_rate_limit(user.id, limit=3)  # 3 manual runs per minute per user (burst protection)
+    check_rate_limit(user.id, limit=3, scope="tracking_run")  # 3 manual runs per minute per user (burst protection)
     brand = await get_brand_for_user(brand_id, db, user)
 
     # Check if brand is paused (expired pitch brand or lapsed subscription)
@@ -96,7 +96,9 @@ async def trigger_run(brand_id: int, background_tasks: BackgroundTasks, db: DbDe
         runs_today_result = await db.execute(
             select(func.count(TrackingRun.id)).where(
                 TrackingRun.brand_id.in_(
-                    select(Brand.id).where(Brand.user_id == user.id)
+                    # Scope to the brand OWNER's brands — a team member owns no
+                    # brands, which would make this count 0 (unlimited runs).
+                    select(Brand.id).where(Brand.user_id == brand.user_id)
                 ),
                 TrackingRun.run_type == "manual",
                 TrackingRun.created_at >= today_start,
@@ -328,7 +330,7 @@ async def _execute_run_with_id(run_id: int, brand_id: int) -> None:
     from sqlalchemy import select
 
     from app.database import AsyncSessionLocal
-    from app.models import Brand, Prompt, TrackingRun
+    from app.models import Brand, Prompt, TrackingRun, User
     from app.services.llm_service import models_for_tier, is_pro_for_brand, runs_per_prompt_for_brand
 
     def utcnow():
@@ -569,7 +571,7 @@ async def trigger_prompt_run(
     from app.models import Prompt
 
     require_active_subscription(user)
-    check_rate_limit(user.id, limit=3)
+    check_rate_limit(user.id, limit=3, scope="tracking_run")
 
     brand = await get_brand_for_user(brand_id, db, user)
     require_brand_active(brand, user)
@@ -614,7 +616,11 @@ async def trigger_prompt_run(
     # avoids a TOCTOU race where another coroutine grabs the lock between
     # our locked() check and the pop().
 
-    tier = user.subscription_tier
+    # Model selection must follow the brand OWNER's tier — an admin or team
+    # member triggering the run would otherwise query the free model set and
+    # corrupt the brand's trend data.
+    owner = await db.get(User, brand.user_id)
+    tier = owner.subscription_tier if owner else user.subscription_tier
     brand_type = str(brand.brand_type or "standard")
     asyncio.create_task(
         _background_prompt_run(run_id, brand_id, prompt_id, str(prompt.text), str(brand.name), tier=tier, brand_type=brand_type),
@@ -662,6 +668,7 @@ async def _background_prompt_run(
 
     runs_per_prompt = runs_per_prompt_for_brand(brand_type)
     semaphore = _asyncio.Semaphore(10)
+    cancel_evt = get_cancel_event(run_id)
 
     logger.info(
         "Prompt run %d — brand=%r prompt_id=%d models=%d runs=%d",
@@ -680,7 +687,7 @@ async def _background_prompt_run(
             run_id=run_id, prompt_id=pid, prompt_text=ptext,
             model=model, run_number=run_number, brand_name=brand_name,
             is_paid=is_paid, brand_type=brand_type,
-            semaphore=semaphore, cancel_event=None,
+            semaphore=semaphore, cancel_event=cancel_evt,
         )
 
     query_results = await run_queries_per_prompt(
@@ -706,6 +713,8 @@ async def _background_prompt_run(
         await run_gap_analysis(brand_id, run_id)
     except Exception as exc:
         logger.warning("Gap analysis failed for prompt run %d (non-fatal): %s", run_id, exc)
+
+    cleanup_cancel_event(run_id)
 
 
 # ── List runs for brand ───────────────────────────────────────────────────────

@@ -52,9 +52,12 @@ api.interceptors.response.use(
 // Extracts the human-readable message from an Axios error response.
 // Falls back to the provided default if the server didn't send a detail field.
 export function parseApiError(err: unknown, fallback = 'Something went wrong. Please try again.'): string {
-  const e = err as { response?: { status?: number; data?: { detail?: string } }; request?: unknown };
+  const e = err as { response?: { status?: number; data?: { detail?: unknown } }; request?: unknown };
   const detail = e?.response?.data?.detail;
-  if (detail) return detail;
+  // FastAPI 422 sends `detail` as an array of objects, and some handlers send
+  // an object — only trust it when it's a plain string, else fall through to a
+  // status-based message. Returning a non-string here crashes React on render.
+  if (typeof detail === 'string' && detail) return detail;
   const status = e?.response?.status;
   if (status === 402) return 'Upgrade your plan to use this feature.';
   if (status === 409) return 'This action is already in progress. Please wait for it to finish.';
@@ -97,7 +100,17 @@ function dedupedGet<T>(url: string, params?: Record<string, unknown>): Promise<T
   if (_inflight.has(key)) return _inflight.get(key) as Promise<T>;
 
   const p = api.get<T>(url, params ? { params } : undefined)
-    .then((r) => { _cache.set(key, { data: r.data, ts: Date.now() }); return r.data; })
+    .then((r) => {
+      // A string body means the proxy/backend returned HTML (error page,
+      // interstitial) with a 200 — our JSON endpoints never do. Treat it as
+      // an error so callers hit their catch instead of caching+returning a
+      // string that then crashes `.map`/`.find` on it.
+      if (typeof r.data === 'string') {
+        throw new Error(`Expected JSON from ${url} but received a non-JSON response.`);
+      }
+      _cache.set(key, { data: r.data, ts: Date.now() });
+      return r.data;
+    })
     .finally(() => _inflight.delete(key));
   _inflight.set(key, p);
   return p;

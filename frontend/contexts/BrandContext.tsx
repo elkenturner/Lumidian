@@ -34,7 +34,10 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   const fetchBrands = useCallback(() => {
     setError(null);
     getBrands()
-      .then((b) => {
+      .then((raw) => {
+        // Defend against a malformed payload slipping through — a non-array
+        // here would crash every consumer's .find/.map and take down the app.
+        const b = Array.isArray(raw) ? raw : [];
         setBrands(b);
         setActiveBrandIdState((prev) => {
           // Restore from localStorage, fallback to first brand

@@ -259,6 +259,37 @@ async def _load_cluster_citations(
     return out
 
 
+async def _load_user_sources(db: AsyncSession, brand_id: int) -> list[dict]:
+    """BrandSource library entries, shaped for rank_and_tier. The user vouched
+    for these, so they get a T2 floor (classify_domain may still say T1).
+    """
+    from sqlalchemy import select, desc
+    from app.models import BrandSource
+    rows = (await db.execute(
+        select(BrandSource).where(BrandSource.brand_id == brand_id)
+        .order_by(desc(BrandSource.added_at)).limit(10)
+    )).scalars().all()
+    out = []
+    for r in rows:
+        domain = _domain_of(r.url)
+        tier = classify_domain(domain)
+        if tier == "T3":
+            tier = "T2"
+        out.append({"url": r.url, "title": r.title or "", "snippet": r.snippet or "",
+                    "domain": domain, "tier": tier, "user_supplied": True})
+    return out
+
+
+def _merge_user(user_sources: list[dict], ranked: list[dict]) -> list[dict]:
+    """Prepend user sources ahead of ranked sources, deduped by normalized URL.
+
+    user_sources are already tiered (T2-floored) — rank_and_tier must NOT be
+    run on them again, so this merge happens after ranking the other path.
+    """
+    seen = {_normalize_url(s["url"]) for s in user_sources}
+    return user_sources + [s for s in ranked if _normalize_url(s["url"]) not in seen]
+
+
 async def build_cluster_pack(
     db: AsyncSession,
     *,
@@ -276,18 +307,25 @@ async def build_cluster_pack(
          because LLMs already filtered them for relevance/credibility.
       2. Live Serper web search across the prompt + key_claims.
 
+    The user's BrandSource library (if any) is merged into BOTH paths before
+    gating — the user vouched for these sources, so they count with a T2
+    floor toward the authority gate, giving users a way to help a failing
+    brief without waiting on Serper/citations alone.
+
     Raises PackGateError if neither path clears the authority gate. On failure
     nothing is persisted; the caller should set cluster.status='briefing_failed'
     with failure_reason=str(exc) and the soft-fail handler (in regenerate_cluster)
     decides whether to fall back to a brand-as-authority pack.
     """
+    user_sources = await _load_user_sources(db, cluster.brand_id)
+
     # 1. Try citations first
     raw_citations = await _load_cluster_citations(
         db, brand_id=cluster.brand_id, prompt_id=cluster.prompt_id,
     )
     if raw_citations:
         ranked = rank_and_tier(raw_citations)
-        pack_sources = ranked[:PACK_CAP]
+        pack_sources = _merge_user(user_sources, ranked)[:PACK_CAP]
         try:
             gate_pack(pack_sources)
             return await _persist_pack(
@@ -303,7 +341,7 @@ async def build_cluster_pack(
     queries = expand_queries(prompt_text=prompt_text, key_claims=key_claims)
     raw = await fetch_and_dedupe(queries)
     ranked = rank_and_tier(raw)
-    pack_sources = ranked[:PACK_CAP]
+    pack_sources = _merge_user(user_sources, ranked)[:PACK_CAP]
     gate_pack(pack_sources)  # raises on failure — nothing persisted yet
     return await _persist_pack(
         db, cluster=cluster, pack_sources=pack_sources, version=version,

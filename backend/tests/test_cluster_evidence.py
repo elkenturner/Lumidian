@@ -153,7 +153,7 @@ from sqlalchemy import select  # noqa: E402
 
 from app.database import AsyncSessionLocal  # noqa: E402
 from app.models import (  # noqa: E402
-    Brand, ContentCluster, ContentClusterSource, ContentEvidencePack,
+    Brand, BrandSource, ContentCluster, ContentClusterSource, ContentEvidencePack,
     Prompt, User,
 )
 from app.services.cluster_evidence import build_cluster_pack  # noqa: E402
@@ -237,3 +237,96 @@ async def test_build_cluster_pack_raises_when_authority_too_low(monkeypatch):
             select(ContentEvidencePack).where(ContentEvidencePack.cluster_id == cluster.id)
         )).scalars().all()
         assert rows == []
+
+
+# ---------------------------------------------------------------------------
+# Task 7: user-attached BrandSource library counts toward the authority gate
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_user_sources_satisfy_gate(monkeypatch):
+    """Brand has 3 BrandSource rows: one .gov domain (T1) + 2 arbitrary T3
+    domains (floored to T2). Serper returns nothing and there are no tracking
+    runs, so the citations path is empty too. build_cluster_pack must still
+    PASS the gate purely off user sources (t1=1, t1+t2=3) and persist them.
+    """
+    async def fake_fetch(queries):
+        return []
+    monkeypatch.setattr("app.services.cluster_evidence.fetch_and_dedupe", fake_fetch)
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="usersrc1@x.com", password_hash="x", name="t")
+        db.add(user); await db.flush()
+        brand = Brand(name="A", slug="a-user-src-1", user_id=user.id)
+        db.add(brand); await db.flush()
+        prompt = Prompt(brand_id=brand.id, text="q")
+        db.add(prompt); await db.flush()
+        db.add_all([
+            BrandSource(brand_id=brand.id, title="Gov data", url="https://data.gov/a", snippet="s"),
+            BrandSource(brand_id=brand.id, title="My blog", url="https://myblog.example.com/b", snippet="s"),
+            BrandSource(brand_id=brand.id, title="Sample", url="https://sample.example.com/c", snippet="s"),
+        ])
+        cluster = ContentCluster(brand_id=brand.id, prompt_id=prompt.id, status="briefing")
+        db.add(cluster); await db.commit(); await db.refresh(cluster)
+
+        pack = await build_cluster_pack(
+            db,
+            cluster=cluster,
+            prompt_text="q",
+            key_claims=[],
+            version=1,
+        )
+
+        assert pack.total_t1 == 1
+        assert pack.total_t2 == 2
+        assert pack.total_t3 == 0
+        urls = {s["url"] for s in pack.sources}
+        assert urls == {
+            "https://data.gov/a",
+            "https://myblog.example.com/b",
+            "https://sample.example.com/c",
+        }
+        assert all(s.get("user_supplied") for s in pack.sources)
+
+
+@pytest.mark.asyncio
+async def test_user_sources_merged_even_when_serper_alone_passes(monkeypatch):
+    """Even when Serper results alone clear the gate, user sources must still
+    be merged into the persisted pack (prepended, deduped by normalized URL).
+    """
+    async def fake_fetch(queries):
+        return [
+            {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+            {"url": "https://nytimes.com/b", "title": "B", "snippet": "..."},
+            {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
+            {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
+        ]
+    monkeypatch.setattr("app.services.cluster_evidence.fetch_and_dedupe", fake_fetch)
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="usersrc2@x.com", password_hash="x", name="t")
+        db.add(user); await db.flush()
+        brand = Brand(name="A", slug="a-user-src-2", user_id=user.id)
+        db.add(brand); await db.flush()
+        prompt = Prompt(brand_id=brand.id, text="q")
+        db.add(prompt); await db.flush()
+        db.add(
+            BrandSource(brand_id=brand.id, title="My site", url="https://mysite.example.com/x", snippet="s")
+        )
+        cluster = ContentCluster(brand_id=brand.id, prompt_id=prompt.id, status="briefing")
+        db.add(cluster); await db.commit(); await db.refresh(cluster)
+
+        pack = await build_cluster_pack(
+            db,
+            cluster=cluster,
+            prompt_text="q",
+            key_claims=[],
+            version=1,
+        )
+
+        urls = {s["url"] for s in pack.sources}
+        assert "https://mysite.example.com/x" in urls
+        user_entry = next(s for s in pack.sources if s["url"] == "https://mysite.example.com/x")
+        assert user_entry["tier"] == "T2"  # T3 domain floored to T2
+        assert user_entry.get("user_supplied") is True

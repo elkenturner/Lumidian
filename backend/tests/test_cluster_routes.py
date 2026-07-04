@@ -6,7 +6,7 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Brand, ContentBrief, ContentCluster, Prompt, User
+from app.models import Brand, ContentBrief, ContentCluster, ContentDraft, Prompt, User
 from tests.conftest import register_and_login
 
 SAMPLE_BRIEF_JSON = '{"positioning":"P","key_claims":["c"],"canonical_phrasings":["acme tracks x"],"stats":[],"narrative_spine":"n","tone_notes":"t"}'
@@ -82,6 +82,53 @@ async def test_regenerate_piece_endpoint(client: httpx.AsyncClient, db_session: 
 
     assert r.status_code == 200
     assert r.json()["title"] == "T2"
+
+
+async def test_failed_pieces_not_counted_as_drafts_in_summary(client: httpx.AsyncClient, db_session: AsyncSession) -> None:
+    """Cluster with 2 done + 3 failed pieces: list endpoint's draft/piece counts
+    reflect 2; detail endpoint still returns all 5 pieces with failure_reason."""
+    await register_and_login(client, "ck-failed@test.com", subscription_tier="starter")
+    user = (await db_session.execute(select(User).where(User.email == "ck-failed@test.com"))).scalar_one()
+    brand = Brand(name="Acme", slug="ck-failed-acme", user_id=user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    prompt = Prompt(brand_id=brand.id, text="Q", prompt_type="standard")
+    db_session.add(prompt)
+    await db_session.flush()
+    cluster = ContentCluster(brand_id=brand.id, prompt_id=prompt.id, status="generation_partial")
+    db_session.add(cluster)
+    await db_session.flush()
+
+    done_platforms = ["linkedin", "medium"]
+    failed_platforms = ["reddit", "quora", "x"]
+    for platform in done_platforms:
+        db_session.add(ContentDraft(
+            brand_id=brand.id, prompt_id=prompt.id, cluster_id=cluster.id,
+            platform=platform, status="draft", title="T", content_text="Body.",
+            source="cluster", generation_state="done",
+        ))
+    for platform in failed_platforms:
+        db_session.add(ContentDraft(
+            brand_id=brand.id, prompt_id=prompt.id, cluster_id=cluster.id,
+            platform=platform, status="failed", title=None, content_text="",
+            source="cluster", generation_state="failed", failure_reason="timeout after 60s",
+        ))
+    await db_session.commit()
+
+    list_resp = await client.get(f"/api/clusters/{brand.id}")
+    assert list_resp.status_code == 200
+    summary = list_resp.json()[0]
+    assert len(summary["pieces"]) == 2
+    assert {p["platform"] for p in summary["pieces"]} == set(done_platforms)
+
+    detail_resp = await client.get(f"/api/clusters/{brand.id}/{cluster.id}")
+    assert detail_resp.status_code == 200
+    detail = detail_resp.json()
+    assert len(detail["drafts"]) == 5
+    failed_out = [d for d in detail["drafts"] if d["platform"] in failed_platforms]
+    assert len(failed_out) == 3
+    assert all(d["generation_state"] == "failed" for d in failed_out)
+    assert all(d["failure_reason"] == "timeout after 60s" for d in failed_out)
 
 
 async def test_edit_brief_endpoint(client: httpx.AsyncClient, db_session: AsyncSession) -> None:

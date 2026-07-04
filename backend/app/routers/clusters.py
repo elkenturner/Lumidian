@@ -115,8 +115,17 @@ async def _guard_regen(brand_id: int, user) -> None:
 
 
 def _summarize_pieces(drafts: list[ContentDraft]) -> list[dict]:
+    """Compact per-piece summary for the cluster list/board view.
+
+    Failed pieces are deliberately excluded here — they carry no content and
+    must not inflate "N drafts to review" / "N of M platforms" counts. They
+    still appear in the full cluster detail payload (get_cluster) so the UI
+    can render a per-piece failure_reason.
+    """
     out = []
     for d in drafts:
+        if d.status == "failed":
+            continue
         out.append({
             "platform": d.platform,
             "draft_id": d.id,

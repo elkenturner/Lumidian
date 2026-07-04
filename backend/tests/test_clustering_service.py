@@ -118,6 +118,41 @@ async def test_regenerate_cluster_respects_disabled_platform(db_session: AsyncSe
 
 
 @pytest.mark.asyncio
+async def test_failed_piece_persists_with_failed_status(db_session: AsyncSession, registered_user: User) -> None:
+    """Force one piece to fail; assert its ContentDraft row has status='failed'
+    (not 'draft') and cluster.status == 'generation_partial'."""
+    brand = Brand(name="Acme", slug="c-acme5", user_id=registered_user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    prompt = Prompt(brand_id=brand.id, text="What is Acme?", prompt_type="standard")
+    db_session.add(prompt)
+    await db_session.commit()
+
+    cluster = await get_or_create_cluster(db_session, brand_id=brand.id, prompt_id=prompt.id)
+
+    async def _fake_generate(*args, **kwargs):
+        if kwargs.get("platform") == "reddit":
+            raise RuntimeError("boom")
+        return ("Title", "Body content here.", None, [], False)
+
+    with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
+         patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(side_effect=_fake_generate)):
+        result = await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
+
+    assert result.status == "generation_partial"
+    drafts = (await db_session.execute(select(ContentDraft).where(ContentDraft.cluster_id == cluster.id))).scalars().all()
+    assert len(drafts) == 5
+    failed = next(d for d in drafts if d.platform == "reddit")
+    assert failed.status == "failed"
+    assert failed.generation_state == "failed"
+    assert failed.content_text == ""
+    assert failed.title is None
+    ok_drafts = [d for d in drafts if d.platform != "reddit"]
+    assert all(d.status == "draft" for d in ok_drafts)
+
+
+@pytest.mark.asyncio
 async def test_regenerate_piece_replaces_only_target(db_session: AsyncSession, registered_user: User) -> None:
     brand = Brand(name="Acme", slug="c-acme4", user_id=registered_user.id)
     db_session.add(brand)

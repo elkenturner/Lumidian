@@ -522,7 +522,7 @@ async def regenerate_cluster(
             db.add(ContentDraft(
                 brand_id=cluster.brand_id, prompt_id=cluster.prompt_id,
                 cluster_id=cluster.id, platform=platform,
-                status="draft", title=None,
+                status="failed", title=None,
                 content_text="", source="cluster",
                 generation_state="failed", failure_reason=reason[:255],
             ))

@@ -238,3 +238,59 @@ async def test_regenerate_cluster_marks_search_unavailable(monkeypatch):
         assert cluster.status == "briefing_failed"
         assert cluster.failure_reason is not None
         assert cluster.failure_reason.startswith("search_unavailable")
+
+
+@pytest.mark.asyncio
+async def test_user_sources_survive_serper_outage(monkeypatch):
+    """Regression: a throttled Serper must not defeat a user whose own
+    BrandSource library already clears the authority gate on its own.
+
+    Previously fetch_and_dedupe raised SearchUnavailableError before
+    _merge_user ever ran, so build_cluster_pack would raise even when the
+    user's library alone (1 .gov + 2 others, floored to T2) satisfies
+    min_t1=1 and min_t1_plus_t2=3. The fix persists a user-sources-only pack
+    in that case instead of propagating the outage as a failure.
+    """
+    from app.database import AsyncSessionLocal
+    from app.models import BrandSource, ContentCluster, ContentEvidencePack
+    from app.services import cluster_evidence
+    from app.services.cluster_evidence import SearchUnavailableError, build_cluster_pack
+    from tests.conftest import _seed_minimal_user_brand_prompt
+
+    async def fake_fetch(queries):
+        raise SearchUnavailableError("search_unavailable: Serper rate-limited on all queries")
+
+    async with AsyncSessionLocal() as db:
+        cluster_id, prompt_id = await _seed_minimal_user_brand_prompt(
+            db, slug="user-sources-survive-outage",
+        )
+        cluster = await db.get(ContentCluster, cluster_id)
+        db.add_all([
+            BrandSource(brand_id=cluster.brand_id, title="Gov stat", url="https://data.gov/report"),
+            BrandSource(brand_id=cluster.brand_id, title="Blog A", url="https://blogexampleone.com/a"),
+            BrandSource(brand_id=cluster.brand_id, title="Blog B", url="https://blogexampletwo.com/b"),
+        ])
+        await db.commit()
+
+    with patch("app.services.cluster_evidence.fetch_and_dedupe", side_effect=fake_fetch):
+        async with AsyncSessionLocal() as db:
+            cluster = await db.get(ContentCluster, cluster_id)
+            pack = await build_cluster_pack(
+                db, cluster=cluster, prompt_text="best CRM", key_claims=[], version=1,
+            )
+
+    assert pack is not None
+    assert pack.total_t1 >= 1
+    assert pack.total_t1 + pack.total_t2 >= 3
+
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as db:
+        packs = (
+            await db.execute(
+                select(ContentEvidencePack).where(ContentEvidencePack.cluster_id == cluster_id)
+            )
+        ).scalars().all()
+        assert len(packs) == 1
+        urls = {s["url"] for s in packs[0].sources}
+        assert "https://data.gov/report" in urls

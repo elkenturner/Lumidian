@@ -391,7 +391,26 @@ async def build_cluster_pack(
 
     # 2. Live Serper search
     queries = expand_queries(prompt_text=prompt_text, key_claims=key_claims)
-    raw = await fetch_and_dedupe(queries)
+    try:
+        raw = await fetch_and_dedupe(queries)
+    except SearchUnavailableError:
+        # Serper is throttled and returned nothing at all. Don't let that
+        # defeat a user who has already supplied enough sources of their own
+        # to clear the authority gate on their own merits — persist a
+        # user-sources-only pack instead of forcing them to wait out the
+        # provider outage. If the user sources alone don't clear the gate,
+        # there's nothing to fall back to, so re-raise as before.
+        user_pack_sources = user_sources[:PACK_CAP]
+        if user_pack_sources and pack_meets_gate(user_pack_sources):
+            logger.info(
+                "cluster %d: Serper unavailable but user sources alone pass "
+                "the gate — persisting user-only pack",
+                cluster.id,
+            )
+            return await _persist_pack(
+                db, cluster=cluster, pack_sources=user_pack_sources, version=version,
+            )
+        raise
     ranked = rank_and_tier(raw)
     pack_sources = _merge_user(user_sources, ranked)[:PACK_CAP]
     gate_pack(pack_sources)  # raises on failure — nothing persisted yet

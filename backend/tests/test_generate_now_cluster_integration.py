@@ -270,3 +270,128 @@ async def test_retry_failed_takes_precedence_over_skip_ready(
         )
 
     assert called_prompt_ids == [prompts[1].id]
+
+
+@pytest.mark.asyncio
+async def test_skip_ready_budget_not_consumed_by_skipped_clusters(
+    db_session: AsyncSession,
+) -> None:
+    """Regression: skipped (ready) clusters must not eat into max_gaps.
+
+    Seed 4 prompts with clusters [ready, ready, briefing_failed, pending] and
+    call with max_gaps=2, skip_ready=True. Previously the loop sliced
+    prompt_ids[:max_gaps] up front, so with max_gaps=2 only the two `ready`
+    prompts would ever be examined — and since both are skipped, NEITHER of
+    the two non-ready prompts would ever get processed. The fix must walk the
+    full prompt list and only count actually-processed (non-skipped)
+    clusters against the budget, so briefing_failed and pending both run.
+    """
+    user = User(
+        email="skip_budget@example.com",
+        password_hash="x",
+        name="SkipBudget",
+        email_verified=True,
+        subscription_tier="pro",
+    )
+    db_session.add(user)
+    await db_session.flush()
+    brand = Brand(name="Acme", slug="acme-skip-budget", user_id=user.id)
+    db_session.add(brand)
+    await db_session.flush()
+
+    statuses = ["ready", "ready", "briefing_failed", "pending"]
+    prompts = []
+    for i, st in enumerate(statuses):
+        p = Prompt(brand_id=brand.id, text=f"Prompt {i}", prompt_type="standard")
+        db_session.add(p)
+        await db_session.flush()
+        prompts.append(p)
+        db_session.add(
+            ContentCluster(
+                brand_id=brand.id,
+                prompt_id=p.id,
+                status=st,
+                pillar_mode="none",
+                version=1,
+                created_at=utcnow(),
+            )
+        )
+    await db_session.commit()
+
+    called_prompt_ids: list[int] = []
+
+    async def fake_regenerate_cluster(db, *, cluster_id, tier, rebuild_brief=True):
+        cluster = (
+            await db.execute(select(ContentCluster).where(ContentCluster.id == cluster_id))
+        ).scalar_one()
+        called_prompt_ids.append(cluster.prompt_id)
+        return cluster
+
+    with patch(
+        "app.services.clustering_service.regenerate_cluster",
+        new=AsyncMock(side_effect=fake_regenerate_cluster),
+    ):
+        await _bg_generate_drafts(
+            brand_id=brand.id, max_gaps=2, source="manual", skip_ready=True
+        )
+
+    assert set(called_prompt_ids) == {prompts[2].id, prompts[3].id}
+
+
+@pytest.mark.asyncio
+async def test_retry_failed_budget_not_consumed_by_skipped_clusters(
+    db_session: AsyncSession,
+) -> None:
+    """Same regression as above but for retry_failed: a `ready` cluster in
+    front of the queue must not eat the budget meant for failed/pending ones.
+    """
+    user = User(
+        email="retry_budget@example.com",
+        password_hash="x",
+        name="RetryBudget",
+        email_verified=True,
+        subscription_tier="pro",
+    )
+    db_session.add(user)
+    await db_session.flush()
+    brand = Brand(name="Acme", slug="acme-retry-budget", user_id=user.id)
+    db_session.add(brand)
+    await db_session.flush()
+
+    statuses = ["ready", "briefing_failed", "generation_partial"]
+    prompts = []
+    for i, st in enumerate(statuses):
+        p = Prompt(brand_id=brand.id, text=f"Prompt {i}", prompt_type="standard")
+        db_session.add(p)
+        await db_session.flush()
+        prompts.append(p)
+        db_session.add(
+            ContentCluster(
+                brand_id=brand.id,
+                prompt_id=p.id,
+                status=st,
+                pillar_mode="none",
+                version=1,
+                created_at=utcnow(),
+            )
+        )
+    await db_session.commit()
+
+    called_prompt_ids: list[int] = []
+
+    async def fake_regenerate_cluster(db, *, cluster_id, tier, rebuild_brief=True):
+        cluster = (
+            await db.execute(select(ContentCluster).where(ContentCluster.id == cluster_id))
+        ).scalar_one()
+        called_prompt_ids.append(cluster.prompt_id)
+        return cluster
+
+    with patch(
+        "app.services.clustering_service.regenerate_cluster",
+        new=AsyncMock(side_effect=fake_regenerate_cluster),
+    ):
+        await _bg_generate_drafts(
+            brand_id=brand.id, max_gaps=2, source="manual", retry_failed=True
+        )
+
+    assert set(called_prompt_ids) == {prompts[1].id, prompts[2].id}

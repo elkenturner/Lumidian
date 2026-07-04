@@ -107,7 +107,10 @@ async def _bg_generate_drafts(
 
     Routes through the cluster pipeline so each prompt's drafts are generated
     as a coordinated 5-piece set from a shared ContentBrief. The ``max_gaps``
-    arg now bounds the number of prompts processed (was: top gaps to draft).
+    arg now bounds the number of prompts *actually processed* (was: top gaps
+    to draft) — clusters filtered out by ``skip_ready``/``retry_failed`` do
+    not consume the budget, so the sweep walks the full prompt list (not a
+    ``[:max_gaps]`` slice) until ``max_gaps`` regenerations have been invoked.
     The legacy ``auto_draft_top_gaps`` path is bypassed.
 
     When ``skip_ready`` is set, clusters that already have content
@@ -153,7 +156,10 @@ async def _bg_generate_drafts(
                 ).scalars().all()
             ]
 
-        for prompt_id in prompt_ids[:max_gaps]:
+        processed = 0
+        for prompt_id in prompt_ids:
+            if processed >= max_gaps:
+                break
             try:
                 # Fresh session per cluster: one poisoned session must never
                 # cascade into "every remaining cluster silently stays pending"
@@ -173,6 +179,10 @@ async def _bg_generate_drafts(
                         "generation_partial",
                     }:
                         continue
+                    # Only clusters that survive the status filters above count
+                    # against the budget — skipped clusters must not consume a
+                    # slot that a later pending/failed prompt could have used.
+                    processed += 1
                     await asyncio.wait_for(
                         regenerate_cluster(cluster_db, cluster_id=cluster.id, tier=tier),
                         timeout=CLUSTER_TIMEOUT_SECONDS,

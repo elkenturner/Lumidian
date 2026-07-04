@@ -165,7 +165,7 @@ async def draft_opportunity(opportunity_id: int, db: DbDep, user: CurrentUser):
     Generate a reply draft for a specific opportunity thread.
     Uses the dynamic drafting engine with full BrandProfile context.
     """
-    check_rate_limit(user.id, limit=10)  # 10 opportunity drafts per minute per user
+    check_rate_limit(user.id, limit=10, scope="opportunity_draft")  # 10 opportunity drafts per minute per user
     from app.services.drafting_service import generate_opportunity_draft
 
     opp = await _get_opportunity_or_404(db, opportunity_id)
@@ -269,7 +269,7 @@ async def trigger_scan(brand_id: int, db: DbDep, user: CurrentUser):
     from app.routers.billing import WEEKLY_SCAN_LIMITS
     from app.services.analytics_service import log_event
 
-    check_rate_limit(user.id, limit=3)  # burst guard: 3 per minute
+    check_rate_limit(user.id, limit=3, scope="opportunity_scan")  # burst guard: 3 per minute
     brand = await get_brand_for_user(brand_id, db, user)
 
     # Check if brand is paused

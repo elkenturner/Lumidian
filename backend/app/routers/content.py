@@ -289,7 +289,7 @@ async def create_draft(brand_id: int, request: CreateDraftRequest, db: DbDep, us
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="Content drafting requires a paid plan. Upgrade to unlock this feature.",
         )
-    check_rate_limit(user.id, limit=10)  # burst guard (per minute)
+    check_rate_limit(user.id, limit=10, scope="content_draft")  # burst guard (per minute)
     brand = await get_brand_for_user(brand_id, db, user)
     require_brand_active(brand, user)
     from app.dependencies import require_paid_for_platform
@@ -725,7 +725,7 @@ async def generate_now(brand_id: int, request: GenerateNowRequest, db: DbDep, us
             status_code=status.HTTP_402_PAYMENT_REQUIRED,
             detail="On-demand draft generation is available on paid plans. Upgrade to unlock this feature.",
         )
-    check_rate_limit(user.id, limit=2)  # burst guard (per minute)
+    check_rate_limit(user.id, limit=2, scope="content_generate_now")  # burst guard (per minute)
 
     if brand_id in _state.generating_brands:
         raise HTTPException(

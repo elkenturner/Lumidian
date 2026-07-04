@@ -120,7 +120,7 @@ async def gap_summary(brand_id: int, db: DbDep, user: CurrentUser):
 async def refresh_gaps(brand_id: int, db: DbDep, user: CurrentUser):
     """Trigger gap analysis on the latest completed run for this brand."""
     require_active_subscription(user)
-    check_rate_limit(user.id, limit=3)
+    check_rate_limit(user.id, limit=3, scope="gaps_refresh")
     brand = await get_brand_for_user(brand_id, db, user)
     require_brand_active(brand, user)
 

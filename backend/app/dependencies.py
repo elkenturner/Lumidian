@@ -54,33 +54,35 @@ def require_paid_for_platform(platform: str, user) -> None:
     )
 
 
-# ── Per-user in-memory rate limiting ─────────────────────────────────────────
-# {user_id: (call_count, window_start_monotonic)}
-_rate_store: dict[int, tuple[int, float]] = {}
+# ── Per-user, per-endpoint in-memory rate limiting ───────────────────────────
+# {(user_id, scope): (call_count, window_start_monotonic)}
+_rate_store: dict[tuple[int, str], tuple[int, float]] = {}
 _RATE_WINDOW = 60.0  # seconds
 
 
-def check_rate_limit(user_id: int, limit: int) -> None:
-    """Raise HTTP 429 if user has exceeded `limit` calls within the last minute.
-    Also prunes all stale entries to keep memory bounded."""
+def check_rate_limit(user_id: int, limit: int, scope: str = "default") -> None:
+    """Raise HTTP 429 if user has exceeded `limit` calls within the last minute
+    for this scope. A single shared counter would let one endpoint's traffic
+    consume another endpoint's (differently-sized) budget."""
     now = monotonic()
     cutoff = now - _RATE_WINDOW
 
     # Prune all stale entries every call (cheap dict iteration)
-    stale_keys = [uid for uid, (_, start) in _rate_store.items() if start < cutoff]
-    for uid in stale_keys:
-        del _rate_store[uid]
+    stale_keys = [k for k, (_, start) in _rate_store.items() if start < cutoff]
+    for k in stale_keys:
+        del _rate_store[k]
 
-    count, start = _rate_store.get(user_id, (0, 0.0))
+    key = (user_id, scope)
+    count, start = _rate_store.get(key, (0, 0.0))
     if now - start > _RATE_WINDOW:
-        _rate_store[user_id] = (1, now)
+        _rate_store[key] = (1, now)
     elif count >= limit:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Rate limit exceeded — max {limit} requests per minute for this endpoint.",
         )
     else:
-        _rate_store[user_id] = (count + 1, start)
+        _rate_store[key] = (count + 1, start)
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 

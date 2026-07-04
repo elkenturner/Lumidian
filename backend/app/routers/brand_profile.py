@@ -195,7 +195,7 @@ async def ai_fill_profile(brand_id: int, db: DbDep, user: CurrentUser):
     Scan the brand's website and return AI-generated suggestions for profile fields.
     Does NOT save anything — the frontend applies suggestions and user saves manually.
     """
-    check_rate_limit(user.id, limit=3)
+    check_rate_limit(user.id, limit=3, scope="profile_ai_fill")
 
     import json
     import os

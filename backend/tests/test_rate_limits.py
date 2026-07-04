@@ -110,12 +110,12 @@ async def test_rate_limit_window_resets():
     check_rate_limit(user_id, limit)
 
     # Manually backdate the window start by > 60 seconds
-    count, start = _rate_store[user_id]
-    _rate_store[user_id] = (count, start - 61.0)
+    count, start = _rate_store[(user_id, "default")]
+    _rate_store[(user_id, "default")] = (count, start - 61.0)
 
     # Should now pass again (new window)
     check_rate_limit(user_id, limit)
-    assert _rate_store[user_id][0] == 1  # counter reset to 1
+    assert _rate_store[(user_id, "default")][0] == 1  # counter reset to 1
 
 
 def test_rate_store_prunes_stale_entries():
@@ -123,13 +123,13 @@ def test_rate_store_prunes_stale_entries():
     _rate_store.clear()
 
     # Simulate a user who hit the limit 2 minutes ago (stale)
-    _rate_store[9999] = (10, time.monotonic() - 200)
+    _rate_store[(9999, "default")] = (10, time.monotonic() - 200)
 
     # A new call for the same user should succeed (not 429) and reset their slot
     check_rate_limit(9999, limit=5)  # should not raise
 
     # The old stale entry must be gone — count reset to 1
-    count, _ = _rate_store[9999]
+    count, _ = _rate_store[(9999, "default")]
     assert count == 1
 
 

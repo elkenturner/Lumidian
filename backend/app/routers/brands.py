@@ -756,7 +756,7 @@ async def remove_competitor(brand_id: int, competitor_id: int, db: DbDep, user: 
 @router.post("/{brand_id}/suggest-prompts", response_model=list[str])
 async def suggest_prompts(brand_id: int, db: DbDep, user: CurrentUser):
     """Use Claude to generate 12-15 diverse tracking prompt suggestions for a brand."""
-    check_rate_limit(user.id, limit=5)
+    check_rate_limit(user.id, limit=5, scope="brands_write")
     from app.models import BrandProfile as BrandProfileModel
 
     brand = await _get_brand_or_404(db, brand_id, user)
@@ -863,7 +863,7 @@ async def infer_scope(brand_id: int, db: DbDep, user: CurrentUser) -> InferScope
     """Use Claude to infer the brand's market scope. Does NOT persist — caller saves via PUT /profile."""
     from app.models import BrandProfile as BrandProfileModel
 
-    check_rate_limit(user.id, limit=5)
+    check_rate_limit(user.id, limit=5, scope="brands_write")
     brand = await _get_brand_or_404(db, brand_id, user)
 
     profile_result = await db.execute(
@@ -955,7 +955,7 @@ async def fetch_website_context_endpoint(
     """
     from app.services.jina_service import fetch_website_context
 
-    check_rate_limit(user.id, limit=5)  # 5 per minute
+    check_rate_limit(user.id, limit=5, scope="brands_write")  # 5 per minute
 
     try:
         context = await fetch_website_context(payload.url)
@@ -1026,7 +1026,7 @@ class _SuggestPreviewReq(_BaseModel):
 @router.post("/suggest-prompts-preview", response_model=list[str])
 async def suggest_prompts_preview(payload: _SuggestPreviewReq, db: DbDep, user: CurrentUser):
     """Generate tracking prompt suggestions from just a brand name (for onboarding wizard)."""
-    check_rate_limit(user.id, limit=5)
+    check_rate_limit(user.id, limit=5, scope="brands_write")
     api_key = _os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
         raise HTTPException(

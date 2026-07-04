@@ -2070,6 +2070,7 @@ export interface ContentClusterSummary {
   last_generated_at: string | null;
   cluster_delta: number | null;
   posted_count: number;
+  failure_reason: string | null;
 }
 
 export interface ContentClusterDetail {

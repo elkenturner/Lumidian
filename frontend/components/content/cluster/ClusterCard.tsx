@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowUpRight, MoreHorizontal, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import type { ContentClusterSummary } from "@/lib/api";
-import { CHIP_CLASSES, clusterChip } from "@/lib/clusterStatus";
+import { CHIP_CLASSES, clusterChip, translateFailureReason } from "@/lib/clusterStatus";
 
 interface Props {
   cluster: ContentClusterSummary;
@@ -18,6 +18,14 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
   const isShell = cluster.status === "pending" && cluster.pieces.length === 0;
   const enabledPlatformCount = cluster.pieces.length;
   const postedCount = cluster.posted_count;
+  // Failed pieces are excluded from board piece counts, so a briefing_failed
+  // (or a generation_partial that somehow lost every piece) card would render
+  // a nonsense "0 of 0 posts live" row. Show the plain-language failure reason
+  // in that slot instead — never a hidden-platform-count row with nothing to count.
+  const isBriefingFailed = cluster.status === "briefing_failed";
+  const failureLine = translateFailureReason(cluster.failure_reason);
+  const showFailureLine = !isShell && (isBriefingFailed || enabledPlatformCount === 0) && !!failureLine;
+  const showProgressRow = !isShell && !showFailureLine;
   // Clamp green dots to the number of visible pieces. No-op when nothing is
   // hidden; prevents rendering more "posted" dots than pieces once the list
   // view filters a platform out.
@@ -70,8 +78,16 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
         )}
       </div>
 
+      {/* Failure reason takes the place of the progress row — there's nothing
+          to count when generation didn't produce any pieces. */}
+      {showFailureLine && (
+        <p className="text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-1">
+          {failureLine}
+        </p>
+      )}
+
       {/* Composed progress bar */}
-      {isShell ? null : (
+      {showProgressRow && (
         <div className="flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1 text-[var(--text-secondary)]">
             {Array.from({ length: enabledPlatformCount }).map((_, i) => (

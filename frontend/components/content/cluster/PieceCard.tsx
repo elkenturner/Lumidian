@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { AlertTriangle, ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
 import { regenerateClusterPiece, updateDraft, type ContentDraft } from "@/lib/api";
+import { translateFailureReason } from "@/lib/clusterStatus";
 import { CitationsSubpanel } from "./CitationsSubpanel";
 
 interface Props {
@@ -80,14 +82,21 @@ function PieceStatusChip({
   return null;
 }
 
-function LowEvidenceBadge() {
+function LowEvidenceBadge({ brandId }: { brandId: number }) {
   return (
     <span
       className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.10)] text-[#fbbf24]"
-      title="Thin sourcing — the writer couldn't ground this post in verified sources. Rewrite to try again, or add sources in the brand's source library."
+      title="Thin sourcing — the writer couldn't ground this post in verified sources. Add sources you trust, or rewrite to try again."
     >
       <AlertTriangle className="h-3 w-3" />
       Thin sourcing
+      <Link
+        href={`/content/${brandId}/sources`}
+        className="ml-1 inline-flex items-center gap-0.5 underline decoration-dotted underline-offset-2 hover:text-[#fde68a]"
+      >
+        Add sources
+        <ArrowUpRight className="h-2.5 w-2.5" />
+      </Link>
     </span>
   );
 }
@@ -144,7 +153,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 {draft.generation_state}
               </span>
             )}
-            {draft?.low_evidence && <LowEvidenceBadge />}
+            {draft?.low_evidence && <LowEvidenceBadge brandId={brandId} />}
             {draft && (
               <PieceStatusChip status={draft.status} delta={draft.attribution_delta} />
             )}
@@ -152,7 +161,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
         </div>
         {draft?.generation_state === "failed" && (
           <div className="mb-2 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-1">
-            Failed: {draft.failure_reason || "unknown error"}
+            Failed: {translateFailureReason(draft.failure_reason) ?? "unknown error"}
           </div>
         )}
 
@@ -310,7 +319,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <PlatformBadge platform={platform} />
-                {draft.low_evidence && <LowEvidenceBadge />}
+                {draft.low_evidence && <LowEvidenceBadge brandId={brandId} />}
                 <PieceStatusChip status={draft.status} delta={draft.attribution_delta} />
               </div>
               <Button

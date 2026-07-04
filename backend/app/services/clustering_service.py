@@ -371,6 +371,7 @@ async def regenerate_cluster(
         build_cluster_pack,
         build_cluster_pack_from_brand_authority,
         build_cluster_pack_ungated,
+        pack_meets_gate,
         PackGateError,
     )
     prompt_row = (await db.execute(
@@ -426,10 +427,14 @@ async def regenerate_cluster(
     else:
         from app.models import ContentEvidencePack as PackModel
         pack = await db.get(PackModel, brief.evidence_pack_id)
-        # Existing pack from a prior run: detect brand-authority pack so we
-        # preserve the low-evidence status on regen-without-rebuild-brief.
-        if pack is not None and pack.sources and pack.sources[0].get("tier") == "brand":
-            low_evidence = True
+        # Existing pack from a prior run: re-check the pack's own sources
+        # against the current authority gate rather than sniffing for the
+        # synthetic "brand" tier. This also catches ungated T1/T2/T3 packs
+        # (from build_cluster_pack_ungated) that failed the gate — those were
+        # previously missed and would silently flip to "ready" on regen.
+        # Brand-authority packs count zero T1/T2 in gate_pack, so they still
+        # yield low_evidence=True — this strictly generalizes the old check.
+        low_evidence = pack is not None and not pack_meets_gate(pack.sources or [])
 
     # --- GENERATION PHASE ---
     cluster.status = "generating"

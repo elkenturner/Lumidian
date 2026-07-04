@@ -164,6 +164,17 @@ def gate_pack(pack: list[dict[str, Any]]) -> None:
         )
 
 
+def pack_meets_gate(sources: list[dict]) -> bool:
+    """True if these already-tiered sources would pass the authority gate now.
+    Used by the pack-reuse path to preserve low-evidence status without
+    sniffing synthetic tiers."""
+    try:
+        gate_pack(list(sources))
+        return True
+    except PackGateError:
+        return False
+
+
 # ---------------------------------------------------------------------------
 # Task 7: top-level builder + persistence
 # ---------------------------------------------------------------------------

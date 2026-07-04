@@ -269,6 +269,100 @@ async def test_regenerate_falls_back_to_ungated_t3_pack(monkeypatch):
         assert "blog-a.example.com" in domains
 
 
+def test_pack_meets_gate_false_for_all_t3_pack():
+    """An all-T3 pack (e.g. a persisted ungated fallback) never clears the gate."""
+    from app.services.cluster_evidence import pack_meets_gate
+
+    pack = [
+        {"url": "https://blog-a.example.com/1", "title": "A", "snippet": "...",
+         "domain": "blog-a.example.com", "tier": "T3"},
+        {"url": "https://blog-b.example.com/2", "title": "B", "snippet": "...",
+         "domain": "blog-b.example.com", "tier": "T3"},
+    ]
+    assert pack_meets_gate(pack) is False
+
+
+def test_pack_meets_gate_false_for_brand_authority_pack():
+    """A brand-authority pack (synthetic 'brand' tier) counts zero T1/T2 —
+    still fails the gate, so low_evidence semantics are unchanged for this path.
+    """
+    from app.services.cluster_evidence import pack_meets_gate
+
+    pack = [
+        {"url": "internal://brand-profile", "title": "Brand profile", "snippet": "...",
+         "domain": "brand-profile", "tier": "brand"},
+        {"url": "https://acme.com/about", "title": "About", "snippet": "...",
+         "domain": "acme.com", "tier": "brand"},
+    ]
+    assert pack_meets_gate(pack) is False
+
+
+def test_pack_meets_gate_true_for_authoritative_pack():
+    """1x T1 + 2x T2 clears both the min-T1 and min-T1+T2 floors."""
+    from app.services.cluster_evidence import pack_meets_gate
+
+    pack = [
+        {"url": "https://www.nih.gov/x", "title": "N", "snippet": "...",
+         "domain": "nih.gov", "tier": "T1"},
+        {"url": "https://techcrunch.com/y", "title": "T", "snippet": "...",
+         "domain": "techcrunch.com", "tier": "T2"},
+        {"url": "https://forbes.com/z", "title": "F", "snippet": "...",
+         "domain": "forbes.com", "tier": "T2"},
+    ]
+    assert pack_meets_gate(pack) is True
+
+
+@pytest.mark.asyncio
+async def test_regenerate_pieces_preserves_low_evidence_for_reused_ungated_pack(monkeypatch):
+    """Regen-without-rebuild-brief ('Regenerate pieces') reuses an existing pack.
+    If that pack is an ungated T3-only pack (from build_cluster_pack_ungated),
+    the cluster must land on ready_low_evidence, not ready — the old
+    `tier == "brand"` sniff missed this case entirely.
+    """
+    from app.services.clustering_service import regenerate_cluster
+
+    async def fake_gen(*args, **kwargs):
+        return "Piece title", "Piece body [S1]", 0.9, [], False
+    monkeypatch.setattr(
+        "app.services.clustering_service._generate_piece_text", fake_gen,
+    )
+
+    async with AsyncSessionLocal() as db:
+        from tests.conftest import _seed_minimal_user_brand_prompt
+        cluster_id, _ = await _seed_minimal_user_brand_prompt(db, slug="reuse-ungated-t3")
+
+        pack = ContentEvidencePack(
+            cluster_id=cluster_id, version=1,
+            sources=[
+                {"url": "https://blog-a.example.com/1", "title": "A", "snippet": "...",
+                 "domain": "blog-a.example.com", "tier": "T3"},
+                {"url": "https://blog-b.example.com/2", "title": "B", "snippet": "...",
+                 "domain": "blog-b.example.com", "tier": "T3"},
+            ],
+            total_t1=0, total_t2=0, total_t3=2,
+        )
+        db.add(pack); await db.flush()
+
+        brief = ContentBrief(
+            cluster_id=cluster_id, version=1,
+            positioning="p", key_claims=[], canonical_phrasings=[], stats=[],
+            narrative_spine="", tone_notes="", created_by="system",
+            evidence_pack_id=pack.id,
+        )
+        db.add(brief)
+        await db.commit()
+
+    async with AsyncSessionLocal() as db:
+        cluster = await regenerate_cluster(
+            db, cluster_id=cluster_id, tier="basic", rebuild_brief=False,
+        )
+        assert cluster.status == "ready_low_evidence"
+
+    async with AsyncSessionLocal() as db:
+        cluster = await db.get(ContentCluster, cluster_id)
+        assert cluster.status == "ready_low_evidence"
+
+
 @pytest.mark.asyncio
 async def test_truly_zero_sources_fails_with_no_sources_found(monkeypatch):
     """Serper empty + no citations + no profile + no audit -> briefing_failed,

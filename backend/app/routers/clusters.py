@@ -170,6 +170,7 @@ async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dic
             "last_generated_at": cluster.last_generated_at,
             "cluster_delta": cluster_delta,
             "posted_count": posted_count,
+            "failure_reason": cluster.failure_reason,
         })
     # Sort by visibility ascending (lowest needs most attention)
     out.sort(key=lambda c: c["visibility_pct"])

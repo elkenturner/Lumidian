@@ -1359,6 +1359,9 @@ class ContentClusterSummary(BaseModel):
     # New: cluster-effect signal aggregated from DraftAttribution rows
     cluster_delta: float | None  # sum of delta across posted pieces with attribution; None if no posted attribution data
     posted_count: int  # count of pieces with status='posted' in this cluster
+    # Verbatim ContentCluster.failure_reason (e.g. "no_sources_found"); None when healthy.
+    # Frontend translates the code into user-facing copy.
+    failure_reason: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -171,3 +171,34 @@ async def test_cross_user_isolation_404(client: httpx.AsyncClient, db_session: A
     # user A (currently logged in) should get 404 for user B's brand
     r = await client.get(f"/api/clusters/{brand_b.id}")
     assert r.status_code in (403, 404)
+
+
+async def test_list_clusters_includes_failure_reason(client: httpx.AsyncClient, db_session: AsyncSession) -> None:
+    """List endpoint must surface failure_reason so the board can explain a
+    briefing_failed cluster without requiring a drill-in to the detail view."""
+    await register_and_login(client, "ck-list-fail@test.com")
+    user = (await db_session.execute(select(User).where(User.email == "ck-list-fail@test.com"))).scalar_one()
+    brand = Brand(name="Acme", slug="ck-list-fail-acme", user_id=user.id)
+    db_session.add(brand)
+    await db_session.flush()
+
+    failed_prompt = Prompt(brand_id=brand.id, text="Q1", prompt_type="standard")
+    healthy_prompt = Prompt(brand_id=brand.id, text="Q2", prompt_type="standard")
+    db_session.add_all([failed_prompt, healthy_prompt])
+    await db_session.flush()
+
+    failed_cluster = ContentCluster(
+        brand_id=brand.id, prompt_id=failed_prompt.id,
+        status="briefing_failed", failure_reason="no_sources_found",
+    )
+    healthy_cluster = ContentCluster(
+        brand_id=brand.id, prompt_id=healthy_prompt.id, status="ready",
+    )
+    db_session.add_all([failed_cluster, healthy_cluster])
+    await db_session.commit()
+
+    r = await client.get(f"/api/clusters/{brand.id}")
+    assert r.status_code == 200
+    by_prompt = {item["prompt_id"]: item for item in r.json()}
+    assert by_prompt[failed_prompt.id]["failure_reason"] == "no_sources_found"
+    assert by_prompt[healthy_prompt.id]["failure_reason"] is None

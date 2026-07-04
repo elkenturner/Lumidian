@@ -42,7 +42,7 @@ export default function SiteAuditIndexPage() {
         <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-1.5">
           Site Audit
         </div>
-        <h1 className="text-2xl font-bold text-[var(--text-primary)] leading-tight">
+        <h1 className="text-2xl font-display text-[var(--text-primary)] leading-tight">
           Pick a brand to audit
         </h1>
         <p className="mt-1.5 max-w-2xl text-sm text-[var(--text-secondary)]">

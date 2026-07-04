@@ -164,7 +164,7 @@ export default function LoginPage() {
         {/* Main login card */}
         {!challengeToken && (
           <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-2xl p-6 md:p-8">
-            <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Welcome back</h1>
+            <h1 className="text-2xl font-display text-[var(--text-primary)] mb-1">Welcome back</h1>
             <p className="text-sm text-[var(--text-secondary)] mb-6">Sign in to your account</p>
 
             {error && (

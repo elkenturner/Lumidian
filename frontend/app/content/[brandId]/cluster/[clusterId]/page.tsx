@@ -226,7 +226,7 @@ export default function ClusterDetailPage() {
           <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-1.5">
             Cluster
           </div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] leading-tight">
+          <h1 className="text-2xl font-display text-[var(--text-primary)] leading-tight">
             {cluster.prompt_text}
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--text-faint)]">

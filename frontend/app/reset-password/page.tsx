@@ -99,7 +99,7 @@ export default function ResetPasswordPage() {
             </div>
           ) : (
             <>
-              <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Set new password</h1>
+              <h1 className="text-2xl font-display text-[var(--text-primary)] mb-1">Set new password</h1>
               <p className="text-sm text-[var(--text-secondary)] mb-6">Choose a new password for your account.</p>
 
               {!token ? (

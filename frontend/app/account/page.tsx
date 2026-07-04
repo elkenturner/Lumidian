@@ -92,7 +92,7 @@ export default function AccountPage() {
       className="px-3 sm:px-8 py-4 sm:py-8 max-w-7xl"
     >
       <div className="mb-7">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Account</h1>
+        <h1 className="text-2xl font-display text-[var(--text-primary)]">Account</h1>
         <p className="text-[13px] text-[var(--text-muted)] mt-1">Manage your subscription and account settings</p>
       </div>
 

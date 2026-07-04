@@ -1313,7 +1313,7 @@ export default function SettingsPage() {
     >
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-[var(--text-primary)]" style={{ letterSpacing: '-0.3px' }}>Settings</h1>
+        <h1 className="text-2xl font-display text-[var(--text-primary)]" style={{ letterSpacing: '-0.3px' }}>Settings</h1>
         <p className="text-[13px] text-[var(--text-muted)] mt-1.5">
           {brand ? `Managing settings for ${brand.name}` : 'Manage your account preferences'}
         </p>

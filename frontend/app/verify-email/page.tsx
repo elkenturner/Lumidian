@@ -92,14 +92,14 @@ export default function VerifyEmailPage() {
         <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-2xl p-6 md:p-8">
           {verified ? (
             <>
-              <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Email verified</h1>
+              <h1 className="text-2xl font-display text-[var(--text-primary)] mb-1">Email verified</h1>
               <p className="text-sm text-[var(--text-secondary)]">
                 Redirecting you to your dashboard...
               </p>
             </>
           ) : (
             <>
-              <h1 className="text-2xl font-bold text-[var(--text-primary)] mb-1">Check your email</h1>
+              <h1 className="text-2xl font-display text-[var(--text-primary)] mb-1">Check your email</h1>
               <p className="text-sm text-[var(--text-secondary)] mb-6">
                 We sent an 8-digit code to{' '}
                 <strong className="text-[var(--text-primary)]">{email}</strong>.

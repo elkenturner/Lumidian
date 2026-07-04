@@ -175,7 +175,7 @@ export default function BillingPage() {
   return (
     <div className="px-8 py-8 max-w-3xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Billing & Plan</h1>
+        <h1 className="text-2xl font-display text-[var(--text-primary)]">Billing & Plan</h1>
         <p className="text-[13px] text-[var(--text-muted)] mt-1.5">Manage your subscription and prompt limits</p>
       </div>
 

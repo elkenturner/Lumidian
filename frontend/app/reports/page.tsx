@@ -295,7 +295,7 @@ export default function ReportsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <div>
-          <h1 className="text-lg sm:text-2xl font-bold text-[var(--text-primary)]">Reports</h1>
+          <h1 className="text-lg sm:text-2xl font-display text-[var(--text-primary)]">Reports</h1>
           <p className="hidden sm:block text-[13px] text-[var(--text-muted)] mt-1.5">Per-prompt visibility breakdown by AI model</p>
         </div>
         <div className={`flex ${isMobile ? 'flex-col w-full' : 'items-center'} gap-2 md:gap-3`}>

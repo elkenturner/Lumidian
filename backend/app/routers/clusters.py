@@ -479,6 +479,13 @@ async def cluster_sources(brand_id: int, cluster_id: int, db: DbDep, user: Curre
 @router.get("/{brand_id}/{cluster_id}/briefs", response_model=list[ContentBriefSchema])
 async def brief_history(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUser):
     await _ensure_brand_owned(db, brand_id, user.id)
+    cluster = (await db.execute(
+        select(ContentCluster).where(
+            ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
+        )
+    )).scalar_one_or_none()
+    if cluster is None:
+        raise HTTPException(404, "Cluster not found")
     rows = (await db.execute(
         select(ContentBrief).where(ContentBrief.cluster_id == cluster_id)
         .order_by(ContentBrief.version.desc())

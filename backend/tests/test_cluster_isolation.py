@@ -10,7 +10,7 @@ from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models import (
-    ContentCluster, ContentClusterSource, ContentEvidencePack,
+    ContentBrief, ContentCluster, ContentClusterSource, ContentEvidencePack,
 )
 from tests.conftest import create_brand, login_user, register_and_login
 
@@ -58,6 +58,10 @@ async def _seed_two_brands_two_users(client) -> tuple[int, int, int, int]:
                 url=f"https://example.com/{c.id}", domain="example.com",
                 tier="T1", title="X", times_cited=0,
             ))
+            db.add(ContentBrief(
+                cluster_id=c.id, version=1,
+                positioning=f"secret positioning for cluster {c.id}",
+            ))
         await db.commit()
         await db.refresh(cluster_a)
         await db.refresh(cluster_b)
@@ -88,11 +92,8 @@ async def test_sources_endpoint_isolated(client):
 async def test_brief_history_endpoint_isolated(client):
     brand_a_id, _, _, cluster_b_id = await _seed_two_brands_two_users(client)
     r = await client.get(f"/api/clusters/{brand_a_id}/{cluster_b_id}/briefs")
-    # The endpoint queries by cluster_id only, after the brand ownership
-    # gate. User A's brand has no cluster_b, so this returns an empty list.
-    # That's acceptable isolation — no leakage of B's data.
-    assert r.status_code == 200
-    assert r.json() == []
+    # Cluster B belongs to another tenant: must 404, never return B's briefs.
+    assert r.status_code == 404
 
 
 @pytest.mark.asyncio

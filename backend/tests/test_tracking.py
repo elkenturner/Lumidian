@@ -74,6 +74,23 @@ async def test_list_runs_after_trigger(client: httpx.AsyncClient):
     assert len(resp.json()) == 1
 
 
+async def test_list_runs_exposes_failed_queries(client: httpx.AsyncClient):
+    """Run summaries must carry failed_queries so the UI can flag degraded runs."""
+    await register_and_login(client, email="failedq@example.com")
+    brand = await create_brand(client, name="Failed Q Brand")
+
+    from app.database import AsyncSessionLocal
+    from app.models import TrackingRun
+    async with AsyncSessionLocal() as db:
+        db.add(TrackingRun(brand_id=brand["id"], status="completed", run_type="manual",
+                           total_queries=7, total_mentions=4, failed_queries=83))
+        await db.commit()
+
+    resp = await client.get(f"/api/tracking/runs/{brand['id']}")
+    assert resp.status_code == 200
+    assert resp.json()[0]["failed_queries"] == 83
+
+
 async def test_list_runs_access_control(client: httpx.AsyncClient):
     await register_and_login(client, email="ownerruns2@example.com")
     brand = await create_brand(client, name="Owner Runs 2 Brand")

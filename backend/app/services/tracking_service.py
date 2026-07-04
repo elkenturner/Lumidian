@@ -271,6 +271,7 @@ async def finalize_run(run_id: int, *, error_message: str | None = None) -> bool
         run.overall_score = round(overall_score, 2)
         run.total_queries = overall_queries
         run.total_mentions = overall_mentions
+        run.failed_queries = sum(1 for qr in qr_rows if qr.error)
         if error_message:
             run.error_message = error_message
 

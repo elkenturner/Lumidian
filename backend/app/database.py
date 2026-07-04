@@ -859,6 +859,26 @@ async def run_migrations():
 
         logger.info("Migration applied: cluster lifecycle flow")
 
+    # --- Migration: tracking_runs.failed_queries (2026-07-04) ---
+    # Counts queries that errored during a run. total_queries only counts
+    # successes, so a run where 83/90 queries timed out previously looked
+    # identical to a healthy small run — the UI can now flag degraded runs.
+    async with engine.begin() as conn:
+        result = await conn.execute(text("PRAGMA table_info(tracking_runs)"))
+        cols = {row[1] for row in result.fetchall()}
+        if "failed_queries" not in cols:
+            await conn.execute(text("ALTER TABLE tracking_runs ADD COLUMN failed_queries INTEGER"))
+            # One-time backfill from query_results so already-degraded runs
+            # (e.g. a run where most queries timed out) get flagged in the UI.
+            await conn.execute(text("""
+                UPDATE tracking_runs SET failed_queries = (
+                    SELECT COUNT(*) FROM query_results qr
+                    WHERE qr.tracking_run_id = tracking_runs.id
+                      AND qr.error IS NOT NULL AND qr.error != ''
+                ) WHERE status = 'completed'
+            """))
+            logger.info("Migration applied: tracking_runs.failed_queries column + backfill")
+
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):
     """On startup, resolve tracking runs stuck in pending/running.

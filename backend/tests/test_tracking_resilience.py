@@ -9,8 +9,11 @@ from app.models import Brand, Prompt, QueryResult, RunModelScore, TrackingRun, U
 from app.services.tracking_service import finalize_run, run_tracking
 
 
-async def _seed_run_with_results(mentioned_pattern: list[bool], model: str = "gemini") -> tuple[int, int]:
-    """Create a user→brand→prompt→running-run with one QueryResult per bool. Returns (run_id, brand_id)."""
+async def _seed_run_with_results(
+    mentioned_pattern: list[bool], model: str = "gemini", errored: int = 0
+) -> tuple[int, int]:
+    """Create a user→brand→prompt→running-run with one QueryResult per bool,
+    plus `errored` failed-query rows. Returns (run_id, brand_id)."""
     async with AsyncSessionLocal() as db:
         user = User(email="fin@example.com", password_hash="x", subscription_tier="pro",
                     subscription_status="active", email_verified=True)
@@ -24,6 +27,10 @@ async def _seed_run_with_results(mentioned_pattern: list[bool], model: str = "ge
         for i, m in enumerate(mentioned_pattern, start=1):
             db.add(QueryResult(tracking_run_id=run.id, prompt_id=prompt.id, model=model,
                                run_number=i, response_text="...", mentioned=m, error=None))
+        for i in range(errored):
+            db.add(QueryResult(tracking_run_id=run.id, prompt_id=prompt.id, model=model,
+                               run_number=len(mentioned_pattern) + i + 1, response_text="",
+                               mentioned=False, error="Request timed out"))
         await db.commit()
         return run.id, brand.id
 
@@ -43,6 +50,28 @@ async def test_finalize_run_computes_scores_and_completes():
             select(RunModelScore).where(RunModelScore.tracking_run_id == run_id)
         )).scalars().all()
         assert len(scores) == 1 and scores[0].score == 66.67
+
+
+async def test_finalize_run_records_failed_query_count():
+    """A partially-degraded run (some queries errored) must persist how many
+    queries failed so the UI can flag the run instead of presenting the
+    surviving handful of responses as a healthy score."""
+    run_id, _ = await _seed_run_with_results([True, False], errored=3)
+    ok = await finalize_run(run_id)
+    assert ok is True
+    async with AsyncSessionLocal() as db:
+        run = await db.get(TrackingRun, run_id)
+        assert run.status == "completed"
+        assert run.total_queries == 2       # errored rows stay out of the denominator
+        assert run.failed_queries == 3      # ...but the failure count is recorded
+
+
+async def test_finalize_run_failed_queries_zero_on_clean_run():
+    run_id, _ = await _seed_run_with_results([True, True, False])
+    await finalize_run(run_id)
+    async with AsyncSessionLocal() as db:
+        run = await db.get(TrackingRun, run_id)
+        assert run.failed_queries == 0
 
 
 async def test_finalize_run_is_idempotent():

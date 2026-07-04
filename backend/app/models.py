@@ -180,6 +180,10 @@ class TrackingRun(Base):
     overall_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     total_queries: Mapped[int | None] = mapped_column(Integer, nullable=True)
     total_mentions: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Queries that errored during the run. total_queries counts only successes
+    # (errors stay out of the score denominator), so without this a run where
+    # 83/90 queries timed out is indistinguishable from a healthy small run.
+    failed_queries: Mapped[int | None] = mapped_column(Integer, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     has_content_influence: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

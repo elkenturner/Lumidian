@@ -65,7 +65,19 @@ function PieceStatusChip({
         </span>
       );
     }
-    const positive = delta >= 0;
+    // Round first so a 0.04 delta doesn't render as a green "+0.0 pts".
+    const rounded = Math.round(delta * 10) / 10;
+    if (rounded === 0) {
+      return (
+        <span
+          className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border-subtle)] bg-[rgba(148,163,184,0.08)] text-[var(--text-muted)]"
+          title="Change in this brand's AI-visibility score for this question since the post went live"
+        >
+          Posted · no change yet
+        </span>
+      );
+    }
+    const positive = rounded > 0;
     return (
       <span
         className={`text-[11px] px-2 py-0.5 rounded-md border ${
@@ -75,7 +87,7 @@ function PieceStatusChip({
         }`}
         title="Change in this brand's AI-visibility score for this question since the post went live"
       >
-        Posted {positive ? "+" : ""}{delta.toFixed(1)} pts
+        Posted {positive ? "+" : ""}{rounded.toFixed(1)} pts
       </span>
     );
   }

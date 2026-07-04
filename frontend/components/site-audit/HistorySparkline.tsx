@@ -43,10 +43,11 @@ export function HistorySparkline({ brandId }: Props) {
         </p>
         <p
           className="text-xs tabular-nums mt-0.5"
-          style={{ color: delta >= 0 ? 'var(--success-text)' : 'var(--danger-text)' }}
+          style={{ color: delta === 0 ? 'var(--text-faint)' : delta > 0 ? 'var(--success-text)' : 'var(--danger-text)' }}
         >
-          {delta >= 0 ? '+' : ''}
-          {delta.toFixed(1)} since last
+          {delta === 0
+            ? 'No change vs last audit'
+            : `${delta > 0 ? '+' : ''}${delta.toFixed(1)} pts vs last audit`}
         </p>
       </div>
       <div className="flex-1 h-12">

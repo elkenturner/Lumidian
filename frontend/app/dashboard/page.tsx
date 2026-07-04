@@ -430,6 +430,10 @@ export default function DashboardPage() {
   })() : null;
 
   const sentData = analytics?.sentiment;
+  const sentSamples = sentData?.classified_mentions ?? 0;
+  // Percentages built from 1-2 mentions read as false confidence ("100%
+  // Positive" next to a 0% visibility score) — require 3 before showing them.
+  const sentLowSample = !!sentData?.has_data && sentSamples < 3;
   // Lead with whichever sentiment actually dominates — previously any positive
   // share won the headline, so 10% positive / 90% negative read "10% Positive".
   const sentDominant = sentData?.has_data
@@ -804,7 +808,7 @@ export default function DashboardPage() {
                     <div className="flex items-start justify-between mb-2">
                       <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
                         Sentiment
-                        <HelpTooltip text="How positively AI models describe your brand when they mention it." />
+                        <HelpTooltip text="How positively AI models describe your brand when they mention it, measured across your recent reports." />
                       </p>
                       <div className="w-8 h-8 rounded-lg bg-[var(--bg-tinted)] flex items-center justify-center text-[var(--accent)] flex-shrink-0">
                         <TrendingUp size={15} />
@@ -812,7 +816,7 @@ export default function DashboardPage() {
                     </div>
                     {loadingAnalytics ? (
                       <div className="h-8 w-16 bg-[var(--bg-tinted)] rounded animate-pulse mt-1" />
-                    ) : sentData?.has_data && sentHeadline ? (
+                    ) : sentData?.has_data && sentHeadline && !sentLowSample ? (
                       <>
                         <p className="text-2xl font-bold mt-1" style={{ color: sentColor }}>
                           {sentHeadline}
@@ -823,18 +827,20 @@ export default function DashboardPage() {
                           <div style={{ width: `${sentData.negative_pct}%`, background: 'var(--danger)' }} />
                         </div>
                         <p className="text-xs text-[var(--text-faint)] mt-1.5">
-                          {Math.round(sentData.neutral_pct)}% neutral &middot; {Math.round(sentData.negative_pct)}% negative
+                          {Math.round(sentData.neutral_pct)}% neutral &middot; {Math.round(sentData.negative_pct)}% negative &middot; {sentSamples} mentions
                         </p>
                       </>
                     ) : (
                       <>
                         <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">&mdash;</p>
                         <p className="text-xs text-[var(--text-faint)] mt-1">
-                          {(sentData?.unclassified_mentions ?? 0) > 0
+                          {sentLowSample
+                            ? `Only ${sentSamples} mention${sentSamples !== 1 ? 's' : ''} so far — not enough to gauge sentiment`
+                            : (sentData?.unclassified_mentions ?? 0) > 0
                             ? 'Sentiment unavailable for this run'
                             : 'No mentions to analyze'}
                         </p>
-                        {(sentData?.unclassified_mentions ?? 0) > 0 && (
+                        {!sentLowSample && (sentData?.unclassified_mentions ?? 0) > 0 && (
                           <p className="text-[10px] text-[var(--text-faint)] mt-0.5">
                             {`${sentData!.unclassified_mentions} mention${sentData!.unclassified_mentions !== 1 ? 's' : ''} found, but classification didn't complete.`}
                           </p>
@@ -928,7 +934,7 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
                       Avg Position
-                      <HelpTooltip text="Position indicates where in the AI response your brand typically appears. Earlier is better." />
+                      <HelpTooltip text="Where in the AI response your brand typically appears when mentioned, across your recent reports. Earlier is better." />
                     </p>
                     <div className="w-8 h-8 rounded-lg bg-[var(--bg-tinted)] flex items-center justify-center text-[var(--accent)]">
                       <Building2 size={15} />
@@ -947,7 +953,7 @@ export default function DashboardPage() {
                           ? 'Mentioned early in responses'
                           : analytics.position.score <= 7
                           ? 'Mentioned mid-way in responses'
-                          : 'Mentioned late in responses'} &middot; {analytics.position.sample_count} samples
+                          : 'Mentioned late in responses'} &middot; based on {analytics.position.sample_count} mention{analytics.position.sample_count !== 1 ? 's' : ''}
                       </p>
                     </>
                   ) : (
@@ -962,7 +968,7 @@ export default function DashboardPage() {
                 <div className="lg:col-span-2 card p-5 flex flex-col">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
-                      Top Cited Domains (across all tracked prompts)
+                      Top Cited Domains
                       <HelpTooltip text="Websites that AI models cite most often across all tracked prompts — regardless of whether your brand was mentioned." />
                     </p>
                     <Globe size={14} className="text-[var(--text-faint)]" />

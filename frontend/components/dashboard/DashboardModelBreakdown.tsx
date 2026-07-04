@@ -26,7 +26,7 @@ export default function DashboardModelBreakdown({ models, deltas, isPitchBrand }
               <span className="text-xs tabular-nums text-[var(--text-secondary)] flex items-center gap-1">
                 {delta !== undefined && delta !== 0 && (
                   <span style={{ color: delta > 0 ? 'var(--success)' : 'var(--danger-text)', fontWeight: 600 }}>
-                    {delta > 0 ? `\u2191${delta}%` : `\u2193${Math.abs(delta)}%`}
+                    {delta > 0 ? `\u2191${delta} pt${delta !== 1 ? 's' : ''}` : `\u2193${Math.abs(delta)} pt${Math.abs(delta) !== 1 ? 's' : ''}`}
                   </span>
                 )}
                 {pct}% <span className="text-[var(--text-faint)]">({m.mention_count}/{m.total})</span>

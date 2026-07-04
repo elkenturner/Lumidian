@@ -28,9 +28,9 @@ export default function StatsGrid({ totalPrompts, daysSinceFirst, publishedCount
     value: string | number;
     icon: React.ElementType;
   }> = [
-    { label: 'Prompts Tracked',   value: totalPrompts || '\u2014',                            icon: MessageSquare },
-    { label: 'Days Tracking',     value: daysSinceFirst != null ? daysSinceFirst : '\u2014',  icon: TrendingUp },
-    { label: 'Content Published', value: publishedCount || '\u2014',                          icon: CheckCircle2 },
+    { label: 'Prompts Tracked',   value: totalPrompts,                                                          icon: MessageSquare },
+    { label: 'Days Tracking',     value: daysSinceFirst != null ? (daysSinceFirst === 0 ? '<1' : daysSinceFirst) : '\u2014', icon: TrendingUp },
+    { label: 'Content Published', value: publishedCount,                                                        icon: CheckCircle2 },
   ];
 
   return (

@@ -41,7 +41,7 @@ export function AuditHistoryList({ brandId }: Props) {
               </span>
               <span className="text-xs text-[var(--text-muted)] capitalize">{a.status}</span>
               <span className="text-xs text-[var(--text-secondary)] tabular-nums text-right">
-                {a.total_pages ?? '—'} pp
+                {a.total_pages ?? '—'} page{a.total_pages !== 1 ? 's' : ''}
               </span>
               <span className="text-xs tabular-nums text-right" style={{ color: gradeColor(grade) }}>
                 {grade}

@@ -349,6 +349,7 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         negative_pct=round(neg_pct, 1),
         has_data=has_data,
         unclassified_mentions=unclassified_mentions,
+        classified_mentions=sent_total,
     )
 
     # 7. Average position

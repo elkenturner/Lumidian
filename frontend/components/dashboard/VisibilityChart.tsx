@@ -62,11 +62,13 @@ export default function VisibilityChart({
           ) : (
             <>
               <p className="text-4xl sm:text-5xl md:text-6xl font-bold text-[var(--text-primary)] mt-1 leading-none">
-                {score != null ? `${animatedScore}%` : 'N/A'}
+                {score != null ? `${animatedScore}%` : '\u2014'}
               </p>
               {scoreDelta !== null && (
                 <p className={`text-xs font-medium mt-2 ${scoreDelta > 0 ? 'text-[var(--success)]' : scoreDelta < 0 ? 'text-[var(--danger-text)]' : 'text-[var(--text-muted)]'}`}>
-                  {scoreDelta > 0 ? `+${scoreDelta}%` : scoreDelta < 0 ? `${scoreDelta}%` : '\u2014'} since {sinceLastRun ?? 'last run'}
+                  {scoreDelta === 0
+                    ? 'No change vs previous report'
+                    : `${scoreDelta > 0 ? '\u2191' : '\u2193'}${Math.abs(scoreDelta)} pt${Math.abs(scoreDelta) !== 1 ? 's' : ''} vs previous report`}
                 </p>
               )}
               {scoreConfidence && scoreConfidence !== 'high' && score != null && (
@@ -112,9 +114,12 @@ export default function VisibilityChart({
           {sparkData.length === 1 ? '1 run recorded' : 'No trend data yet'}
         </p>
       )}
-      {nextReportHours !== null && (
+      {(sinceLastRun || nextReportHours !== null) && (
         <p className="text-[11px] text-[var(--text-faint)] mt-2">
-          Next report in {nextReportHours}h
+          {[
+            sinceLastRun ? `Updated ${sinceLastRun}` : null,
+            nextReportHours !== null ? `${sinceLastRun ? 'next' : 'Next'} report in ~${nextReportHours}h` : null,
+          ].filter(Boolean).join(' · ')}
         </p>
       )}
     </div>

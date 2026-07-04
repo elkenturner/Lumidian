@@ -8,10 +8,13 @@ import {
   getBrand,
   generateNow,
   getDraftStatusFresh,
+  getContentReadiness,
   listClusters,
   regenerateClusterByPrompt,
   type BrandDetail,
   type ContentClusterSummary,
+  type ContentReadiness,
+  type ContentReadinessWarning,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ClusterCard } from "@/components/content/cluster/ClusterCard";
@@ -27,6 +30,22 @@ import {
   DropdownMenuRadioItem,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+
+// ── Readiness preflight (Task F3) ───────────────────────────────────────────
+// Per-warning-code link shown next to each message in the confirm layer.
+const READINESS_WARNING_LINK: Record<string, { href: (brandId: number) => string; label: string }> = {
+  profile_empty: { href: () => "/settings?tab=profile", label: "Fix brand profile" },
+  no_sources: { href: (brandId) => `/content/${brandId}/sources`, label: "Add sources" },
+  no_tracking_run: { href: () => "/dashboard", label: "Run tracking" },
+};
 
 type SortKey = "visibility" | "updated" | "version";
 type FilterKey = "all" | "not_started" | "needs_attention" | "ready" | "in_progress" | "failed";
@@ -187,9 +206,12 @@ export default function ContentBrandPage() {
   const [loadError, setLoadError] = useState(false);
   const [sweepSummary, setSweepSummary] = useState<SweepSummary | null>(null);
   const [sweepDismissed, setSweepDismissed] = useState(false);
-  // F3 (readiness preflight) isn't built yet — this stays null until that task
-  // lands and starts populating it. With null readiness we just omit the link.
-  const [readiness] = useState<{ profile_empty: boolean } | null>(null);
+  // Populated by the generate preflight (Task F3) so the sweep banner's "Fix
+  // brand profile" link (F2) can light up once we know the brand's profile
+  // state. Stays null until the user attempts a generate.
+  const [readiness, setReadiness] = useState<ContentReadiness | null>(null);
+  // Non-null while the "before you generate" confirm layer is showing.
+  const [pendingWarnings, setPendingWarnings] = useState<ContentReadinessWarning[] | null>(null);
   const { hidden, toggle, isVisible } = useHiddenPlatforms(brandId);
   const platformsVisible = CLUSTER_PLATFORMS.filter((p) => !hidden.has(p)).length;
   // True only once a poll has actually observed the backend mid-sweep. Guards
@@ -313,8 +335,7 @@ export default function ContentBrandPage() {
     }
   }
 
-  async function generateAll() {
-    if (generating) return;
+  async function runGenerateNow() {
     setGenError(null);
     try {
       // skipReady=true → only pending/failed clusters are (re)generated, never
@@ -331,6 +352,34 @@ export default function ContentBrandPage() {
         setGenError("Couldn't start generation. Please try again.");
       }
     }
+  }
+
+  // Entry point for both the first-run hero button and the toolbar "Generate
+  // N not started" button. Runs a readiness preflight first: if it turns up
+  // warnings, hold generation behind a confirm layer; if the preflight call
+  // itself fails, don't let that block generation — just proceed.
+  async function generateAll() {
+    if (generating) return;
+    try {
+      const r = await getContentReadiness(brandId);
+      setReadiness(r);
+      if (r.warnings.length > 0) {
+        setPendingWarnings(r.warnings);
+        return;
+      }
+    } catch (e) {
+      console.warn("Readiness preflight failed; proceeding without it.", e);
+    }
+    await runGenerateNow();
+  }
+
+  function confirmGenerateAnyway() {
+    setPendingWarnings(null);
+    void runGenerateNow();
+  }
+
+  function cancelGenerate() {
+    setPendingWarnings(null);
   }
 
   async function retryFailed() {
@@ -596,6 +645,49 @@ export default function ContentBrandPage() {
       )}
 
       {started && genError && <p className="text-xs text-[#fb7185]">{genError}</p>}
+
+      {/* Readiness preflight confirm layer — shown when the pre-generate check
+          found gaps. Generation only proceeds via "Generate anyway". */}
+      <Dialog open={pendingWarnings !== null} onOpenChange={(o) => !o && cancelGenerate()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Before you generate</DialogTitle>
+            <DialogDescription>
+              Posts will still be written, but they&apos;ll be stronger if you fix these first.
+            </DialogDescription>
+          </DialogHeader>
+          <ul className="space-y-2.5">
+            {(pendingWarnings ?? []).map((w) => {
+              const link = READINESS_WARNING_LINK[w.code];
+              return (
+                <li key={w.code} className="text-sm text-[var(--text-secondary)]">
+                  {w.message}
+                  {link && (
+                    <>
+                      {" "}
+                      <Link
+                        href={link.href(brandId)}
+                        className="text-[var(--accent)] underline underline-offset-2 hover:opacity-80 whitespace-nowrap"
+                      >
+                        {link.label}
+                      </Link>
+                    </>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={cancelGenerate}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={confirmGenerateAnyway} className="gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" />
+              Generate anyway
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <div className="pt-8 mt-8 border-t border-[var(--border-subtle)]">
         <button

@@ -556,6 +556,26 @@ export async function getDraftStatusFresh(brandId: number): Promise<DraftQueueSt
   return res.data;
 }
 
+export interface ContentReadinessWarning {
+  code: string;
+  message: string;
+}
+
+export interface ContentReadiness {
+  profile_completion_pct: number;
+  profile_empty: boolean;
+  source_count: number;
+  has_completed_run: boolean;
+  warnings: ContentReadinessWarning[];
+}
+
+/** Preflight check surfaced before bulk generation — never blocks generation
+ * on its own; callers should proceed if this call fails. */
+export async function getContentReadiness(brandId: number): Promise<ContentReadiness> {
+  const res = await api.get<ContentReadiness>(`/content/${brandId}/readiness`);
+  return res.data;
+}
+
 // ── Opportunity functions ────────────────────────────────────────────────────
 
 export async function getOpportunities(brandId: number): Promise<ContentOpportunity[]> {

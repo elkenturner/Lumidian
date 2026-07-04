@@ -737,6 +737,8 @@ class AiFillProfileResponse(BaseModel):
     company_description: str | None = None
     tone_of_voice: str | None = None
     key_stats: list[str] = []
+    target_audience: str | None = None
+    persisted_fields: list[str] = []
 
 
 # ── Brand with stats (for brand switcher) ─────────────────────────────────────

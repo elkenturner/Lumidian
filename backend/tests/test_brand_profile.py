@@ -10,7 +10,20 @@ Covers:
 """
 from __future__ import annotations
 
+from unittest.mock import AsyncMock, MagicMock, patch
+
 from tests.conftest import create_brand, register_and_login
+
+
+def _mock_anthropic_returning(json_text: str):
+    """Patch context manager that makes anthropic.AsyncAnthropic return json_text from messages.create."""
+    msg = MagicMock()
+    msg.content = [MagicMock(text=json_text)]
+    fake_client = AsyncMock()
+    fake_client.messages.create = AsyncMock(return_value=msg)
+    return patch("anthropic.AsyncAnthropic", return_value=fake_client), patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "test-key"}
+    )
 
 # ── GET /api/brands/{id}/profile ─────────────────────────────────────────────
 
@@ -311,6 +324,79 @@ async def test_target_audience_roundtrip(client):
     assert data["target_audience"] == "mid-market trucking ops leaders"
     # 1 of 7 fields filled
     assert data["completion_pct"] == 14.3
+
+
+# ── AI-fill persistence ──────────────────────────────────────────────────────
+
+async def test_ai_fill_persists_into_empty_fields(client):
+    """Mock the LLM to return description/tone/key_stats/target_audience.
+    POST ai-fill on an empty profile -> GET shows them persisted;
+    response.persisted_fields lists all four."""
+    await register_and_login(client)
+    brand = await create_brand(client)
+
+    # Pre-seed cached website context so ai-fill skips the Jina fetch.
+    await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={"internal_brand_context": "Scraped homepage copy about the company."},
+    )
+
+    fake_json = (
+        '{"company_description": "We build AI tools for logistics.", '
+        '"tone_of_voice": "Confident and direct.", '
+        '"key_stats": ["100K users", "$10M ARR"], '
+        '"target_audience": "mid-market trucking ops leaders"}'
+    )
+    anth_patch, env_patch = _mock_anthropic_returning(fake_json)
+    with anth_patch, env_patch:
+        resp = await client.post(f"/api/brands/{brand['id']}/profile/ai-fill")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert set(body["persisted_fields"]) == {
+        "company_description", "tone_of_voice", "key_stats", "target_audience",
+    }
+    assert body["target_audience"] == "mid-market trucking ops leaders"
+
+    get_resp = await client.get(f"/api/brands/{brand['id']}/profile")
+    data = get_resp.json()
+    assert data["company_description"] == "We build AI tools for logistics."
+    assert data["tone_of_voice"] == "Confident and direct."
+    assert data["key_stats"] == ["100K users", "$10M ARR"]
+    assert data["target_audience"] == "mid-market trucking ops leaders"
+
+
+async def test_ai_fill_never_overwrites_filled_fields(client):
+    """Pre-fill tone_of_voice; ai-fill suggests a different tone ->
+    stored tone unchanged; persisted_fields excludes tone_of_voice."""
+    await register_and_login(client)
+    brand = await create_brand(client)
+
+    await client.put(
+        f"/api/brands/{brand['id']}/profile",
+        json={
+            "tone_of_voice": "Playful and irreverent",
+            "internal_brand_context": "Scraped homepage copy about the company.",
+        },
+    )
+
+    fake_json = (
+        '{"company_description": "We build AI tools for logistics.", '
+        '"tone_of_voice": "Serious and formal.", '
+        '"key_stats": [], '
+        '"target_audience": null}'
+    )
+    anth_patch, env_patch = _mock_anthropic_returning(fake_json)
+    with anth_patch, env_patch:
+        resp = await client.post(f"/api/brands/{brand['id']}/profile/ai-fill")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert "tone_of_voice" not in body["persisted_fields"]
+    assert "company_description" in body["persisted_fields"]
+
+    get_resp = await client.get(f"/api/brands/{brand['id']}/profile")
+    data = get_resp.json()
+    assert data["tone_of_voice"] == "Playful and irreverent"
+    assert data["company_description"] == "We build AI tools for logistics."
 
 
 async def test_internal_brand_context_writable(client):

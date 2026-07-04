@@ -243,8 +243,10 @@ async def update_brand_profile(brand_id: int, payload: BrandProfileUpdate, db: D
 @router.post("/{brand_id}/profile/ai-fill", response_model=AiFillProfileResponse)
 async def ai_fill_profile(brand_id: int, db: DbDep, user: CurrentUser):
     """
-    Scan the brand's website and return AI-generated suggestions for profile fields.
-    Does NOT save anything — the frontend applies suggestions and user saves manually.
+    Scan the brand's website, generate AI suggestions for profile fields, and
+    persist each suggested field into the profile ONLY where the stored field
+    is currently empty (non-destructive — never overwrites an existing value).
+    The response includes `persisted_fields` listing which fields were written.
     """
     check_rate_limit(user.id, limit=3, scope="profile_ai_fill")
 
@@ -293,7 +295,8 @@ Return a JSON object with exactly these keys (use null for anything you cannot d
 {{
   "company_description": "2-3 sentence description of what the company does, its products/services, and what makes it unique",
   "tone_of_voice": "1-2 sentence description of the brand's communication style and personality",
-  "key_stats": ["list", "of", "up to 5 specific facts, numbers, or claims found on the site"]
+  "key_stats": ["list", "of", "up to 5 specific facts, numbers, or claims found on the site"],
+  "target_audience": "1 sentence describing who the brand sells to (its target customer/audience)"
 }}
 
 Return ONLY the JSON object, no markdown, no explanation. Never refuse or explain why you cannot generate a description — always produce your best answer from the content."""
@@ -322,11 +325,31 @@ Return ONLY the JSON object, no markdown, no explanation. Never refuse or explai
     if any(desc.lower().startswith(p) for p in ["i cannot", "i can't", "i'm unable", "sorry,", "unfortunately,"]):
         data["company_description"] = None
 
-    return AiFillProfileResponse(
+    suggestions = AiFillProfileResponse(
         company_description=data.get("company_description") or None,
         tone_of_voice=data.get("tone_of_voice") or None,
         key_stats=[s for s in (data.get("key_stats") or []) if isinstance(s, str)],
+        target_audience=data.get("target_audience") or None,
     )
+
+    persisted: list[str] = []
+    if suggestions.company_description and not (profile.company_description or "").strip():
+        profile.company_description = suggestions.company_description
+        persisted.append("company_description")
+    if suggestions.tone_of_voice and not (profile.tone_of_voice or "").strip():
+        profile.tone_of_voice = suggestions.tone_of_voice
+        persisted.append("tone_of_voice")
+    if suggestions.key_stats and not profile.key_stats:
+        profile.key_stats = json.dumps(suggestions.key_stats)
+        persisted.append("key_stats")
+    if suggestions.target_audience and not (profile.target_audience or "").strip():
+        profile.target_audience = suggestions.target_audience
+        persisted.append("target_audience")
+    if persisted:
+        await db.commit()
+
+    suggestions.persisted_fields = persisted
+    return suggestions
 
 
 # ── BrandSource library ─────────────────────────────────────────────────────

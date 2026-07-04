@@ -6,7 +6,7 @@ const PUBLIC_PATHS = ['/', '/login', '/register', '/onboarding', '/forgot-passwo
 // Paths that redirect to /dashboard if already authenticated
 const AUTH_REDIRECT_PATHS = ['/login', '/register'];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const session = request.cookies.get('clarity_session')?.value;
   const isAuthenticated = session === '1';

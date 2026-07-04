@@ -34,7 +34,8 @@ import {
   Prompt,
   CompetitorAnalysis,
 } from '@/lib/api';
-import TrendChart from '@/components/TrendChart';
+import dynamic from 'next/dynamic';
+const TrendChart = dynamic(() => import('@/components/TrendChart'), { ssr: false, loading: () => <div className="min-h-[280px] animate-pulse" /> });
 import { useBrand } from '@/contexts/BrandContext';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';

@@ -65,21 +65,32 @@ import { parseUTCISO } from '@/lib/utils/formatting';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 
+import dynamic from 'next/dynamic';
 import {
   DashboardHeader,
   StatsGrid,
-  VisibilityChart,
   BrandTable,
   BestPromptCard,
-  DonutDomains,
   DashboardModelBreakdown,
   CitationGaps,
   HelpTooltip,
   MethodologyCallout,
   buildPromptGroups,
-  CompetitiveGapCard,
-  CompetitiveGapDrawer,
 } from '@/components/dashboard';
+
+// Recharts is ~390KB; load the chart components on demand so they don't sit in
+// the dashboard's initial bundle. Placeholders reserve height to avoid shift.
+const chartFallback = <div className="card min-h-[240px] animate-pulse" />;
+const VisibilityChart = dynamic(() => import('@/components/dashboard/VisibilityChart'), { ssr: false, loading: () => chartFallback });
+const DonutDomains = dynamic(() => import('@/components/dashboard/DonutDomains'), { ssr: false });
+const CompetitiveGapCard = dynamic(
+  () => import('@/components/dashboard/CompetitiveGapCard').then((m) => m.CompetitiveGapCard),
+  { ssr: false, loading: () => chartFallback },
+);
+const CompetitiveGapDrawer = dynamic(
+  () => import('@/components/dashboard/CompetitiveGapDrawer').then((m) => m.CompetitiveGapDrawer),
+  { ssr: false },
+);
 import { AskCoachButton } from '@/components/coach/AskCoachButton';
 
 // ── Page ───────────────────────────────────────────────────────────────────────

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ExternalLink } from "lucide-react";
+import { Check, ExternalLink, Loader2, ScrollText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   acceptClusterPillar,
+  regenerateClusterPiece,
   rejectClusterPillar,
   type ContentClusterDetail,
   type ContentDraft,
@@ -28,7 +29,18 @@ interface Props {
  */
 export function OwnedSiteCard({ brandId, cluster, candidate, draft, onClusterUpdated, onDraftUpdated }: Props) {
   const [busy, setBusy] = useState(false);
+  const [deepGenerating, setDeepGenerating] = useState(false);
   const showProposal = cluster.pillar_mode === "proposed" && !!candidate && !draft;
+
+  async function writeDeepVersion() {
+    setDeepGenerating(true);
+    try {
+      const updated = await regenerateClusterPiece(brandId, cluster.id, "owned_site", { depth: "deep" });
+      onDraftUpdated(updated);
+    } finally {
+      setDeepGenerating(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-2">
@@ -86,6 +98,23 @@ export function OwnedSiteCard({ brandId, cluster, candidate, draft, onClusterUpd
         </div>
       )}
       <PieceCard brandId={brandId} clusterId={cluster.id} platform="owned_site" draft={draft} onUpdated={onDraftUpdated} />
+      <div className="flex justify-end">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={writeDeepVersion}
+          disabled={deepGenerating}
+          className="!px-2 text-[var(--text-secondary)]"
+          title="Longer FAQ-rich page (1,800+ words) built for AI citation — takes a bit longer"
+        >
+          {deepGenerating ? (
+            <Loader2 className="h-3 w-3 animate-spin" />
+          ) : (
+            <ScrollText className="h-3 w-3" />
+          )}
+          {deepGenerating ? "Writing deep version…" : "Write deep version"}
+        </Button>
+      </div>
     </div>
   );
 }

@@ -2166,8 +2166,12 @@ export async function regenerateClusterPiece(
   brandId: number,
   clusterId: number,
   platform: string,
+  opts?: { depth?: "deep" },
 ): Promise<ContentDraft> {
-  const res = await api.post<ContentDraft>(`/clusters/${brandId}/${clusterId}/regenerate-piece`, { platform });
+  const res = await api.post<ContentDraft>(`/clusters/${brandId}/${clusterId}/regenerate-piece`, {
+    platform,
+    ...(opts?.depth ? { depth: opts.depth } : {}),
+  });
   return res.data;
 }
 

@@ -1442,7 +1442,10 @@ class PillarCandidateSchema(BaseModel):
 
 
 class RegeneratePieceRequest(BaseModel):
-    platform: str  # must be one of: linkedin, medium, reddit, quora, x
+    platform: str  # must be one of: linkedin, medium, reddit, quora, x, owned_site
+    # "deep" is only meaningful for platform="owned_site" — the router forwards
+    # it to regenerate_piece, which ignores it for every other platform.
+    depth: Literal["standard", "deep"] = "standard"
 
 
 class ClusterAngleUpdate(BaseModel):

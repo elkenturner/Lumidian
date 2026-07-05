@@ -62,6 +62,7 @@ def _derive_title_fallback(body: str, *, prompt_text: str, platform: str) -> str
 
 async def _gen_owned_site_piece(
     *, cluster, brand_row, prompt_row, brief_context, pack, tier, low_evidence: bool = False,
+    depth: str = "standard",
 ):
     """Cluster anchor piece: the brand's own site. Evidence = the cluster pack.
 
@@ -75,6 +76,10 @@ async def _gen_owned_site_piece(
     same way every other platform does (`low_ev or low_evidence`) so the
     anchor piece doesn't understate its evidence quality relative to its
     siblings just because its own pack slice happened to be non-empty.
+
+    `depth`: "standard" (default) or "deep" — a long-form, FAQ-rich variant
+    (see `owned_site.build_owned_site_prompt`). Deep pages need a larger
+    writer token budget to fit the 1800-3000 word target plus the FAQ section.
     """
     import json as _json
     from datetime import datetime, timezone
@@ -101,14 +106,17 @@ async def _gen_owned_site_piece(
         from app.services.drafting_service import _voice_directive_from_profile
         voice = _voice_directive_from_profile(prof)
 
+        max_tokens = 8000 if depth == "deep" else PLATFORM_MAX_TOKENS.get("owned_site", 3000)
+
         async def _writer(p: str) -> str:
-            return await call_claude(p, max_tokens=PLATFORM_MAX_TOKENS.get("owned_site", 3000))
+            return await call_claude(p, max_tokens=max_tokens)
 
         owned = await asyncio.wait_for(
             owned_site.generate_owned_site_draft(
                 writer=_writer, brand=brand_dict, target_query=prompt_row.text,
                 evidence=evidence, voice=voice, brief=brief_context,
                 date_published=datetime.now(timezone.utc).date().isoformat(),
+                depth=depth,
             ),
             timeout=PIECE_TIMEOUT_SECONDS,
         )
@@ -118,7 +126,15 @@ async def _gen_owned_site_piece(
             + _json.dumps(owned.jsonld, indent=2)
             + "\n```\n"
         )
-        title = owned.jsonld.get("headline") or _derive_title_fallback(
+        # jsonld is a bare Article node normally, but a deep page's FAQ folds
+        # it into an {"@graph": [Article, FAQPage]} shape — the headline then
+        # lives on the graph's first node instead of the top level.
+        jsonld_headline = owned.jsonld.get("headline")
+        if jsonld_headline is None:
+            graph = owned.jsonld.get("@graph")
+            if graph:
+                jsonld_headline = graph[0].get("headline")
+        title = jsonld_headline or _derive_title_fallback(
             owned.body, prompt_text=prompt_row.text, platform="owned_site")
         low_ev = (not evidence) or low_evidence
         return ("ok", "owned_site", title, body, owned.anti_ai_score, [], low_ev)
@@ -773,6 +789,7 @@ async def regenerate_piece(
     cluster_id: int,
     platform: str,
     tier: str | None,
+    depth: str = "standard",
 ) -> ContentDraft:
     if platform not in CLUSTER_PLATFORMS:
         raise ValueError(f"Unsupported cluster platform: {platform}")
@@ -818,6 +835,7 @@ async def regenerate_piece(
         res = await _gen_owned_site_piece(
             cluster=cluster, brand_row=brand_row, prompt_row=prompt_row,
             brief_context=ctx, pack=pack, tier=tier, low_evidence=low_evidence,
+            depth=depth,
         )
         if res[0] == "fail":
             raise RuntimeError(f"owned_site piece generation failed: {res[2]}")

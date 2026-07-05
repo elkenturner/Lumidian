@@ -19,8 +19,10 @@ def test_render_medium_emits_inline_links_and_footer():
     text = "Cancer detection accuracy hit 94% [S1]. Subsequent studies confirmed [S2]."
     pack = _pack(("S1", "https://nature.com/a", "Nature"), ("S2", "https://pubmed.gov/b", "PubMed"))
     rendered, citations = render_citations(text=text, pack=pack, platform="medium")
-    assert "[1](https://nature.com/a)" in rendered
-    assert "[2](https://pubmed.gov/b)" in rendered
+    assert "[1]" in rendered
+    assert "[1](https://nature.com/a)" not in rendered  # inline stays plain; footer carries the URL
+    assert "https://nature.com/a" in rendered  # ...in the Sources footer
+    assert "confirmed [2]." in rendered
     assert "Sources" in rendered
     assert "1. [Nature](https://nature.com/a)" in rendered
     assert len(citations) == 2

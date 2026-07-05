@@ -257,6 +257,12 @@ async def enrich_pack_snippets(
         try:
             async with sem:
                 resp = await client.get(url)
+            # Only parse HTML — a PDF (e.g. a court opinion) decoded as text is
+            # long binary garbage that would "win" the longer-snippet rule and
+            # poison the source's snippet.
+            ctype = (resp.headers.get("content-type") or "").lower()
+            if "html" not in ctype and "text/plain" not in ctype:
+                return
             # Cap the HTML we parse: html.parser is pure-Python CPU work that
             # runs inline on the event loop — an unbounded 5MB page would
             # stall every other request while it parses. The first 512KB is

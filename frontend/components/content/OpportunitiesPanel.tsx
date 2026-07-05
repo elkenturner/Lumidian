@@ -27,11 +27,10 @@ import {
 interface Props {
   brandId: number;
   /** Collapsed by default when the brand already has cluster content. */
-  defaultCollapsed?: boolean;
 }
 
-export function OpportunitiesPanel({ brandId, defaultCollapsed = false }: Props) {
-  const [expanded, setExpanded] = useState(!defaultCollapsed);
+export function OpportunitiesPanel({ brandId }: Props) {
+  const [expanded, setExpanded] = useState(false);
   const [opportunities, setOpportunities] = useState<ContentOpportunity[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [drafts, setDrafts] = useState<Record<number, ContentDraft>>({});
@@ -155,19 +154,15 @@ export function OpportunitiesPanel({ brandId, defaultCollapsed = false }: Props)
 
   const newCount = rows.filter((o) => o.status === "new").length;
 
+  // Present-but-secondary: the top rows are always visible so the section
+  // never reads as hidden, while the long tail stays behind a toggle.
+  const visibleRows = expanded ? rows : rows.slice(0, 3);
+  const hiddenCount = rows.length - visibleRows.length;
+
   return (
     <div className="card !p-0 overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full px-5 py-3 flex items-center justify-between hover:bg-[var(--bg-card)] text-left"
-      >
+      <div className="px-5 py-3 flex items-center justify-between">
         <span className="flex items-center gap-2 font-semibold text-[var(--text-primary)]">
-          {expanded ? (
-            <ChevronDown className="h-4 w-4 text-[var(--text-secondary)]" />
-          ) : (
-            <ChevronRight className="h-4 w-4 text-[var(--text-secondary)]" />
-          )}
           Live threads to join
           {newCount > 0 && (
             <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-[rgba(96,165,250,0.15)] text-[var(--accent-foreground)]">
@@ -175,16 +170,15 @@ export function OpportunitiesPanel({ brandId, defaultCollapsed = false }: Props)
             </span>
           )}
         </span>
-      </button>
+        <span className="text-xs text-[var(--text-faint)] hidden sm:block">
+          Real conversations matching your tracked questions — reply there to build presence AI engines retrieve.
+        </span>
+      </div>
 
-      {expanded && (
+      {(
         <div className="border-t border-[var(--border-subtle)]">
-          <p className="px-5 pt-3 pb-1 text-xs text-[var(--text-faint)] max-w-2xl">
-            Real conversations on Reddit, Quora, LinkedIn and X that match your tracked questions.
-            Reply there to build presence AI engines retrieve.
-          </p>
           <div className="divide-y divide-[var(--border-subtle)]">
-            {rows.map((opp) => (
+            {visibleRows.map((opp) => (
               <OpportunityRow
                 key={opp.id}
                 opp={opp}
@@ -201,6 +195,24 @@ export function OpportunitiesPanel({ brandId, defaultCollapsed = false }: Props)
               />
             ))}
           </div>
+          {hiddenCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setExpanded(true)}
+              className="w-full px-5 py-2.5 text-left text-xs font-medium text-[var(--accent-foreground)] hover:bg-[var(--bg-card)] border-t border-[var(--border-subtle)]"
+            >
+              Show all {rows.length} threads
+            </button>
+          )}
+          {expanded && rows.length > 3 && (
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="w-full px-5 py-2.5 text-left text-xs font-medium text-[var(--text-faint)] hover:bg-[var(--bg-card)] border-t border-[var(--border-subtle)]"
+            >
+              Show fewer
+            </button>
+          )}
         </div>
       )}
     </div>

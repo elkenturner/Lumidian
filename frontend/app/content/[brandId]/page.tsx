@@ -667,7 +667,7 @@ export default function ContentBrandPage() {
       {started && genError && <p className="text-xs text-[#fb7185]">{genError}</p>}
 
       {!noPrompts && (
-        <OpportunitiesPanel brandId={brandId} defaultCollapsed={clusters.length > 0} />
+        <OpportunitiesPanel brandId={brandId} />
       )}
 
       {/* Readiness preflight confirm layer — shown when the pre-generate check

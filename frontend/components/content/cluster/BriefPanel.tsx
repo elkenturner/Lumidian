@@ -275,7 +275,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
                     variant="secondary"
                     onClick={saveAndRegenerate}
                     disabled={saving || regenerating}
-                    title="Save the brief and immediately rewrite all 5 posts from it"
+                    title="Save the brief and immediately rewrite all posts from it"
                   >
                     {regenerating ? "Regenerating…" : "Save & regenerate"}
                   </Button>

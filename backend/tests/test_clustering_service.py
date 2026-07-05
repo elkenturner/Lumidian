@@ -185,3 +185,124 @@ async def test_regenerate_piece_replaces_only_target(db_session: AsyncSession, r
     others = [d for d in drafts if d.platform != "linkedin"]
     assert li.title == "Updated"
     assert all(d.title == "First" for d in others)
+
+
+# ── regenerate_piece must never clobber a posted draft (I4) ──────────────────
+
+@pytest_asyncio.fixture
+async def _brief_only_cluster(db_session: AsyncSession, registered_user: User) -> ContentCluster:
+    """A minimal cluster with an already-promoted brief, so regenerate_piece's
+    brief lookup succeeds without needing to build one (build_brief pulls in
+    the evidence pipeline, which is out of scope for these tests)."""
+    brand = Brand(name="Acme", slug="c-acme-i4", user_id=registered_user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    prompt = Prompt(brand_id=brand.id, text="Q", prompt_type="standard")
+    db_session.add(prompt)
+    await db_session.flush()
+    cluster = ContentCluster(
+        brand_id=brand.id, prompt_id=prompt.id, status="ready", pillar_mode="none", version=1,
+    )
+    db_session.add(cluster)
+    await db_session.flush()
+    brief = ContentBrief(
+        cluster_id=cluster.id, positioning="Pos", key_claims=["c1"],
+        canonical_phrasings=["Acme does X"], stats=[], narrative_spine="spine",
+        tone_notes="neutral", created_by="test",
+    )
+    db_session.add(brief)
+    await db_session.flush()
+    cluster.last_brief_id = brief.id
+    await db_session.commit()
+    await db_session.refresh(cluster)
+    return cluster
+
+
+@pytest.mark.asyncio
+async def test_regenerate_piece_only_posted_draft_creates_new_row_untouched(
+    db_session: AsyncSession, _brief_only_cluster: ContentCluster,
+) -> None:
+    """If the only existing draft for (cluster, platform) is 'posted', piece
+    regen must leave it alone and create a brand-new draft row instead of
+    silently mutating a published post."""
+    cluster = _brief_only_cluster
+    posted = ContentDraft(
+        brand_id=cluster.brand_id, prompt_id=cluster.prompt_id, cluster_id=cluster.id,
+        platform="linkedin", status="posted", title="Live post", content_text="Live body.",
+        source="cluster",
+    )
+    db_session.add(posted)
+    await db_session.commit()
+    await db_session.refresh(posted)
+
+    with patch(
+        "app.services.clustering_service._generate_piece_text",
+        new=AsyncMock(return_value=("New Title", "New body.", None, [], False)),
+    ):
+        result = await regenerate_piece(db_session, cluster_id=cluster.id, platform="linkedin", tier="starter")
+
+    # The posted row is untouched.
+    await db_session.refresh(posted)
+    assert posted.status == "posted"
+    assert posted.title == "Live post"
+    assert posted.content_text == "Live body."
+
+    # A distinct new draft row was created.
+    assert result.id != posted.id
+    assert result.status == "draft"
+    assert result.title == "New Title"
+
+    drafts = (
+        await db_session.execute(
+            select(ContentDraft).where(
+                ContentDraft.cluster_id == cluster.id, ContentDraft.platform == "linkedin",
+            )
+        )
+    ).scalars().all()
+    assert len(drafts) == 2
+
+
+@pytest.mark.asyncio
+async def test_regenerate_piece_posted_plus_draft_updates_draft_no_multiple_results(
+    db_session: AsyncSession, _brief_only_cluster: ContentCluster,
+) -> None:
+    """A posted row AND a non-posted (draft) row coexisting for the same
+    (cluster, platform) must not raise MultipleResultsFound — the draft row
+    is the one that gets updated; the posted row is untouched."""
+    cluster = _brief_only_cluster
+    posted = ContentDraft(
+        brand_id=cluster.brand_id, prompt_id=cluster.prompt_id, cluster_id=cluster.id,
+        platform="linkedin", status="posted", title="Live post", content_text="Live body.",
+        source="cluster",
+    )
+    draft_row = ContentDraft(
+        brand_id=cluster.brand_id, prompt_id=cluster.prompt_id, cluster_id=cluster.id,
+        platform="linkedin", status="draft", title="Old Title", content_text="Old body.",
+        source="cluster",
+    )
+    db_session.add_all([posted, draft_row])
+    await db_session.commit()
+    await db_session.refresh(posted)
+    await db_session.refresh(draft_row)
+
+    with patch(
+        "app.services.clustering_service._generate_piece_text",
+        new=AsyncMock(return_value=("Updated Title", "Updated body.", None, [], False)),
+    ):
+        result = await regenerate_piece(db_session, cluster_id=cluster.id, platform="linkedin", tier="starter")
+
+    assert result.id == draft_row.id
+    assert result.title == "Updated Title"
+
+    await db_session.refresh(posted)
+    assert posted.status == "posted"
+    assert posted.title == "Live post"
+
+    drafts = (
+        await db_session.execute(
+            select(ContentDraft).where(
+                ContentDraft.cluster_id == cluster.id, ContentDraft.platform == "linkedin",
+            )
+        )
+    ).scalars().all()
+    assert len(drafts) == 2

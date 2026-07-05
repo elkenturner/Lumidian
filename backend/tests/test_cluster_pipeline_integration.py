@@ -299,3 +299,104 @@ async def test_free_tier_cluster_still_persists_no_quality_or_citations(
         )
     ).scalars().all()
     assert citations == []
+
+
+@pytest.mark.asyncio
+async def test_attached_pillar_reference_reaches_linkedin_and_x_siblings(
+    db_session: AsyncSession,
+    pro_brand_with_prompt: tuple[User, Brand, Prompt],
+) -> None:
+    """Regression for I1: `_gen` loops over BASE platform names ("linkedin",
+    "x") but `_APPENDS_PILLAR_REF` keys on the resolved variant vocabulary
+    (linkedin_article, x_thread). Without resolving first, the reference
+    silently never lands on those two pieces.
+    """
+    user, brand, prompt = pro_brand_with_prompt
+    cluster = ContentCluster(
+        brand_id=brand.id,
+        prompt_id=prompt.id,
+        status="pending",
+        pillar_mode="attached",
+        pillar_url="https://acme.com/pillar-page",
+        version=1,
+    )
+    db_session.add(cluster)
+    await db_session.commit()
+
+    async def fake_pipeline(**kwargs):
+        return (f"Body for {kwargs['platform_key']}.", None, [], False)
+
+    async def fake_build_brief(db, *, cluster, tier):
+        from datetime import UTC, datetime
+        brief = ContentBrief(
+            cluster_id=cluster.id,
+            positioning="Pos",
+            key_claims=[],
+            canonical_phrasings=[],
+            stats=[],
+            narrative_spine="",
+            tone_notes="",
+            created_by="test",
+            created_at=datetime.now(UTC),
+        )
+        db.add(brief)
+        await db.flush()
+        cluster.last_brief_id = brief.id
+        await db.flush()
+        return brief
+
+    _FAKE_EVIDENCE = [
+        {"url": "https://reuters.com/a", "title": "A", "snippet": "..."},
+        {"url": "https://nytimes.com/b", "title": "B", "snippet": "..."},
+        {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
+        {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
+    ]
+
+    with patch(
+        "app.services.clustering_service.build_brief",
+        new=AsyncMock(side_effect=fake_build_brief),
+    ), patch(
+        "app.services.cluster_evidence.fetch_and_dedupe",
+        new=AsyncMock(return_value=_FAKE_EVIDENCE),
+    ), patch(
+        "app.services.drafting_service._generate_with_new_pipeline",
+        new=AsyncMock(side_effect=fake_pipeline),
+    ), patch(
+        "app.services.clustering_service.generate_draft_summary",
+        new=AsyncMock(return_value=""),
+    ), patch(
+        "app.services.clustering_service.propose_pillar",
+        new=AsyncMock(return_value=None),
+    ), patch(
+        "app.services.drafting_service._analyze_responses_for_prompt",
+        new=AsyncMock(return_value=""),
+    ), patch(
+        "app.services.drafting_service._get_prompt_visibility",
+        new=AsyncMock(return_value=0.0),
+    ), patch(
+        "app.services.drafting_service._load_profile_context",
+        new=AsyncMock(return_value=""),
+    ), patch(
+        "app.services.clustering_service._gen_owned_site_piece",
+        new=AsyncMock(return_value=("ok", "owned_site", "T", "B", None, [], False)),
+    ):
+        result = await regenerate_cluster(db_session, cluster_id=cluster.id, tier="pro")
+
+    assert result.status == "ready"
+    drafts = (
+        await db_session.execute(
+            select(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
+        )
+    ).scalars().all()
+    by_platform = {d.platform: d for d in drafts}
+
+    # linkedin and x must both carry the pillar link.
+    assert "https://acme.com/pillar-page" in by_platform["linkedin"].content_text
+    assert "https://acme.com/pillar-page" in by_platform["x"].content_text
+    # quora also gets it (already worked pre-fix — guards against regressions).
+    assert "https://acme.com/pillar-page" in by_platform["quora"].content_text
+    # reddit and medium never get a pillar reference.
+    assert "https://acme.com/pillar-page" not in by_platform["reddit"].content_text
+    assert "https://acme.com/pillar-page" not in by_platform["medium"].content_text
+    # Labels must be source-neutral now (pillar is own-site, not Medium).
+    assert "Medium" not in by_platform["linkedin"].content_text

@@ -17,7 +17,6 @@ _MARKER_RE = re.compile(r"\[S(\d+)\]")
 
 _PLATFORMS_WITH_FOOTER = {"medium", "linkedin_article", "quora"}
 _LINKEDIN_POST_PLATFORMS = {"linkedin_post", "linkedin_reply"}
-_REDDIT_PLATFORMS: set[str] = set()  # retired: reddit renders linkless (July 2026 research)
 _STRIP_PLATFORMS = {"x_post", "x_thread", "x_reply", "reddit", "reddit_reply", "reddit_comment"}
 
 

@@ -432,6 +432,100 @@ async def test_haiku_rejected_post_not_stored(tmp_db):
     assert count == 0
 
 
+# ── clear_existing wipe (I3 regression) ───────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_clear_existing_wipes_new_but_keeps_drafted(tmp_db, db_session):
+    """A manual re-scan (clear_existing=True) must not destroy a lead the user
+    already drafted, or one they explicitly dismissed — only 'new' rows are
+    stale enough to wipe. thread_url dedup must still see the surviving rows
+    so they aren't re-inserted as duplicates.
+    """
+    from app.models import ContentOpportunity
+    from app.services import reddit_scanner_service
+
+    brand_id = await tmp_db.create_brand_with_prompt(
+        name="Acme", prompt="what is the best project management saas tool"
+    )
+
+    drafted = ContentOpportunity(
+        brand_id=brand_id, platform="reddit", thread_url="https://reddit.com/r/x/drafted",
+        thread_title="drafted lead", relevance_score=80.0, status="drafted",
+    )
+    stale_new = ContentOpportunity(
+        brand_id=brand_id, platform="reddit", thread_url="https://reddit.com/r/x/stale",
+        thread_title="stale lead", relevance_score=50.0, status="new",
+    )
+    db_session.add_all([drafted, stale_new])
+    await db_session.commit()
+
+    def fake_search(query, num_results=10, cache_key=None, subreddit=None):
+        return []
+
+    with patch.object(reddit_scanner_service, "_search_reddit_posts", side_effect=fake_search), \
+         patch.object(reddit_scanner_service, "_haiku_relevance_check", return_value=[]):
+        await reddit_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True)
+
+    from sqlalchemy import select
+    remaining = (
+        await db_session.execute(
+            select(ContentOpportunity).where(ContentOpportunity.brand_id == brand_id)
+        )
+    ).scalars().all()
+    remaining_urls = {o.thread_url for o in remaining}
+
+    assert "https://reddit.com/r/x/drafted" in remaining_urls
+    assert "https://reddit.com/r/x/stale" not in remaining_urls
+
+
+@pytest.mark.asyncio
+async def test_clear_existing_dedup_skips_surviving_drafted_url(tmp_db, db_session):
+    """A candidate whose URL matches a surviving drafted row must not be
+    stored a second time — the drafted row's thread_url must still count
+    for dedup even though clear_existing wiped the 'new' rows.
+    """
+    from app.models import ContentOpportunity
+    from app.services import reddit_scanner_service
+
+    brand_id = await tmp_db.create_brand_with_prompt(
+        name="Acme", prompt="what is the best project management saas tool"
+    )
+
+    dup_url = "https://www.reddit.com/r/SaaS/comments/xyz/post/"
+    drafted = ContentOpportunity(
+        brand_id=brand_id, platform="reddit", thread_url=dup_url,
+        thread_title="already drafted", relevance_score=80.0, status="drafted",
+    )
+    db_session.add(drafted)
+    await db_session.commit()
+
+    result = _make_serper_result(
+        dup_url, "what is the best project management saas tool for remote teams",
+        subreddit="SaaS",
+    )
+
+    def fake_search(query, num_results=10, cache_key=None, subreddit=None):
+        return [result]
+
+    with patch.object(reddit_scanner_service, "_search_reddit_posts", side_effect=fake_search), \
+         patch.object(reddit_scanner_service, "_haiku_relevance_check", return_value=[True]):
+        count = await reddit_scanner_service.scan_brand_opportunities(brand_id, clear_existing=True)
+
+    assert count == 0
+
+    from sqlalchemy import select
+    rows = (
+        await db_session.execute(
+            select(ContentOpportunity).where(
+                ContentOpportunity.brand_id == brand_id,
+                ContentOpportunity.thread_url == dup_url,
+            )
+        )
+    ).scalars().all()
+    assert len(rows) == 1
+    assert rows[0].status == "drafted"
+
+
 # ── _prune_stale_opportunities ────────────────────────────────────────────────
 
 @pytest.mark.asyncio

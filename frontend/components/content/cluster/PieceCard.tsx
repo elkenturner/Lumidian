@@ -133,6 +133,23 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
     if (!draft) return;
     setUpdatingStatus(true);
     try {
+      // The owned_site piece is the cluster's pillar page — once it's live,
+      // its URL is what lets sibling pieces (LinkedIn/X) attach a real
+      // cross-reference. Ask for it right here rather than requiring a
+      // detour through a separate pillar-attach flow.
+      if (status === "posted" && platform === "owned_site") {
+        const url = window.prompt(
+          "URL of the published page (needed to link your other posts to it):"
+        );
+        const trimmed = url?.trim();
+        onUpdated(
+          await updateDraft(draft.id, {
+            status,
+            ...(trimmed ? { posted_url: trimmed } : {}),
+          })
+        );
+        return;
+      }
       onUpdated(await updateDraft(draft.id, { status }));
     } finally {
       setUpdatingStatus(false);

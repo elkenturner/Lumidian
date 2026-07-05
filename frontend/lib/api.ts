@@ -493,7 +493,13 @@ export async function generateDraft(
 
 export async function updateDraft(
   draftId: number,
-  data: { title?: string; content_text?: string; status?: string; prompt_id?: number }
+  data: {
+    title?: string;
+    content_text?: string;
+    status?: string;
+    prompt_id?: number;
+    posted_url?: string;
+  }
 ): Promise<ContentDraft> {
   const res = await api.put<ContentDraft>(`/content/draft/${draftId}`, data);
   invalidateCache('/content/');

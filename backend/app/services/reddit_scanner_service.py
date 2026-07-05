@@ -776,18 +776,31 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             # Bust Serper in-process cache so fresh scan fetches new results
             for p in prompts:
                 invalidate_cache(p.id)
-            # Delete only Reddit opportunities so parallel Quora scan rows aren't wiped
+            # Delete only Reddit opportunities so parallel Quora scan rows aren't
+            # wiped, AND only status="new" rows — a manual re-scan must not
+            # destroy leads the user already acted on (drafted) or explicitly
+            # kept (dismissed survives too, since it's not "new").
             await db.execute(
                 sql_delete(ContentOpportunity).where(
                     ContentOpportunity.brand_id == brand_id,
                     ContentOpportunity.platform == "reddit",
+                    ContentOpportunity.status == "new",
                 )
             )
             await db.commit()
             logger.info(
-                "Reddit scanner: cleared existing opportunities for brand_id=%d", brand_id
+                "Reddit scanner: cleared existing 'new' opportunities for brand_id=%d", brand_id
             )
-            existing_urls: set[str] = set()
+            # Surviving (drafted/dismissed) rows still count for thread_url
+            # dedup so the re-scan doesn't insert a duplicate for a thread the
+            # user already acted on.
+            existing_row = await db.execute(
+                select(ContentOpportunity.thread_url).where(
+                    ContentOpportunity.brand_id == brand_id,
+                    ContentOpportunity.platform == "reddit",
+                )
+            )
+            existing_urls = {r[0] for r in existing_row.all()}
         else:
             # Prune stale Reddit opportunities (status=new); high-relevance
             # leads survive 90 days, low-relevance ones still expire at 14.

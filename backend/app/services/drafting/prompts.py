@@ -244,7 +244,7 @@ CLUSTER BRIEF (this content is part of a coordinated cross-platform cluster — 
 CLUSTER RULES (in addition to all other rules below):
   - Express the brand's POSITIONING and KEY CLAIMS in your OWN words, framed naturally for {platform}. Do NOT copy any phrase verbatim, and never repeat the same claim more than once in this piece — identical/repeated brand sentences read as spam, get removed on Reddit/Quora, and lower AI-citation odds.
   - Name the brand clearly once, as a concrete fact.
-  - You may reference sibling platforms semantically (e.g. "we dug deeper on Medium"), but never invent URLs.
+  - You may reference sibling platforms semantically (e.g. "there's a longer breakdown of this on Medium"), but never invent URLs.
   - Maintain the narrative spine without restating it verbatim.
   - Do not open with the brand name. Do not include CTAs. Maintain practitioner voice — the brand is mentioned as a fact, not a pitch.
 """

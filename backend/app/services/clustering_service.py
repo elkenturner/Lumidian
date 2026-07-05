@@ -157,8 +157,8 @@ def append_pillar_reference(
     if platform.startswith("x_"):
         # Space-constrained — bare URL, no label
         return text.rstrip() + f"\n{pillar_url}"
-    # linkedin_*, quora
-    return text.rstrip() + f"\n\nFurther reading on Medium: {pillar_url}"
+    # linkedin_*, quora — the pillar is the brand's own-site page, not Medium.
+    return text.rstrip() + f"\n\nMore detail here: {pillar_url}"
 
 
 async def get_or_create_cluster(db: AsyncSession, *, brand_id: int, prompt_id: int) -> ContentCluster:
@@ -661,10 +661,14 @@ async def regenerate_cluster(
                     draft_text=body,
                     sources=(pack.sources if pack else []),
                 )
-            # Asymmetric pillar reference
+            # Asymmetric pillar reference. `_APPENDS_PILLAR_REF` keys on the
+            # resolved variant vocabulary (linkedin_article, x_thread, ...),
+            # not the base platform name this loop iterates over, so resolve
+            # before the lookup — otherwise linkedin/x pieces never match and
+            # silently never receive the reference.
             pillar = cluster.pillar_url if cluster.pillar_mode == "attached" else None
             body = append_pillar_reference(
-                text=body, platform=platform, pillar_url=pillar,
+                text=body, platform=resolve_platform_key(platform), pillar_url=pillar,
             )
             # A piece off the brand-authority soft-fail pack is inherently thin.
             low_ev = low_ev or low_evidence
@@ -829,12 +833,17 @@ async def regenerate_piece(
             angle_directive=angle_text,
         )
 
+    # Exclude posted drafts: a piece regen must never mutate a draft the user
+    # has already published. Order by id desc so, if more than one non-posted
+    # row somehow exists for this (cluster, platform), the newest wins instead
+    # of raising MultipleResultsFound.
     existing = (await db.execute(
         select(ContentDraft).where(
             ContentDraft.cluster_id == cluster.id,
             ContentDraft.platform == platform,
-        )
-    )).scalar_one_or_none()
+            ContentDraft.status != "posted",
+        ).order_by(ContentDraft.id.desc())
+    )).scalars().first()
 
     if existing:
         existing.title = title

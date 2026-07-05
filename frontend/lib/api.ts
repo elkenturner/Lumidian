@@ -591,6 +591,18 @@ export async function getOpportunities(brandId: number): Promise<ContentOpportun
   return dedupedGet<ContentOpportunity[]>(`/opportunities/${brandId}`);
 }
 
+export async function draftOpportunity(opportunityId: number): Promise<ContentDraft> {
+  const res = await api.post<ContentDraft>(`/opportunities/${opportunityId}/draft`);
+  invalidateCache('/opportunities/');
+  invalidateCache('/content/');
+  return res.data;
+}
+
+export async function dismissOpportunity(opportunityId: number): Promise<void> {
+  await api.delete(`/opportunities/${opportunityId}/dismiss`);
+  invalidateCache('/opportunities/');
+}
+
 export async function triggerScan(brandId: number): Promise<{ message: string }> {
   const res = await api.post<{ message: string }>(`/opportunities/${brandId}/scan`);
   invalidateCache('/opportunities/');
@@ -2166,8 +2178,12 @@ export async function regenerateClusterPiece(
   brandId: number,
   clusterId: number,
   platform: string,
+  opts?: { depth?: "deep" },
 ): Promise<ContentDraft> {
-  const res = await api.post<ContentDraft>(`/clusters/${brandId}/${clusterId}/regenerate-piece`, { platform });
+  const res = await api.post<ContentDraft>(`/clusters/${brandId}/${clusterId}/regenerate-piece`, {
+    platform,
+    ...(opts?.depth ? { depth: opts.depth } : {}),
+  });
   return res.data;
 }
 

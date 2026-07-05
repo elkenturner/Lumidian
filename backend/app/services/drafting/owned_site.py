@@ -19,6 +19,7 @@ Public API:
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from app.services.drafting import anti_ai
@@ -78,6 +79,7 @@ def build_owned_site_prompt(
     voice: str | None = None,
     avoid: str | None = None,
     brief: str | None = None,
+    depth: str = "standard",
 ) -> str:
     """Construct the owned-site writer prompt.
 
@@ -87,6 +89,10 @@ def build_owned_site_prompt(
     `avoid`: regeneration feedback from a prior anti_ai scan (specific tells to remove).
     `brief`: shared cluster brief context (positioning, canonical phrasings) when
     this page is generated as a cluster's anchor piece.
+    `depth`: "standard" (default) follows OWNED_SITE_SPEC's extractable-passage
+    format. "deep" targets a long-form 1800-3000 word page with a trailing
+    FAQ section — research shows long-form owned-site pages with
+    query-matched headings get cited roughly 4x more often.
     """
     name = brand.get("name", "the brand")
     parts: list[str] = []
@@ -118,6 +124,19 @@ def build_owned_site_prompt(
                  + _evidence_block(evidence))
 
     parts.append("FORMAT: " + OWNED_SITE_SPEC["format"] + ". " + OWNED_SITE_SPEC["length_note"] + ".")
+    if depth == "deep":
+        parts.append(
+            "DEEP-PAGE MODE: this page targets 1800-3000 words — substantially "
+            "longer and more comprehensive than the standard page, covering the "
+            "topic from every angle a real searcher would want. Every H2 heading "
+            "must itself read as a question or a direct answer to a query "
+            "variant of the target topic (query-mirroring) — never a generic "
+            "label. End the page with a final '## Frequently asked questions' "
+            "section containing 5-8 '### <question>' subsections — each "
+            "question phrased as a real user query about the target topic "
+            "(query-mirroring), each answered in a self-contained 60-120 word "
+            "block that stands alone if extracted."
+        )
     parts.append("CITATION-DRIVER RULES (these make AI cite the page):\n- "
                  + "\n- ".join(_CITATION_DRIVERS))
     parts.append("REQUIREMENTS:\n- " + "\n- ".join(OWNED_SITE_SPEC["must"]))
@@ -193,6 +212,39 @@ def _extract_title(body: str) -> str:
     return ""
 
 
+_FAQ_H2_RE = re.compile(r"^##\s*frequently asked questions\s*$", re.IGNORECASE | re.MULTILINE)
+_H2_RE = re.compile(r"^##\s+\S", re.MULTILINE)
+_H3_Q_RE = re.compile(r"^###\s*(.+?)\s*$", re.MULTILINE)
+_H3_RE = re.compile(r"^###\s+\S", re.MULTILINE)
+
+
+def _extract_faq(body: str) -> list[dict]:
+    """Parse a '## Frequently asked questions' section into Q/A pairs.
+
+    Finds the FAQ H2 (case-insensitive), then each '### <question>'
+    subsection under it up to the next H2 (or end of body). Best-effort
+    regex parse — returns [] when the section is absent or empty.
+    """
+    m = _FAQ_H2_RE.search(body)
+    if not m:
+        return []
+    section = body[m.end():]
+    next_h2 = _H2_RE.search(section)
+    if next_h2:
+        section = section[:next_h2.start()]
+
+    pairs: list[dict] = []
+    for qm in _H3_Q_RE.finditer(section):
+        question = qm.group(1).strip()
+        start = qm.end()
+        next_q = _H3_RE.search(section, start)
+        end = next_q.start() if next_q else len(section)
+        answer = section[start:end].strip()
+        if question and answer:
+            pairs.append({"question": question, "answer": answer})
+    return pairs
+
+
 async def generate_owned_site_draft(
     writer,
     brand: dict,
@@ -202,6 +254,7 @@ async def generate_owned_site_draft(
     date_published: str = "",
     max_retries: int = 2,
     brief: str | None = None,
+    depth: str = "standard",
 ) -> OwnedSiteDraft:
     """Generate an owned-site draft, gating through the anti-AI engine.
 
@@ -211,21 +264,26 @@ async def generate_owned_site_draft(
     flagged_for_review instead.
     `brief`: optional cluster brief context, forwarded to the prompt builder when
     this draft anchors a coordinated cluster.
+    `depth`: "standard" or "deep" (long-form, FAQ-rich) — see `build_owned_site_prompt`.
+    When the generated body carries a '## Frequently asked questions' section
+    (typically only in deep mode), it is parsed via `_extract_faq` and folded
+    into the JSON-LD as a FAQPage node.
     """
-    prompt = build_owned_site_prompt(brand, target_query, evidence, voice, brief=brief)
+    prompt = build_owned_site_prompt(brand, target_query, evidence, voice, brief=brief, depth=depth)
     body = await writer(prompt)
 
     async def _regen(feedback: str) -> str:
         return await writer(
             build_owned_site_prompt(
-                brand, target_query, evidence, voice, avoid=feedback, brief=brief
+                brand, target_query, evidence, voice, avoid=feedback, brief=brief, depth=depth
             )
         )
 
     body, report, regens = await anti_ai.enforce(body, regenerate=_regen, max_retries=max_retries)
     attempts = 1 + regens
     title = _extract_title(body)
-    jsonld = build_jsonld(title, brand, date_published)
+    faq = _extract_faq(body)
+    jsonld = build_jsonld(title, brand, date_published, faq=faq or None)
     return OwnedSiteDraft(
         body=body,
         jsonld=jsonld,

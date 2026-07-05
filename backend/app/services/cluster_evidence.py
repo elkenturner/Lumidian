@@ -13,10 +13,14 @@ Public entry points (added in this task):
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any
 from urllib.parse import urlparse
+
+import httpx
+from bs4 import BeautifulSoup
 
 from app.services.drafting.evidence import (  # reuse existing client
     SerperRateLimitError,
@@ -219,6 +223,82 @@ from app.models import (  # noqa: E402
 )
 
 
+_ENRICH_STRIP_TAGS = ("script", "style", "nav", "header", "footer", "aside")
+_ENRICH_MAX_HTML_CHARS = 512 * 1024  # parse at most 512KB of HTML (event-loop guard)
+_ENRICH_USER_AGENT = "Mozilla/5.0 (compatible; LumidianBot/1.0)"
+_CITED_BY_AI_PLACEHOLDER = "(cited by AI for this prompt)"
+
+
+async def enrich_pack_snippets(
+    sources: list[dict],
+    *,
+    max_chars: int = 1800,
+    concurrency: int = 5,
+    timeout_s: float = 8.0,
+) -> list[dict]:
+    """Fetch each source's page and upgrade `snippet` (and placeholder `title`)
+    with real page text, in place, on the same dicts.
+
+    Best-effort only: skips non-http(s) URLs (e.g. `internal://brand-profile`)
+    without attempting a fetch, and any per-URL failure (network error, parse
+    error, anything) leaves that source's dict completely untouched. Never
+    raises — a slow or broken source must never block pack persistence.
+
+    Never downgrades: the fetched snippet only replaces the existing one when
+    it is strictly longer, so a solid Serper snippet is never clobbered by a
+    short cookie-banner/paywall fragment.
+    """
+    sem = asyncio.Semaphore(concurrency)
+
+    async def _enrich_one(client: httpx.AsyncClient, source: dict) -> None:
+        url = source.get("url") or ""
+        if not url.startswith("http"):
+            return
+        try:
+            async with sem:
+                resp = await client.get(url)
+            # Cap the HTML we parse: html.parser is pure-Python CPU work that
+            # runs inline on the event loop — an unbounded 5MB page would
+            # stall every other request while it parses. The first 512KB is
+            # far more than enough to fill an 1800-char snippet.
+            html = resp.text[:_ENRICH_MAX_HTML_CHARS]
+            soup = BeautifulSoup(html, "html.parser")
+
+            title_tag = soup.title
+            fetched_title = ""
+            if title_tag is not None:
+                fetched_title = " ".join(title_tag.get_text(" ", strip=True).split())
+                # Don't let the page title leak into the body snippet too.
+                title_tag.decompose()
+
+            for tag_name in _ENRICH_STRIP_TAGS:
+                for tag in soup.find_all(tag_name):
+                    tag.decompose()
+            fetched_text = " ".join(soup.get_text(" ", strip=True).split())
+            fetched_snippet = fetched_text[:max_chars]
+
+            existing_snippet = source.get("snippet") or ""
+            if len(fetched_snippet) > len(existing_snippet):
+                source["snippet"] = fetched_snippet
+
+            existing_title = (source.get("title") or "").strip()
+            if fetched_title and existing_title in ("", _CITED_BY_AI_PLACEHOLDER):
+                source["title"] = fetched_title[:200]
+        except Exception as exc:
+            logger.debug("evidence enrichment: failed to fetch %s: %s", url, exc)
+
+    async with httpx.AsyncClient(
+        follow_redirects=True,
+        # Short connect timeout so a blackholed host (offline CI, firewalled
+        # runner) fails in ~1.5s instead of hanging the full read timeout.
+        timeout=httpx.Timeout(connect=1.5, read=timeout_s, write=timeout_s, pool=timeout_s),
+        headers={"User-Agent": _ENRICH_USER_AGENT},
+    ) as client:
+        await asyncio.gather(*(_enrich_one(client, s) for s in sources))
+
+    return sources
+
+
 async def _persist_pack(
     db: AsyncSession,
     *,
@@ -233,6 +313,8 @@ async def _persist_pack(
     on (cluster_id, url), so without this regen would fail with an integrity
     error any time a URL appears in both the previous and the new pack.
     """
+    pack_sources = await enrich_pack_snippets(list(pack_sources))
+
     from sqlalchemy import delete
     await db.execute(
         delete(ContentClusterSource).where(ContentClusterSource.cluster_id == cluster.id)

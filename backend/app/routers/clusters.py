@@ -358,6 +358,7 @@ async def regenerate_piece_endpoint(
             cluster_id=cluster.id,
             platform=request.platform,
             tier=user.subscription_tier,
+            depth=request.depth,
         )
     finally:
         _state.generating_brands.discard(brand_id)

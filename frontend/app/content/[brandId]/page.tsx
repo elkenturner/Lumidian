@@ -18,6 +18,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { ClusterCard } from "@/components/content/cluster/ClusterCard";
+import { OpportunitiesPanel } from "@/components/content/OpportunitiesPanel";
 import { clusterHasContent, translateFailureReason } from "@/lib/clusterStatus";
 import { useHiddenPlatforms } from "@/lib/useHiddenPlatforms";
 import { CLUSTER_PLATFORMS, CLUSTER_PLATFORM_LABELS } from "@/lib/clusterPlatforms";
@@ -664,6 +665,10 @@ export default function ContentBrandPage() {
       )}
 
       {started && genError && <p className="text-xs text-[#fb7185]">{genError}</p>}
+
+      {!noPrompts && (
+        <OpportunitiesPanel brandId={brandId} defaultCollapsed={clusters.length > 0} />
+      )}
 
       {/* Readiness preflight confirm layer — shown when the pre-generate check
           found gaps. Generation only proceeds via "Generate anyway". */}

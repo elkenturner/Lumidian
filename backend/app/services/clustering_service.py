@@ -62,6 +62,7 @@ def _derive_title_fallback(body: str, *, prompt_text: str, platform: str) -> str
 
 async def _gen_owned_site_piece(
     *, cluster, brand_row, prompt_row, brief_context, pack, tier, low_evidence: bool = False,
+    depth: str = "standard",
 ):
     """Cluster anchor piece: the brand's own site. Evidence = the cluster pack.
 
@@ -75,6 +76,10 @@ async def _gen_owned_site_piece(
     same way every other platform does (`low_ev or low_evidence`) so the
     anchor piece doesn't understate its evidence quality relative to its
     siblings just because its own pack slice happened to be non-empty.
+
+    `depth`: "standard" (default) or "deep" — a long-form, FAQ-rich variant
+    (see `owned_site.build_owned_site_prompt`). Deep pages need a larger
+    writer token budget to fit the 1800-3000 word target plus the FAQ section.
     """
     import json as _json
     from datetime import datetime, timezone
@@ -101,14 +106,17 @@ async def _gen_owned_site_piece(
         from app.services.drafting_service import _voice_directive_from_profile
         voice = _voice_directive_from_profile(prof)
 
+        max_tokens = 8000 if depth == "deep" else PLATFORM_MAX_TOKENS.get("owned_site", 3000)
+
         async def _writer(p: str) -> str:
-            return await call_claude(p, max_tokens=PLATFORM_MAX_TOKENS.get("owned_site", 3000))
+            return await call_claude(p, max_tokens=max_tokens)
 
         owned = await asyncio.wait_for(
             owned_site.generate_owned_site_draft(
                 writer=_writer, brand=brand_dict, target_query=prompt_row.text,
                 evidence=evidence, voice=voice, brief=brief_context,
                 date_published=datetime.now(timezone.utc).date().isoformat(),
+                depth=depth,
             ),
             timeout=PIECE_TIMEOUT_SECONDS,
         )
@@ -118,7 +126,15 @@ async def _gen_owned_site_piece(
             + _json.dumps(owned.jsonld, indent=2)
             + "\n```\n"
         )
-        title = owned.jsonld.get("headline") or _derive_title_fallback(
+        # jsonld is a bare Article node normally, but a deep page's FAQ folds
+        # it into an {"@graph": [Article, FAQPage]} shape — the headline then
+        # lives on the graph's first node instead of the top level.
+        jsonld_headline = owned.jsonld.get("headline")
+        if jsonld_headline is None:
+            graph = owned.jsonld.get("@graph")
+            if graph:
+                jsonld_headline = graph[0].get("headline")
+        title = jsonld_headline or _derive_title_fallback(
             owned.body, prompt_text=prompt_row.text, platform="owned_site")
         low_ev = (not evidence) or low_evidence
         return ("ok", "owned_site", title, body, owned.anti_ai_score, [], low_ev)
@@ -435,6 +451,22 @@ async def _persist_citations_and_summary(
         )
 
 
+async def _mark_opportunities_drafted(db: AsyncSession, opportunity_ids: list[int]) -> None:
+    """Mark routed opportunities as drafted so they aren't re-selected by a
+    future regen. Callers must only pass IDs whose piece actually generated
+    successfully — a failed piece must leave its opportunity untouched so a
+    future regen can retry it. Shared by ``regenerate_cluster`` and
+    ``regenerate_piece``.
+    """
+    if not opportunity_ids:
+        return
+    from app.models import ContentOpportunity
+    for o in (await db.execute(
+        select(ContentOpportunity).where(ContentOpportunity.id.in_(opportunity_ids))
+    )).scalars().all():
+        o.status = "drafted"
+
+
 async def regenerate_cluster(
     db: AsyncSession,
     *,
@@ -727,12 +759,7 @@ async def regenerate_cluster(
         t["opportunity_id"] for platform, t in post_targets.items()
         if platform in ok_platforms and t.get("opportunity_id")
     ]
-    if routed_opp_ids:
-        from app.models import ContentOpportunity
-        for o in (await db.execute(
-            select(ContentOpportunity).where(ContentOpportunity.id.in_(routed_opp_ids))
-        )).scalars().all():
-            o.status = "drafted"
+    await _mark_opportunities_drafted(db, routed_opp_ids)
 
     if any_failed:
         cluster.status = "generation_partial"
@@ -762,6 +789,7 @@ async def regenerate_piece(
     cluster_id: int,
     platform: str,
     tier: str | None,
+    depth: str = "standard",
 ) -> ContentDraft:
     if platform not in CLUSTER_PLATFORMS:
         raise ValueError(f"Unsupported cluster platform: {platform}")
@@ -807,29 +835,55 @@ async def regenerate_piece(
         res = await _gen_owned_site_piece(
             cluster=cluster, brand_row=brand_row, prompt_row=prompt_row,
             brief_context=ctx, pack=pack, tier=tier, low_evidence=low_evidence,
+            depth=depth,
         )
         if res[0] == "fail":
             raise RuntimeError(f"owned_site piece generation failed: {res[2]}")
         _, _, title, body, quality_score, citations, low_ev = res
+        target: dict = {}
     else:
-        # No target-resolution pass here (unlike regenerate_cluster's `_gen`),
-        # so there's no known subreddit to classify — falls back to "neutral"
-        # for auto reddit pieces, same as any other unclassified subreddit.
+        # Resolve a concrete post target (real subreddit thread / Quora
+        # question) exactly like regenerate_cluster's `_gen` does, scoped to
+        # this single platform via `enabled=[platform]`.
+        target = {}
+        if platform in ("reddit", "quora"):
+            post_targets = await _resolve_post_targets(
+                db, brand_id=cluster.brand_id, brand_name=brand_row.name,
+                prompt_id=cluster.prompt_id, prompt_text=prompt_row.text,
+                enabled=[platform],
+            )
+            target = post_targets.get(platform, {})
+            if target.get("brief_append"):
+                ctx = ctx + "\n\n" + target["brief_append"]
+
+        # Reddit thread routing: generate via the reddit_comment spec while the
+        # draft's stored platform stays the base "reddit" card slot.
+        platform_for_generation = target.get("platform_key_override") or platform
+
+        # Resolve the insider/neutral angle using the target's subreddit
+        # classification (same as regenerate_cluster's `_gen`) instead of
+        # always falling back to an unclassified "neutral" angle.
         from app.services.drafting.angle import angle_directive as _angle_text, effective_angle
-        resolved_angle = effective_angle(resolve_platform_key(platform), cluster.angle or "auto", None)
+        angle_platform_key = resolve_platform_key(platform_for_generation)
+        sub_cls = None
+        if angle_platform_key.startswith("reddit") and target.get("subreddit"):
+            from app.services.drafting.platforms import classify_subreddit
+            sub_cls = classify_subreddit(target["subreddit"])
+        resolved_angle = effective_angle(angle_platform_key, cluster.angle or "auto", sub_cls)
         angle_text = _angle_text(resolved_angle, brand_row.name)
         title, body, quality_score, citations, low_ev = await _generate_piece_text(
             db,
             brand_id=cluster.brand_id,
             brand_name=brand_row.name,
             prompt_id=cluster.prompt_id,
-            platform=platform,
+            platform=platform_for_generation,
             prompt_text=prompt_row.text,
             visibility_pct=visibility_pct,
             profile_context=profile_context,
             response_analysis=response_analysis,
             brief_context=ctx,
             tier=tier,
+            opportunity_context=target.get("opportunity"),
             angle_directive=angle_text,
         )
 
@@ -851,6 +905,10 @@ async def regenerate_piece(
         existing.status = "draft"
         existing.quality_score = quality_score
         existing.low_evidence = low_ev
+        if platform in ("reddit", "quora"):
+            existing.content_brief = target.get("brief")
+            existing.target_title = target.get("target_title")
+            existing.opportunity_id = target.get("opportunity_id")
         # Replace prior citations so the row reflects the regenerated body.
         await db.execute(
             delete(ContentDraftCitation).where(ContentDraftCitation.draft_id == existing.id)
@@ -866,6 +924,9 @@ async def regenerate_piece(
             title=title,
             content_text=body,
             source="cluster",
+            content_brief=target.get("brief") if platform in ("reddit", "quora") else None,
+            target_title=target.get("target_title") if platform in ("reddit", "quora") else None,
+            opportunity_id=target.get("opportunity_id") if platform in ("reddit", "quora") else None,
             quality_score=quality_score,
             low_evidence=low_ev,
         )
@@ -875,6 +936,13 @@ async def regenerate_piece(
     await _persist_citations_and_summary(
         db, draft=draft, citations=citations, query=prompt_row.text,
     )
+
+    # Mark the routed opportunity drafted ONLY now that generation + persist
+    # have both succeeded — mirrors regenerate_cluster's ok-gated marking so a
+    # piece that raises before this point (caught by the caller) leaves the
+    # opportunity untouched for a future retry.
+    if platform in ("reddit", "quora") and target.get("opportunity_id"):
+        await _mark_opportunities_drafted(db, [target["opportunity_id"]])
 
     await db.commit()
     await db.refresh(draft)

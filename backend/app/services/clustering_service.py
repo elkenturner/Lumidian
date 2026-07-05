@@ -252,7 +252,7 @@ async def _resolve_post_targets(
                 .limit(1)
             )).scalars().first()
             if opp is not None:
-                sub = (opp.subreddit or "").lstrip("r/")
+                sub = (opp.subreddit or "").removeprefix("r/")
                 strategy = (
                     build_subreddit_strategy(sub, brand_name, classify_subreddit(sub))
                     if sub else ""
@@ -626,7 +626,14 @@ async def regenerate_cluster(
 
     # Mark any opportunity we routed a reddit piece to as drafted so it isn't
     # re-selected by a future regen. Best-effort — never blocks the cluster.
-    routed_opp_ids = [t["opportunity_id"] for t in post_targets.values() if t.get("opportunity_id")]
+    # Only mark opportunities whose piece actually generated ("ok") — a
+    # failed piece must leave its opportunity untouched so a future regen
+    # can retry it, rather than silently burning it on the first attempt.
+    ok_platforms = {r[1] for r in results if r[0] == "ok"}
+    routed_opp_ids = [
+        t["opportunity_id"] for platform, t in post_targets.items()
+        if platform in ok_platforms and t.get("opportunity_id")
+    ]
     if routed_opp_ids:
         from app.models import ContentOpportunity
         for o in (await db.execute(

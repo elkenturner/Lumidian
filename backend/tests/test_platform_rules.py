@@ -1,5 +1,10 @@
 """Rules-content tests: the prompt/spec text encodes the July 2026 research decisions."""
-from app.services.drafting.platforms import PLATFORM_SPECS, PLATFORM_MAX_TOKENS
+from app.services.drafting.platforms import (
+    PLATFORM_SPECS,
+    PLATFORM_MAX_TOKENS,
+    build_subreddit_strategy,
+    classify_subreddit,
+)
 from app.services.drafting.prompts import build_prompt
 
 
@@ -50,6 +55,26 @@ def test_reddit_comment_spec_exists():
     # reply variants stay out of the standalone-content platform list
     from app.services.drafting.platforms import CONTENT_PLATFORMS
     assert "reddit_comment" not in CONTENT_PLATFORMS
+
+
+def test_classify_subreddit_does_not_mangle_r_initial_names():
+    # A bare r-initial name (e.g. scanner-stored "rust") must classify the
+    # same as its "r/"-prefixed form — the old .lstrip("r/") strips leading
+    # 'r' and '/' characters individually, turning "rust" into "ust".
+    assert classify_subreddit("rust") == classify_subreddit("r/rust")
+
+
+def test_classify_subreddit_relationships_is_restricted():
+    # "relationships" starts with 'r'; the old char-class lstrip("r/") turns
+    # it into "elationships", which misses the "restricted" name-signal
+    # check entirely. It must still be classified "restricted".
+    assert classify_subreddit("relationships") == "restricted"
+
+
+def test_build_subreddit_strategy_preserves_r_initial_name():
+    out = build_subreddit_strategy("rust", "Acme", "allowed")
+    assert "r/rust" in out
+    assert "r/ust" not in out
 
 
 def test_core_prompt_bans_fake_customer_voice():

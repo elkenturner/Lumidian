@@ -315,7 +315,7 @@ _ALLOWED_NAME_SIGNALS = (
 
 def classify_subreddit(subreddit: str) -> str:
     """Returns 'restricted', 'allowed', or 'cautious' for a given subreddit name."""
-    sub = subreddit.lower().strip().lstrip("r/")
+    sub = subreddit.lower().strip().removeprefix("r/")
     if sub in _PROMO_RESTRICTED_SUBREDDITS:
         return "restricted"
     if any(kw in sub for kw in _RESTRICTED_NAME_SIGNALS):
@@ -327,7 +327,7 @@ def classify_subreddit(subreddit: str) -> str:
 
 def build_subreddit_strategy(subreddit: str, brand_name: str, strategy: str) -> str:
     """Returns the prompt block telling Claude how to handle promotion for this subreddit."""
-    sub = subreddit.lstrip("r/")
+    sub = subreddit.removeprefix("r/")
     if strategy == "restricted":
         return (
             f"\nCOMMUNITY STRATEGY — CRITICAL:\n"

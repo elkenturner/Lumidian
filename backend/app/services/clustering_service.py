@@ -235,34 +235,76 @@ async def _resolve_post_targets(
                 build_subreddit_strategy,
                 classify_subreddit,
             )
-            from app.services.reddit_scanner_service import (
-                find_first_valid_subreddit,
-                get_relevant_subreddits,
-            )
-            prof = (await db.execute(
-                select(BrandProfile).where(BrandProfile.brand_id == brand_id)
-            )).scalar_one_or_none()
-            prompts = list((await db.execute(
-                select(Prompt).where(Prompt.brand_id == brand_id)
-            )).scalars().all())
-            subs = await asyncio.wait_for(
-                asyncio.to_thread(
-                    get_relevant_subreddits,
-                    prof.company_description if prof else None,
-                    [p.text for p in prompts], 5,
-                ),
-                timeout=12,
-            )
-            sub = await asyncio.wait_for(find_first_valid_subreddit(subs), timeout=8) if subs else None
-            if sub:
-                strategy = build_subreddit_strategy(sub, brand_name, classify_subreddit(sub))
+            # 1) Prefer a real, relevant, un-actioned thread — replies to open
+            # evergreen threads are the highest-value Reddit play for AI
+            # retrieval (July 2026 research). Best-effort like everything here.
+            from app.models import ContentOpportunity
+            opp = (await db.execute(
+                select(ContentOpportunity)
+                .where(
+                    ContentOpportunity.brand_id == brand_id,
+                    ContentOpportunity.prompt_id == prompt_id,
+                    ContentOpportunity.platform == "reddit",
+                    ContentOpportunity.status == "new",
+                    ContentOpportunity.relevance_score >= 60,
+                )
+                .order_by(ContentOpportunity.relevance_score.desc())
+                .limit(1)
+            )).scalars().first()
+            if opp is not None:
+                sub = (opp.subreddit or "").lstrip("r/")
+                strategy = (
+                    build_subreddit_strategy(sub, brand_name, classify_subreddit(sub))
+                    if sub else ""
+                )
+                preview = getattr(opp, "body_preview", None) or ""
                 targets["reddit"] = {
-                    "brief": f"r/{sub}",
-                    "brief_append": (
-                        f"SUBREDDIT TARGET: this post will be published in r/{sub}. "
-                        f"Write it to fit that community.\n{strategy}"
+                    "brief": opp.thread_url,
+                    "target_title": (opp.thread_title or "")[:300] or None,
+                    "platform_key_override": "reddit_comment",
+                    "opportunity_id": opp.id,
+                    "subreddit": sub or None,
+                    "opportunity": (
+                        f"THREAD: {opp.thread_title}\nURL: {opp.thread_url}\n"
+                        + (f"SUBREDDIT: r/{sub}\n" if sub else "")
+                        + (f"THREAD EXCERPT:\n{preview}\n" if preview else "")
+                        + f"\nWrite a top-level comment that directly answers this thread."
+                        + (f"\n{strategy}" if strategy else "")
                     ),
                 }
+            else:
+                # 2) Fall back to a standalone post in a validated subreddit
+                #    (existing behavior).
+                from app.services.reddit_scanner_service import (
+                    find_first_valid_subreddit,
+                    get_relevant_subreddits,
+                )
+                prof = (await db.execute(
+                    select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+                )).scalar_one_or_none()
+                prompts = list((await db.execute(
+                    select(Prompt).where(Prompt.brand_id == brand_id)
+                )).scalars().all())
+                subs = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        get_relevant_subreddits,
+                        prof.company_description if prof else None,
+                        [p.text for p in prompts], 5,
+                    ),
+                    timeout=12,
+                )
+                sub = await asyncio.wait_for(find_first_valid_subreddit(subs), timeout=8) if subs else None
+                if sub:
+                    strategy = build_subreddit_strategy(sub, brand_name, classify_subreddit(sub))
+                    targets["reddit"] = {
+                        "brief": f"r/{sub}",
+                        "target_title": None,
+                        "subreddit": sub,
+                        "brief_append": (
+                            f"SUBREDDIT TARGET: this post will be published in r/{sub}. "
+                            f"Write it to fit that community.\n{strategy}"
+                        ),
+                    }
         except Exception as exc:
             logger.warning("cluster reddit target resolve skipped: %s", exc)
     if "quora" in enabled:
@@ -276,6 +318,7 @@ async def _resolve_post_targets(
                 title, url, snippet = q.get("title", ""), q.get("url", ""), q.get("snippet", "")
                 targets["quora"] = {
                     "brief": url,
+                    "target_title": (title or "")[:300] or None,
                     "opportunity": (
                         f"QUESTION: {title}\nURL: {url}\n\n"
                         + (f"QUESTION CONTEXT (excerpt):\n{snippet}\n\n" if snippet else "")
@@ -493,6 +536,9 @@ async def regenerate_cluster(
         # the brief). Quora: write the answer TO the resolved real question.
         if target.get("brief_append"):
             ctx = ctx + "\n\n" + target["brief_append"]
+        # Reddit thread routing: generate via the reddit_comment spec while the
+        # draft's stored platform stays the base "reddit" card slot.
+        platform_for_generation = target.get("platform_key_override") or platform
         try:
             # Each piece runs in the asyncio.gather below, so it MUST use its own
             # DB session — a single AsyncSession shared across concurrent coroutines
@@ -503,7 +549,7 @@ async def regenerate_cluster(
                 title, body, q, citations, low_ev = await asyncio.wait_for(
                     _generate_piece_text(
                         piece_db, brand_id=cluster.brand_id, brand_name=brand_row.name,
-                        prompt_id=cluster.prompt_id, platform=platform,
+                        prompt_id=cluster.prompt_id, platform=platform_for_generation,
                         prompt_text=prompt_row.text, visibility_pct=visibility_pct,
                         profile_context=profile_context,
                         response_analysis=response_analysis,
@@ -564,6 +610,8 @@ async def regenerate_cluster(
             status="draft", title=title,  # already non-empty via _derive_title_fallback
             content_text=body, source="cluster",
             content_brief=post_targets.get(platform, {}).get("brief"),
+            target_title=post_targets.get(platform, {}).get("target_title"),
+            opportunity_id=post_targets.get(platform, {}).get("opportunity_id"),
             quality_score=q, generation_state="done",
             low_evidence=low_ev,
         )
@@ -575,6 +623,16 @@ async def regenerate_cluster(
         await _persist_citations_and_summary(
             db, draft=draft, citations=citations, query=prompt_row.text,
         )
+
+    # Mark any opportunity we routed a reddit piece to as drafted so it isn't
+    # re-selected by a future regen. Best-effort — never blocks the cluster.
+    routed_opp_ids = [t["opportunity_id"] for t in post_targets.values() if t.get("opportunity_id")]
+    if routed_opp_ids:
+        from app.models import ContentOpportunity
+        for o in (await db.execute(
+            select(ContentOpportunity).where(ContentOpportunity.id.in_(routed_opp_ids))
+        )).scalars().all():
+            o.status = "drafted"
 
     if any_failed:
         cluster.status = "generation_partial"

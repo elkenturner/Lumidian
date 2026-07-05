@@ -35,8 +35,14 @@ export function OpportunitiesPanel({ brandId, defaultCollapsed = false }: Props)
   const [opportunities, setOpportunities] = useState<ContentOpportunity[] | null>(null);
   const [loadError, setLoadError] = useState(false);
   const [drafts, setDrafts] = useState<Record<number, ContentDraft>>({});
-  const [draftingId, setDraftingId] = useState<number | null>(null);
-  const [postingId, setPostingId] = useState<number | null>(null);
+  // Sets, not scalars: two rows can be in flight at once, and a scalar would
+  // re-enable row A's button as soon as row B starts (duplicate LLM drafts).
+  const [draftingIds, setDraftingIds] = useState<Set<number>>(new Set());
+  const [postingIds, setPostingIds] = useState<Set<number>>(new Set());
+  const addTo = (setter: React.Dispatch<React.SetStateAction<Set<number>>>, id: number) =>
+    setter((prev) => new Set(prev).add(id));
+  const removeFrom = (setter: React.Dispatch<React.SetStateAction<Set<number>>>, id: number) =>
+    setter((prev) => { const next = new Set(prev); next.delete(id); return next; });
   const [dismissingIds, setDismissingIds] = useState<Set<number>>(new Set());
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
@@ -66,7 +72,8 @@ export function OpportunitiesPanel({ brandId, defaultCollapsed = false }: Props)
   }
 
   async function handleDraft(opp: ContentOpportunity) {
-    setDraftingId(opp.id);
+    if (draftingIds.has(opp.id)) return;
+    addTo(setDraftingIds, opp.id);
     setRowError(opp.id, null);
     try {
       const draft = await draftOpportunity(opp.id);
@@ -77,7 +84,7 @@ export function OpportunitiesPanel({ brandId, defaultCollapsed = false }: Props)
     } catch (e) {
       setRowError(opp.id, parseApiError(e, "Couldn't draft a reply for this thread. Please try again."));
     } finally {
-      setDraftingId(null);
+      removeFrom(setDraftingIds, opp.id);
     }
   }
 
@@ -107,7 +114,8 @@ export function OpportunitiesPanel({ brandId, defaultCollapsed = false }: Props)
   async function handleMarkPosted(opp: ContentOpportunity) {
     const draft = drafts[opp.id];
     if (!draft) return;
-    setPostingId(opp.id);
+    if (postingIds.has(opp.id)) return;
+    addTo(setPostingIds, opp.id);
     setRowError(opp.id, null);
     try {
       const updated = await updateDraft(draft.id, { status: "posted" });
@@ -115,7 +123,7 @@ export function OpportunitiesPanel({ brandId, defaultCollapsed = false }: Props)
     } catch (e) {
       setRowError(opp.id, parseApiError(e, "Couldn't mark this as posted. Please try again."));
     } finally {
-      setPostingId(null);
+      removeFrom(setPostingIds, opp.id);
     }
   }
 
@@ -181,8 +189,8 @@ export function OpportunitiesPanel({ brandId, defaultCollapsed = false }: Props)
                 key={opp.id}
                 opp={opp}
                 draft={drafts[opp.id]}
-                drafting={draftingId === opp.id}
-                posting={postingId === opp.id}
+                drafting={draftingIds.has(opp.id)}
+                posting={postingIds.has(opp.id)}
                 dismissing={dismissingIds.has(opp.id)}
                 copied={copiedId === opp.id}
                 error={rowErrors[opp.id]}

@@ -62,7 +62,7 @@ export default function VisibilityChart({
           ) : (
             <>
               <p className="text-4xl sm:text-5xl md:text-6xl font-bold text-[var(--text-primary)] mt-1 leading-none">
-                {score != null ? `${animatedScore}%` : '\u2014'}
+                {score == null ? '\u2014' : score > 0 && score < 1 ? '<1%' : `${animatedScore}%`}
               </p>
               {scoreDelta !== null && (
                 <p className={`text-xs font-medium mt-2 ${scoreDelta > 0 ? 'text-[var(--success)]' : scoreDelta < 0 ? 'text-[var(--danger-text)]' : 'text-[var(--text-muted)]'}`}>

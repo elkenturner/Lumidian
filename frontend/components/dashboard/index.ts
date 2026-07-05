@@ -1,13 +1,10 @@
 export { default as DashboardHeader } from './DashboardHeader';
-export { default as StatsGrid } from './StatsGrid';
 export { default as VisibilityChart } from './VisibilityChart';
 export { default as BrandTable } from './BrandTable';
 export { default as BestPromptCard } from './BestPromptCard';
 export { default as DonutDomains } from './DonutDomains';
 export { default as DashboardModelBreakdown } from './DashboardModelBreakdown';
-export { default as CitationGaps } from './CitationGaps';
 export { default as HelpTooltip } from './HelpTooltip';
-export { default as MethodologyCallout } from './MethodologyCallout';
 export { default as SparklineTooltip } from './SparklineTooltip';
 export { buildPromptGroups } from './BestPromptCard';
 export type { PromptGroup } from './BestPromptCard';

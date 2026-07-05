@@ -22,6 +22,8 @@ interface BrandSummary {
 interface DashboardHeaderProps {
   selectedBrand: BrandSummary | undefined;
   selectedBrandId: number | null;
+  /** Quiet stats line under the brand name, e.g. "25 prompts tracked · tracking for 6 days". */
+  meta?: string;
   isMobile: boolean;
   triggering: boolean;
   isRunning: boolean;
@@ -37,6 +39,7 @@ interface DashboardHeaderProps {
 export default function DashboardHeader({
   selectedBrand,
   selectedBrandId,
+  meta,
   isMobile,
   triggering,
   isRunning,
@@ -67,7 +70,7 @@ export default function DashboardHeader({
           <h1 className="text-lg sm:text-2xl text-[var(--text-primary)] capitalize" style={{ fontFamily: 'var(--font-syne)', fontWeight: 700, letterSpacing: '-0.02em' }}>
             {selectedBrand ? selectedBrand.name : 'Dashboard'}
           </h1>
-          <p className="hidden sm:block text-[13px] text-[var(--text-muted)] mt-1.5">AI visibility analytics</p>
+          <p className="hidden sm:block text-[13px] text-[var(--text-muted)] mt-1.5">{meta ?? 'AI visibility analytics'}</p>
         </div>
       </div>
       <div className={`flex ${isMobile ? 'flex-col w-full' : 'items-center'} gap-2 sm:gap-3`}>

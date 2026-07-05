@@ -534,15 +534,16 @@ async def run_tracking(
             competitors = comps_result.scalars().all()
 
             if competitors:
+                # Word-boundary matching (same matcher as SOV/gap analytics) —
+                # raw substring inflated short names, e.g. "Raft" inside "draft".
+                from app.services.competitive_gap import _mention_matches
+
                 comp_mention_rows = []
                 for qr in query_results:
                     if not qr.response_text or qr.error:
                         continue
-                    response_norm = _normalize(qr.response_text)
                     for comp in competitors:
-                        exact = comp.name.lower() in qr.response_text.lower()
-                        fuzzy = _normalize(comp.name) in response_norm
-                        mentioned = exact or fuzzy
+                        mentioned = _mention_matches(qr.response_text, comp.name)
                         comp_mention_rows.append(CompetitorMention(
                             tracking_run_id=run_id,
                             competitor_id=comp.id,

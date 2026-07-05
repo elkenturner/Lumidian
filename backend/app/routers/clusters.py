@@ -29,6 +29,7 @@ from app.models import (
     Prompt,
 )
 from app.schemas import (
+    ClusterAngleUpdate,
     ClusterPieceStatus,
     ClusterSourceItem,
     ClusterSourcesPayload,
@@ -268,6 +269,30 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
         "posted_count": posted_count,
         "angle": cluster.angle,
     }
+
+
+@router.patch("/{brand_id}/{cluster_id}", response_model=ContentClusterDetail)
+async def update_cluster(
+    brand_id: int,
+    cluster_id: int,
+    payload: ClusterAngleUpdate,
+    db: DbDep,
+    user: CurrentUser,
+) -> dict:
+    """Update the cluster's content angle. Takes effect on the next generation
+    (initial pieces, per-piece regen, or full regen) — does not rewrite
+    already-generated drafts."""
+    await _ensure_brand_owned(db, brand_id, user)
+    cluster = (await db.execute(
+        select(ContentCluster).where(
+            ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
+        )
+    )).scalar_one_or_none()
+    if cluster is None:
+        raise HTTPException(404, "Cluster not found")
+    cluster.angle = payload.angle
+    await db.commit()
+    return await get_cluster(brand_id, cluster.id, db, user)  # type: ignore
 
 
 @router.post("/{brand_id}/by-prompt/{prompt_id}/regenerate", response_model=ContentClusterDetail)

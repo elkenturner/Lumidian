@@ -1445,6 +1445,10 @@ class RegeneratePieceRequest(BaseModel):
     platform: str  # must be one of: linkedin, medium, reddit, quora, x
 
 
+class ClusterAngleUpdate(BaseModel):
+    angle: Literal["auto", "insider", "neutral"]
+
+
 class EditBriefRequest(BaseModel):
     positioning: str | None = None
     key_claims: list[str] | None = None

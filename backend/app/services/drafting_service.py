@@ -34,6 +34,7 @@ from app.models import (
     Brand,
     BrandContentSettings,
     BrandProfile,
+    ContentCluster,
     ContentDraft,
     ContentDraftCitation,
     ContentGap,
@@ -647,6 +648,7 @@ async def _generate_with_new_pipeline(
     brief_context: str | None = None,
     enforce_brand_mention: bool = False,
     model_override: str | None = None,
+    angle_directive: str | None = None,
 ) -> tuple[str, float | None, list[RenderedCitation], bool]:
     """
     Run the full retrieve → draft → critique → rewrite → render pipeline.
@@ -662,6 +664,10 @@ async def _generate_with_new_pipeline(
 
     ``brief_context`` is forwarded to ``build_prompt`` for cluster-pipeline callers
     that need to inject a shared ContentBrief (positioning, canonical phrasings, etc.).
+
+    ``angle_directive`` is the resolved insider/neutral persona text (see
+    ``drafting/angle.py``); callers resolve the angle per-platform before
+    calling in. ``None`` means no angle section is injected (e.g. owned_site).
     """
     # Layer 1: Evidence Pack — paid tiers only
     pack = None
@@ -718,6 +724,7 @@ async def _generate_with_new_pipeline(
         voice_sample=voice_sample,
         related_draft_summary=related_summary,
         voice_directive=voice_directive,
+        angle_directive=angle_directive,
     )
     raw_text = await call_claude(
         claude_prompt,
@@ -1218,6 +1225,17 @@ async def generate_gap_draft(
     quality_score: float | None = None
     rendered_citations: list[RenderedCitation] = []
 
+    # Resolve the content angle (insider/neutral persona) for this piece. Gap
+    # drafts aren't cluster-authored, but if this prompt already has a cluster
+    # the operator's angle choice there should still apply. No cluster → "auto".
+    from app.services.drafting.angle import angle_directive as _angle_text, effective_angle
+    _cluster_for_angle = (await db.execute(
+        select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+    )).scalar_one_or_none()
+    _cluster_angle = (_cluster_for_angle.angle if _cluster_for_angle else None) or "auto"
+    _resolved_angle = effective_angle(platform_key, _cluster_angle, _reddit_strategy)
+    _angle_directive_text = _angle_text(_resolved_angle, brand.name)
+
     # B2 Phase 3: single path for all tiers. The core handles paid (evidence pack /
     # critic / voice / citations) and free-pitch (cheap single-shot) via tier gating,
     # plus the brand-mention guard and the universal anti-AI gate. Free tier uses the
@@ -1242,6 +1260,7 @@ async def generate_gap_draft(
             user_tier not in ("basic", "starter", "pro")
             and _reddit_strategy != "restricted"
         ),
+        angle_directive=_angle_directive_text,
     )
 
     raw_text = remove_hedging(raw_text)

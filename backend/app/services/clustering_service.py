@@ -239,6 +239,7 @@ async def _generate_piece_text(
     brief_context: str,
     tier: str | None,
     opportunity_context: str | None = None,
+    angle_directive: str | None = None,
 ) -> tuple[str, str, float | None, list[RenderedCitation], bool]:
     """Generate one cluster piece via the full content-quality pipeline.
 
@@ -270,6 +271,7 @@ async def _generate_piece_text(
         db=db,
         brief_context=brief_context,
         opportunity_context=opportunity_context,
+        angle_directive=angle_directive,
     )
     # Final polish (same step the gap-draft path applies after the pipeline).
     raw_text = remove_hedging(raw_text)
@@ -613,6 +615,18 @@ async def regenerate_cluster(
                 cluster=cluster, brand_row=brand_row, prompt_row=prompt_row,
                 brief_context=ctx, pack=pack, tier=tier, low_evidence=low_evidence,
             )
+        # Resolve the insider/neutral angle for this piece. Both reddit target
+        # modes (routed thread + standalone post) carry a bare "subreddit" key.
+        # Use the resolved platform KEY (e.g. "linkedin" -> "linkedin_article")
+        # so it matches the matrix's platform vocabulary.
+        from app.services.drafting.angle import angle_directive as _angle_text, effective_angle
+        angle_platform_key = resolve_platform_key(platform_for_generation)
+        sub_cls = None
+        if angle_platform_key.startswith("reddit") and target.get("subreddit"):
+            from app.services.drafting.platforms import classify_subreddit
+            sub_cls = classify_subreddit(target["subreddit"])
+        resolved_angle = effective_angle(angle_platform_key, cluster.angle or "auto", sub_cls)
+        angle_text = _angle_text(resolved_angle, brand_row.name)
         try:
             # Each piece runs in the asyncio.gather below, so it MUST use its own
             # DB session — a single AsyncSession shared across concurrent coroutines
@@ -629,6 +643,7 @@ async def regenerate_cluster(
                         response_analysis=response_analysis,
                         brief_context=ctx, tier=tier,
                         opportunity_context=target.get("opportunity"),
+                        angle_directive=angle_text,
                     ),
                     timeout=PIECE_TIMEOUT_SECONDS,
                 )
@@ -793,6 +808,12 @@ async def regenerate_piece(
             raise RuntimeError(f"owned_site piece generation failed: {res[2]}")
         _, _, title, body, quality_score, citations, low_ev = res
     else:
+        # No target-resolution pass here (unlike regenerate_cluster's `_gen`),
+        # so there's no known subreddit to classify — falls back to "neutral"
+        # for auto reddit pieces, same as any other unclassified subreddit.
+        from app.services.drafting.angle import angle_directive as _angle_text, effective_angle
+        resolved_angle = effective_angle(resolve_platform_key(platform), cluster.angle or "auto", None)
+        angle_text = _angle_text(resolved_angle, brand_row.name)
         title, body, quality_score, citations, low_ev = await _generate_piece_text(
             db,
             brand_id=cluster.brand_id,
@@ -805,6 +826,7 @@ async def regenerate_piece(
             response_analysis=response_analysis,
             brief_context=ctx,
             tier=tier,
+            angle_directive=angle_text,
         )
 
     existing = (await db.execute(

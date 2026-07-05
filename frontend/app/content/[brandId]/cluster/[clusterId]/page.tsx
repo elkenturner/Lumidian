@@ -183,7 +183,7 @@ export default function ClusterDetailPage() {
   const deltaLabel = deltaRounded === null
     ? "—"
     : deltaRounded === 0
-    ? "No change"
+    ? "No lift yet"
     : `${deltaRounded > 0 ? "+" : ""}${deltaRounded.toFixed(1)} pts`;
   const statusLabel = clusterChip({ status: effectiveStatus, version: cluster.version, posted_count: cluster.posted_count, pieces: cluster.drafts.map((d) => ({ platform: d.platform })) }).label;
 

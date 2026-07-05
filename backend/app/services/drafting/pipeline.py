@@ -256,3 +256,30 @@ def enforce_x_char_limit(text: str, platform: str) -> str:
         return "\n".join(trimmed)
 
     return _trim_to_limit(text)
+
+
+# ── Markdown emphasis stripping ───────────────────────────────────────────────
+
+# **bold**, ***bold-italic***, __bold__ — longest markers first so ***x***
+# collapses cleanly. Single-asterisk italics are left alone (too easy to
+# collide with bullet lists and multiplication).
+_EMPHASIS_RE = _re.compile(r"(\*\*\*|\*\*|___|__)(?=\S)(.+?)(?<=\S)\1")
+
+# Platforms whose output is published as real markdown/HTML and must keep
+# formatting. Everything else (LinkedIn, Reddit, Quora, X, Medium's editor)
+# renders pasted asterisks literally — "**Section**" reads as clutter.
+_MARKDOWN_KEEP_PLATFORMS = {"owned_site", "wikipedia"}
+
+
+def strip_markdown_emphasis(text: str, platform: str = "") -> str:
+    """Remove **bold**/__bold__ emphasis markers, keeping the inner text.
+
+    Markdown links [title](url) and ## headings are untouched.
+    """
+    if platform in _MARKDOWN_KEEP_PLATFORMS:
+        return text
+    prev = None
+    while prev != text:
+        prev = text
+        text = _EMPHASIS_RE.sub(r"\2", text)
+    return text

@@ -290,6 +290,7 @@ WRITING RULES (evidence-backed — these drive whether AI engines cite the conte
   - NEVER write as a satisfied customer or user of {brand_name} ("I've been using it and love it") when writing on the brand's behalf — undisclosed insider testimonials are an FTC violation. First-person experience is fine only in an openly affiliated voice.
   - Write in a genuine human voice: vary sentence length, and avoid AI clichés (no "delve", "tapestry", em dashes, "in conclusion", "it's not just X — it's Y"). Drafts that read as AI-written are automatically rejected, so this is not optional.
   - No meta-commentary about the content itself ("This post addresses...", "This answer explains...").
+  - NEVER use markdown emphasis — no **bold**, no __underline__, no ***combined*** — the target platforms render the asterisks literally as clutter. If a line needs to stand out, give it its own short line.
 
 QUERY MIRRORING RULES (critical for AI retrieval — these are checked):
   - The FIRST SENTENCE of the content body must directly address, answer, or engage with the target query using its specific subject matter — not with generic background. If the query is "Can cancer be detected through breath analysis?", the first sentence must talk specifically about breath analysis and cancer detection — NOT start with "Cancer affects millions of people worldwide."

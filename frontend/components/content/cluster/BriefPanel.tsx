@@ -122,6 +122,9 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
 
       {expanded && (
         <div className="border-t border-[var(--border-subtle)] p-5 space-y-5 text-sm">
+          <p className="text-xs text-[var(--text-faint)]">
+            The shared strategy behind every post in this cluster. Edit it and regenerate to change all posts at once.
+          </p>
           {draftDirty && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
               You have unsaved brief changes. Click <strong>Save</strong> below to persist.
@@ -135,8 +138,8 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
           )}
           {!editing ? (
             <>
-              <Field label="Positioning">{brief.positioning || <Empty />}</Field>
-              <Field label="Canonical phrasings (appear verbatim across pieces)">
+              <Field label="The angle">{brief.positioning || <Empty />}</Field>
+              <Field label="Core messages (each post rewords these — never verbatim)">
                 {brief.canonical_phrasings.length ? (
                   <ul className="space-y-1 text-[var(--text-secondary)]">
                     {brief.canonical_phrasings.map((p, i) => (
@@ -150,7 +153,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
                   <Empty />
                 )}
               </Field>
-              <Field label="Key claims">
+              <Field label="Claims we make">
                 {brief.key_claims.length ? (
                   <ul className="space-y-1 text-[var(--text-secondary)]">
                     {brief.key_claims.map((c, i) => (
@@ -179,8 +182,8 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
                   </ul>
                 </Field>
               )}
-              <Field label="Narrative spine">{brief.narrative_spine || <Empty />}</Field>
-              {brief.tone_notes && <Field label="Tone notes">{brief.tone_notes}</Field>}
+              <Field label="Story arc">{brief.narrative_spine || <Empty />}</Field>
+              {brief.tone_notes && <Field label="Tone">{brief.tone_notes}</Field>}
               <Button
                 variant="outline"
                 size="sm"
@@ -191,7 +194,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
             </>
           ) : (
             <>
-              <Field label="Positioning">
+              <Field label="The angle">
                 <textarea
                   value={positioning}
                   onChange={(e) => {
@@ -202,7 +205,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
                   rows={2}
                 />
               </Field>
-              <Field label="Canonical phrasings (one per line)">
+              <Field label="Core messages (one per line)">
                 <textarea
                   value={phrasings}
                   onChange={(e) => {
@@ -213,7 +216,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
                   rows={4}
                 />
               </Field>
-              <Field label="Key claims (one per line)">
+              <Field label="Claims we make (one per line)">
                 <textarea
                   value={keyClaims}
                   onChange={(e) => {
@@ -224,7 +227,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
                   rows={4}
                 />
               </Field>
-              <Field label="Narrative spine">
+              <Field label="Story arc">
                 <textarea
                   value={narrative}
                   onChange={(e) => {
@@ -247,7 +250,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
                   placeholder="Conversion lift | 32% | internal benchmark 2026"
                 />
               </Field>
-              <Field label="Tone notes">
+              <Field label="Tone">
                 <textarea
                   value={toneNotes}
                   onChange={(e) => {

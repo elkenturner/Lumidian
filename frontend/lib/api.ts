@@ -2206,7 +2206,7 @@ export interface ClusterStatusPayload {
 export interface ClusterSourceItem {
   url: string;
   domain: string;
-  tier: 'T1' | 'T2' | 'T3';
+  tier: 'T1' | 'T2' | 'T3' | 'brand';
   title: string | null;
   times_cited: number;
 }

@@ -1,17 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getClusterSources, type ClusterSourceItem, type ClusterSourcesPayload } from "@/lib/api";
+import { getClusterSources, type ClusterSourcesPayload } from "@/lib/api";
 
 interface Props {
   brandId: number;
   clusterId: number;
 }
 
-const TIER_COLORS: Record<ClusterSourceItem["tier"], string> = {
+const TIER_LABELS: Record<string, string> = {
+  T1: "Major press & research",
+  T2: "Industry press",
+  T3: "Other web",
+  brand: "Your site & profile",
+};
+const TIER_COLORS: Record<string, string> = {
   T1: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   T2: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   T3: "bg-slate-500/15 text-slate-300 border-slate-500/30",
+  brand: "bg-amber-500/15 text-amber-300 border-amber-500/30",
 };
 
 export function SourceSpinePanel({ brandId, clusterId }: Props) {
@@ -48,22 +55,30 @@ export function SourceSpinePanel({ brandId, clusterId }: Props) {
     );
   }
 
+  const totalBrand = data.sources.filter((s) => s.tier === "brand").length;
+
   return (
     <div className="space-y-3">
-      <div className="flex gap-3 text-xs text-slate-300">
-        <TierCount label="T1" count={data.total_t1} activeColor="text-emerald-300" />
-        <TierCount label="T2" count={data.total_t2} activeColor="text-sky-300" />
-        <TierCount label="T3" count={data.total_t3} activeColor="text-slate-400" />
+      <div className="flex flex-wrap gap-3 text-xs text-slate-300">
+        <TierCount label={TIER_LABELS.T1} count={data.total_t1} activeColor="text-emerald-300" />
+        <TierCount label={TIER_LABELS.T2} count={data.total_t2} activeColor="text-sky-300" />
+        <TierCount label={TIER_LABELS.T3} count={data.total_t3} activeColor="text-slate-400" />
+        {totalBrand > 0 && (
+          <TierCount label={TIER_LABELS.brand} count={totalBrand} activeColor="text-amber-300" />
+        )}
       </div>
+      <p className="text-xs text-[var(--text-faint)]">
+        Facts in these posts are grounded in these sources. Stronger sources keep claims accurate and quotable.
+      </p>
       <ul className="divide-y divide-slate-800">
         {data.sources.map((s) => (
           <li key={s.url} className="py-2 flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span
-                  className={`text-[10px] uppercase px-1.5 py-0.5 rounded border ${TIER_COLORS[s.tier]}`}
+                  className={`px-1.5 py-0.5 rounded border text-[10px] ${TIER_COLORS[s.tier] ?? TIER_COLORS.T3}`}
                 >
-                  {s.tier}
+                  {TIER_LABELS[s.tier] ?? s.tier}
                 </span>
                 <span className="text-sm text-slate-200 font-medium">{s.domain}</span>
               </div>
@@ -76,6 +91,11 @@ export function SourceSpinePanel({ brandId, clusterId }: Props) {
                 {s.title || s.url}
               </a>
             </div>
+            {s.times_cited > 0 && (
+              <span className="shrink-0 text-xs text-[var(--text-muted)]">
+                Cited in {s.times_cited} post{s.times_cited === 1 ? "" : "s"}
+              </span>
+            )}
           </li>
         ))}
       </ul>

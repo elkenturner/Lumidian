@@ -5,7 +5,7 @@ interface Citation {
   url: string;
   title: string | null;
   position_marker: number | null;
-  tier?: "T1" | "T2" | "T3" | null;
+  tier?: "T1" | "T2" | "T3" | "brand" | null;
 }
 
 // Shared tier vocabulary — matches SourceSpinePanel so a source reads the same
@@ -14,24 +14,25 @@ const TIER_COLORS: Record<string, string> = {
   T1: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   T2: "bg-sky-500/15 text-sky-300 border-sky-500/30",
   T3: "bg-slate-500/15 text-slate-300 border-slate-500/30",
+  brand: "bg-amber-500/15 text-amber-300 border-amber-500/30",
 };
 
 const TIER_LABEL: Record<string, string> = {
-  T1: "Top-tier authority (wire service, peer-reviewed, .gov/.edu)",
-  T2: "Recognized trade / industry publication",
-  T3: "General source",
+  T1: "Major press & research",
+  T2: "Industry press",
+  T3: "Other web",
+  brand: "Your site & profile",
 };
 
 function TierBadge({ tier }: { tier?: string | null }) {
   if (!tier) return null;
   return (
     <span
-      className={`text-[10px] uppercase px-1.5 py-0.5 rounded border shrink-0 ${
+      className={`px-1.5 py-0.5 rounded border shrink-0 text-[10px] ${
         TIER_COLORS[tier] ?? TIER_COLORS.T3
       }`}
-      title={TIER_LABEL[tier] ?? "Source authority tier"}
     >
-      {tier}
+      {TIER_LABEL[tier] ?? tier}
     </span>
   );
 }

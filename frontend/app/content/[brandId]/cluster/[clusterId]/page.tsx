@@ -14,20 +14,15 @@ import { Button } from "@/components/ui/button";
 import {
   getCluster,
   getContentGaps,
-  getOpportunities,
   proposeClusterPillar,
   rebuildCluster,
   regenerateClusterPieces,
   type ContentClusterDetail,
   type ContentDraft,
   type ContentGap,
-  type ContentOpportunity,
   type PillarCandidate,
 } from "@/lib/api";
 import { BriefPanel } from "@/components/content/cluster/BriefPanel";
-import { GapInput } from "@/components/content/cluster/GapInput";
-import { InputsZone } from "@/components/content/cluster/InputsZone";
-import { OpportunitiesInput } from "@/components/content/cluster/OpportunitiesInput";
 import { PieceCard } from "@/components/content/cluster/PieceCard";
 import { PillarCard } from "@/components/content/cluster/PillarCard";
 import { SourceSpinePanel } from "@/components/content/cluster/SourceSpinePanel";
@@ -53,7 +48,6 @@ export default function ClusterDetailPage() {
 
   const [cluster, setCluster] = useState<ContentClusterDetail | null>(null);
   const [candidate, setCandidate] = useState<PillarCandidate | null>(null);
-  const [opportunities, setOpportunities] = useState<ContentOpportunity[]>([]);
   const [gaps, setGaps] = useState<ContentGap[]>([]);
   const [loading, setLoading] = useState(true);
   const [regenAction, setRegenAction] = useState<null | "pieces" | "rebuild">(null);
@@ -62,18 +56,14 @@ export default function ClusterDetailPage() {
     let cancelled = false;
     async function load() {
       try {
-        const [c, cand, opps, gapList] = await Promise.all([
+        const [c, cand, gapList] = await Promise.all([
           getCluster(brandId, clusterId),
           proposeClusterPillar(brandId, clusterId).catch(() => null),
-          getOpportunities(brandId).catch(() => [] as ContentOpportunity[]),
           getContentGaps(brandId).catch(() => [] as ContentGap[]),
         ]);
         if (!cancelled) {
           setCluster(c);
           setCandidate(cand);
-          setOpportunities(
-            opps.filter((o) => o.prompt_id === c.prompt_id && o.status !== "dismissed"),
-          );
           setGaps(gapList.filter((g) => g.prompt_id === c.prompt_id));
         }
       } catch {
@@ -269,6 +259,19 @@ export default function ClusterDetailPage() {
               </>
             )}
           </div>
+          {gaps.length > 0 && (() => {
+            const g = gaps[0];
+            const top = Object.entries(g.competitor_mentions ?? {})
+              .sort((a, b) => b[1] - a[1]).slice(0, 2).map(([n]) => n);
+            return (
+              <div className="mt-1.5 text-sm text-[var(--text-muted)]">
+                {g.prompt_visibility !== null && (
+                  <>You appear in <span className="text-[var(--text-secondary)] font-medium">{Math.round(g.prompt_visibility)}%</span> of AI answers here</>
+                )}
+                {top.length > 0 && <> · <span className="text-[var(--text-secondary)]">{top.join(", ")}</span> {top.length === 1 ? "is" : "are"} winning this question</>}
+              </div>
+            );
+          })()}
           <div className="mt-3 flex flex-wrap gap-2">
             {hasContent ? (
               <>
@@ -462,23 +465,14 @@ export default function ClusterDetailPage() {
         </div>
       </div>
 
-      {/* ZONE 3 — Inputs (Pillar / Opportunities / Gaps) */}
-      <InputsZone
-        pillar={
-          candidate || cluster.pillar_mode !== "none" ? (
-            <PillarCard
-              brandId={brandId}
-              cluster={cluster}
-              candidate={candidate}
-              onClusterUpdated={(c) => setCluster(c)}
-            />
-          ) : undefined
-        }
-        opportunities={
-          opportunities.length ? <OpportunitiesInput items={opportunities} /> : undefined
-        }
-        gaps={gaps.length ? <GapInput items={gaps} /> : undefined}
-      />
+      {(candidate || cluster.pillar_mode !== "none") && (
+        <PillarCard
+          brandId={brandId}
+          cluster={cluster}
+          candidate={candidate}
+          onClusterUpdated={(c) => setCluster(c)}
+        />
+      )}
     </div>
   );
 }

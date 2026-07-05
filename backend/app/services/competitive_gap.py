@@ -46,6 +46,18 @@ def _normalize(text: str) -> str:
     return re.sub(r"[^a-z0-9]", "", text.lower())
 
 
+def _as_naive_utc(dt: datetime) -> datetime:
+    """
+    Coerce a datetime to naive UTC. App code writes naive UTC, but rows seeded
+    by external scripts can carry '+00:00'-suffixed strings that SQLAlchemy's
+    SQLite dialect parses back as tz-aware — comparing those against our naive
+    window bounds raises TypeError.
+    """
+    if dt.tzinfo is None:
+        return dt
+    return dt.astimezone(UTC).replace(tzinfo=None)
+
+
 def _mention_matches(text: str | None, name: str) -> bool:
     """
     True if `name` appears in `text` as a word-bounded match (case-insensitive)
@@ -144,6 +156,7 @@ async def compute_competitive_gap(
     )
     competitors = list(comp_rows.scalars().all())
     has_competitors = len(competitors) > 0
+    comp_created: dict[int, datetime] = {c.id: _as_naive_utc(c.created_at) for c in competitors}
 
     # Runs covering both windows
     run_rows = await db.execute(
@@ -159,7 +172,9 @@ async def compute_competitive_gap(
         return _empty_response(brand_id, window, has_competitors)
 
     run_ids = [r.id for r in runs]
-    run_completed: dict[int, datetime] = {r.id: r.completed_at for r in runs}
+    run_completed: dict[int, datetime] = {
+        r.id: _as_naive_utc(r.completed_at) for r in runs if r.completed_at is not None
+    }
 
     # Query results (filter errors out)
     qr_rows = await db.execute(
@@ -198,7 +213,7 @@ async def compute_competitive_gap(
         hits = sum(1 for qr in qrs if _mention_matches(qr.response_text, comp.name))
         return hits / len(qrs) * 100.0
 
-    eligible_competitors = [c for c in competitors if c.created_at <= end]
+    eligible_competitors = [c for c in competitors if comp_created[c.id] <= end]
     competitor_pcts = {c.id: _comp_pct(cur_qrs, c) for c in eligible_competitors}
     if eligible_competitors:
         comp_avg_pct = sum(competitor_pcts.values()) / len(eligible_competitors)
@@ -212,7 +227,7 @@ async def compute_competitive_gap(
     if prior_rows and eligible_competitors:
         prior_qrs = [qr for qr, _ in prior_rows]
         prior_brand_pct = sum(1 for qr in prior_qrs if qr.mentioned) / len(prior_qrs) * 100.0
-        prior_eligible = [c for c in eligible_competitors if c.created_at <= prior_end]
+        prior_eligible = [c for c in eligible_competitors if comp_created[c.id] <= prior_end]
         if prior_eligible:
             prior_comp_pcts = [_comp_pct(prior_qrs, c) for c in prior_eligible]
             prior_avg = sum(prior_comp_pcts) / len(prior_eligible)
@@ -231,7 +246,7 @@ async def compute_competitive_gap(
             continue
         day_total = len(day_qrs)
         day_brand_pct = sum(1 for qr in day_qrs if qr.mentioned) / day_total * 100.0
-        day_eligible = [c for c in competitors if c.created_at.date() <= day]
+        day_eligible = [c for c in competitors if comp_created[c.id].date() <= day]
         if day_eligible:
             day_comp_pcts = {c.id: _comp_pct(day_qrs, c) for c in day_eligible}
             day_comp_avg = sum(day_comp_pcts.values()) / len(day_eligible)
@@ -259,7 +274,7 @@ async def compute_competitive_gap(
     # ── Per-competitor stats ────────────────────────────────────────────────
     comp_stats: list[CompetitorGapStat] = []
     for c in competitors:
-        eligible_now = c.created_at <= end
+        eligible_now = comp_created[c.id] <= end
         if not eligible_now:
             comp_stats.append(CompetitorGapStat(
                 competitor_id=c.id,
@@ -275,7 +290,7 @@ async def compute_competitive_gap(
         c_gap = brand_pct - c_pct
         # Per-competitor delta: same window-aggregate trick
         c_delta: float | None = None
-        if prior_rows and c.created_at <= prior_end:
+        if prior_rows and comp_created[c.id] <= prior_end:
             prior_qrs = [qr for qr, _ in prior_rows]
             prior_brand_pct = sum(1 for qr in prior_qrs if qr.mentioned) / len(prior_qrs) * 100.0 if prior_qrs else 0.0
             prior_c_pct = _comp_pct(prior_qrs, c)

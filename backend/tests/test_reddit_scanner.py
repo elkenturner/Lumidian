@@ -430,3 +430,51 @@ async def test_haiku_rejected_post_not_stored(tmp_db):
         count = await reddit_scanner_service.scan_brand_opportunities(brand_id)
 
     assert count == 0
+
+
+# ── _prune_stale_opportunities ────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_prune_retains_high_relevance_evergreen_threads(db_session):
+    from datetime import UTC, datetime, timedelta
+
+    from app.models import Brand, ContentOpportunity, User
+    from app.services.reddit_scanner_service import _prune_stale_opportunities
+
+    user = User(email="prune@example.com", password_hash="x", name="P")
+    db_session.add(user)
+    await db_session.flush()
+    brand = Brand(name="PruneCo", slug="pruneco", user_id=user.id)
+    db_session.add(brand)
+    await db_session.flush()
+
+    old = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=30)
+    keep = ContentOpportunity(
+        brand_id=brand.id, platform="reddit", thread_url="u1",
+        thread_title="t1", relevance_score=75.0, status="new", created_at=old,
+    )
+    drop = ContentOpportunity(
+        brand_id=brand.id, platform="reddit", thread_url="u2",
+        thread_title="t2", relevance_score=40.0, status="new", created_at=old,
+    )
+    ancient = ContentOpportunity(
+        brand_id=brand.id, platform="reddit", thread_url="u3",
+        thread_title="t3", relevance_score=90.0, status="new",
+        created_at=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=120),
+    )
+    db_session.add_all([keep, drop, ancient])
+    await db_session.commit()
+
+    await _prune_stale_opportunities(db_session, brand_id=brand.id)
+    await db_session.commit()
+
+    from sqlalchemy import select
+    urls = {
+        o.thread_url
+        for o in (
+            await db_session.execute(
+                select(ContentOpportunity).where(ContentOpportunity.brand_id == brand.id)
+            )
+        ).scalars().all()
+    }
+    assert urls == {"u1"}  # high-relevance 30d kept; low-rel 30d and 120d dropped

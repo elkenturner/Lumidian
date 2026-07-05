@@ -15,7 +15,6 @@ import {
   Play,
   Loader2,
   Globe,
-  Link2,
   PauseCircle,
 } from 'lucide-react';
 import { logError } from '@/lib/utils/errors';
@@ -25,7 +24,6 @@ import {
   getTrends,
   getDashboardAnalytics,
   getResponses,
-  getDrafts,
   getRecentRuns,
   triggerRun,
   getRunStatus,
@@ -69,13 +67,10 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import dynamic from 'next/dynamic';
 import {
   DashboardHeader,
-  StatsGrid,
   BrandTable,
   BestPromptCard,
   DashboardModelBreakdown,
-  CitationGaps,
   HelpTooltip,
-  MethodologyCallout,
   buildPromptGroups,
 } from '@/components/dashboard';
 
@@ -114,7 +109,6 @@ export default function DashboardPage() {
   const [responses, setResponses] = useState<QueryResult[]>([]);
   const [loadingResponses, setLoadingResponses] = useState(false);
   const [brandDetail, setBrandDetail] = useState<BrandDetail | null>(null);
-  const [publishedCount, setPublishedCount] = useState(0);
 
   // Toast
   const [toast, setToast] = useState<ToastData | null>(null);
@@ -213,7 +207,6 @@ export default function DashboardPage() {
       setCompetitors(Array.isArray(comps) ? comps : []);
       setLoadingAnalytics(false);
       setResponses(Array.isArray(resps) ? resps.filter((r) => r.response_text) : []);
-      getDrafts(brandId, undefined, 'posted').then((d) => setPublishedCount(d.length)).catch((err) => logError(err, 'Dashboard: fetch posted drafts count'));
     } catch {
       if (signal?.aborted) return;
       setLoadingAnalytics(false);
@@ -467,7 +460,6 @@ export default function DashboardPage() {
   const isAtRunLimit = !user?.is_admin && usage !== null && usage.manual_run_limit !== null && usage.manual_runs_today >= usage.manual_run_limit;
 
   const totalPrompts = (brandDetail?.prompts ?? []).length;
-  const totalRuns = trends.length;
 
   // Derive Performance by Model from the latest run's model breakdown (same
   // data source as the headline score) so all numbers stay consistent.
@@ -485,6 +477,14 @@ export default function DashboardPage() {
   const daysSinceFirst = trends.length > 0 && trends[0].completed_at
     ? Math.max(0, Math.floor((Date.now() - parseUTCISO(trends[0].completed_at).getTime()) / 86_400_000))
     : null;
+
+  // Replaces the old stats tiles + usage line: one quiet meta line in the header.
+  const headerMeta = [
+    totalPrompts > 0 ? `${totalPrompts} prompt${totalPrompts !== 1 ? 's' : ''} tracked` : null,
+    daysSinceFirst != null
+      ? daysSinceFirst < 1 ? 'tracking since today' : `tracking for ${daysSinceFirst} day${daysSinceFirst !== 1 ? 's' : ''}`
+      : null,
+  ].filter(Boolean).join(' · ');
 
   const modelDeltas: Record<string, number> = (() => {
     if (trends.length < 2) return {};
@@ -537,24 +537,6 @@ export default function DashboardPage() {
             daysRemaining={billingStatus?.days_remaining ?? null}
             trialEnd={billingStatus?.subscription_trial_end ?? null}
           />
-        </div>
-      )}
-
-      {/* Usage indicator (non-admin) — compact inline */}
-      {usage && !user?.is_admin && (
-        <div className="flex items-center gap-3 text-[10px] text-[var(--text-faint)] mb-4">
-          <span className="flex items-center gap-1.5">
-            <span className="text-[var(--text-muted)]">{totalPrompts} prompt{totalPrompts !== 1 ? 's' : ''}</span>
-          </span>
-          {usage.manual_run_limit !== null && (
-            <>
-              <span className="text-[var(--bg-elevated)]">&middot;</span>
-              <span className="flex items-center gap-1.5">
-                <span className="text-[var(--text-muted)]">Runs today</span>
-                <span className="font-semibold tabular-nums text-[var(--text-secondary)]">{usage.manual_runs_today}/{usage.manual_run_limit}</span>
-              </span>
-            </>
-          )}
         </div>
       )}
 
@@ -624,6 +606,7 @@ export default function DashboardPage() {
       <DashboardHeader
         selectedBrand={selectedBrand}
         selectedBrandId={selectedBrandId}
+        meta={headerMeta || undefined}
         isMobile={isMobile}
         triggering={triggering}
         isRunning={isRunning}
@@ -718,8 +701,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          <MethodologyCallout visible={!isFirstRun && score !== null} />
-
           {/* Mobile: single page-level loader on first analytics load
               (prevents the 7+ skeleton blocks pulsing simultaneously) */}
           {!isFirstRun && isMobile && loadingAnalytics && !analytics && (
@@ -745,35 +726,10 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* Brand profile completeness notification */}
-              {brandProfile && brandProfile.completion_pct < 100 && (
-                <Callout
-                  variant="inline"
-                  body="Complete your brand profile to improve draft quality"
-                  action={
-                    <Link
-                      href="/settings?tab=profile"
-                      className="text-xs text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors font-medium whitespace-nowrap"
-                    >
-                      Complete profile &rarr;
-                    </Link>
-                  }
-                />
-              )}
-
-              {/* Quick stats row */}
-              {!loadingAnalytics && totalRuns > 0 && (
-                <StatsGrid
-                  totalPrompts={totalPrompts}
-                  daysSinceFirst={daysSinceFirst}
-                  publishedCount={publishedCount}
-                  isMobile={isMobile}
-                />
-              )}
-
-              {/* Row 1: Visibility Score | Competitive Gap */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {/* Row 1: Visibility Score (hero) | Competitive Gap */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
                 {/* Visibility score + sparkline */}
+                <div className="lg:col-span-3">
                 <VisibilityChart
                   score={score}
                   scoreDelta={scoreDelta}
@@ -785,20 +741,45 @@ export default function DashboardPage() {
                   activeModels={analytics?.active_models}
                   brandId={selectedBrandId ?? undefined}
                 />
+                </div>
 
-                {/* Competitive Gap card */}
-                <CompetitiveGapCard
-                  data={competitiveGap}
-                  loading={gapLoading || loadingAnalytics}
-                  window={gapWindow}
-                  onWindowChange={setGapWindow}
-                  onExpand={() => setGapDrawerOpen(true)}
-                  onAddCompetitorsClick={() => setCompetitorModalOpen(true)}
-                />
+                {/* Competitive Gap card — or, with no competitors yet, the single
+                    combined CTA (this used to be two near-identical "Add
+                    competitors" cards: gap + share of voice). */}
+                <div className="lg:col-span-2">
+                {!loadingAnalytics && !gapLoading && competitors.length === 0 ? (
+                  <div className="card p-6 h-full flex flex-col items-start justify-center">
+                    <div className="w-10 h-10 rounded-xl bg-[var(--bg-tinted)] flex items-center justify-center text-[var(--accent)] mb-3">
+                      <Users size={18} />
+                    </div>
+                    <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Competitive landscape</h3>
+                    <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
+                      Track the brands AI recommends instead of you — unlock your visibility gap and share of voice.
+                    </p>
+                    <button
+                      onClick={() => setCompetitorModalOpen(true)}
+                      className="flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--accent-light)] rounded-lg px-4 py-2 text-xs font-semibold transition-colors"
+                    >
+                      <Plus size={14} />
+                      Add competitors
+                    </button>
+                  </div>
+                ) : (
+                  <CompetitiveGapCard
+                    data={competitiveGap}
+                    loading={gapLoading || loadingAnalytics}
+                    window={gapWindow}
+                    onWindowChange={setGapWindow}
+                    onExpand={() => setGapDrawerOpen(true)}
+                    onAddCompetitorsClick={() => setCompetitorModalOpen(true)}
+                  />
+                )}
+                </div>
               </div>
 
-              {/* Row 2: Best Prompt + Sentiment | SOV (was the right column of old Row 1) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              {/* Row 2: Best Prompt + Sentiment | SOV (SOV only once competitors exist —
+                  the row-1 combined CTA is the single entry point before that) */}
+              <div className={`grid grid-cols-1 ${competitors.length > 0 ? 'md:grid-cols-2' : ''} gap-4 mb-4`}>
                 {/* Best Prompt + Sentiment */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <BestPromptCard responses={responses} loading={loadingAnalytics} />
@@ -851,6 +832,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* SOV */}
+                {competitors.length > 0 && (
                 <div className="card p-5">
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
@@ -890,41 +872,46 @@ export default function DashboardPage() {
                     ];
                     let colorIdx = 0;
 
+                    const topRival = [...allStats].filter((s) => !s.is_primary).sort((a, b) => b.mention_rate - a.mention_rate)[0];
+
                     return (
-                      <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : count <= 2 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
-                        {sorted.map((s) => {
-                          const pct = Math.round(s.mention_rate * 100);
-                          const competitorColor = s.is_primary ? null : mutedColors[colorIdx++ % mutedColors.length];
-                          const barColor = s.is_primary ? 'var(--accent)' : competitorColor!;
-                          const textColor = s.is_primary ? 'var(--accent-light)' : competitorColor!;
-                          return (
-                            <div key={s.name} className="flex flex-col gap-1.5">
-                              <div className="flex items-center justify-between">
-                                <span className={`text-xs font-medium truncate capitalize ${s.is_primary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{s.name}</span>
-                                <span className="text-xs font-semibold tabular-nums ml-2 flex-shrink-0" style={{ color: textColor }}>{pct}%</span>
+                      <>
+                        <div className={`grid gap-3 ${isMobile ? 'grid-cols-1' : count <= 2 ? 'grid-cols-1' : count <= 4 ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-3'}`}>
+                          {sorted.map((s) => {
+                            const pct = Math.round(s.mention_rate * 100);
+                            const competitorColor = s.is_primary ? null : mutedColors[colorIdx++ % mutedColors.length];
+                            const barColor = s.is_primary ? 'var(--accent)' : competitorColor!;
+                            const textColor = s.is_primary ? 'var(--accent-light)' : competitorColor!;
+                            return (
+                              <div key={s.name} className="flex flex-col gap-1.5">
+                                <div className="flex items-center justify-between">
+                                  <span className={`text-xs font-medium truncate capitalize ${s.is_primary ? 'text-[var(--text-primary)]' : 'text-[var(--text-secondary)]'}`}>{s.name}</span>
+                                  <span className="text-xs font-semibold tabular-nums ml-2 flex-shrink-0" style={{ color: textColor }}>{pct}%</span>
+                                </div>
+                                <div className="h-1.5 rounded-full bg-[var(--bg-tinted)] overflow-hidden">
+                                  <div
+                                    className="h-full rounded-full transition-[width] duration-500"
+                                    style={{ width: `${pct}%`, background: barColor }}
+                                  />
+                                </div>
                               </div>
-                              <div className="h-1.5 rounded-full bg-[var(--bg-tinted)] overflow-hidden">
-                                <div
-                                  className="h-full rounded-full transition-[width] duration-500"
-                                  style={{ width: `${pct}%`, background: barColor }}
-                                />
-                              </div>
-                              {!s.is_primary && selectedBrandId != null && (
-                                <AskCoachButton
-                                  brandId={selectedBrandId}
-                                  question={`Why is ${s.name} outperforming us in AI visibility?`}
-                                  className="text-[10px] text-[var(--text-faint)] hover:text-[var(--accent)] underline underline-offset-2 transition-colors text-left"
-                                >
-                                  Why are they ahead?
-                                </AskCoachButton>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                        {topRival && selectedBrandId != null && (
+                          <AskCoachButton
+                            brandId={selectedBrandId}
+                            question={`Why is ${topRival.name} outperforming us in AI visibility, and what should we do about it?`}
+                            className="mt-3 text-[11px] text-[var(--text-faint)] hover:text-[var(--accent)] underline underline-offset-2 transition-colors text-left"
+                          >
+                            Why are competitors ahead?
+                          </AskCoachButton>
+                        )}
+                      </>
                     );
                   })()}
                 </div>
+                )}
               </div>
 
               {/* Row 3 (was Row 2): Avg Position + Top Domains */}
@@ -1012,20 +999,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Row 5: Sources you're missing from */}
-              {analytics && analytics.total_responses_analyzed > 0 && selectedBrand && (
-                <div className="mb-4">
-                  <div className="card p-5">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Link2 size={15} className="text-[var(--accent)]" />
-                      <h3 className="text-[15px] font-medium text-[var(--text-primary)]">Sources you&apos;re missing from</h3>
-                      <HelpTooltip text="Draftable sources AI cites for your prompts — ranked by how many times they were cited without mentioning your brand." />
-                    </div>
-                    <CitationGaps gaps={analytics.citation_gaps} brandId={selectedBrand.id} />
-                  </div>
-                </div>
-              )}
-
               {/* Recent Conversations */}
               <BrandTable
                 analytics={analytics}
@@ -1037,6 +1010,25 @@ export default function DashboardPage() {
                 convModelFilter={convModelFilter}
                 setConvModelFilter={setConvModelFilter}
               />
+
+              {/* Brand profile completeness — quiet footer nudge (was the first
+                  banner on the page; the score should greet people, not a chore) */}
+              {brandProfile && brandProfile.completion_pct < 100 && (
+                <div className="mt-4">
+                  <Callout
+                    variant="inline"
+                    body="Complete your brand profile to improve draft quality"
+                    action={
+                      <Link
+                        href="/settings?tab=profile"
+                        className="text-xs text-[var(--accent)] hover:text-[var(--accent-light)] transition-colors font-medium whitespace-nowrap"
+                      >
+                        Complete profile &rarr;
+                      </Link>
+                    }
+                  />
+                </div>
+              )}
             </>
           )}
         </>

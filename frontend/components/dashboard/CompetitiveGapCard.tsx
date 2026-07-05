@@ -125,7 +125,7 @@ export function CompetitiveGapCard({
       tabIndex={0}
       onClick={onExpand}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExpand(); } }}
-      className="card p-5 flex flex-col text-left hover:border-[var(--accent-border)] transition-colors group relative cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+      className="card p-5 h-full flex flex-col text-left hover:border-[var(--accent-border)] transition-colors group relative cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
     >
       <ArrowRight
         size={14}

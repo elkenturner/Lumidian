@@ -78,7 +78,14 @@ async def _cluster_lift_for_prompt(
     )).scalar_one_or_none()
     if first_attr is None:
         return None
+    # score_at_posting is None when the draft was posted before any tracking
+    # run measured the prompt (content.py stores it as NULL). No baseline →
+    # no lift; returning None must not crash the whole detail endpoint.
+    if first_attr.score_at_posting is None:
+        return None
     current = await _get_prompt_visibility(db, prompt_id)
+    if current is None:
+        return None
     return round(float(current) - float(first_attr.score_at_posting), 2)
 
 

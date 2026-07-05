@@ -191,3 +191,39 @@ async def test_brief_history_endpoint(client):
     assert r.status_code == 200, r.text
     body = r.json()
     assert [b["version"] for b in body] == [3, 2, 1]  # descending
+
+
+@pytest.mark.asyncio
+async def test_detail_survives_attribution_with_null_score(client):
+    """A DraftAttribution row with score_at_posting=None (created when a draft
+    is posted before any tracking run measured the prompt) must not 500 the
+    cluster detail endpoint — cluster_delta degrades to None instead."""
+    await register_and_login(client, "nullattr@x.com")
+    brand = await create_brand(client, "NullAttr")
+    r = await client.get(f"/api/brands/{brand['id']}")
+    prompt_id = r.json()["prompts"][0]["id"]
+    async with AsyncSessionLocal() as db:
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "ready"
+        from app.models import ContentDraft, DraftAttribution
+        draft = ContentDraft(
+            brand_id=brand["id"], prompt_id=prompt_id, cluster_id=cluster.id,
+            platform="owned_site", status="posted", content_text="x",
+            source="cluster", posted_url="https://ex.com/p",
+        )
+        db.add(draft)
+        await db.flush()
+        from app.models import utcnow
+        db.add(DraftAttribution(
+            draft_id=draft.id, brand_id=brand["id"], prompt_id=prompt_id,
+            score_at_posting=None, current_score=None, delta=None,
+            posted_at=utcnow(),
+        ))
+        await db.commit()
+        cluster_id = cluster.id
+
+    r = await client.get(f"/api/clusters/{brand['id']}/{cluster_id}")
+    assert r.status_code == 200, r.text
+    assert r.json()["cluster_delta"] is None

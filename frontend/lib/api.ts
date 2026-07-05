@@ -232,6 +232,9 @@ export interface ContentDraft {
   title: string | null;
   content_text: string;
   content_brief: string | null;
+  // Human label for the routing destination (e.g. the Quora question title,
+  // or the Reddit thread title when content_brief is a full thread URL).
+  target_title?: string | null;
   platform_guidelines_applied: string | null;
   visibility_score_at_draft: number | null;
   estimated_impact: number | null;
@@ -2124,6 +2127,7 @@ export interface ContentClusterDetail {
   last_generated_at: string | null;
   cluster_delta: number | null;
   posted_count: number;
+  angle: "auto" | "insider" | "neutral";
 }
 
 export interface PillarCandidate {
@@ -2167,6 +2171,15 @@ export async function editClusterBrief(
   patch: Partial<Pick<ContentBrief, 'positioning' | 'key_claims' | 'canonical_phrasings' | 'stats' | 'narrative_spine' | 'tone_notes'>>,
 ): Promise<ContentBrief> {
   const res = await api.patch<ContentBrief>(`/clusters/${brandId}/${clusterId}/brief`, patch);
+  return res.data;
+}
+
+export async function updateClusterAngle(
+  brandId: number,
+  clusterId: number,
+  angle: "auto" | "insider" | "neutral",
+): Promise<ContentClusterDetail> {
+  const res = await api.patch<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}`, { angle });
   return res.data;
 }
 

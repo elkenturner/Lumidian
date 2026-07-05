@@ -17,14 +17,15 @@ import {
   proposeClusterPillar,
   rebuildCluster,
   regenerateClusterPieces,
+  updateClusterAngle,
   type ContentClusterDetail,
   type ContentDraft,
   type ContentGap,
   type PillarCandidate,
 } from "@/lib/api";
 import { BriefPanel } from "@/components/content/cluster/BriefPanel";
+import { OwnedSiteCard } from "@/components/content/cluster/OwnedSiteCard";
 import { PieceCard } from "@/components/content/cluster/PieceCard";
-import { PillarCard } from "@/components/content/cluster/PillarCard";
 import { SourceSpinePanel } from "@/components/content/cluster/SourceSpinePanel";
 import PlatformBadge from "@/components/PlatformBadge";
 import { useClusterStatus } from "@/hooks/useClusterStatus";
@@ -40,6 +41,12 @@ const PLATFORM_ORDER = CLUSTER_PLATFORMS;
 
 const ACTIVE_STATUSES = new Set(["briefing", "generating"]);
 
+const ANGLES = [
+  { key: "auto", label: "Auto", tip: "Insider voice on LinkedIn/Medium/X; neutral on Quora and strict subreddits" },
+  { key: "insider", label: "Insider", tip: "Openly affiliated voice — first-person experience, casual disclosure when endorsing" },
+  { key: "neutral", label: "Neutral", tip: "Independent-practitioner voice — the brand appears as one option among alternatives" },
+] as const;
+
 export default function ClusterDetailPage() {
   const router = useRouter();
   const params = useParams<{ brandId: string; clusterId: string }>();
@@ -51,6 +58,7 @@ export default function ClusterDetailPage() {
   const [gaps, setGaps] = useState<ContentGap[]>([]);
   const [loading, setLoading] = useState(true);
   const [regenAction, setRegenAction] = useState<null | "pieces" | "rebuild">(null);
+  const [savingAngle, setSavingAngle] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -223,6 +231,16 @@ export default function ClusterDetailPage() {
     }
   }
 
+  async function setAngle(a: "auto" | "insider" | "neutral") {
+    if (!cluster || a === cluster.angle) return;
+    setSavingAngle(true);
+    try {
+      setCluster(await updateClusterAngle(brandId, clusterId, a));
+    } finally {
+      setSavingAngle(false);
+    }
+  }
+
   return (
     <div className="px-4 sm:px-8 py-6 sm:py-8 max-w-[1400px] space-y-6">
       <button
@@ -321,7 +339,38 @@ export default function ClusterDetailPage() {
                 Generate posts
               </Button>
             )}
+            <div
+              className="flex items-center gap-1 rounded-md border border-[var(--border-subtle)] p-0.5"
+              role="radiogroup"
+              aria-label="Content voice"
+            >
+              <span className="px-1.5 text-[11px] text-[var(--text-faint)] font-semibold uppercase tracking-wider">
+                Voice
+              </span>
+              {ANGLES.map((a) => (
+                <button
+                  key={a.key}
+                  role="radio"
+                  aria-checked={cluster.angle === a.key}
+                  title={a.tip}
+                  disabled={savingAngle || isActive}
+                  onClick={() => setAngle(a.key)}
+                  className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                    cluster.angle === a.key
+                      ? "bg-[var(--bg-card)] text-[var(--text-primary)] border border-[var(--border-subtle)]"
+                      : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+                  }`}
+                >
+                  {a.label}
+                </button>
+              ))}
+            </div>
           </div>
+          {hasContent && cluster.angle !== "auto" && (
+            <div className="mt-1.5 text-xs text-[var(--text-faint)]">
+              Applies when you rewrite the posts.
+            </div>
+          )}
         </div>
         {/* Lift only appears once a post has gone live and been measured —
             otherwise it reads "—" forever. Mirrors the cluster card. */}
@@ -395,16 +444,28 @@ export default function ClusterDetailPage() {
           Posts
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {platforms.filter((p) => isVisible(p)).map((platform) => (
-            <PieceCard
-              key={platform}
-              brandId={brandId}
-              clusterId={cluster.id}
-              platform={platform}
-              draft={draftsByPlatform.get(platform) ?? null}
-              onUpdated={updateDraft}
-            />
-          ))}
+          {platforms.filter((p) => isVisible(p)).map((platform) =>
+            platform === "owned_site" ? (
+              <OwnedSiteCard
+                key={platform}
+                brandId={brandId}
+                cluster={cluster}
+                candidate={candidate}
+                draft={draftsByPlatform.get(platform) ?? null}
+                onClusterUpdated={(c) => setCluster(c)}
+                onDraftUpdated={updateDraft}
+              />
+            ) : (
+              <PieceCard
+                key={platform}
+                brandId={brandId}
+                clusterId={cluster.id}
+                platform={platform}
+                draft={draftsByPlatform.get(platform) ?? null}
+                onUpdated={updateDraft}
+              />
+            ),
+          )}
         </div>
       </div>
 
@@ -464,15 +525,6 @@ export default function ClusterDetailPage() {
           </div>
         </div>
       </div>
-
-      {(candidate || cluster.pillar_mode !== "none") && (
-        <PillarCard
-          brandId={brandId}
-          cluster={cluster}
-          candidate={candidate}
-          onClusterUpdated={(c) => setCluster(c)}
-        />
-      )}
     </div>
   );
 }

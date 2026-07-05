@@ -224,6 +224,7 @@ from app.models import (  # noqa: E402
 
 
 _ENRICH_STRIP_TAGS = ("script", "style", "nav", "header", "footer", "aside")
+_ENRICH_MAX_HTML_CHARS = 512 * 1024  # parse at most 512KB of HTML (event-loop guard)
 _ENRICH_USER_AGENT = "Mozilla/5.0 (compatible; LumidianBot/1.0)"
 _CITED_BY_AI_PLACEHOLDER = "(cited by AI for this prompt)"
 
@@ -256,12 +257,19 @@ async def enrich_pack_snippets(
         try:
             async with sem:
                 resp = await client.get(url)
-            soup = BeautifulSoup(resp.text, "html.parser")
+            # Cap the HTML we parse: html.parser is pure-Python CPU work that
+            # runs inline on the event loop — an unbounded 5MB page would
+            # stall every other request while it parses. The first 512KB is
+            # far more than enough to fill an 1800-char snippet.
+            html = resp.text[:_ENRICH_MAX_HTML_CHARS]
+            soup = BeautifulSoup(html, "html.parser")
 
             title_tag = soup.title
             fetched_title = ""
             if title_tag is not None:
                 fetched_title = " ".join(title_tag.get_text(" ", strip=True).split())
+                # Don't let the page title leak into the body snippet too.
+                title_tag.decompose()
 
             for tag_name in _ENRICH_STRIP_TAGS:
                 for tag in soup.find_all(tag_name):
@@ -281,7 +289,9 @@ async def enrich_pack_snippets(
 
     async with httpx.AsyncClient(
         follow_redirects=True,
-        timeout=timeout_s,
+        # Short connect timeout so a blackholed host (offline CI, firewalled
+        # runner) fails in ~1.5s instead of hanging the full read timeout.
+        timeout=httpx.Timeout(connect=1.5, read=timeout_s, write=timeout_s, pool=timeout_s),
         headers={"User-Agent": _ENRICH_USER_AGENT},
     ) as client:
         await asyncio.gather(*(_enrich_one(client, s) for s in sources))

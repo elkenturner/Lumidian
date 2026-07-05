@@ -65,7 +65,12 @@ async def test_full_cluster_lifecycle(
     ), patch(
         "app.services.cluster_evidence.fetch_and_dedupe",
         new=AsyncMock(return_value=_FAKE_PACK),
+    ), patch(
+        "app.services.clustering_service._gen_owned_site_piece",
+        new=AsyncMock(return_value=("ok", "owned_site", "Title", "Body.", None, [], False)),
     ):
+        from app.services.clustering_service import CLUSTER_PLATFORMS
+
         # 1. Trigger cluster regeneration
         r1 = await client.post(f"/api/clusters/{brand.id}/by-prompt/{prompt.id}/regenerate")
         assert r1.status_code == 200, r1.text
@@ -77,7 +82,7 @@ async def test_full_cluster_lifecycle(
         body = r2.json()
         assert len(body) == 1
         assert body[0]["status"] == "ready"
-        assert len(body[0]["pieces"]) == 5
+        assert len(body[0]["pieces"]) == len(CLUSTER_PLATFORMS)
 
         # 3. Detail returns brief + drafts
         r3 = await client.get(f"/api/clusters/{brand.id}/{cluster_id}")
@@ -85,7 +90,7 @@ async def test_full_cluster_lifecycle(
         detail = r3.json()
         assert detail["brief"] is not None
         assert detail["brief"]["positioning"] == "P"
-        assert len(detail["drafts"]) == 5
+        assert len(detail["drafts"]) == len(CLUSTER_PLATFORMS)
 
         # 4. Edit brief
         r4 = await client.patch(

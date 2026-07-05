@@ -156,17 +156,23 @@ async def test_cluster_pieces_route_through_content_quality_pipeline(
     ), patch(
         "app.services.drafting_service._load_profile_context",
         new=AsyncMock(return_value="profile ctx"),
+    ), patch(
+        # owned_site anchor bypasses the generic pipeline — its dedicated
+        # generator is covered by test_cluster_owned_site.py.
+        "app.services.clustering_service._gen_owned_site_piece",
+        new=AsyncMock(return_value=("ok", "owned_site", "OS Title", "OS body.", 7.5, [], False)),
     ):
         result = await regenerate_cluster(db_session, cluster_id=cluster.id, tier="pro")
 
     assert result.status == "ready"
 
-    # Every piece reached the new pipeline with tier='pro' and a brief context.
+    # Every social piece reached the new pipeline with tier='pro' and a brief context.
     assert len(seen_tiers) == 5
     assert all(t == "pro" for t in seen_tiers)
     assert all("POSITIONING: Pos" in ctx for ctx in seen_brief_contexts)
-    # All 5 cluster platforms exercised — names are the resolved platform keys
-    # (e.g. `linkedin` → `linkedin_article`, `x` → `x_thread`).
+    # All 5 social cluster platforms exercised — names are the resolved platform
+    # keys (e.g. `linkedin` → `linkedin_article`, `x` → `x_thread`). owned_site
+    # routes through its own generator, not this pipeline.
     assert set(seen_platforms) == {"linkedin_article", "medium", "reddit", "quora", "x_thread"}
 
     # Every draft has the critic's quality_score persisted.
@@ -175,7 +181,8 @@ async def test_cluster_pieces_route_through_content_quality_pipeline(
             select(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
         )
     ).scalars().all()
-    assert len(drafts) == 5
+    from app.services.clustering_service import CLUSTER_PLATFORMS
+    assert len(drafts) == len(CLUSTER_PLATFORMS)
     assert all(d.quality_score == 7.5 for d in drafts)
     assert all(d.summary == "Acme reduces X by 40%." for d in drafts)
 
@@ -269,6 +276,9 @@ async def test_free_tier_cluster_still_persists_no_quality_or_citations(
     ), patch(
         "app.services.drafting_service._load_profile_context",
         new=AsyncMock(return_value=""),
+    ), patch(
+        "app.services.clustering_service._gen_owned_site_piece",
+        new=AsyncMock(return_value=("ok", "owned_site", "T", "B", None, [], False)),
     ):
         result = await regenerate_cluster(db_session, cluster_id=cluster.id, tier=None)
 
@@ -278,7 +288,8 @@ async def test_free_tier_cluster_still_persists_no_quality_or_citations(
             select(ContentDraft).where(ContentDraft.cluster_id == cluster.id)
         )
     ).scalars().all()
-    assert len(drafts) == 5
+    from app.services.clustering_service import CLUSTER_PLATFORMS
+    assert len(drafts) == len(CLUSTER_PLATFORMS)
     assert all(d.quality_score is None for d in drafts)
     citations = (
         await db_session.execute(

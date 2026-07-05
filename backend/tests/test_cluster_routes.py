@@ -49,7 +49,8 @@ async def test_regenerate_cluster_endpoint_creates_pieces(client: httpx.AsyncCli
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
          patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
-         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("T", "Body.", None, [], False))):
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("T", "Body.", None, [], False))), \
+         patch("app.services.clustering_service._gen_owned_site_piece", new=AsyncMock(return_value=("ok", "owned_site", "T", "Body.", None, [], False))):
         r = await client.post(
             f"/api/clusters/{brand.id}/by-prompt/{prompt.id}/regenerate",
         )
@@ -57,7 +58,8 @@ async def test_regenerate_cluster_endpoint_creates_pieces(client: httpx.AsyncCli
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ready"
-    assert len(body["drafts"]) == 5
+    from app.services.clustering_service import CLUSTER_PLATFORMS
+    assert len(body["drafts"]) == len(CLUSTER_PLATFORMS)
 
 
 async def test_regenerate_piece_endpoint(client: httpx.AsyncClient, db_session: AsyncSession) -> None:

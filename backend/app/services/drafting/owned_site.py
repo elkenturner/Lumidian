@@ -77,6 +77,7 @@ def build_owned_site_prompt(
     evidence: list[dict] | None = None,
     voice: str | None = None,
     avoid: str | None = None,
+    brief: str | None = None,
 ) -> str:
     """Construct the owned-site writer prompt.
 
@@ -84,6 +85,8 @@ def build_owned_site_prompt(
     audience, approved_language, what_not_to_say.
     `voice`: a voice/guidelines sample or instruction to mirror (Layer B/C input).
     `avoid`: regeneration feedback from a prior anti_ai scan (specific tells to remove).
+    `brief`: shared cluster brief context (positioning, canonical phrasings) when
+    this page is generated as a cluster's anchor piece.
     """
     name = brand.get("name", "the brand")
     parts: list[str] = []
@@ -104,6 +107,12 @@ def build_owned_site_prompt(
     if brand.get("what_not_to_say"):
         bp.append(f"NEVER say: {brand['what_not_to_say']}")
     parts.append("\n".join(bp))
+
+    if brief:
+        parts.append(
+            "CLUSTER BRIEF (this page anchors a coordinated cross-platform cluster — "
+            "express these ideas in your own words, never verbatim):\n" + brief
+        )
 
     parts.append("EVIDENCE SOURCES (cite as [S1], [S2], …; never invent figures):\n"
                  + _evidence_block(evidence))
@@ -192,6 +201,7 @@ async def generate_owned_site_draft(
     voice: str | None = None,
     date_published: str = "",
     max_retries: int = 2,
+    brief: str | None = None,
 ) -> OwnedSiteDraft:
     """Generate an owned-site draft, gating through the anti-AI engine.
 
@@ -199,13 +209,17 @@ async def generate_owned_site_draft(
     or a stub in tests). Loop: generate → autofix → scan → if failing, regenerate
     with the specific tells fed back. Never silently ships a failing draft — it is
     flagged_for_review instead.
+    `brief`: optional cluster brief context, forwarded to the prompt builder when
+    this draft anchors a coordinated cluster.
     """
-    prompt = build_owned_site_prompt(brand, target_query, evidence, voice)
+    prompt = build_owned_site_prompt(brand, target_query, evidence, voice, brief=brief)
     body = await writer(prompt)
 
     async def _regen(feedback: str) -> str:
         return await writer(
-            build_owned_site_prompt(brand, target_query, evidence, voice, avoid=feedback)
+            build_owned_site_prompt(
+                brand, target_query, evidence, voice, avoid=feedback, brief=brief
+            )
         )
 
     body, report, regens = await anti_ai.enforce(body, regenerate=_regen, max_retries=max_retries)

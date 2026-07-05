@@ -35,7 +35,7 @@ from app.services.drafting.voice import generate_draft_summary
 
 logger = logging.getLogger(__name__)
 
-CLUSTER_PLATFORMS: tuple[str, ...] = ("linkedin", "medium", "reddit", "quora", "x")
+CLUSTER_PLATFORMS: tuple[str, ...] = ("owned_site", "linkedin", "medium", "reddit", "quora", "x")
 
 # Hard ceiling on a single platform's writer pipeline. asyncio.gather waits for
 # every leg, so without this any one hung Claude call freezes the entire batch
@@ -58,6 +58,67 @@ def _derive_title_fallback(body: str, *, prompt_text: str, platform: str) -> str
             return first[:80].rstrip()
     label = platform.replace("_", " ").title()
     return f"{label} draft for {prompt_text}"[:80].rstrip()
+
+
+async def _gen_owned_site_piece(*, cluster, brand_row, prompt_row, brief_context, pack, tier):
+    """Cluster anchor piece: the brand's own site. Evidence = the cluster pack.
+
+    Mirrors the owned_site branch in drafting_service.py's onboarding/manual
+    draft flow, but is fed by the CLUSTER evidence pack (not the brand's
+    crawled publications) and threads the shared cluster brief through so the
+    page anchors the same positioning as the other platform pieces.
+    """
+    import json as _json
+    from datetime import datetime, timezone
+    from app.services.drafting.client import call_claude
+    from app.services.drafting.platforms import PLATFORM_MAX_TOKENS
+    from app.services.drafting import owned_site
+
+    try:
+        async with AsyncSessionLocal() as piece_db:
+            prof = (await piece_db.execute(
+                select(BrandProfile).where(BrandProfile.brand_id == cluster.brand_id)
+            )).scalar_one_or_none()
+        brand_dict = {
+            "name": brand_row.name,
+            "description": prof.company_description if prof else None,
+            "url": brand_row.website_url or None,
+            "audience": prof.target_audience if prof else None,
+        }
+        evidence = [
+            {"title": s.get("title"), "url": s.get("url", ""), "snippet": s.get("snippet", "")}
+            for s in (pack.sources if pack else [])
+            if s.get("url") and not str(s.get("url")).startswith("internal://")
+        ] or None
+        from app.services.drafting_service import _voice_directive_from_profile
+        voice = _voice_directive_from_profile(prof)
+
+        async def _writer(p: str) -> str:
+            return await call_claude(p, max_tokens=PLATFORM_MAX_TOKENS.get("owned_site", 3000))
+
+        owned = await asyncio.wait_for(
+            owned_site.generate_owned_site_draft(
+                writer=_writer, brand=brand_dict, target_query=prompt_row.text,
+                evidence=evidence, voice=voice, brief=brief_context,
+                date_published=datetime.now(timezone.utc).date().isoformat(),
+            ),
+            timeout=PIECE_TIMEOUT_SECONDS,
+        )
+        body = (
+            owned.body
+            + "\n\n---\nSchema markup (JSON-LD — paste inside the page's <head>):\n\n```json\n"
+            + _json.dumps(owned.jsonld, indent=2)
+            + "\n```\n"
+        )
+        title = owned.jsonld.get("headline") or _derive_title_fallback(
+            owned.body, prompt_text=prompt_row.text, platform="owned_site")
+        low_ev = not evidence
+        return ("ok", "owned_site", title, body, owned.anti_ai_score, [], low_ev)
+    except asyncio.TimeoutError:
+        return ("fail", "owned_site", f"timeout after {PIECE_TIMEOUT_SECONDS:.0f}s")
+    except Exception as exc:
+        logger.exception("owned_site piece failed: %s", exc)
+        return ("fail", "owned_site", str(exc))
 
 # Platforms that get a soft "further reading" reference to the cluster's
 # Medium piece (or own-site pillar). Reddit is EXCLUDED — outbound links to
@@ -539,6 +600,11 @@ async def regenerate_cluster(
         # Reddit thread routing: generate via the reddit_comment spec while the
         # draft's stored platform stays the base "reddit" card slot.
         platform_for_generation = target.get("platform_key_override") or platform
+        if platform == "owned_site":
+            return await _gen_owned_site_piece(
+                cluster=cluster, brand_row=brand_row, prompt_row=prompt_row,
+                brief_context=ctx, pack=pack, tier=tier,
+            )
         try:
             # Each piece runs in the asyncio.gather below, so it MUST use its own
             # DB session — a single AsyncSession shared across concurrent coroutines
@@ -696,19 +762,34 @@ async def regenerate_piece(
     sibs = [p for p in enabled if p != platform]
     ctx = _build_brief_context(brief_row, sibs)
 
-    title, body, quality_score, citations, low_ev = await _generate_piece_text(
-        db,
-        brand_id=cluster.brand_id,
-        brand_name=brand_row.name,
-        prompt_id=cluster.prompt_id,
-        platform=platform,
-        prompt_text=prompt_row.text,
-        visibility_pct=visibility_pct,
-        profile_context=profile_context,
-        response_analysis=response_analysis,
-        brief_context=ctx,
-        tier=tier,
-    )
+    if platform == "owned_site":
+        # Anchor piece — must go through the dedicated owned_site generator
+        # (JSON-LD, anti-AI gate), not the generic social-piece pipeline.
+        pack = None
+        if brief_row.evidence_pack_id is not None:
+            from app.models import ContentEvidencePack as PackModel
+            pack = await db.get(PackModel, brief_row.evidence_pack_id)
+        res = await _gen_owned_site_piece(
+            cluster=cluster, brand_row=brand_row, prompt_row=prompt_row,
+            brief_context=ctx, pack=pack, tier=tier,
+        )
+        if res[0] == "fail":
+            raise RuntimeError(f"owned_site piece generation failed: {res[2]}")
+        _, _, title, body, quality_score, citations, low_ev = res
+    else:
+        title, body, quality_score, citations, low_ev = await _generate_piece_text(
+            db,
+            brand_id=cluster.brand_id,
+            brand_name=brand_row.name,
+            prompt_id=cluster.prompt_id,
+            platform=platform,
+            prompt_text=prompt_row.text,
+            visibility_pct=visibility_pct,
+            profile_context=profile_context,
+            response_analysis=response_analysis,
+            brief_context=ctx,
+            tier=tier,
+        )
 
     existing = (await db.execute(
         select(ContentDraft).where(

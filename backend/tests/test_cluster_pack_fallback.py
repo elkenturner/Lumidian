@@ -242,6 +242,12 @@ async def test_regenerate_falls_back_to_ungated_t3_pack(monkeypatch):
         "app.services.clustering_service._generate_piece_text", fake_gen,
     )
 
+    async def fake_owned(**kwargs):
+        return ("ok", "owned_site", "Piece title", "Piece body [S1]", 0.9, [], False)
+    monkeypatch.setattr(
+        "app.services.clustering_service._gen_owned_site_piece", fake_owned,
+    )
+
     async def fake_brief_call(prompt, tier):
         import json
         return json.dumps({
@@ -325,6 +331,12 @@ async def test_regenerate_pieces_preserves_low_evidence_for_reused_ungated_pack(
         return "Piece title", "Piece body [S1]", 0.9, [], False
     monkeypatch.setattr(
         "app.services.clustering_service._generate_piece_text", fake_gen,
+    )
+
+    async def fake_owned(**kwargs):
+        return ("ok", "owned_site", "Piece title", "Piece body [S1]", 0.9, [], False)
+    monkeypatch.setattr(
+        "app.services.clustering_service._gen_owned_site_piece", fake_owned,
     )
 
     async with AsyncSessionLocal() as db:

@@ -879,6 +879,23 @@ async def run_migrations():
             """))
             logger.info("Migration applied: tracking_runs.failed_queries column + backfill")
 
+    # --- Migration: cluster-detail overhaul routing + angle (2026-07-04) ---
+    # target_title is the human-readable label for a routed piece's destination
+    # (content_brief already holds the URL); angle controls per-platform tone
+    # ('auto' | 'insider' | 'neutral') resolved at generation time.
+    async with engine.begin() as conn:
+        result = await conn.execute(text("PRAGMA table_info(content_drafts)"))
+        cols = {row[1] for row in result.fetchall()}
+        if "target_title" not in cols:
+            await conn.execute(text("ALTER TABLE content_drafts ADD COLUMN target_title VARCHAR(300)"))
+            logger.info("Migration applied: content_drafts.target_title column")
+
+        result = await conn.execute(text("PRAGMA table_info(content_clusters)"))
+        cols = {row[1] for row in result.fetchall()}
+        if "angle" not in cols:
+            await conn.execute(text("ALTER TABLE content_clusters ADD COLUMN angle VARCHAR(16) NOT NULL DEFAULT 'auto'"))
+            logger.info("Migration applied: content_clusters.angle column")
+
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):
     """On startup, resolve tracking runs stuck in pending/running.

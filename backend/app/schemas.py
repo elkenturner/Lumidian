@@ -1365,6 +1365,7 @@ class ContentClusterSummary(BaseModel):
     # Verbatim ContentCluster.failure_reason (e.g. "no_sources_found"); None when healthy.
     # Frontend translates the code into user-facing copy.
     failure_reason: str | None = None
+    angle: str = "auto"
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -1398,6 +1399,9 @@ class ContentClusterDraft(BaseModel):
     attribution_delta: float | None = None
     # Thin sourcing — writer cited nothing real / empty evidence pack
     low_evidence: bool = False
+    # Routing destination (WS2): URL in content_brief, human label in target_title
+    content_brief: str | None = None
+    target_title: str | None = None
 
     @field_validator("low_evidence", mode="before")
     @classmethod
@@ -1424,6 +1428,7 @@ class ContentClusterDetail(BaseModel):
     # Mirrors ContentClusterSummary
     cluster_delta: float | None
     posted_count: int
+    angle: str = "auto"
 
     model_config = ConfigDict(from_attributes=True)
 

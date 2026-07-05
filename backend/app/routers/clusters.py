@@ -172,6 +172,7 @@ async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dic
             "cluster_delta": cluster_delta,
             "posted_count": posted_count,
             "failure_reason": cluster.failure_reason,
+            "angle": cluster.angle,
         })
     # Sort by visibility ascending (lowest needs most attention)
     out.sort(key=lambda c: c["visibility_pct"])
@@ -240,6 +241,9 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
             "low_evidence": d.low_evidence,
             "posted_url": d.posted_url,
             "brief_version": d.brief_version,
+            # Routing destination: URL in content_brief, human label in target_title
+            "content_brief": d.content_brief,
+            "target_title": d.target_title,
         })
 
     # Lift + posted count keyed on prompt_id so legacy + Wikipedia
@@ -262,6 +266,7 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
         "last_generated_at": cluster.last_generated_at,
         "cluster_delta": cluster_delta,
         "posted_count": posted_count,
+        "angle": cluster.angle,
     }
 
 

@@ -26,15 +26,18 @@ def test_render_medium_emits_inline_links_and_footer():
     assert len(citations) == 2
 
 
-def test_render_reddit_uses_conversational_block():
-    # Updated 2026-05-20 cluster redesign: Reddit moved from inline
-    # "(source: domain)" to a trailing "More on this:" conversational block.
+def test_render_reddit_is_linkless_prose_only():
+    # Updated July 2026: Reddit renders linkless — prose attribution only.
+    # No inline parenthetical, no "More on this:" footer, no domain leakage
+    # (outbound links to own content are the classic Reddit spam fingerprint).
     text = "Studies show 94% accuracy [S1]."
     pack = _pack(("S1", "https://nature.com/a", "Nature"))
-    rendered, _ = render_citations(text=text, pack=pack, platform="reddit")
+    rendered, used = render_citations(text=text, pack=pack, platform="reddit")
     assert "(source: nature.com)" not in rendered
-    assert "More on this:" in rendered
-    assert "nature.com" in rendered
+    assert "More on this:" not in rendered
+    assert "nature.com" not in rendered
+    assert "[S1]" not in rendered
+    assert len(used) == 1
 
 
 def test_render_x_strips_markers():

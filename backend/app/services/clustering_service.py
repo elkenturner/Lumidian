@@ -60,10 +60,11 @@ def _derive_title_fallback(body: str, *, prompt_text: str, platform: str) -> str
     return f"{label} draft for {prompt_text}"[:80].rstrip()
 
 # Platforms that get a soft "further reading" reference to the cluster's
-# Medium piece (or own-site pillar). Asymmetric — Medium/Wikipedia get nothing.
+# Medium piece (or own-site pillar). Reddit is EXCLUDED — outbound links to
+# own content are the classic spam fingerprint there (July 2026 research);
+# Medium/Wikipedia get nothing either.
 _APPENDS_PILLAR_REF = {
     "linkedin_post", "linkedin_reply", "linkedin_article",
-    "reddit", "reddit_reply",
     "quora",
     "x_post", "x_thread", "x_reply",
 }
@@ -87,8 +88,6 @@ def append_pillar_reference(
     if platform.startswith("x_"):
         # Space-constrained — bare URL, no label
         return text.rstrip() + f"\n{pillar_url}"
-    if platform.startswith("reddit"):
-        return text.rstrip() + f"\n\nI wrote a longer version on Medium: {pillar_url}"
     # linkedin_*, quora
     return text.rstrip() + f"\n\nFurther reading on Medium: {pillar_url}"
 

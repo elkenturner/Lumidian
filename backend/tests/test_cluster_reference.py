@@ -10,12 +10,15 @@ def test_linkedin_post_appends_further_reading():
     assert "https://example.com/medium-post" in out
 
 
-def test_reddit_appends_softly():
-    out = append_pillar_reference(
-        text="Post body.", platform="reddit",
-        pillar_url="https://example.com/medium-post",
-    )
-    assert "Medium" in out and "https://example.com/medium-post" in out
+def test_reddit_appends_nothing():
+    # Updated July 2026: reddit is excluded from pillar references — outbound
+    # links to own content are the classic spam fingerprint there.
+    for platform in ("reddit", "reddit_reply", "reddit_comment"):
+        out = append_pillar_reference(
+            text="Post body.", platform=platform,
+            pillar_url="https://example.com/medium-post",
+        )
+        assert out == "Post body."
 
 
 def test_x_inserts_url_only_no_label():

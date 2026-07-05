@@ -74,11 +74,11 @@ PLATFORM_GUIDELINES: dict[str, dict] = {
         "rules": [
             "No overt promotion or marketing language",
             "Must add genuine value to the discussion",
-            "Be transparent about brand affiliation if relevant",
+            "If your post endorses your brand, disclose your affiliation casually in the post itself (FTC rules + Reddit norms). Neutral factual mentions don't need it.",
             "Match subreddit tone and culture",
             "Answer questions, don't pitch products",
         ],
-        "disclaimer": "Always disclose brand affiliation per Reddit's rules.",
+        "disclaimer": "If your post endorses your brand, disclose your affiliation casually in the post itself (FTC rules + Reddit norms). Neutral factual mentions don't need it.",
         "workflow": "comment_or_post",
     },
     "quora": {
@@ -90,7 +90,7 @@ PLATFORM_GUIDELINES: dict[str, dict] = {
             "Cite sources where appropriate",
             "Focus on value to the reader",
         ],
-        "disclaimer": "Disclose any brand affiliation in your Quora credentials.",
+        "disclaimer": "Disclose affiliation via your answer credential; add an inline line only if the answer recommends your product.",
         "workflow": "answer",
     },
     "medium": {

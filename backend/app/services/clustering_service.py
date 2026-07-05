@@ -60,13 +60,21 @@ def _derive_title_fallback(body: str, *, prompt_text: str, platform: str) -> str
     return f"{label} draft for {prompt_text}"[:80].rstrip()
 
 
-async def _gen_owned_site_piece(*, cluster, brand_row, prompt_row, brief_context, pack, tier):
+async def _gen_owned_site_piece(
+    *, cluster, brand_row, prompt_row, brief_context, pack, tier, low_evidence: bool = False,
+):
     """Cluster anchor piece: the brand's own site. Evidence = the cluster pack.
 
     Mirrors the owned_site branch in drafting_service.py's onboarding/manual
     draft flow, but is fed by the CLUSTER evidence pack (not the brand's
     crawled publications) and threads the shared cluster brief through so the
     page anchors the same positioning as the other platform pieces.
+
+    `low_evidence`: the cluster-level "brand-as-authority soft-fail" flag
+    (see `_gen` in `regenerate_cluster`). Folded into the returned low_ev the
+    same way every other platform does (`low_ev or low_evidence`) so the
+    anchor piece doesn't understate its evidence quality relative to its
+    siblings just because its own pack slice happened to be non-empty.
     """
     import json as _json
     from datetime import datetime, timezone
@@ -112,7 +120,7 @@ async def _gen_owned_site_piece(*, cluster, brand_row, prompt_row, brief_context
         )
         title = owned.jsonld.get("headline") or _derive_title_fallback(
             owned.body, prompt_text=prompt_row.text, platform="owned_site")
-        low_ev = not evidence
+        low_ev = (not evidence) or low_evidence
         return ("ok", "owned_site", title, body, owned.anti_ai_score, [], low_ev)
     except asyncio.TimeoutError:
         return ("fail", "owned_site", f"timeout after {PIECE_TIMEOUT_SECONDS:.0f}s")
@@ -603,7 +611,7 @@ async def regenerate_cluster(
         if platform == "owned_site":
             return await _gen_owned_site_piece(
                 cluster=cluster, brand_row=brand_row, prompt_row=prompt_row,
-                brief_context=ctx, pack=pack, tier=tier,
+                brief_context=ctx, pack=pack, tier=tier, low_evidence=low_evidence,
             )
         try:
             # Each piece runs in the asyncio.gather below, so it MUST use its own
@@ -769,9 +777,17 @@ async def regenerate_piece(
         if brief_row.evidence_pack_id is not None:
             from app.models import ContentEvidencePack as PackModel
             pack = await db.get(PackModel, brief_row.evidence_pack_id)
+        # This function has no separate briefing-phase state tracking a
+        # brand-authority soft-fail (unlike regenerate_cluster's `_gen`), so
+        # derive it the same way regenerate_cluster does when reusing an
+        # existing pack: re-check the pack's own sources against the
+        # authority gate. Brand-authority packs count zero T1/T2 sources and
+        # so still yield low_evidence=True.
+        from app.services.cluster_evidence import pack_meets_gate
+        low_evidence = pack is not None and not pack_meets_gate(pack.sources or [])
         res = await _gen_owned_site_piece(
             cluster=cluster, brand_row=brand_row, prompt_row=prompt_row,
-            brief_context=ctx, pack=pack, tier=tier,
+            brief_context=ctx, pack=pack, tier=tier, low_evidence=low_evidence,
         )
         if res[0] == "fail":
             raise RuntimeError(f"owned_site piece generation failed: {res[2]}")

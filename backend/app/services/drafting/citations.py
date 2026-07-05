@@ -116,7 +116,10 @@ def render_citations(
         if platform == "wikipedia":
             return f"<ref>{{{{cite web|url={src.url}|title={src.title}}}}}</ref>"
         display = ref_to_display[ref]
-        return f"[{display}]({src.url})"
+        # Plain [n] in the body — Medium/LinkedIn/Quora editors don't parse
+        # pasted markdown, so an inline [n](url) shows as raw link clutter.
+        # The numbered Sources footer carries the actual URLs.
+        return f"[{display}]"
 
     rendered = _MARKER_RE.sub(_replace, text).strip()
 

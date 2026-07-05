@@ -286,6 +286,46 @@ async def test_compute_recently_added_competitor_marked_no_data():
     assert resp.headline_gap_pp is None
 
 
+async def test_compute_tolerates_timezone_aware_timestamps():
+    """Rows seeded outside the app (scripts, imports) can carry offset-suffixed
+    timestamp strings ('...+00:00') in SQLite, which SQLAlchemy parses back as
+    tz-AWARE datetimes. The service must not crash comparing them to its naive
+    window bounds — this was a live 500 on /competitive-gap."""
+    from datetime import datetime, timedelta
+    from sqlalchemy import text
+    from app.database import AsyncSessionLocal
+    from app.services.competitive_gap import compute_competitive_gap
+
+    today = datetime.utcnow().replace(microsecond=0)
+    _, brand_id = await _seed_brand_with_runs(
+        user_email="tzaware@example.com",
+        competitors=[("Notion", today - timedelta(days=30))],
+        runs=[{
+            "completed_at": today - timedelta(hours=2),
+            "queries": [
+                {"model": "chatgpt", "mentioned": True, "response_text": "Acme is great."},
+                {"model": "gemini", "mentioned": False, "response_text": "Try Notion instead."},
+            ],
+        }],
+    )
+    # Rewrite the timestamps the way a raw seeding script would store them:
+    # offset-suffixed strings, which round-trip as aware datetimes.
+    async with AsyncSessionLocal() as db:
+        await db.execute(text(
+            "UPDATE competitors SET created_at = :ts WHERE brand_id = :b"),
+            {"ts": f"{today - timedelta(days=30)}+00:00", "b": brand_id})
+        await db.execute(text(
+            "UPDATE tracking_runs SET completed_at = :ts WHERE brand_id = :b"),
+            {"ts": f"{today - timedelta(hours=2)}+00:00", "b": brand_id})
+        await db.commit()
+    async with AsyncSessionLocal() as db:
+        resp = await compute_competitive_gap(brand_id=brand_id, window="7d", db=db)
+    assert resp.has_data is True
+    assert resp.headline_gap_pp == pytest.approx(0.0, abs=1e-6)  # 50% − 50%
+    assert len(resp.competitors) == 1
+    assert resp.competitors[0].has_data is True
+
+
 async def test_compute_per_day_trend_groups_multiple_runs_same_day():
     from datetime import datetime, timedelta
     from app.database import AsyncSessionLocal

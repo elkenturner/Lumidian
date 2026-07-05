@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -9,6 +10,7 @@ import {
   RefreshCw,
   RotateCw,
   Sparkles,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -58,6 +60,8 @@ export default function ClusterDetailPage() {
   const [gaps, setGaps] = useState<ContentGap[]>([]);
   const [loading, setLoading] = useState(true);
   const [regenAction, setRegenAction] = useState<null | "pieces" | "rebuild">(null);
+  // Posted-history rows open the archived text in a read-only modal.
+  const [viewingDraft, setViewingDraft] = useState<ContentDraft | null>(null);
   const [savingAngle, setSavingAngle] = useState(false);
 
   useEffect(() => {
@@ -474,31 +478,45 @@ export default function ClusterDetailPage() {
           <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-3">
             Posted history
           </div>
-          <div className="space-y-2">
+          <div className="card !p-0 overflow-hidden divide-y divide-[var(--border-subtle)]">
             {cluster.drafts
               .filter(d => d.status === "posted" && isVisible(d.platform))
               .sort((a, b) => (b.posted_at ?? "").localeCompare(a.posted_at ?? ""))
               .map(d => (
-                <div key={d.id} className="flex items-center gap-3 text-xs text-[var(--text-secondary)]">
+                <button
+                  key={d.id}
+                  type="button"
+                  onClick={() => setViewingDraft(d)}
+                  title="Read what was posted"
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-[var(--bg-card)] transition-colors"
+                >
                   <PlatformBadge platform={d.platform} size="sm" />
-                  <span>{d.posted_at ? new Date(d.posted_at).toLocaleDateString() : "—"}</span>
-                  {d.posted_url && (
-                    <a href={d.posted_url} target="_blank" rel="noopener noreferrer" className="text-[var(--accent-foreground)] hover:underline">
-                      View ↗
-                    </a>
-                  )}
-                  {d.brief_version != null && (
-                    <span className="text-[var(--text-faint)]">from brief v{d.brief_version}</span>
-                  )}
+                  <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-secondary)]">
+                    {d.title && d.title !== "(untitled)" ? d.title : (d.content_text || "").slice(0, 90)}
+                  </span>
+                  <span className="shrink-0 text-xs text-[var(--text-faint)]">
+                    {d.posted_at ? new Date(d.posted_at).toLocaleDateString() : "—"}
+                  </span>
                   {d.attribution_delta != null && (() => {
                     const r = Math.round(d.attribution_delta * 10) / 10;
                     return (
-                      <span className={r === 0 ? "text-[var(--text-faint)]" : r > 0 ? "text-[#4ade80]" : "text-[#fb7185]"}>
-                        {r === 0 ? "no change" : `${r > 0 ? "+" : ""}${r.toFixed(1)} pts`}
+                      <span className={`shrink-0 text-xs ${r === 0 ? "text-[var(--text-faint)]" : r > 0 ? "text-[#4ade80]" : "text-[#fb7185]"}`}>
+                        {r === 0 ? "no lift yet" : `${r > 0 ? "+" : ""}${r.toFixed(1)} pts`}
                       </span>
                     );
                   })()}
-                </div>
+                  {d.posted_url && (
+                    <a
+                      href={d.posted_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="shrink-0 text-xs text-[var(--accent-foreground)] hover:underline"
+                    >
+                      View live ↗
+                    </a>
+                  )}
+                </button>
               ))}
           </div>
         </div>
@@ -525,6 +543,44 @@ export default function ClusterDetailPage() {
           </div>
         </div>
       </div>
+      {viewingDraft && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setViewingDraft(null)}
+        >
+          <div
+            className="card-elevated w-full max-w-2xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                <PlatformBadge platform={viewingDraft.platform} />
+                <span className="text-xs text-[var(--text-faint)]">
+                  Posted {viewingDraft.posted_at ? new Date(viewingDraft.posted_at).toLocaleDateString() : "—"}
+                  {viewingDraft.brief_version != null ? ` · brief v${viewingDraft.brief_version}` : ""}
+                </span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setViewingDraft(null)} className="!px-1.5" aria-label="Close">
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            {viewingDraft.title && viewingDraft.title !== "(untitled)" && (
+              <h3 className="text-lg font-bold text-[var(--text-primary)] mb-3">{viewingDraft.title}</h3>
+            )}
+            <div className="flex-1 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--text-secondary)] leading-relaxed pr-2">
+              {viewingDraft.content_text}
+            </div>
+            {viewingDraft.posted_url && (
+              <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                <a href={viewingDraft.posted_url} target="_blank" rel="noopener noreferrer" className="text-sm text-[var(--accent-foreground)] hover:underline">
+                  View live post ↗
+                </a>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

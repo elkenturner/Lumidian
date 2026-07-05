@@ -104,7 +104,19 @@ export function CompetitiveGapCard({
     );
   }
 
-  if (!data) return null;
+  // Fetch failed (or hasn't resolved) — keep the grid slot filled with a
+  // graceful fallback instead of collapsing the hero row.
+  if (!data) {
+    return (
+      <div className="card p-5 h-full flex flex-col">
+        <CardHeader window={window} onWindowChange={onWindowChange} />
+        <p className="text-3xl font-bold text-[var(--text-primary)] mt-2">&mdash;</p>
+        <p className="text-xs text-[var(--text-faint)] mt-1">
+          Competitive data couldn&apos;t be loaded — refresh to try again.
+        </p>
+      </div>
+    );
+  }
 
   const headlineGap = data.headline_gap_pp;
   const delta = data.headline_delta_pp;

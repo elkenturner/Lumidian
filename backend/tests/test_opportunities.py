@@ -87,3 +87,63 @@ async def test_opportunities_90_day_boundary(client: httpx.AsyncClient, db_sessi
     opps = resp.json()
     assert len(opps) == 1
     assert opps[0]["platform"] == "reddit"
+
+async def test_reddit_evergreen_thread_included_despite_old_posted_at(client: httpx.AsyncClient, db_session):
+    """Aged evergreen reddit threads are the AI retrieval surface — a thread
+    posted a year ago but discovered recently must appear in the panel."""
+    await register_and_login(client, email="evergreen@example.com")
+    brand = await create_brand(client, name="Evergreen Brand")
+    brand_id = brand["id"]
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    # Thread created ~400 days ago; discovered now (created_at defaults to now).
+    await _seed_opportunity(db_session, brand_id, "reddit", 82.0, now - timedelta(days=400))
+    # Same-age linkedin post stays excluded (ephemeral platform).
+    await _seed_opportunity(db_session, brand_id, "linkedin", 82.0, now - timedelta(days=400))
+
+    resp = await client.get(f"/api/opportunities/{brand_id}")
+    assert resp.status_code == 200
+    opps = resp.json()
+    assert len(opps) == 1
+    assert opps[0]["platform"] == "reddit"
+
+
+async def test_reddit_stale_discovery_excluded(client: httpx.AsyncClient, db_session):
+    """Reddit freshness keys on discovery date: a lead we found 100 days ago is stale."""
+    await register_and_login(client, email="staledisc@example.com")
+    brand = await create_brand(client, name="Stale Discovery Brand")
+    brand_id = brand["id"]
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    opp = await _seed_opportunity(db_session, brand_id, "reddit", 82.0, now - timedelta(days=400))
+    # Backdate the discovery beyond the window.
+    from app.models import ContentOpportunity
+    from sqlalchemy import update as sa_update
+    await db_session.execute(
+        sa_update(ContentOpportunity).where(ContentOpportunity.id == opp.id)
+        .values(created_at=now - timedelta(days=100))
+    )
+    await db_session.commit()
+
+    resp = await client.get(f"/api/opportunities/{brand_id}")
+    assert resp.status_code == 200
+    assert resp.json() == []
+
+
+async def test_reddit_recency_scored_on_discovery_not_thread_age(client: httpx.AsyncClient, db_session):
+    """A freshly discovered year-old reddit thread should not be recency-punished."""
+    await register_and_login(client, email="redditrank@example.com")
+    brand = await create_brand(client, name="Reddit Rank Brand")
+    brand_id = brand["id"]
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    # Old thread, fresh discovery: rel 60 → 60*0.7 + 100*0.3 = 72
+    await _seed_opportunity(db_session, brand_id, "reddit", 60.0, now - timedelta(days=400))
+    # 80-day-old quora, rel 80 → 80*0.7 + 20*0.3 = 62
+    await _seed_opportunity(db_session, brand_id, "quora", 80.0, now - timedelta(days=80))
+
+    resp = await client.get(f"/api/opportunities/{brand_id}")
+    assert resp.status_code == 200
+    opps = resp.json()
+    assert len(opps) == 2
+    assert opps[0]["platform"] == "reddit"

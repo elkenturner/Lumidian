@@ -30,9 +30,10 @@ def _mock_async_client(get_return_value=None, get_side_effect=None):
     return factory, client
 
 
-def _resp(html: str) -> MagicMock:
+def _resp(html: str, content_type: str = "text/html; charset=utf-8") -> MagicMock:
     resp = MagicMock()
     resp.text = html
+    resp.headers = {"content-type": content_type}
     return resp
 
 
@@ -156,3 +157,16 @@ async def test_persist_pack_enriches_snippets_before_saving():
 
     assert len(pack.sources[0]["snippet"]) > 0
     assert pack.sources[0]["title"] == "Enriched Title"
+
+
+@pytest.mark.asyncio
+async def test_non_html_content_type_skipped():
+    """A PDF response must never replace a snippet with decoded binary garbage."""
+    factory, client = _mock_async_client(get_return_value=_resp("%PDF-1.7 " + "x " * 4000, content_type="application/pdf"))
+    sources = [{"url": "https://ex.gov/opinion.pdf", "title": "Slip opinion", "snippet": "Good snippet."}]
+
+    with patch("app.services.cluster_evidence.httpx.AsyncClient", factory):
+        out = await enrich_pack_snippets(sources)
+
+    assert out[0]["snippet"] == "Good snippet."
+    assert out[0]["title"] == "Slip opinion"

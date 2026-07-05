@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 logger = logging.getLogger(__name__)
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -56,9 +56,17 @@ def _enrich_opportunity(opp: ContentOpportunity, prompt_text_map: dict[int, str]
 
 
 def _blended_score(opp: ContentOpportunity, now: datetime) -> float:
-    """Blend relevance (70%) with recency (30%) for sort ordering."""
+    """Blend relevance (70%) with recency (30%) for sort ordering.
+
+    Reddit recency keys on when WE discovered the lead, not the thread's age —
+    aged evergreen threads are what AI engines actually retrieve and cite, so
+    a year-old thread found yesterday is a fresh lead, not a stale one.
+    """
     rel = opp.relevance_score or 0
-    posted = opp.posted_at or opp.created_at
+    if opp.platform == "reddit":
+        posted = opp.created_at or opp.posted_at
+    else:
+        posted = opp.posted_at or opp.created_at
     age_days = (now - posted).days
     if age_days <= 7:
         recency = 100
@@ -89,7 +97,20 @@ async def list_opportunities(
         select(ContentOpportunity)
         .where(ContentOpportunity.brand_id == brand_id)
         .where(
-            func.coalesce(ContentOpportunity.posted_at, ContentOpportunity.created_at) >= cutoff
+            # Ephemeral platforms (linkedin/x/quora) age out by thread date.
+            # Reddit is exempt from thread age — evergreen threads are the AI
+            # retrieval surface — and instead ages out by DISCOVERY date
+            # (created_at), matching the scanner's own retention rules.
+            or_(
+                and_(
+                    ContentOpportunity.platform == "reddit",
+                    ContentOpportunity.created_at >= cutoff,
+                ),
+                and_(
+                    ContentOpportunity.platform != "reddit",
+                    func.coalesce(ContentOpportunity.posted_at, ContentOpportunity.created_at) >= cutoff,
+                ),
+            )
         )
     )
     if opp_status is not None:

@@ -62,6 +62,7 @@ from app.services.drafting import (
     extract_title_and_body,
     parse_wikipedia_draft,
     remove_hedging,
+    strip_markdown_emphasis,
 )
 from app.services.drafting import anti_ai, owned_site
 from app.services.drafting.citations import (
@@ -873,6 +874,11 @@ async def _generate_with_new_pipeline(
                 "Citation rendering failed for brand %d prompt %d: %s",
                 brand_id, prompt_id, exc,
             )
+
+    # Social platforms + Medium render pasted asterisks literally — strip
+    # markdown emphasis after citation rendering (footer [title](url) links
+    # are untouched). owned_site/wikipedia keep their markup.
+    raw_text = strip_markdown_emphasis(raw_text, platform_key)
 
     return raw_text, quality_score, citations, low_evidence
 

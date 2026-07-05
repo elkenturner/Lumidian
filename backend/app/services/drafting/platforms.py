@@ -150,7 +150,7 @@ PLATFORM_SPECS: dict[str, dict] = {
         "tone": "professional thought leadership — insightful but accessible, written for industry peers",
         "rules": [
             "Open with a compelling hook that frames a professional challenge or insight — not 'I've been thinking about...'",
-            "Structure with clear sections using bold text for section breaks (NOT markdown ## headers — LinkedIn renders bold, not headers)",
+            "Structure with short plain-text section-break lines (a concise Title-Case line on its own) — never markdown: no ## headers and no **bold** markers, LinkedIn renders the asterisks literally",
             "Write as a credible industry voice sharing hard-won expertise, not a brand spokesperson",
             "Include concrete data, examples, or case studies to support every major claim",
             "The brand name MUST appear at least once, in a concrete professional context — a specific result, capability, or approach",

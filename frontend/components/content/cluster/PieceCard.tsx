@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AlertTriangle, ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -73,7 +74,7 @@ function PieceStatusChip({
           className="text-[11px] px-2 py-0.5 rounded-md border border-[var(--border-subtle)] bg-[rgba(148,163,184,0.08)] text-[var(--text-muted)]"
           title="Change in this brand's AI-visibility score for this question since the post went live"
         >
-          Posted · no change yet
+          Posted · no lift yet
         </span>
       );
     }
@@ -97,7 +98,7 @@ function PieceStatusChip({
 function LowEvidenceBadge({ brandId }: { brandId: number }) {
   return (
     <span
-      className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.10)] text-[#fbbf24]"
+      className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] px-2 py-0.5 rounded-md border border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.10)] text-[#fbbf24]"
       title="Thin sourcing — the writer couldn't ground this post in verified sources. Add sources you trust, or rewrite to try again."
     >
       <AlertTriangle className="h-3 w-3" />
@@ -182,12 +183,18 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 {draft.generation_state}
               </span>
             )}
-            {draft?.low_evidence && <LowEvidenceBadge brandId={brandId} />}
             {draft && (
               <PieceStatusChip status={draft.status} delta={draft.attribution_delta} />
             )}
           </div>
         </div>
+        {/* Own row (never crowding the header chips); once posted the draft
+            shipped — the sourcing nudge belongs to future rewrites, not here. */}
+        {draft?.low_evidence && draft.status !== "posted" && (
+          <div className="mb-2">
+            <LowEvidenceBadge brandId={brandId} />
+          </div>
+        )}
         {draft?.generation_state === "failed" && (
           <div className="mb-2 text-xs text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded px-2 py-1">
             Failed: {translateFailureReason(draft.failure_reason) ?? "unknown error"}
@@ -196,7 +203,12 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
 
         {draft ? (
           draft.status === "posted" ? (
-            <div className="flex-1 flex flex-col justify-center gap-2 py-2">
+            <div className="flex-1 flex flex-col justify-center gap-1.5 py-2">
+              {draft.title && draft.title !== "(untitled)" && (
+                <h4 className="text-sm font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
+                  {draft.title}
+                </h4>
+              )}
               <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
                 Posted on{" "}
                 {draft.posted_at
@@ -356,7 +368,10 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
         </div>
       </div>
 
-      {expanded && draft && (
+      {/* Portaled to <body>: any transformed ancestor (cards animate) turns
+          position:fixed into position:absolute, which dumped this modal at the
+          bottom of the page instead of centering it in the viewport. */}
+      {expanded && draft && createPortal(
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
           onClick={() => setExpanded(false)}
@@ -368,7 +383,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
             <div className="flex items-start justify-between gap-3 mb-4">
               <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <PlatformBadge platform={platform} />
-                {draft.low_evidence && <LowEvidenceBadge brandId={brandId} />}
+                {draft.low_evidence && draft.status !== "posted" && <LowEvidenceBadge brandId={brandId} />}
                 <PieceStatusChip status={draft.status} delta={draft.attribution_delta} />
               </div>
               <Button
@@ -442,7 +457,8 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               </Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

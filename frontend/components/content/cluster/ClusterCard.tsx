@@ -45,7 +45,7 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
   const deltaLabel = deltaRounded === null
     ? "—"
     : deltaRounded === 0
-    ? "No change"
+    ? "No lift yet"
     : `${deltaRounded > 0 ? "+" : ""}${deltaRounded.toFixed(1)} pts`;
   const chip = clusterChip(cluster);
 

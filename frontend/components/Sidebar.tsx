@@ -429,6 +429,8 @@ export default function Sidebar({ expanded, onExpandedChange }: SidebarProps) {
                   </button>
                 </div>
                 <div className="flex items-center gap-2 px-3.5 pb-2 pt-1">
+                  <Link href="/methodology" className="text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">Methodology</Link>
+                  <span className="text-[10px] text-[var(--text-faint)]">·</span>
                   <Link href="/privacy" className="text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">Privacy</Link>
                   <span className="text-[10px] text-[var(--text-faint)]">·</span>
                   <Link href="/terms" className="text-[10px] text-[var(--text-faint)] hover:text-[var(--text-muted)] transition-colors">Terms</Link>

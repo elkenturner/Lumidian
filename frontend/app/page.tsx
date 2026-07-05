@@ -211,6 +211,9 @@ function Header({ scrolled }: { scrolled: boolean }) {
             <a href="#features" className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">
               Features
             </a>
+            <Link href="/methodology" className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">
+              Methodology
+            </Link>
             <a href="#pricing" className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">
               Pricing
             </a>
@@ -249,6 +252,7 @@ function Header({ scrolled }: { scrolled: boolean }) {
           <div className="md:hidden py-4 border-t border-[var(--border-subtle)]">
             <nav className="flex flex-col gap-1">
               <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[var(--text-secondary)] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">Features</a>
+              <Link href="/methodology" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[var(--text-secondary)] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">Methodology</Link>
               <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[var(--text-secondary)] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">Pricing</a>
               <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[var(--text-secondary)] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">FAQ</a>
               <div className="flex flex-col gap-3 pt-4 mt-2 border-t border-[var(--border-subtle)]">
@@ -974,6 +978,7 @@ function Footer() {
             <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Product</h4>
             <nav className="space-y-3">
               <a href="#features" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Features</a>
+              <Link href="/methodology" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Methodology</Link>
               <a href="#pricing" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Pricing</a>
               <a href="#faq" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">FAQ</a>
             </nav>

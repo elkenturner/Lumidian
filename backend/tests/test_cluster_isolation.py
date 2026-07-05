@@ -108,3 +108,12 @@ async def test_rebuild_endpoint_isolated(client):
     brand_a_id, _, _, cluster_b_id = await _seed_two_brands_two_users(client)
     r = await client.post(f"/api/clusters/{brand_a_id}/{cluster_b_id}/rebuild")
     assert r.status_code in (403, 404)
+
+
+@pytest.mark.asyncio
+async def test_patch_angle_endpoint_isolated(client):
+    brand_a_id, _, _, cluster_b_id = await _seed_two_brands_two_users(client)
+    r = await client.patch(
+        f"/api/clusters/{brand_a_id}/{cluster_b_id}", json={"angle": "neutral"}
+    )
+    assert r.status_code in (403, 404)

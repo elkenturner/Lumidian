@@ -232,6 +232,9 @@ export interface ContentDraft {
   title: string | null;
   content_text: string;
   content_brief: string | null;
+  // Human label for the routing destination (e.g. the Quora question title,
+  // or the Reddit thread title when content_brief is a full thread URL).
+  target_title?: string | null;
   platform_guidelines_applied: string | null;
   visibility_score_at_draft: number | null;
   estimated_impact: number | null;
@@ -490,7 +493,13 @@ export async function generateDraft(
 
 export async function updateDraft(
   draftId: number,
-  data: { title?: string; content_text?: string; status?: string; prompt_id?: number }
+  data: {
+    title?: string;
+    content_text?: string;
+    status?: string;
+    prompt_id?: number;
+    posted_url?: string;
+  }
 ): Promise<ContentDraft> {
   const res = await api.put<ContentDraft>(`/content/draft/${draftId}`, data);
   invalidateCache('/content/');
@@ -2124,6 +2133,7 @@ export interface ContentClusterDetail {
   last_generated_at: string | null;
   cluster_delta: number | null;
   posted_count: number;
+  angle: "auto" | "insider" | "neutral";
 }
 
 export interface PillarCandidate {
@@ -2170,6 +2180,15 @@ export async function editClusterBrief(
   return res.data;
 }
 
+export async function updateClusterAngle(
+  brandId: number,
+  clusterId: number,
+  angle: "auto" | "insider" | "neutral",
+): Promise<ContentClusterDetail> {
+  const res = await api.patch<ContentClusterDetail>(`/clusters/${brandId}/${clusterId}`, { angle });
+  return res.data;
+}
+
 export async function proposeClusterPillar(brandId: number, clusterId: number): Promise<PillarCandidate | null> {
   const res = await api.post<PillarCandidate | null>(`/clusters/${brandId}/${clusterId}/pillar/propose`);
   return res.data;
@@ -2206,7 +2225,7 @@ export interface ClusterStatusPayload {
 export interface ClusterSourceItem {
   url: string;
   domain: string;
-  tier: 'T1' | 'T2' | 'T3';
+  tier: 'T1' | 'T2' | 'T3' | 'brand';
   title: string | null;
   times_cited: number;
 }

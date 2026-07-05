@@ -29,6 +29,12 @@ async def test_regenerate_uses_shared_pack_and_sets_last_brief_id(monkeypatch):
     monkeypatch.setattr(
         "app.services.clustering_service._generate_piece_text", fake_gen,
     )
+
+    async def fake_owned(**kwargs):
+        return ("ok", "owned_site", "Piece title", "Piece body [S1]", 0.9, [], False)
+    monkeypatch.setattr(
+        "app.services.clustering_service._gen_owned_site_piece", fake_owned,
+    )
     # Mock brief LLM to return valid JSON
     async def fake_brief_call(prompt, tier):
         import json
@@ -55,8 +61,9 @@ async def test_regenerate_uses_shared_pack_and_sets_last_brief_id(monkeypatch):
         )).scalars().all()
         assert cluster.status == "ready"
         assert cluster.last_brief_id is not None
-        assert len(packs) == 1  # ONE pack, not 5
-        assert len(drafts) == 5
+        from app.services.clustering_service import CLUSTER_PLATFORMS
+        assert len(packs) == 1  # ONE pack shared across all pieces
+        assert len(drafts) == len(CLUSTER_PLATFORMS)
 
 
 @pytest.mark.asyncio
@@ -115,6 +122,12 @@ async def test_partial_generation_marks_generation_partial(monkeypatch):
         return "T", "B", 0.5, []
     monkeypatch.setattr(
         "app.services.clustering_service._generate_piece_text", fake_gen,
+    )
+
+    async def fake_owned(**kwargs):
+        return ("ok", "owned_site", "T", "B", 0.5, [], False)
+    monkeypatch.setattr(
+        "app.services.clustering_service._gen_owned_site_piece", fake_owned,
     )
     async def fake_brief_call(prompt, tier):
         import json

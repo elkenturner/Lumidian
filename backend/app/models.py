@@ -352,6 +352,9 @@ class ContentDraft(Base):
     title: Mapped[str | None] = mapped_column(String(500), nullable=True)
     content_text: Mapped[str] = mapped_column(Text, nullable=False)
     content_brief: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Human-readable destination for routed pieces (reddit thread title /
+    # Quora question title). content_brief holds the URL; this holds the label.
+    target_title: Mapped[str | None] = mapped_column(String(300), nullable=True)
     platform_guidelines_applied: Mapped[str | None] = mapped_column(Text, nullable=True)
     visibility_score_at_draft: Mapped[float | None] = mapped_column(Float, nullable=True)
     estimated_impact: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -406,6 +409,11 @@ class ContentCluster(Base):
     status: Mapped[str] = mapped_column(String(32), default="pending")
     pillar_mode: Mapped[str] = mapped_column(String(32), default="none")
     pillar_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    # Content angle for social pieces: 'auto' | 'insider' | 'neutral'.
+    # Resolved per-platform at generation time (see drafting/angle.py).
+    # server_default keeps raw-SQL inserts (e.g. the 2026-06-28 cluster-shell
+    # backfill migration) valid on freshly created tables.
+    angle: Mapped[str] = mapped_column(String(16), default="auto", server_default="auto")
     # Deferred FK to content_briefs — table created after; use_alter avoids DDL ordering issues
     last_brief_id: Mapped[int | None] = mapped_column(
         Integer,

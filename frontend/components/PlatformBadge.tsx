@@ -9,6 +9,7 @@ interface PlatformBadgeProps {
 
 // Official brand colors with matching bg/border tints for dark UI
 const PLATFORM_STYLES: Record<string, { bg: string; text: string; border: string }> = {
+  owned_site:      { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
   reddit:          { bg: 'rgba(255,69,0,0.10)',    text: '#FF4500', border: 'rgba(255,69,0,0.22)'    },
   quora:           { bg: 'rgba(185,43,39,0.10)',   text: '#B92B27', border: 'rgba(185,43,39,0.22)'   },
   medium:          { bg: 'rgba(148,163,184,0.10)', text: 'var(--text-secondary)', border: 'rgba(148,163,184,0.18)' },
@@ -24,6 +25,7 @@ const PLATFORM_STYLES: Record<string, { bg: string; text: string; border: string
 };
 
 const PLATFORM_LABELS: Record<string, string> = {
+  owned_site: 'Your site',
   reddit: 'Reddit',
   quora: 'Quora',
   medium: 'Medium',

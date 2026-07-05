@@ -69,6 +69,12 @@ async def test_regenerate_cluster_completes_when_one_piece_hangs(
               new=AsyncMock(return_value=_FAKE_PACK)),
         patch.object(clustering_service, "_generate_piece_text",
                      side_effect=maybe_hang_piece),
+        # owned_site bypasses _generate_piece_text — stub it so this test
+        # never reaches a live LLM.
+        patch.object(clustering_service, "_gen_owned_site_piece",
+                     new=AsyncMock(return_value=(
+                         "ok", "owned_site", "Title", "Body for owned_site.",
+                         None, [], False))),
         # Post-piece claim verifier makes a real LLM call otherwise; neutralize
         # it so this test stays hermetic and measures only timeout behavior.
         patch("app.services.drafting.claim_verifier.verify_claims",

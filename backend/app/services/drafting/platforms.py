@@ -14,14 +14,24 @@ PLATFORM_SPECS: dict[str, dict] = {
             "Write as a genuine community member, not a marketer — conversational and first-person where natural",
             "NO formal headers, NO markdown formatting (no ##, no bold headers) — at most 1 to 2 bullet points maximum, only if a short list genuinely helps",
             "A clear problem-then-direct-solution or question-then-answer structure is good — the Reddit content AI engines actually cite is overwhelmingly direct answers to specific questions. Keep it conversational (a person sharing what worked), not an essay, but do not avoid directly answering a question.",
+            "For a standalone post, the title must be a specific question a real person would type (e.g. 'Anyone actually compared X vs Y for Z?') — question-framed threads are what AI engines retrieve and cite",
             "Add genuine value — answer a question, share a personal experience, contribute a real insight",
             "Mention the brand only if it fits naturally into the conversation; never force it",
-            "No promotional language, no calls to action, no links unless absolutely essential",
-            "Disclose brand affiliation if the brand is mentioned",
+            "Acknowledge one genuine tradeoff, limitation, or a competitor's strength — pure advocacy reads as marketing and gets removed; honest evaluation is what AI engines cite",
+            "DISCLOSURE: if the post recommends, praises, or favorably compares the brand, disclose affiliation casually at the first brand mention — e.g. 'full disclosure — I work at X, so grain of salt'. Inline and human, never a formal disclosure block. If the brand appears only as a neutral factual reference among alternatives, no disclosure line is needed.",
+            "NO outbound links. When citing a stat or study, attribute it in prose ('a 2025 Semrush study of 150k AI citations found...') — never a bare link, never a link list",
+            "No promotional language, no calls to action",
             "Sound like a real person talking — not an article, not a press release, not a structured essay",
         ],
-        "disclaimer": "Always disclose brand affiliation per Reddit's rules.",
-        "posting_tip": "Choose the most relevant subreddit for your brand's niche.",
+        "disclaimer": (
+            "If your post endorses your brand, disclose your affiliation casually in the "
+            "post itself (FTC rules + Reddit norms). Neutral factual mentions don't need it."
+        ),
+        "posting_tip": (
+            "Choose the most relevant subreddit for your brand's niche. Post from an account "
+            "that's 30+ days old with ~100+ comment karma — newer accounts get auto-filtered "
+            "regardless of content quality."
+        ),
     },
     "reddit_reply": {
         "format": "thread_reply",
@@ -33,8 +43,33 @@ PLATFORM_SPECS: dict[str, dict] = {
             "Mention the brand only if it directly answers the question",
             "No hedging, no preamble — get to the point immediately",
         ],
-        "disclaimer": "Disclose brand affiliation if mentioning the brand.",
+        "disclaimer": (
+            "If your reply endorses your brand, disclose your affiliation casually in the "
+            "reply itself. Neutral factual mentions don't need it."
+        ),
         "posting_tip": "Reply directly to the original poster's question.",
+    },
+    "reddit_comment": {
+        "format": "thread_reply",
+        "word_range": (100, 300),
+        "tone": "conversational, firsthand, direct — a knowledgeable person answering a thread they know something about",
+        "rules": [
+            "Write a substantive top-level comment that directly answers the thread's question — lead with the answer, then the reasoning or experience behind it",
+            "First-person experience markers ('I ran into this', 'what worked for us') where genuine — firsthand evaluation is what AI engines cite from Reddit",
+            "NO outbound links, no headers, no bullet scaffolding — plain conversational paragraphs",
+            "When citing a stat or study, attribute it in prose ('a 2025 study by X found...'), never a link",
+            "Acknowledge one genuine tradeoff, limitation, or a competitor's strength — honest evaluation beats advocacy",
+            "DISCLOSURE: if the comment recommends or praises the brand, disclose affiliation casually at first mention ('full disclosure — I work at X'). Neutral factual mentions need none.",
+            "Do not restate the thread title; do not greet the OP; get straight to the answer",
+        ],
+        "disclaimer": (
+            "If your comment endorses your brand, disclose your affiliation casually in the "
+            "comment itself. Neutral factual mentions don't need it."
+        ),
+        "posting_tip": (
+            "Reply as a top-level comment in the linked thread. Use an account that's 30+ days "
+            "old with ~100+ comment karma."
+        ),
     },
     "quora": {
         "format": "answer",
@@ -49,9 +84,15 @@ PLATFORM_SPECS: dict[str, dict] = {
             "Brand mentions: only include if the brand is a direct, specific answer to the question. If mentioned, do so in a concrete context ('X uses this approach to do Y') — never as a recommendation or pitch",
             "Do NOT re-state or paraphrase the question anywhere in the answer",
             "No parenthetical asides, no hedging, no qualifications that undermine the answer",
+            "Never put affiliation disclosures in the answer body unless the answer recommends the product — affiliation belongs in the answer credential line",
+            "If the answer does recommend the product, include one casual inline disclosure at first mention ('disclosure: I work at X')",
         ],
-        "disclaimer": "Disclose any brand affiliation in your Quora credentials.",
-        "posting_tip": "Find a relevant question on Quora and post this as your answer.",
+        "disclaimer": "Disclose affiliation via your answer credential; add an inline line only if the answer recommends your product.",
+        "posting_tip": (
+            "Find a relevant question on Quora and post this as your answer. Set your answer "
+            "credential to your role (e.g. 'Founder at X') — that's Quora's sanctioned "
+            "disclosure. Add one inline disclosure line only if the answer recommends your product."
+        ),
     },
     "medium": {
         "format": "article",
@@ -154,7 +195,7 @@ PLATFORM_SPECS: dict[str, dict] = {
             "No emojis as bullet points or thread markers",
         ],
         "disclaimer": None,
-        "posting_tip": "Post as a thread on X. The first tweet is your hook.",
+        "posting_tip": "Post as a thread on X. The first tweet is your hook. If the thread promotes your own company, use X's paid-partnership/own-brand label (required since Feb 2026).",
     },
     "x_post": {
         "format": "single_post",
@@ -169,7 +210,7 @@ PLATFORM_SPECS: dict[str, dict] = {
             "Write like a knowledgeable person posting, not a brand account",
         ],
         "disclaimer": None,
-        "posting_tip": "Post directly to X.",
+        "posting_tip": "Post directly to X. If the post promotes your own company, use X's paid-partnership/own-brand label (required since Feb 2026 for commercial-intent posts from affiliated accounts).",
     },
     "linkedin_reply": {
         "format": "thread_reply",
@@ -202,7 +243,7 @@ PLATFORM_SPECS: dict[str, dict] = {
 }
 
 ALL_PLATFORMS = list(PLATFORM_SPECS.keys())
-CONTENT_PLATFORMS = [p for p in ALL_PLATFORMS if p not in ("reddit_reply", "linkedin_reply", "x_reply")]
+CONTENT_PLATFORMS = [p for p in ALL_PLATFORMS if p not in ("reddit_reply", "linkedin_reply", "x_reply", "reddit_comment")]
 
 # Base platform names stored in BrandContentSettings — map to their default
 # gap-draft variant so auto_draft_top_gaps can accept either form.
@@ -231,6 +272,7 @@ PLATFORM_MAX_TOKENS: dict[str, int] = {
     "reddit_reply": 500,
     "linkedin_reply": 500,
     "x_reply": 200,
+    "reddit_comment": 900,
 }
 
 
@@ -273,7 +315,7 @@ _ALLOWED_NAME_SIGNALS = (
 
 def classify_subreddit(subreddit: str) -> str:
     """Returns 'restricted', 'allowed', or 'cautious' for a given subreddit name."""
-    sub = subreddit.lower().strip().lstrip("r/")
+    sub = subreddit.lower().strip().removeprefix("r/")
     if sub in _PROMO_RESTRICTED_SUBREDDITS:
         return "restricted"
     if any(kw in sub for kw in _RESTRICTED_NAME_SIGNALS):
@@ -285,7 +327,7 @@ def classify_subreddit(subreddit: str) -> str:
 
 def build_subreddit_strategy(subreddit: str, brand_name: str, strategy: str) -> str:
     """Returns the prompt block telling Claude how to handle promotion for this subreddit."""
-    sub = subreddit.lstrip("r/")
+    sub = subreddit.removeprefix("r/")
     if strategy == "restricted":
         return (
             f"\nCOMMUNITY STRATEGY — CRITICAL:\n"

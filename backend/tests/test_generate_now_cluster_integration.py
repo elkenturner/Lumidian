@@ -62,6 +62,9 @@ async def test_bg_generate_drafts_creates_cluster_per_prompt(
             {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
             {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
         ]),
+    ), patch(
+        "app.services.clustering_service._gen_owned_site_piece",
+        new=AsyncMock(return_value=("ok", "owned_site", "Title", "Body content.", None, [], False)),
     ):
         await _bg_generate_drafts(brand_id=brand.id, max_gaps=10, source="manual")
 
@@ -75,8 +78,9 @@ async def test_bg_generate_drafts_creates_cluster_per_prompt(
     drafts = (
         await db_session.execute(select(ContentDraft).where(ContentDraft.brand_id == brand.id))
     ).scalars().all()
-    # 5 platforms × 2 prompts = 10 drafts
-    assert len(drafts) == 10
+    # one draft per cluster platform x 2 prompts
+    from app.services.clustering_service import CLUSTER_PLATFORMS
+    assert len(drafts) == len(CLUSTER_PLATFORMS) * 2
     assert all(d.cluster_id is not None for d in drafts)
     assert all(d.source == "cluster" for d in drafts)
 
@@ -100,6 +104,9 @@ async def test_bg_generate_drafts_max_gaps_bounds_prompts(
             {"url": "https://techcrunch.com/c", "title": "C", "snippet": "..."},
             {"url": "https://forbes.com/d", "title": "D", "snippet": "..."},
         ]),
+    ), patch(
+        "app.services.clustering_service._gen_owned_site_piece",
+        new=AsyncMock(return_value=("ok", "owned_site", "T", "B", None, [], False)),
     ):
         await _bg_generate_drafts(brand_id=brand.id, max_gaps=1, source="manual")
 

@@ -133,6 +133,23 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
     if (!draft) return;
     setUpdatingStatus(true);
     try {
+      // The owned_site piece is the cluster's pillar page — once it's live,
+      // its URL is what lets sibling pieces (LinkedIn/X) attach a real
+      // cross-reference. Ask for it right here rather than requiring a
+      // detour through a separate pillar-attach flow.
+      if (status === "posted" && platform === "owned_site") {
+        const url = window.prompt(
+          "URL of the published page (needed to link your other posts to it):"
+        );
+        const trimmed = url?.trim();
+        onUpdated(
+          await updateDraft(draft.id, {
+            status,
+            ...(trimmed ? { posted_url: trimmed } : {}),
+          })
+        );
+        return;
+      }
       onUpdated(await updateDraft(draft.id, { status }));
     } finally {
       setUpdatingStatus(false);
@@ -218,19 +235,39 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
           </p>
         )}
 
-        {draft?.content_brief && (platform === "reddit" || platform === "quora") && (
+        {draft && (platform === "reddit" || platform === "quora") && draft.content_brief && (
           <a
-            href={platform === "reddit" ? `https://reddit.com/${draft.content_brief}` : draft.content_brief}
+            href={draft.content_brief.startsWith("r/") ? `https://reddit.com/${draft.content_brief}` : draft.content_brief}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-[var(--accent-foreground)] hover:text-[var(--text-primary)]"
-            title={platform === "reddit" ? "Suggested subreddit to post this in" : "A real Quora question this answers"}
+            className="mt-2 flex items-start gap-1.5 rounded-md border border-[var(--border-subtle)] bg-[rgba(148,163,184,0.06)] px-2.5 py-2 text-xs font-medium text-[var(--accent-foreground)] hover:border-[var(--accent-foreground)]"
+            title={
+              platform === "reddit"
+                ? draft.content_brief.startsWith("r/")
+                  ? "Suggested subreddit for this post"
+                  : "A real thread this comment answers — reply there"
+                : "A real Quora question this answers"
+            }
           >
-            <MapPin className="h-3 w-3 shrink-0" />
-            <span className="truncate">
-              {platform === "reddit" ? `Post in ${draft.content_brief}` : "Answer this Quora question"}
+            <MapPin className="h-3.5 w-3.5 shrink-0 mt-px" />
+            <span className="min-w-0">
+              {platform === "reddit" && draft.content_brief.startsWith("r/") && (
+                <>Post in <span className="font-semibold">{draft.content_brief}</span></>
+              )}
+              {platform === "reddit" && !draft.content_brief.startsWith("r/") && (
+                <>
+                  Reply in this thread
+                  {draft.target_title ? <>: <span className="font-semibold line-clamp-2">“{draft.target_title}”</span></> : null}
+                </>
+              )}
+              {platform === "quora" && (
+                <>
+                  Answer
+                  {draft.target_title ? <>: <span className="font-semibold line-clamp-2">“{draft.target_title}”</span></> : " this Quora question"}
+                </>
+              )}
             </span>
-            <ArrowUpRight className="h-3 w-3 shrink-0" />
+            <ArrowUpRight className="h-3.5 w-3.5 shrink-0 mt-px" />
           </a>
         )}
 

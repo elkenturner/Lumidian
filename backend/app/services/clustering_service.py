@@ -35,7 +35,7 @@ from app.services.drafting.voice import generate_draft_summary
 
 logger = logging.getLogger(__name__)
 
-CLUSTER_PLATFORMS: tuple[str, ...] = ("linkedin", "medium", "reddit", "quora", "x")
+CLUSTER_PLATFORMS: tuple[str, ...] = ("owned_site", "linkedin", "medium", "reddit", "quora", "x")
 
 # Hard ceiling on a single platform's writer pipeline. asyncio.gather waits for
 # every leg, so without this any one hung Claude call freezes the entire batch
@@ -59,11 +59,81 @@ def _derive_title_fallback(body: str, *, prompt_text: str, platform: str) -> str
     label = platform.replace("_", " ").title()
     return f"{label} draft for {prompt_text}"[:80].rstrip()
 
+
+async def _gen_owned_site_piece(
+    *, cluster, brand_row, prompt_row, brief_context, pack, tier, low_evidence: bool = False,
+):
+    """Cluster anchor piece: the brand's own site. Evidence = the cluster pack.
+
+    Mirrors the owned_site branch in drafting_service.py's onboarding/manual
+    draft flow, but is fed by the CLUSTER evidence pack (not the brand's
+    crawled publications) and threads the shared cluster brief through so the
+    page anchors the same positioning as the other platform pieces.
+
+    `low_evidence`: the cluster-level "brand-as-authority soft-fail" flag
+    (see `_gen` in `regenerate_cluster`). Folded into the returned low_ev the
+    same way every other platform does (`low_ev or low_evidence`) so the
+    anchor piece doesn't understate its evidence quality relative to its
+    siblings just because its own pack slice happened to be non-empty.
+    """
+    import json as _json
+    from datetime import datetime, timezone
+    from app.services.drafting.client import call_claude
+    from app.services.drafting.platforms import PLATFORM_MAX_TOKENS
+    from app.services.drafting import owned_site
+
+    try:
+        async with AsyncSessionLocal() as piece_db:
+            prof = (await piece_db.execute(
+                select(BrandProfile).where(BrandProfile.brand_id == cluster.brand_id)
+            )).scalar_one_or_none()
+        brand_dict = {
+            "name": brand_row.name,
+            "description": prof.company_description if prof else None,
+            "url": brand_row.website_url or None,
+            "audience": prof.target_audience if prof else None,
+        }
+        evidence = [
+            {"title": s.get("title"), "url": s.get("url", ""), "snippet": s.get("snippet", "")}
+            for s in (pack.sources if pack else [])
+            if s.get("url") and not str(s.get("url")).startswith("internal://")
+        ] or None
+        from app.services.drafting_service import _voice_directive_from_profile
+        voice = _voice_directive_from_profile(prof)
+
+        async def _writer(p: str) -> str:
+            return await call_claude(p, max_tokens=PLATFORM_MAX_TOKENS.get("owned_site", 3000))
+
+        owned = await asyncio.wait_for(
+            owned_site.generate_owned_site_draft(
+                writer=_writer, brand=brand_dict, target_query=prompt_row.text,
+                evidence=evidence, voice=voice, brief=brief_context,
+                date_published=datetime.now(timezone.utc).date().isoformat(),
+            ),
+            timeout=PIECE_TIMEOUT_SECONDS,
+        )
+        body = (
+            owned.body
+            + "\n\n---\nSchema markup (JSON-LD — paste inside the page's <head>):\n\n```json\n"
+            + _json.dumps(owned.jsonld, indent=2)
+            + "\n```\n"
+        )
+        title = owned.jsonld.get("headline") or _derive_title_fallback(
+            owned.body, prompt_text=prompt_row.text, platform="owned_site")
+        low_ev = (not evidence) or low_evidence
+        return ("ok", "owned_site", title, body, owned.anti_ai_score, [], low_ev)
+    except asyncio.TimeoutError:
+        return ("fail", "owned_site", f"timeout after {PIECE_TIMEOUT_SECONDS:.0f}s")
+    except Exception as exc:
+        logger.exception("owned_site piece failed: %s", exc)
+        return ("fail", "owned_site", str(exc))
+
 # Platforms that get a soft "further reading" reference to the cluster's
-# Medium piece (or own-site pillar). Asymmetric — Medium/Wikipedia get nothing.
+# Medium piece (or own-site pillar). Reddit is EXCLUDED — outbound links to
+# own content are the classic spam fingerprint there (July 2026 research);
+# Medium/Wikipedia get nothing either.
 _APPENDS_PILLAR_REF = {
     "linkedin_post", "linkedin_reply", "linkedin_article",
-    "reddit", "reddit_reply",
     "quora",
     "x_post", "x_thread", "x_reply",
 }
@@ -87,10 +157,8 @@ def append_pillar_reference(
     if platform.startswith("x_"):
         # Space-constrained — bare URL, no label
         return text.rstrip() + f"\n{pillar_url}"
-    if platform.startswith("reddit"):
-        return text.rstrip() + f"\n\nI wrote a longer version on Medium: {pillar_url}"
-    # linkedin_*, quora
-    return text.rstrip() + f"\n\nFurther reading on Medium: {pillar_url}"
+    # linkedin_*, quora — the pillar is the brand's own-site page, not Medium.
+    return text.rstrip() + f"\n\nMore detail here: {pillar_url}"
 
 
 async def get_or_create_cluster(db: AsyncSession, *, brand_id: int, prompt_id: int) -> ContentCluster:
@@ -171,6 +239,7 @@ async def _generate_piece_text(
     brief_context: str,
     tier: str | None,
     opportunity_context: str | None = None,
+    angle_directive: str | None = None,
 ) -> tuple[str, str, float | None, list[RenderedCitation], bool]:
     """Generate one cluster piece via the full content-quality pipeline.
 
@@ -202,6 +271,7 @@ async def _generate_piece_text(
         db=db,
         brief_context=brief_context,
         opportunity_context=opportunity_context,
+        angle_directive=angle_directive,
     )
     # Final polish (same step the gap-draft path applies after the pipeline).
     raw_text = remove_hedging(raw_text)
@@ -236,34 +306,76 @@ async def _resolve_post_targets(
                 build_subreddit_strategy,
                 classify_subreddit,
             )
-            from app.services.reddit_scanner_service import (
-                find_first_valid_subreddit,
-                get_relevant_subreddits,
-            )
-            prof = (await db.execute(
-                select(BrandProfile).where(BrandProfile.brand_id == brand_id)
-            )).scalar_one_or_none()
-            prompts = list((await db.execute(
-                select(Prompt).where(Prompt.brand_id == brand_id)
-            )).scalars().all())
-            subs = await asyncio.wait_for(
-                asyncio.to_thread(
-                    get_relevant_subreddits,
-                    prof.company_description if prof else None,
-                    [p.text for p in prompts], 5,
-                ),
-                timeout=12,
-            )
-            sub = await asyncio.wait_for(find_first_valid_subreddit(subs), timeout=8) if subs else None
-            if sub:
-                strategy = build_subreddit_strategy(sub, brand_name, classify_subreddit(sub))
+            # 1) Prefer a real, relevant, un-actioned thread — replies to open
+            # evergreen threads are the highest-value Reddit play for AI
+            # retrieval (July 2026 research). Best-effort like everything here.
+            from app.models import ContentOpportunity
+            opp = (await db.execute(
+                select(ContentOpportunity)
+                .where(
+                    ContentOpportunity.brand_id == brand_id,
+                    ContentOpportunity.prompt_id == prompt_id,
+                    ContentOpportunity.platform == "reddit",
+                    ContentOpportunity.status == "new",
+                    ContentOpportunity.relevance_score >= 60,
+                )
+                .order_by(ContentOpportunity.relevance_score.desc())
+                .limit(1)
+            )).scalars().first()
+            if opp is not None:
+                sub = (opp.subreddit or "").removeprefix("r/")
+                strategy = (
+                    build_subreddit_strategy(sub, brand_name, classify_subreddit(sub))
+                    if sub else ""
+                )
+                preview = getattr(opp, "body_preview", None) or ""
                 targets["reddit"] = {
-                    "brief": f"r/{sub}",
-                    "brief_append": (
-                        f"SUBREDDIT TARGET: this post will be published in r/{sub}. "
-                        f"Write it to fit that community.\n{strategy}"
+                    "brief": opp.thread_url,
+                    "target_title": (opp.thread_title or "")[:300] or None,
+                    "platform_key_override": "reddit_comment",
+                    "opportunity_id": opp.id,
+                    "subreddit": sub or None,
+                    "opportunity": (
+                        f"THREAD: {opp.thread_title}\nURL: {opp.thread_url}\n"
+                        + (f"SUBREDDIT: r/{sub}\n" if sub else "")
+                        + (f"THREAD EXCERPT:\n{preview}\n" if preview else "")
+                        + f"\nWrite a top-level comment that directly answers this thread."
+                        + (f"\n{strategy}" if strategy else "")
                     ),
                 }
+            else:
+                # 2) Fall back to a standalone post in a validated subreddit
+                #    (existing behavior).
+                from app.services.reddit_scanner_service import (
+                    find_first_valid_subreddit,
+                    get_relevant_subreddits,
+                )
+                prof = (await db.execute(
+                    select(BrandProfile).where(BrandProfile.brand_id == brand_id)
+                )).scalar_one_or_none()
+                prompts = list((await db.execute(
+                    select(Prompt).where(Prompt.brand_id == brand_id)
+                )).scalars().all())
+                subs = await asyncio.wait_for(
+                    asyncio.to_thread(
+                        get_relevant_subreddits,
+                        prof.company_description if prof else None,
+                        [p.text for p in prompts], 5,
+                    ),
+                    timeout=12,
+                )
+                sub = await asyncio.wait_for(find_first_valid_subreddit(subs), timeout=8) if subs else None
+                if sub:
+                    strategy = build_subreddit_strategy(sub, brand_name, classify_subreddit(sub))
+                    targets["reddit"] = {
+                        "brief": f"r/{sub}",
+                        "target_title": None,
+                        "subreddit": sub,
+                        "brief_append": (
+                            f"SUBREDDIT TARGET: this post will be published in r/{sub}. "
+                            f"Write it to fit that community.\n{strategy}"
+                        ),
+                    }
         except Exception as exc:
             logger.warning("cluster reddit target resolve skipped: %s", exc)
     if "quora" in enabled:
@@ -277,6 +389,7 @@ async def _resolve_post_targets(
                 title, url, snippet = q.get("title", ""), q.get("url", ""), q.get("snippet", "")
                 targets["quora"] = {
                     "brief": url,
+                    "target_title": (title or "")[:300] or None,
                     "opportunity": (
                         f"QUESTION: {title}\nURL: {url}\n\n"
                         + (f"QUESTION CONTEXT (excerpt):\n{snippet}\n\n" if snippet else "")
@@ -494,6 +607,26 @@ async def regenerate_cluster(
         # the brief). Quora: write the answer TO the resolved real question.
         if target.get("brief_append"):
             ctx = ctx + "\n\n" + target["brief_append"]
+        # Reddit thread routing: generate via the reddit_comment spec while the
+        # draft's stored platform stays the base "reddit" card slot.
+        platform_for_generation = target.get("platform_key_override") or platform
+        if platform == "owned_site":
+            return await _gen_owned_site_piece(
+                cluster=cluster, brand_row=brand_row, prompt_row=prompt_row,
+                brief_context=ctx, pack=pack, tier=tier, low_evidence=low_evidence,
+            )
+        # Resolve the insider/neutral angle for this piece. Both reddit target
+        # modes (routed thread + standalone post) carry a bare "subreddit" key.
+        # Use the resolved platform KEY (e.g. "linkedin" -> "linkedin_article")
+        # so it matches the matrix's platform vocabulary.
+        from app.services.drafting.angle import angle_directive as _angle_text, effective_angle
+        angle_platform_key = resolve_platform_key(platform_for_generation)
+        sub_cls = None
+        if angle_platform_key.startswith("reddit") and target.get("subreddit"):
+            from app.services.drafting.platforms import classify_subreddit
+            sub_cls = classify_subreddit(target["subreddit"])
+        resolved_angle = effective_angle(angle_platform_key, cluster.angle or "auto", sub_cls)
+        angle_text = _angle_text(resolved_angle, brand_row.name)
         try:
             # Each piece runs in the asyncio.gather below, so it MUST use its own
             # DB session — a single AsyncSession shared across concurrent coroutines
@@ -504,12 +637,13 @@ async def regenerate_cluster(
                 title, body, q, citations, low_ev = await asyncio.wait_for(
                     _generate_piece_text(
                         piece_db, brand_id=cluster.brand_id, brand_name=brand_row.name,
-                        prompt_id=cluster.prompt_id, platform=platform,
+                        prompt_id=cluster.prompt_id, platform=platform_for_generation,
                         prompt_text=prompt_row.text, visibility_pct=visibility_pct,
                         profile_context=profile_context,
                         response_analysis=response_analysis,
                         brief_context=ctx, tier=tier,
                         opportunity_context=target.get("opportunity"),
+                        angle_directive=angle_text,
                     ),
                     timeout=PIECE_TIMEOUT_SECONDS,
                 )
@@ -527,10 +661,14 @@ async def regenerate_cluster(
                     draft_text=body,
                     sources=(pack.sources if pack else []),
                 )
-            # Asymmetric pillar reference
+            # Asymmetric pillar reference. `_APPENDS_PILLAR_REF` keys on the
+            # resolved variant vocabulary (linkedin_article, x_thread, ...),
+            # not the base platform name this loop iterates over, so resolve
+            # before the lookup — otherwise linkedin/x pieces never match and
+            # silently never receive the reference.
             pillar = cluster.pillar_url if cluster.pillar_mode == "attached" else None
             body = append_pillar_reference(
-                text=body, platform=platform, pillar_url=pillar,
+                text=body, platform=resolve_platform_key(platform), pillar_url=pillar,
             )
             # A piece off the brand-authority soft-fail pack is inherently thin.
             low_ev = low_ev or low_evidence
@@ -565,6 +703,8 @@ async def regenerate_cluster(
             status="draft", title=title,  # already non-empty via _derive_title_fallback
             content_text=body, source="cluster",
             content_brief=post_targets.get(platform, {}).get("brief"),
+            target_title=post_targets.get(platform, {}).get("target_title"),
+            opportunity_id=post_targets.get(platform, {}).get("opportunity_id"),
             quality_score=q, generation_state="done",
             low_evidence=low_ev,
         )
@@ -576,6 +716,23 @@ async def regenerate_cluster(
         await _persist_citations_and_summary(
             db, draft=draft, citations=citations, query=prompt_row.text,
         )
+
+    # Mark any opportunity we routed a reddit piece to as drafted so it isn't
+    # re-selected by a future regen. Best-effort — never blocks the cluster.
+    # Only mark opportunities whose piece actually generated ("ok") — a
+    # failed piece must leave its opportunity untouched so a future regen
+    # can retry it, rather than silently burning it on the first attempt.
+    ok_platforms = {r[1] for r in results if r[0] == "ok"}
+    routed_opp_ids = [
+        t["opportunity_id"] for platform, t in post_targets.items()
+        if platform in ok_platforms and t.get("opportunity_id")
+    ]
+    if routed_opp_ids:
+        from app.models import ContentOpportunity
+        for o in (await db.execute(
+            select(ContentOpportunity).where(ContentOpportunity.id.in_(routed_opp_ids))
+        )).scalars().all():
+            o.status = "drafted"
 
     if any_failed:
         cluster.status = "generation_partial"
@@ -632,26 +789,61 @@ async def regenerate_piece(
     sibs = [p for p in enabled if p != platform]
     ctx = _build_brief_context(brief_row, sibs)
 
-    title, body, quality_score, citations, low_ev = await _generate_piece_text(
-        db,
-        brand_id=cluster.brand_id,
-        brand_name=brand_row.name,
-        prompt_id=cluster.prompt_id,
-        platform=platform,
-        prompt_text=prompt_row.text,
-        visibility_pct=visibility_pct,
-        profile_context=profile_context,
-        response_analysis=response_analysis,
-        brief_context=ctx,
-        tier=tier,
-    )
+    if platform == "owned_site":
+        # Anchor piece — must go through the dedicated owned_site generator
+        # (JSON-LD, anti-AI gate), not the generic social-piece pipeline.
+        pack = None
+        if brief_row.evidence_pack_id is not None:
+            from app.models import ContentEvidencePack as PackModel
+            pack = await db.get(PackModel, brief_row.evidence_pack_id)
+        # This function has no separate briefing-phase state tracking a
+        # brand-authority soft-fail (unlike regenerate_cluster's `_gen`), so
+        # derive it the same way regenerate_cluster does when reusing an
+        # existing pack: re-check the pack's own sources against the
+        # authority gate. Brand-authority packs count zero T1/T2 sources and
+        # so still yield low_evidence=True.
+        from app.services.cluster_evidence import pack_meets_gate
+        low_evidence = pack is not None and not pack_meets_gate(pack.sources or [])
+        res = await _gen_owned_site_piece(
+            cluster=cluster, brand_row=brand_row, prompt_row=prompt_row,
+            brief_context=ctx, pack=pack, tier=tier, low_evidence=low_evidence,
+        )
+        if res[0] == "fail":
+            raise RuntimeError(f"owned_site piece generation failed: {res[2]}")
+        _, _, title, body, quality_score, citations, low_ev = res
+    else:
+        # No target-resolution pass here (unlike regenerate_cluster's `_gen`),
+        # so there's no known subreddit to classify — falls back to "neutral"
+        # for auto reddit pieces, same as any other unclassified subreddit.
+        from app.services.drafting.angle import angle_directive as _angle_text, effective_angle
+        resolved_angle = effective_angle(resolve_platform_key(platform), cluster.angle or "auto", None)
+        angle_text = _angle_text(resolved_angle, brand_row.name)
+        title, body, quality_score, citations, low_ev = await _generate_piece_text(
+            db,
+            brand_id=cluster.brand_id,
+            brand_name=brand_row.name,
+            prompt_id=cluster.prompt_id,
+            platform=platform,
+            prompt_text=prompt_row.text,
+            visibility_pct=visibility_pct,
+            profile_context=profile_context,
+            response_analysis=response_analysis,
+            brief_context=ctx,
+            tier=tier,
+            angle_directive=angle_text,
+        )
 
+    # Exclude posted drafts: a piece regen must never mutate a draft the user
+    # has already published. Order by id desc so, if more than one non-posted
+    # row somehow exists for this (cluster, platform), the newest wins instead
+    # of raising MultipleResultsFound.
     existing = (await db.execute(
         select(ContentDraft).where(
             ContentDraft.cluster_id == cluster.id,
             ContentDraft.platform == platform,
-        )
-    )).scalar_one_or_none()
+            ContentDraft.status != "posted",
+        ).order_by(ContentDraft.id.desc())
+    )).scalars().first()
 
     if existing:
         existing.title = title

@@ -17,8 +17,7 @@ _MARKER_RE = re.compile(r"\[S(\d+)\]")
 
 _PLATFORMS_WITH_FOOTER = {"medium", "linkedin_article", "quora"}
 _LINKEDIN_POST_PLATFORMS = {"linkedin_post", "linkedin_reply"}
-_REDDIT_PLATFORMS = {"reddit", "reddit_reply"}
-_STRIP_PLATFORMS = {"x_post", "x_thread", "x_reply"}
+_STRIP_PLATFORMS = {"x_post", "x_thread", "x_reply", "reddit", "reddit_reply", "reddit_comment"}
 
 
 @dataclass
@@ -79,10 +78,12 @@ def render_citations(
 ) -> tuple[str, list[RenderedCitation]]:
     """Render [SN] markers into platform-native citation forms.
 
-    Per the 2026-05-20 cluster redesign:
+    Per the 2026-05-20 cluster redesign (reddit updated July 2026):
       - Medium / linkedin_article / quora: numbered footer block
       - linkedin_post: end-of-post "Sources" numbered block (NOT inline)
-      - reddit:        conversational "More on this:" trailing block
+      - reddit / reddit_reply / reddit_comment: linkless — prose attribution
+        only, markers stripped, no footer at all (outbound links to own
+        content are the classic Reddit spam fingerprint)
       - wikipedia:     <ref>{{cite web}}</ref> inline
       - x_*:           strip markers entirely
 
@@ -109,7 +110,7 @@ def render_citations(
         src = by_ref[ref]
         if platform in _STRIP_PLATFORMS:
             return ""
-        if platform in _LINKEDIN_POST_PLATFORMS or platform in _REDDIT_PLATFORMS:
+        if platform in _LINKEDIN_POST_PLATFORMS:
             # Marker removed inline; references aggregate into trailing block
             return ""
         if platform == "wikipedia":
@@ -134,13 +135,5 @@ def render_citations(
             src = by_ref[ref]
             footer.append(f"{n}. {src.title} — {src.url}")
         rendered = rendered + "\n".join(footer)
-    elif platform in _REDDIT_PLATFORMS:
-        # Reddit native: conversational trailing line, plain markdown
-        parts = ["", "", "More on this:"]
-        for ref in ref_to_display:
-            src = by_ref[ref]
-            domain = _domain(src.url)
-            parts.append(f"- {domain} — [{src.title}]({src.url})")
-        rendered = rendered + "\n".join(parts)
 
     return rendered, used

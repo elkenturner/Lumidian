@@ -19,10 +19,14 @@ import os
 import re
 import time
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING
 
 import httpx
 
 from app.services.serper_search_service import SERPER_SEMAPHORE
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -703,6 +707,39 @@ Return ONLY a comma-separated list of subreddit names (without r/ prefix), nothi
 
 # ── Main scanner ──────────────────────────────────────────────────────────────
 
+async def _prune_stale_opportunities(db: "AsyncSession", *, brand_id: int) -> None:
+    """Prune stale un-actioned Reddit opportunities (status=new).
+
+    Aged evergreen threads are the AI retrieval surface (avg cited Reddit
+    post is ~1 year old — July 2026 research), so high-relevance leads are
+    kept for 90 days (matching the router's list window). Low-relevance
+    leads still expire at 14 days.
+    """
+    from sqlalchemy import select
+
+    from app.models import ContentOpportunity
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    cutoff_low = now - timedelta(days=14)
+    cutoff_high = now - timedelta(days=90)
+    rows = (
+        await db.execute(
+            select(ContentOpportunity).where(
+                ContentOpportunity.brand_id == brand_id,
+                ContentOpportunity.platform == "reddit",
+                ContentOpportunity.status == "new",
+            )
+        )
+    ).scalars().all()
+    for opp in rows:
+        created = opp.created_at
+        if created is None:
+            continue
+        threshold = cutoff_high if (opp.relevance_score or 0) >= 60 else cutoff_low
+        if created < threshold:
+            await db.delete(opp)
+
+
 async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) -> int:
     """
     Scan Reddit for relevant threads for a single brand.
@@ -739,31 +776,35 @@ async def scan_brand_opportunities(brand_id: int, clear_existing: bool = False) 
             # Bust Serper in-process cache so fresh scan fetches new results
             for p in prompts:
                 invalidate_cache(p.id)
-            # Delete only Reddit opportunities so parallel Quora scan rows aren't wiped
+            # Delete only Reddit opportunities so parallel Quora scan rows aren't
+            # wiped, AND only status="new" rows — a manual re-scan must not
+            # destroy leads the user already acted on (drafted) or explicitly
+            # kept (dismissed survives too, since it's not "new").
             await db.execute(
                 sql_delete(ContentOpportunity).where(
                     ContentOpportunity.brand_id == brand_id,
                     ContentOpportunity.platform == "reddit",
+                    ContentOpportunity.status == "new",
                 )
             )
             await db.commit()
             logger.info(
-                "Reddit scanner: cleared existing opportunities for brand_id=%d", brand_id
+                "Reddit scanner: cleared existing 'new' opportunities for brand_id=%d", brand_id
             )
-            existing_urls: set[str] = set()
-        else:
-            # Prune only Reddit opportunities older than 14 days (status=new)
-            cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=14)
-            old_row = await db.execute(
-                select(ContentOpportunity).where(
+            # Surviving (drafted/dismissed) rows still count for thread_url
+            # dedup so the re-scan doesn't insert a duplicate for a thread the
+            # user already acted on.
+            existing_row = await db.execute(
+                select(ContentOpportunity.thread_url).where(
                     ContentOpportunity.brand_id == brand_id,
                     ContentOpportunity.platform == "reddit",
-                    ContentOpportunity.created_at < cutoff,
-                    ContentOpportunity.status == "new",
                 )
             )
-            for old_opp in old_row.scalars().all():
-                await db.delete(old_opp)
+            existing_urls = {r[0] for r in existing_row.all()}
+        else:
+            # Prune stale Reddit opportunities (status=new); high-relevance
+            # leads survive 90 days, low-relevance ones still expire at 14.
+            await _prune_stale_opportunities(db, brand_id=brand_id)
 
             existing_row = await db.execute(
                 select(ContentOpportunity.thread_url).where(

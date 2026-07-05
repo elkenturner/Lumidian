@@ -23,11 +23,13 @@ from app.models import (
     ContentCluster,
     ContentClusterSource,
     ContentDraft,
+    ContentDraftCitation,
     ContentEvidencePack,
     DraftAttribution,
     Prompt,
 )
 from app.schemas import (
+    ClusterAngleUpdate,
     ClusterPieceStatus,
     ClusterSourceItem,
     ClusterSourcesPayload,
@@ -76,7 +78,14 @@ async def _cluster_lift_for_prompt(
     )).scalar_one_or_none()
     if first_attr is None:
         return None
+    # score_at_posting is None when the draft was posted before any tracking
+    # run measured the prompt (content.py stores it as NULL). No baseline →
+    # no lift; returning None must not crash the whole detail endpoint.
+    if first_attr.score_at_posting is None:
+        return None
     current = await _get_prompt_visibility(db, prompt_id)
+    if current is None:
+        return None
     return round(float(current) - float(first_attr.score_at_posting), 2)
 
 
@@ -171,6 +180,7 @@ async def list_clusters(brand_id: int, db: DbDep, user: CurrentUser) -> list[dic
             "cluster_delta": cluster_delta,
             "posted_count": posted_count,
             "failure_reason": cluster.failure_reason,
+            "angle": cluster.angle,
         })
     # Sort by visibility ascending (lowest needs most attention)
     out.sort(key=lambda c: c["visibility_pct"])
@@ -239,6 +249,9 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
             "low_evidence": d.low_evidence,
             "posted_url": d.posted_url,
             "brief_version": d.brief_version,
+            # Routing destination: URL in content_brief, human label in target_title
+            "content_brief": d.content_brief,
+            "target_title": d.target_title,
         })
 
     # Lift + posted count keyed on prompt_id so legacy + Wikipedia
@@ -261,7 +274,32 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
         "last_generated_at": cluster.last_generated_at,
         "cluster_delta": cluster_delta,
         "posted_count": posted_count,
+        "angle": cluster.angle,
     }
+
+
+@router.patch("/{brand_id}/{cluster_id}", response_model=ContentClusterDetail)
+async def update_cluster(
+    brand_id: int,
+    cluster_id: int,
+    payload: ClusterAngleUpdate,
+    db: DbDep,
+    user: CurrentUser,
+) -> dict:
+    """Update the cluster's content angle. Takes effect on the next generation
+    (initial pieces, per-piece regen, or full regen) — does not rewrite
+    already-generated drafts."""
+    await _ensure_brand_owned(db, brand_id, user)
+    cluster = (await db.execute(
+        select(ContentCluster).where(
+            ContentCluster.id == cluster_id, ContentCluster.brand_id == brand_id,
+        )
+    )).scalar_one_or_none()
+    if cluster is None:
+        raise HTTPException(404, "Cluster not found")
+    cluster.angle = payload.angle
+    await db.commit()
+    return await get_cluster(brand_id, cluster.id, db, user)  # type: ignore
 
 
 @router.post("/{brand_id}/by-prompt/{prompt_id}/regenerate", response_model=ContentClusterDetail)
@@ -511,13 +549,32 @@ async def cluster_sources(brand_id: int, cluster_id: int, db: DbDep, user: Curre
             ContentClusterSource.cluster_id == cluster.id,
         )
     )).scalars().all()
+
+    # Compute real per-URL usage from citations attached to this cluster's
+    # drafts. ContentClusterSource.times_cited is written 0 at pack build and
+    # never incremented — the payload field is computed here instead.
+    from app.services.cluster_evidence import _normalize_url
+
+    cite_rows = (await db.execute(
+        select(ContentDraftCitation.url, ContentDraftCitation.draft_id)
+        .join(ContentDraft, ContentDraft.id == ContentDraftCitation.draft_id)
+        .where(ContentDraft.cluster_id == cluster.id)
+    )).all()
+    usage: dict[str, set[int]] = {}
+    for url, draft_id in cite_rows:
+        usage.setdefault(_normalize_url(url or ""), set()).add(draft_id)
+
     tier_order = {"T1": 0, "T2": 1, "T3": 2}
-    rows = sorted(rows, key=lambda r: (tier_order.get(r.tier, 3), -r.times_cited))
+
+    def _cited(r) -> int:
+        return len(usage.get(_normalize_url(r.url), set()))
+
+    rows = sorted(rows, key=lambda r: (-_cited(r), tier_order.get(r.tier, 3)))
     return ClusterSourcesPayload(
         total_t1=pack.total_t1, total_t2=pack.total_t2, total_t3=pack.total_t3,
         sources=[ClusterSourceItem(
             url=r.url, domain=r.domain, tier=r.tier, title=r.title,
-            times_cited=r.times_cited,
+            times_cited=_cited(r),
         ) for r in rows],
     )
 

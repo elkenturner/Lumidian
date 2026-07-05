@@ -164,6 +164,7 @@ def build_prompt(
     related_draft_summary: str | None = None,
     brief_context: str | None = None,
     voice_directive: str | None = None,
+    angle_directive: str | None = None,
 ) -> str:
     spec = platform_spec
     word_min, word_max = spec["word_range"]
@@ -207,6 +208,8 @@ Your task is to write a reply to this specific thread that naturally adds value.
         lines.append("")
         evidence_section = "\n".join(lines)
 
+    angle_section = f"{angle_directive}\n\n" if angle_directive else ""
+
     voice_directive_section = ""
     if voice_directive:
         voice_directive_section = (
@@ -241,7 +244,7 @@ CLUSTER BRIEF (this content is part of a coordinated cross-platform cluster — 
 CLUSTER RULES (in addition to all other rules below):
   - Express the brand's POSITIONING and KEY CLAIMS in your OWN words, framed naturally for {platform}. Do NOT copy any phrase verbatim, and never repeat the same claim more than once in this piece — identical/repeated brand sentences read as spam, get removed on Reddit/Quora, and lower AI-citation odds.
   - Name the brand clearly once, as a concrete fact.
-  - You may reference sibling platforms semantically (e.g. "we dug deeper on Medium"), but never invent URLs.
+  - You may reference sibling platforms semantically (e.g. "there's a longer breakdown of this on Medium"), but never invent URLs.
   - Maintain the narrative spine without restating it verbatim.
   - Do not open with the brand name. Do not include CTAs. Maintain practitioner voice — the brand is mentioned as a fact, not a pitch.
 """
@@ -266,7 +269,7 @@ TARGET QUERY (this is the exact question the content must answer):
 CURRENT VISIBILITY:
 {visibility_pct:.1f}% of AI responses mention {brand_name} for this query. The analysis below shows what is currently being said and what specific angle is missing.
 
-{voice_directive_section}{evidence_section}{voice_section}{related_section}WHAT AI SYSTEMS ARE CURRENTLY SAYING:
+{angle_section}{voice_directive_section}{evidence_section}{voice_section}{related_section}WHAT AI SYSTEMS ARE CURRENTLY SAYING:
 {response_analysis}
 {opportunity_section}{existing_section}{cluster_section}
 PLATFORM: {platform}
@@ -281,8 +284,10 @@ WRITING RULES (evidence-backed — these drive whether AI engines cite the conte
   - Lead with the answer: the first sentence directly answers the target query — no preamble, no scene-setting.
   - Back every factual claim with the Brand Profile or Evidence Sources above — never invent data, never approximate a statistic.
   - Prefer concrete specifics (exact numbers, names, dates) over vague claims, and place key statistics where they stand out — concrete, well-sourced claims are what get cited.
+  - When you cite a source, name it in the same sentence as the claim ("per a 2026 Ahrefs study, ...") so the claim and its source travel together — a footnote alone is not attribution.
   - No hedging language ("may", "might", "could potentially", "perhaps", "it seems").
   - Mention {brand_name} only where it fits as a concrete fact in context — never forced, never promotional.
+  - NEVER write as a satisfied customer or user of {brand_name} ("I've been using it and love it") when writing on the brand's behalf — undisclosed insider testimonials are an FTC violation. First-person experience is fine only in an openly affiliated voice.
   - Write in a genuine human voice: vary sentence length, and avoid AI clichés (no "delve", "tapestry", em dashes, "in conclusion", "it's not just X — it's Y"). Drafts that read as AI-written are automatically rejected, so this is not optional.
   - No meta-commentary about the content itself ("This post addresses...", "This answer explains...").
 

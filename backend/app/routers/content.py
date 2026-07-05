@@ -572,6 +572,12 @@ async def update_draft(draft_id: int, request: UpdateDraftRequest, db: DbDep, us
                     brief_row = await db.get(ContentBrief, cluster_row.last_brief_id)
                     if brief_row is not None:
                         draft.brief_version = brief_row.version
+                # Owned-site cluster piece posted with a URL becomes the cluster's
+                # pillar page — the anchor other platform pieces can reference.
+                if (draft.platform == "owned_site" and draft.posted_url
+                        and cluster_row is not None):
+                    cluster_row.pillar_url = draft.posted_url
+                    cluster_row.pillar_mode = "attached"
 
     draft.updated_at = utcnow()
     await db.commit()

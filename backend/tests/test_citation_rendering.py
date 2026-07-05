@@ -28,7 +28,8 @@ def test_linkedin_post_now_uses_end_block_not_inline_domain():
     assert len(used) == 2
 
 
-def test_reddit_uses_conversational_woven_block_not_inline_domain():
+def test_reddit_is_linkless_prose_only_no_footer():
+    # Updated July 2026: reddit renders prose-only, no link footer of any kind.
     pack = _pack(
         ("https://reuters.com/a", "Reuters story"),
         ("https://nytimes.com/b", "NYT story"),
@@ -40,11 +41,14 @@ def test_reddit_uses_conversational_woven_block_not_inline_domain():
     )
     # No inline parenthetical
     assert "(source:" not in rendered
-    # Trailing conversational line
-    assert "More on this:" in rendered or "Sources:" in rendered
-    # Both domains surface in the trailing block
-    assert "reuters.com" in rendered
-    assert "nytimes.com" in rendered
+    # No trailing conversational block or footer at all
+    assert "More on this:" not in rendered
+    assert "Sources:" not in rendered
+    # No domain leakage anywhere
+    assert "reuters.com" not in rendered
+    assert "nytimes.com" not in rendered
+    # Citations still tracked for the UI even though not rendered
+    assert len(used) == 2
 
 
 def test_medium_footer_unchanged():

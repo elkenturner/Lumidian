@@ -41,6 +41,11 @@ SAMPLE_BRIEF_JSON = """{
 }"""
 
 
+def _owned_ok(title: str = "Title", body: str = "Body content here.") -> tuple:
+    """Mock return for _gen_owned_site_piece — the finished results-loop tuple."""
+    return ("ok", "owned_site", title, body, None, [], False)
+
+
 @pytest_asyncio.fixture
 async def registered_user(db_session: AsyncSession) -> User:
     """Create and persist a minimal User for direct-DB model tests."""
@@ -53,7 +58,7 @@ async def registered_user(db_session: AsyncSession) -> User:
 @pytest.mark.asyncio
 async def test_cluster_platforms_excludes_wikipedia() -> None:
     assert "wikipedia" not in CLUSTER_PLATFORMS
-    assert set(CLUSTER_PLATFORMS) == {"linkedin", "medium", "reddit", "quora", "x"}
+    assert set(CLUSTER_PLATFORMS) == {"owned_site", "linkedin", "medium", "reddit", "quora", "x"}
 
 
 @pytest.mark.asyncio
@@ -71,7 +76,7 @@ async def test_get_or_create_cluster_idempotent(db_session: AsyncSession, regist
 
 
 @pytest.mark.asyncio
-async def test_regenerate_cluster_produces_5_pieces(db_session: AsyncSession, registered_user: User) -> None:
+async def test_regenerate_cluster_produces_piece_per_platform(db_session: AsyncSession, registered_user: User) -> None:
     brand = Brand(name="Acme", slug="c-acme2", user_id=registered_user.id)
     db_session.add(brand)
     await db_session.flush()
@@ -83,13 +88,14 @@ async def test_regenerate_cluster_produces_5_pieces(db_session: AsyncSession, re
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
          patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
-         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body content here.", None, [], False))):
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body content here.", None, [], False))), \
+         patch("app.services.clustering_service._gen_owned_site_piece", new=AsyncMock(return_value=_owned_ok())):
         result = await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
 
     assert result.status == "ready"
     drafts = (await db_session.execute(select(ContentDraft).where(ContentDraft.cluster_id == cluster.id))).scalars().all()
-    assert len(drafts) == 5
-    assert {d.platform for d in drafts} == {"linkedin", "medium", "reddit", "quora", "x"}
+    assert len(drafts) == len(CLUSTER_PLATFORMS)
+    assert {d.platform for d in drafts} == set(CLUSTER_PLATFORMS)
     assert all(d.cluster_id == cluster.id for d in drafts)
 
 
@@ -108,13 +114,14 @@ async def test_regenerate_cluster_respects_disabled_platform(db_session: AsyncSe
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
          patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
-         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body.", None, [], False))):
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Title", "Body.", None, [], False))), \
+         patch("app.services.clustering_service._gen_owned_site_piece", new=AsyncMock(return_value=_owned_ok())):
         await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
 
     drafts = (await db_session.execute(select(ContentDraft).where(ContentDraft.cluster_id == cluster.id))).scalars().all()
     platforms = {d.platform for d in drafts}
     assert "x" not in platforms
-    assert len(drafts) == 4
+    assert len(drafts) == len(CLUSTER_PLATFORMS) - 1
 
 
 @pytest.mark.asyncio
@@ -137,12 +144,13 @@ async def test_failed_piece_persists_with_failed_status(db_session: AsyncSession
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
          patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
-         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(side_effect=_fake_generate)):
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(side_effect=_fake_generate)), \
+         patch("app.services.clustering_service._gen_owned_site_piece", new=AsyncMock(return_value=_owned_ok())):
         result = await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
 
     assert result.status == "generation_partial"
     drafts = (await db_session.execute(select(ContentDraft).where(ContentDraft.cluster_id == cluster.id))).scalars().all()
-    assert len(drafts) == 5
+    assert len(drafts) == len(CLUSTER_PLATFORMS)
     failed = next(d for d in drafts if d.platform == "reddit")
     assert failed.status == "failed"
     assert failed.generation_state == "failed"
@@ -165,7 +173,8 @@ async def test_regenerate_piece_replaces_only_target(db_session: AsyncSession, r
 
     with patch("app.services.cluster_brief._call_llm", new=AsyncMock(return_value=SAMPLE_BRIEF_JSON)), \
          patch("app.services.cluster_evidence.fetch_and_dedupe", new=AsyncMock(return_value=_FAKE_EVIDENCE)), \
-         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("First", "First body.", None, [], False))):
+         patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("First", "First body.", None, [], False))), \
+         patch("app.services.clustering_service._gen_owned_site_piece", new=AsyncMock(return_value=_owned_ok(title="First", body="First body."))):
         await regenerate_cluster(db_session, cluster_id=cluster.id, tier="starter")
 
     with patch("app.services.clustering_service._generate_piece_text", new=AsyncMock(return_value=("Updated", "Updated body.", None, [], False))):
@@ -176,3 +185,124 @@ async def test_regenerate_piece_replaces_only_target(db_session: AsyncSession, r
     others = [d for d in drafts if d.platform != "linkedin"]
     assert li.title == "Updated"
     assert all(d.title == "First" for d in others)
+
+
+# ── regenerate_piece must never clobber a posted draft (I4) ──────────────────
+
+@pytest_asyncio.fixture
+async def _brief_only_cluster(db_session: AsyncSession, registered_user: User) -> ContentCluster:
+    """A minimal cluster with an already-promoted brief, so regenerate_piece's
+    brief lookup succeeds without needing to build one (build_brief pulls in
+    the evidence pipeline, which is out of scope for these tests)."""
+    brand = Brand(name="Acme", slug="c-acme-i4", user_id=registered_user.id)
+    db_session.add(brand)
+    await db_session.flush()
+    prompt = Prompt(brand_id=brand.id, text="Q", prompt_type="standard")
+    db_session.add(prompt)
+    await db_session.flush()
+    cluster = ContentCluster(
+        brand_id=brand.id, prompt_id=prompt.id, status="ready", pillar_mode="none", version=1,
+    )
+    db_session.add(cluster)
+    await db_session.flush()
+    brief = ContentBrief(
+        cluster_id=cluster.id, positioning="Pos", key_claims=["c1"],
+        canonical_phrasings=["Acme does X"], stats=[], narrative_spine="spine",
+        tone_notes="neutral", created_by="test",
+    )
+    db_session.add(brief)
+    await db_session.flush()
+    cluster.last_brief_id = brief.id
+    await db_session.commit()
+    await db_session.refresh(cluster)
+    return cluster
+
+
+@pytest.mark.asyncio
+async def test_regenerate_piece_only_posted_draft_creates_new_row_untouched(
+    db_session: AsyncSession, _brief_only_cluster: ContentCluster,
+) -> None:
+    """If the only existing draft for (cluster, platform) is 'posted', piece
+    regen must leave it alone and create a brand-new draft row instead of
+    silently mutating a published post."""
+    cluster = _brief_only_cluster
+    posted = ContentDraft(
+        brand_id=cluster.brand_id, prompt_id=cluster.prompt_id, cluster_id=cluster.id,
+        platform="linkedin", status="posted", title="Live post", content_text="Live body.",
+        source="cluster",
+    )
+    db_session.add(posted)
+    await db_session.commit()
+    await db_session.refresh(posted)
+
+    with patch(
+        "app.services.clustering_service._generate_piece_text",
+        new=AsyncMock(return_value=("New Title", "New body.", None, [], False)),
+    ):
+        result = await regenerate_piece(db_session, cluster_id=cluster.id, platform="linkedin", tier="starter")
+
+    # The posted row is untouched.
+    await db_session.refresh(posted)
+    assert posted.status == "posted"
+    assert posted.title == "Live post"
+    assert posted.content_text == "Live body."
+
+    # A distinct new draft row was created.
+    assert result.id != posted.id
+    assert result.status == "draft"
+    assert result.title == "New Title"
+
+    drafts = (
+        await db_session.execute(
+            select(ContentDraft).where(
+                ContentDraft.cluster_id == cluster.id, ContentDraft.platform == "linkedin",
+            )
+        )
+    ).scalars().all()
+    assert len(drafts) == 2
+
+
+@pytest.mark.asyncio
+async def test_regenerate_piece_posted_plus_draft_updates_draft_no_multiple_results(
+    db_session: AsyncSession, _brief_only_cluster: ContentCluster,
+) -> None:
+    """A posted row AND a non-posted (draft) row coexisting for the same
+    (cluster, platform) must not raise MultipleResultsFound — the draft row
+    is the one that gets updated; the posted row is untouched."""
+    cluster = _brief_only_cluster
+    posted = ContentDraft(
+        brand_id=cluster.brand_id, prompt_id=cluster.prompt_id, cluster_id=cluster.id,
+        platform="linkedin", status="posted", title="Live post", content_text="Live body.",
+        source="cluster",
+    )
+    draft_row = ContentDraft(
+        brand_id=cluster.brand_id, prompt_id=cluster.prompt_id, cluster_id=cluster.id,
+        platform="linkedin", status="draft", title="Old Title", content_text="Old body.",
+        source="cluster",
+    )
+    db_session.add_all([posted, draft_row])
+    await db_session.commit()
+    await db_session.refresh(posted)
+    await db_session.refresh(draft_row)
+
+    with patch(
+        "app.services.clustering_service._generate_piece_text",
+        new=AsyncMock(return_value=("Updated Title", "Updated body.", None, [], False)),
+    ):
+        result = await regenerate_piece(db_session, cluster_id=cluster.id, platform="linkedin", tier="starter")
+
+    assert result.id == draft_row.id
+    assert result.title == "Updated Title"
+
+    await db_session.refresh(posted)
+    assert posted.status == "posted"
+    assert posted.title == "Live post"
+
+    drafts = (
+        await db_session.execute(
+            select(ContentDraft).where(
+                ContentDraft.cluster_id == cluster.id, ContentDraft.platform == "linkedin",
+            )
+        )
+    ).scalars().all()
+    assert len(drafts) == 2

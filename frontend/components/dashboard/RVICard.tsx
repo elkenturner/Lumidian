@@ -115,8 +115,7 @@ export function RVICard({
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExpand(); } }}
         className="card p-5 h-full flex flex-col text-left hover:border-[var(--accent-border)] transition-colors group relative cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
       >
-        <ArrowRight size={14} className="absolute top-4 right-4 text-[var(--text-faint)] group-hover:text-[var(--accent)] transition-colors" aria-hidden="true" />
-        <CardHeader window={window} onWindowChange={onWindowChange} />
+        <CardHeader window={window} onWindowChange={onWindowChange} showArrow />
         <div className="flex items-center gap-2 mt-3">
           <ShieldCheck size={18} className="text-[var(--success)]" />
           <p className="text-lg font-bold text-[var(--text-primary)]">Territory owned</p>
@@ -143,12 +142,7 @@ export function RVICard({
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onExpand(); } }}
       className="card p-5 h-full flex flex-col text-left hover:border-[var(--accent-border)] transition-colors group relative cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
     >
-      <ArrowRight
-        size={14}
-        className="absolute top-4 right-4 text-[var(--text-faint)] group-hover:text-[var(--accent)] transition-colors"
-        aria-hidden="true"
-      />
-      <CardHeader window={window} onWindowChange={onWindowChange} />
+      <CardHeader window={window} onWindowChange={onWindowChange} showArrow />
 
       <div className="mt-2">
         <p className="text-3xl font-bold" style={{ color: peerPctColor(data.rvi) }}>
@@ -212,15 +206,15 @@ export function RVICard({
 }
 
 function CardHeader({
-  window, onWindowChange,
-}: { window: RVIWindow; onWindowChange: (w: RVIWindow) => void }) {
+  window, onWindowChange, showArrow = false,
+}: { window: RVIWindow; onWindowChange: (w: RVIWindow) => void; showArrow?: boolean }) {
   return (
     <div className="flex items-center justify-between">
       <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
         Relative Visibility
         <HelpTooltip text={HELP_TEXT} />
       </p>
-      <div className="flex gap-1">
+      <div className="flex items-center gap-1">
         {WINDOWS.map((w) => (
           <button
             key={w}
@@ -235,6 +229,13 @@ function CardHeader({
             {w}
           </button>
         ))}
+        {showArrow && (
+          <ArrowRight
+            size={14}
+            className="ml-1 text-[var(--text-faint)] group-hover:text-[var(--accent)] transition-colors"
+            aria-hidden="true"
+          />
+        )}
       </div>
     </div>
   );

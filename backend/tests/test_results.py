@@ -264,3 +264,105 @@ async def test_export_pdf_access_control(client: httpx.AsyncClient):
     await register_and_login(client, email="pdf_thief@example.com")
     resp = await client.get(f"/api/reports/{brand['id']}/export")
     assert resp.status_code == 403
+
+
+def _pdf_text(pdf_bytes: bytes) -> bytes:
+    """Concatenate all zlib-decompressed content streams of a ReportLab PDF."""
+    import re
+    import zlib
+
+    import base64
+
+    out = b""
+    for m in re.finditer(rb"stream\r?\n(.*?)endstream", pdf_bytes, re.DOTALL):
+        body = m.group(1).strip(b"\r\n")
+        if body.endswith(b"~>"):  # ReportLab default: ASCII85 wrapping FlateDecode
+            try:
+                body = zlib.decompress(base64.a85decode(body, adobe=True))
+            except (ValueError, zlib.error):
+                pass
+        else:
+            try:
+                body = zlib.decompress(body)
+            except zlib.error:
+                pass  # uncompressed stream — search it raw
+        out += body
+    return out
+
+
+async def test_export_pdf_includes_rvi_section(client: httpx.AsyncClient):
+    """A brand with a peer registering on its prompt gets a Relative Visibility
+    section in the PDF, including the index value and the peer's name."""
+    await register_and_login(client, email="pdf_rvi@example.com")
+    brand = await create_brand(
+        client,
+        name="Lumidian",
+        prompts=["best AI visibility tool"],
+    )
+    prompt_id = brand["prompts"][0]["id"]
+    comp = await client.post(f"/api/brands/{brand['id']}/competitors", json={"name": "Profound"})
+    assert comp.status_code == 201, comp.text
+
+    async with AsyncSessionLocal() as db:
+        from datetime import datetime, timedelta
+        now = datetime.now(UTC).replace(tzinfo=None)
+        # current window: brand 1/2, peer 2/2 -> RVI 0.50
+        # prior 30d window (35 days back): brand 2/2, peer 2/2 -> RVI 1.00 -> delta -0.50
+        for when, texts in [
+            (now, [("chatgpt", True, "Lumidian and Profound are both options."),
+                   ("gemini", False, "Profound is one option.")]),
+            (now - timedelta(days=35), [("chatgpt", True, "Lumidian beats Profound."),
+                                        ("gemini", True, "Lumidian over Profound.")]),
+        ]:
+            run = TrackingRun(
+                brand_id=brand["id"], status="completed", run_type="manual",
+                overall_score=50.0, total_queries=2, total_mentions=1,
+                has_content_influence=False, created_at=when, completed_at=when,
+            )
+            db.add(run)
+            await db.flush()
+            for model, mentioned, text_ in texts:
+                db.add(QueryResult(tracking_run_id=run.id, prompt_id=prompt_id, model=model,
+                                   run_number=1, mentioned=mentioned, response_text=text_))
+        await db.commit()
+
+    resp = await client.get(f"/api/reports/{brand['id']}/export")
+    assert resp.status_code == 200
+    assert resp.content[:4] == b"%PDF"
+    text = _pdf_text(resp.content)
+    assert b"Relative Visibility" in text
+    # brand 50% vs Profound 100% -> RVI 0.50
+    assert b"0.50" in text
+    assert b"Profound" in text
+    # delta vs the prior-window RVI of 1.00 renders with an ASCII sign
+    assert b"-0.50 vs prior 30 days" in text
+
+
+async def test_export_pdf_survives_rvi_failure(client: httpx.AsyncClient, monkeypatch):
+    """RVI is additive garnish — if it blows up, the report still generates."""
+    await register_and_login(client, email="pdf_rvi_fail@example.com")
+    brand = await create_brand(client, name="PDF RVI Fail Brand")
+    prompt_id = brand["prompts"][0]["id"]
+    await _insert_completed_run(brand["id"], prompt_id, overall_score=65.0)
+
+    async def _boom(**kwargs):
+        raise RuntimeError("rvi exploded")
+
+    monkeypatch.setattr("app.services.rvi.compute_rvi", _boom)
+
+    resp = await client.get(f"/api/reports/{brand['id']}/export")
+    assert resp.status_code == 200
+    assert resp.content[:4] == b"%PDF"
+    assert b"Relative Visibility" not in _pdf_text(resp.content)
+
+
+async def test_export_pdf_no_peers_omits_rvi_section(client: httpx.AsyncClient):
+    """No competitors → no Relative Visibility section (no empty-state noise in PDFs)."""
+    await register_and_login(client, email="pdf_rvi_nopeers@example.com")
+    brand = await create_brand(client, name="PDF No Peers Brand")
+    prompt_id = brand["prompts"][0]["id"]
+    await _insert_completed_run(brand["id"], prompt_id, overall_score=65.0)
+
+    resp = await client.get(f"/api/reports/{brand['id']}/export")
+    assert resp.status_code == 200
+    assert b"Relative Visibility" not in _pdf_text(resp.content)

@@ -118,6 +118,17 @@ async def export_report(
         reverse=True,
     )
 
+    # ── Relative Visibility (RVI) — additive; never blocks the report ────────
+    rvi_data = None
+    try:
+        from app.services import rvi as rvi_service
+        rvi_data = await rvi_service.compute_rvi(brand_id=brand_id, window="30d", db=db)
+        if not (rvi_data.has_peers and rvi_data.has_data):
+            rvi_data = None  # no peers / no data → omit the section, no empty-state noise
+    except Exception:
+        logger.warning("RVI computation failed for brand %d report; omitting section", brand_id, exc_info=True)
+        rvi_data = None
+
     # ── Build PDF ─────────────────────────────────────────────────────────────
 
     try:
@@ -129,6 +140,7 @@ async def export_report(
             sorted_groups=sorted_groups,
             model_scores=model_scores,
             generated_at=datetime.now(UTC),
+            rvi=rvi_data,
         )
     except Exception as exc:
         logger.exception("PDF generation failed for brand %d: %s", brand_id, exc)
@@ -155,6 +167,7 @@ def _build_pdf(
     sorted_groups: list,
     model_scores: dict[str, float],
     generated_at: datetime,
+    rvi=None,  # RVIResponse | None — pre-filtered: only passed when has_peers and has_data
 ) -> bytes:
     from reportlab.lib import colors
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
@@ -296,6 +309,102 @@ def _build_pdf(
             ]))
             story.append(ms_table)
             story.append(Spacer(1, 6 * mm))
+
+    # ── Relative Visibility (RVI) ─────────────────────────────────────────────
+    if rvi is not None:
+        story.append(Paragraph("Relative Visibility (RVI)", S_H2))
+
+        if rvi.rvi is not None:
+            rvi_col = COL_GREEN if rvi.rvi >= 1 else COL_RED
+            if rvi.rvi >= 1:
+                sentence = (f"Cited {rvi.rvi:.1f}× as often as your typical peer "
+                            f"on contested prompts.")
+            else:
+                sentence = (f"Cited at {round(rvi.rvi * 100)}% of your peers' rate "
+                            f"on contested prompts.")
+            delta_str = ""
+            if rvi.rvi_delta is not None and rvi.rvi_delta != 0:
+                # ASCII sign, not ▲/▼ — base-14 Helvetica (WinAnsi) lacks those glyphs
+                sign = "+" if rvi.rvi_delta > 0 else "-"
+                delta_str = f"  ·  {sign}{abs(rvi.rvi_delta):.2f} vs prior 30 days"
+            sub = (f"You {rvi.brand_pct:.1f}%  ·  Peer average {rvi.peer_avg_pct:.1f}%  ·  "
+                   f"{rvi.contested_prompt_count} contested prompt"
+                   f"{'s' if rvi.contested_prompt_count != 1 else ''}"
+                   f"  ·  last 30 days{delta_str}")
+            rvi_row = [[
+                Paragraph(f"{rvi.rvi:.2f}×", ParagraphStyle(
+                    "RviBig", fontSize=26, textColor=rvi_col, fontName="Helvetica-Bold",
+                    leading=32, alignment=TA_CENTER)),
+                Paragraph(f"<b>{sentence}</b><br/><font size='8' color='#94a3b8'>{sub}</font>",
+                          ParagraphStyle("RviD", fontSize=10, textColor=COL_TEXT,
+                                         fontName="Helvetica", leading=15, alignment=TA_LEFT)),
+            ]]
+            rvi_table = Table(rvi_row, colWidths=[42 * mm, body_w - 42 * mm])
+            rvi_table.setStyle(TableStyle([
+                ("VALIGN",       (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING",  (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+                ("TOPPADDING",   (0, 0), (-1, -1), 12),
+                ("BOTTOMPADDING",(0, 0), (-1, -1), 12),
+                ("BACKGROUND",   (0, 0), (-1, -1), colors.HexColor("#161625")),
+                ("BOX",          (0, 0), (-1, -1), 0.5, COL_BORDER),
+            ]))
+            story.append(rvi_table)
+        else:
+            # No contested prompts — full owned territory, no ratio to report
+            story.append(Paragraph(
+                f"<b>Territory owned.</b> No peer registers on any prompt you track — "
+                f"{rvi.owned_prompt_count} prompt{'s' if rvi.owned_prompt_count != 1 else ''} "
+                f"held uncontested over the last 30 days.",
+                ParagraphStyle("RviOwn", fontSize=10, textColor=COL_GREEN,
+                               fontName="Helvetica", leading=15),
+            ))
+
+        # Peer table (visibility over the contested set)
+        if rvi.rvi is not None and rvi.peers:
+            story.append(Spacer(1, 3 * mm))
+            peer_rows = [[
+                Paragraph("Peer", ParagraphStyle("RPH", fontSize=8, textColor=COL_MUTED,
+                                                 fontName="Helvetica-Bold", leading=11)),
+                Paragraph("Visibility", ParagraphStyle("RPH2", fontSize=8, textColor=COL_MUTED,
+                                                       fontName="Helvetica-Bold", leading=11,
+                                                       alignment=TA_RIGHT)),
+            ]]
+            for p in rvi.peers:
+                pct_str = f"{p.pct:.1f}%" if p.pct is not None else "—"
+                peer_rows.append([
+                    Paragraph(p.name, ParagraphStyle("RPC", fontSize=8, textColor=COL_TEXT,
+                                                     fontName="Helvetica", leading=11)),
+                    Paragraph(pct_str, ParagraphStyle("RPC2", fontSize=8, textColor=COL_TEXT,
+                                                      fontName="Helvetica-Bold", leading=11,
+                                                      alignment=TA_RIGHT)),
+                ])
+            peer_table = Table(peer_rows, colWidths=[body_w * 0.75, body_w * 0.25])
+            peer_table.setStyle(TableStyle([
+                ("BACKGROUND",     (0, 0), (-1, 0), COL_BORDER),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [COL_CARD, colors.HexColor("#0f0f1a")]),
+                ("BOX",            (0, 0), (-1, -1), 1, COL_BORDER),
+                ("TOPPADDING",     (0, 0), (-1, -1), 5),
+                ("BOTTOMPADDING",  (0, 0), (-1, -1), 5),
+                ("LEFTPADDING",    (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING",   (0, 0), (-1, -1), 8),
+                ("VALIGN",         (0, 0), (-1, -1), "MIDDLE"),
+            ]))
+            story.append(peer_table)
+
+        # Owned-territory line + pool footnote
+        notes = []
+        if rvi.rvi is not None and rvi.owned_prompt_count > 0:
+            notes.append(f"Owns {rvi.owned_prompt_count} prompt"
+                         f"{'s' if rvi.owned_prompt_count != 1 else ''} where no peer registers.")
+        pool_names = ", ".join(p.name for p in rvi.peers)
+        footnote = f"Peer pool: {pool_names}"
+        if rvi.excluded:
+            footnote += f"  ·  excluded from index: {', '.join(e.name for e in rvi.excluded)}"
+        notes.append(footnote)
+        story.append(Spacer(1, 2 * mm))
+        story.append(Paragraph("  ·  ".join(notes), S_LABEL))
+        story.append(Spacer(1, 5 * mm))
 
     # ── Trend table ───────────────────────────────────────────────────────────
     if completed_runs:

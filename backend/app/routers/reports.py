@@ -537,7 +537,7 @@ def _build_pdf(
     story.append(Spacer(1, 6 * mm))
     story.append(HRFlowable(width="100%", thickness=0.5, color=COL_BORDER, spaceAfter=4 * mm))
     story.append(Paragraph(
-        f"<font color='#818cf8'>Lumidian</font>  ·  {generated_at.strftime('%Y-%m-%d %H:%M')} UTC  ·  lumidian.com",
+        f"<font color='#818cf8'>Lumidian</font>  ·  {generated_at.strftime('%Y-%m-%d %H:%M')} UTC  ·  lumidian.ai",
         ParagraphStyle("Footer", fontSize=8, textColor=COL_MUTED, fontName="Helvetica",
                        leading=11, alignment=TA_CENTER),
     ))

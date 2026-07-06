@@ -9,6 +9,7 @@ import PlatformBadge from "@/components/PlatformBadge";
 import { getPlatformGuidelines, regenerateClusterPiece, updateDraft, type ContentDraft, type PlatformGuidelines } from "@/lib/api";
 import { translateFailureReason } from "@/lib/clusterStatus";
 import { CitationsSubpanel } from "./CitationsSubpanel";
+import { MarkPostedDialog } from "./MarkPostedDialog";
 
 interface Props {
   brandId: number;
@@ -219,6 +220,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [confirmingPost, setConfirmingPost] = useState(false);
 
   async function regenerate() {
     setRegenerating(true);
@@ -230,28 +232,22 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
     }
   }
 
-  async function setStatus(status: "draft" | "approved" | "posted") {
+  // Marking posted goes through MarkPostedDialog: it carries the last-second
+  // account/disclosure reminder (reddit/quora), and captures the live URL —
+  // required for owned_site (the pillar page siblings cross-reference),
+  // optional elsewhere (powers "View live" links).
+  async function confirmPosted(postedUrl: string | null) {
     if (!draft) return;
     setUpdatingStatus(true);
     try {
-      // The owned_site piece is the cluster's pillar page — once it's live,
-      // its URL is what lets sibling pieces (LinkedIn/X) attach a real
-      // cross-reference. Ask for it right here rather than requiring a
-      // detour through a separate pillar-attach flow.
-      if (status === "posted" && platform === "owned_site") {
-        const url = window.prompt(
-          "URL of the published page (needed to link your other posts to it):"
-        );
-        const trimmed = url?.trim();
-        onUpdated(
-          await updateDraft(draft.id, {
-            status,
-            ...(trimmed ? { posted_url: trimmed } : {}),
-          })
-        );
-        return;
-      }
-      onUpdated(await updateDraft(draft.id, { status }));
+      onUpdated(
+        await updateDraft(draft.id, {
+          status: "posted",
+          ...(postedUrl ? { posted_url: postedUrl } : {}),
+        })
+      );
+      setConfirmingPost(false);
+      setExpanded(false);
     } finally {
       setUpdatingStatus(false);
     }
@@ -424,7 +420,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setStatus("posted")}
+                onClick={() => setConfirmingPost(true)}
                 disabled={updatingStatus}
                 className="!px-2 text-[#7dd3fc] hover:text-[#bae6fd]"
                 title="Mark this as published so its visibility impact gets tracked"
@@ -536,7 +532,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setStatus("posted")}
+                  onClick={() => setConfirmingPost(true)}
                   disabled={updatingStatus}
                   className="text-[#7dd3fc]"
                 >
@@ -561,6 +557,15 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
           </div>
         </div>,
         document.body
+      )}
+
+      {confirmingPost && draft && (
+        <MarkPostedDialog
+          platform={platform}
+          draft={draft}
+          onConfirm={confirmPosted}
+          onClose={() => setConfirmingPost(false)}
+        />
       )}
     </>
   );

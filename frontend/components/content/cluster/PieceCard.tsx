@@ -3,13 +3,14 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, Sparkles, UserRound, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, Sparkles, Trash2, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
-import { getPlatformGuidelines, regenerateClusterPiece, updateDraft, type ContentDraft, type PlatformGuidelines } from "@/lib/api";
+import { deleteDraft, getPlatformGuidelines, regenerateClusterPiece, updateDraft, type ContentDraft, type PlatformGuidelines } from "@/lib/api";
 import { translateFailureReason } from "@/lib/clusterStatus";
 import { parseUTCISO } from "@/lib/utils/formatting";
 import { CitationsSubpanel } from "./CitationsSubpanel";
+import { DeletePostedDialog } from "./DeletePostedDialog";
 import { MarkPostedDialog } from "./MarkPostedDialog";
 
 interface Props {
@@ -20,6 +21,11 @@ interface Props {
   /** Whether the current user is on the Pro tier — gates the Critic Notes subpanel. */
   isPro?: boolean;
   onUpdated: (draft: ContentDraft) => void;
+  /** Called after the draft is deleted — the parent refetches the cluster. */
+  onDeleted?: () => void;
+  /** Extra content rendered at the bottom of the card, inside its border
+   *  (e.g. the owned-site deep-version action). */
+  footerExtra?: React.ReactNode;
 }
 
 const STATUS_TONE: Record<string, string> = {
@@ -216,12 +222,21 @@ function HowToPost({ platform, draft }: { platform: string; draft: ContentDraft 
   );
 }
 
-export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, onUpdated }: Props) {
+export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, onUpdated, onDeleted, footerExtra }: Props) {
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [confirmingPost, setConfirmingPost] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  async function confirmDelete() {
+    if (!draft) return;
+    await deleteDraft(draft.id);
+    setConfirmingDelete(false);
+    setExpanded(false);
+    onDeleted?.();
+  }
 
   async function regenerate() {
     setRegenerating(true);
@@ -439,6 +454,20 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 Mark posted
               </Button>
             )}
+            {/* Icon-only: four labeled actions overflow the 1/3-width card.
+                The confirm dialog spells out the consequence in full. */}
+            {draft && draft.status === "posted" && onDeleted && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmingDelete(true)}
+                className="!px-2 text-[var(--text-muted)] hover:text-[#fb7185]"
+                title="Delete this posted record (the live post stays up)"
+                aria-label="Delete this posted record"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -472,6 +501,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
             </Button>
           </div>
         </div>
+        {footerExtra}
       </div>
 
       {/* Portaled to <body>: any transformed ancestor (cards animate) turns
@@ -525,6 +555,17 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
             {draft.status !== "posted" && <HowToPost platform={platform} draft={draft} />}
 
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
+              {draft.status === "posted" && onDeleted && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmingDelete(true)}
+                  className="mr-auto text-[var(--text-muted)] hover:text-[#fb7185]"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={copy}>
                 {copied ? (
                   <>
@@ -575,6 +616,14 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
           draft={draft}
           onConfirm={confirmPosted}
           onClose={() => setConfirmingPost(false)}
+        />
+      )}
+
+      {confirmingDelete && draft && (
+        <DeletePostedDialog
+          draft={draft}
+          onConfirm={confirmDelete}
+          onClose={() => setConfirmingDelete(false)}
         />
       )}
     </>

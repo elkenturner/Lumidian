@@ -658,6 +658,16 @@ async def delete_draft(draft_id: int, db: DbDep, user: CurrentUser):
     secs = int((utcnow() - draft.created_at).total_seconds()) if draft.created_at else None
     brand_id = draft.brand_id
     platform = draft.platform
+    # Deleting the posted owned-site piece that anchors the cluster pillar must
+    # detach the pillar too — siblings cross-reference pillar_url on regen.
+    if (draft.platform == "owned_site" and draft.status == "posted"
+            and draft.cluster_id is not None and draft.posted_url):
+        from app.models import ContentCluster
+        cluster_row = await db.get(ContentCluster, draft.cluster_id)
+        if (cluster_row is not None and cluster_row.pillar_mode == "attached"
+                and cluster_row.pillar_url == draft.posted_url):
+            cluster_row.pillar_mode = "none"
+            cluster_row.pillar_url = None
     await db.delete(draft)
     await db.commit()
 

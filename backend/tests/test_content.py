@@ -181,6 +181,85 @@ async def test_delete_draft(client: httpx.AsyncClient):
     assert resp.status_code == 404
 
 
+async def _setup_pillar_cluster(brand_id: int, *, pillar_url: str, draft_platform: str, draft_posted_url: str) -> tuple[int, int]:
+    """Cluster with an attached pillar + one posted draft. Returns (cluster_id, draft_id)."""
+    from app.database import AsyncSessionLocal
+    from app.models import ContentCluster, ContentDraft, Prompt
+    from sqlalchemy import select
+
+    async with AsyncSessionLocal() as db:
+        prompt = (await db.execute(select(Prompt).where(Prompt.brand_id == brand_id))).scalars().first()
+        assert prompt is not None
+        # Brand creation auto-creates a cluster shell per prompt — reuse it.
+        cluster = (
+            await db.execute(select(ContentCluster).where(ContentCluster.prompt_id == prompt.id))
+        ).scalars().first()
+        if cluster is None:
+            cluster = ContentCluster(brand_id=brand_id, prompt_id=prompt.id, status="ready")
+            db.add(cluster)
+            await db.flush()
+        cluster.status = "ready"
+        cluster.pillar_mode = "attached"
+        cluster.pillar_url = pillar_url
+        draft = ContentDraft(
+            brand_id=brand_id,
+            cluster_id=cluster.id,
+            platform=draft_platform,
+            status="posted",
+            posted_url=draft_posted_url,
+            content_text="Posted anchor content.",
+        )
+        db.add(draft)
+        await db.commit()
+        return cluster.id, draft.id
+
+
+async def test_delete_posted_owned_site_anchor_detaches_pillar(client: httpx.AsyncClient):
+    """Deleting the posted owned-site piece that anchors the cluster pillar must
+    reset pillar_mode/pillar_url — otherwise the 'Anchored to' state dangles."""
+    await register_and_login(client, email="pillardetach@example.com")
+    brand = await create_brand(client, name="Pillar Detach Brand")
+    url = "https://example.com/pillar-page"
+    cluster_id, draft_id = await _setup_pillar_cluster(
+        brand["id"], pillar_url=url, draft_platform="owned_site", draft_posted_url=url
+    )
+
+    resp = await client.delete(f"/api/content/draft/{draft_id}")
+    assert resp.status_code == 204
+
+    from app.database import AsyncSessionLocal
+    from app.models import ContentCluster
+
+    async with AsyncSessionLocal() as db:
+        cluster = await db.get(ContentCluster, cluster_id)
+        assert cluster.pillar_mode == "none"
+        assert cluster.pillar_url is None
+
+
+async def test_delete_posted_non_anchor_keeps_pillar(client: httpx.AsyncClient):
+    """Deleting a posted sibling piece (or an owned-site draft posted at a
+    different URL) must leave the attached pillar untouched."""
+    await register_and_login(client, email="pillarkeep@example.com")
+    brand = await create_brand(client, name="Pillar Keep Brand")
+    cluster_id, draft_id = await _setup_pillar_cluster(
+        brand["id"],
+        pillar_url="https://example.com/pillar-page",
+        draft_platform="medium",
+        draft_posted_url="https://medium.com/@x/post",
+    )
+
+    resp = await client.delete(f"/api/content/draft/{draft_id}")
+    assert resp.status_code == 204
+
+    from app.database import AsyncSessionLocal
+    from app.models import ContentCluster
+
+    async with AsyncSessionLocal() as db:
+        cluster = await db.get(ContentCluster, cluster_id)
+        assert cluster.pillar_mode == "attached"
+        assert cluster.pillar_url == "https://example.com/pillar-page"
+
+
 # ── Draft queue cap (DRAFT_CAP = 20) ─────────────────────────────────────────
 
 async def test_generate_now_endpoint_exists(client: httpx.AsyncClient):

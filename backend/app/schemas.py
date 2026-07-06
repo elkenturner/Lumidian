@@ -1425,6 +1425,11 @@ class ContentClusterDraft(BaseModel):
     attribution_delta: float | None = None
     # Thin sourcing — writer cited nothing real / empty evidence pack
     low_evidence: bool = False
+    # Live-post link + strategy snapshot for posted pieces. The router has
+    # always sent these; without the schema fields they were silently dropped
+    # ("View live" links never rendered on the cluster page).
+    posted_url: str | None = None
+    brief_version: int | None = None
     # Routing destination (WS2): URL in content_brief, human label in target_title
     content_brief: str | None = None
     target_title: str | None = None

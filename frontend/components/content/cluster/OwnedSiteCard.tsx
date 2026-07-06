@@ -20,6 +20,7 @@ interface Props {
   draft: ContentDraft | null;
   onClusterUpdated: (c: ContentClusterDetail) => void;
   onDraftUpdated: (d: ContentDraft) => void;
+  onDraftDeleted?: () => void;
 }
 
 /**
@@ -27,7 +28,7 @@ interface Props {
  * (platform="owned_site") with the pillar proposal / attached states
  * rendered above it. Absorbs the old standalone PillarCard.
  */
-export function OwnedSiteCard({ brandId, cluster, candidate, draft, onClusterUpdated, onDraftUpdated }: Props) {
+export function OwnedSiteCard({ brandId, cluster, candidate, draft, onClusterUpdated, onDraftUpdated, onDraftDeleted }: Props) {
   const [busy, setBusy] = useState(false);
   const [deepGenerating, setDeepGenerating] = useState(false);
   const showProposal = cluster.pillar_mode === "proposed" && !!candidate && !draft;
@@ -97,24 +98,41 @@ export function OwnedSiteCard({ brandId, cluster, candidate, draft, onClusterUpd
           </div>
         </div>
       )}
-      <PieceCard brandId={brandId} clusterId={cluster.id} platform="owned_site" draft={draft} onUpdated={onDraftUpdated} />
-      <div className="flex justify-end">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={writeDeepVersion}
-          disabled={deepGenerating}
-          className="!px-2 text-[var(--text-secondary)]"
-          title="Longer FAQ-rich page (1,800+ words) built for AI citation — takes a bit longer"
-        >
-          {deepGenerating ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <ScrollText className="h-3 w-3" />
-          )}
-          {deepGenerating ? "Writing deep version…" : "Write deep version"}
-        </Button>
-      </div>
+      <PieceCard
+        brandId={brandId}
+        clusterId={cluster.id}
+        platform="owned_site"
+        draft={draft}
+        onUpdated={onDraftUpdated}
+        onDeleted={onDraftDeleted}
+        footerExtra={
+          // Lives inside the card so it clearly belongs to this piece. The
+          // explanation is visible text, not tooltip-only (UI trap #5).
+          draft ? (
+            <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between gap-3">
+              <p className="min-w-0 text-[11px] text-[var(--text-faint)] leading-relaxed">
+                A deep version rewrites this page at 1,800+ words with an FAQ
+                section — a format built for AI citation.
+              </p>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={writeDeepVersion}
+                disabled={deepGenerating}
+                className="!px-2 shrink-0 text-[var(--text-secondary)]"
+                title="Takes a bit longer to write than a standard rewrite"
+              >
+                {deepGenerating ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <ScrollText className="h-3 w-3" />
+                )}
+                {deepGenerating ? "Writing…" : "Write deep version"}
+              </Button>
+            </div>
+          ) : undefined
+        }
+      />
     </div>
   );
 }

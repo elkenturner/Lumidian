@@ -10,6 +10,7 @@ import {
   RefreshCw,
   RotateCw,
   Sparkles,
+  Trash2,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
+  deleteDraft,
   getCluster,
   getContentGaps,
   proposeClusterPillar,
@@ -34,6 +36,7 @@ import {
   type PillarCandidate,
 } from "@/lib/api";
 import { BriefPanel } from "@/components/content/cluster/BriefPanel";
+import { DeletePostedDialog } from "@/components/content/cluster/DeletePostedDialog";
 import { OwnedSiteCard } from "@/components/content/cluster/OwnedSiteCard";
 import { PieceCard } from "@/components/content/cluster/PieceCard";
 import { SourceSpinePanel } from "@/components/content/cluster/SourceSpinePanel";
@@ -71,6 +74,8 @@ export default function ClusterDetailPage() {
   const [regenAction, setRegenAction] = useState<null | "pieces" | "rebuild">(null);
   // Posted-history rows open the archived text in a read-only modal.
   const [viewingDraft, setViewingDraft] = useState<ContentDraft | null>(null);
+  // Posted record pending delete confirmation.
+  const [deletingDraft, setDeletingDraft] = useState<ContentDraft | null>(null);
   const [savingAngle, setSavingAngle] = useState(false);
   // Which regeneration is awaiting confirmation (only asked once content exists).
   const [confirmRegen, setConfirmRegen] = useState<null | "pieces" | "rebuild">(null);
@@ -164,20 +169,18 @@ export default function ClusterDetailPage() {
     }
   }
 
-  // Canonical platform set for this cluster — live status pieces are
-  // authoritative (they list every enabled platform); fall back to whatever
-  // drafts exist, then to the known order. Ordered by PLATFORM_ORDER for a
-  // stable layout, with any unknown platforms appended.
+  // Always render the canonical platform set (plus any unknown platforms a
+  // draft carries, appended after). Deriving the set from existing drafts
+  // alone made a platform's card vanish once its only draft was deleted,
+  // taking the per-platform Generate button with it.
   const platformSet = new Set<string>([
     ...(liveStatus?.pieces.map((p) => p.platform) ?? []),
     ...cluster.drafts.map((d) => d.platform),
   ]);
-  const platforms = platformSet.size
-    ? [
-        ...PLATFORM_ORDER.filter((p) => platformSet.has(p)),
-        ...Array.from(platformSet).filter((p) => !PLATFORM_ORDER.includes(p)),
-      ]
-    : PLATFORM_ORDER;
+  const platforms = [
+    ...PLATFORM_ORDER,
+    ...Array.from(platformSet).filter((p) => !PLATFORM_ORDER.includes(p)),
+  ];
 
   // Failed shells are placeholders, not posts — count only drafts that
   // actually produced content. Counted over the VISIBLE platforms so the
@@ -213,6 +216,20 @@ export default function ClusterDetailPage() {
         .concat(updated);
       return { ...prev, drafts };
     });
+  }
+
+  // Deletions change more than the draft list (posted counts, pillar state),
+  // so refetch the whole cluster rather than patching locally.
+  async function refetchCluster() {
+    setCluster(await getCluster(brandId, clusterId));
+  }
+
+  async function confirmDeletePosted() {
+    if (!deletingDraft) return;
+    await deleteDraft(deletingDraft.id);
+    setDeletingDraft(null);
+    if (viewingDraft?.id === deletingDraft.id) setViewingDraft(null);
+    await refetchCluster();
   }
 
   async function onRegeneratePieces() {
@@ -488,6 +505,7 @@ export default function ClusterDetailPage() {
                 draft={draftsByPlatform.get(platform) ?? null}
                 onClusterUpdated={(c) => setCluster(c)}
                 onDraftUpdated={updateDraft}
+                onDraftDeleted={refetchCluster}
               />
             ) : (
               <PieceCard
@@ -497,6 +515,7 @@ export default function ClusterDetailPage() {
                 platform={platform}
                 draft={draftsByPlatform.get(platform) ?? null}
                 onUpdated={updateDraft}
+                onDeleted={refetchCluster}
               />
             ),
           )}
@@ -513,12 +532,22 @@ export default function ClusterDetailPage() {
               .filter(d => d.status === "posted" && isVisible(d.platform))
               .sort((a, b) => (b.posted_at ?? "").localeCompare(a.posted_at ?? ""))
               .map(d => (
-                <button
+                // div-with-role rather than <button>: the row contains its own
+                // interactive children (live link, delete), and nesting those
+                // inside a real button is invalid HTML that breaks hydration.
+                <div
                   key={d.id}
-                  type="button"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => setViewingDraft(d)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setViewingDraft(d);
+                    }
+                  }}
                   title="Read what was posted"
-                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left hover:bg-[var(--bg-card)] transition-colors"
+                  className="w-full px-4 py-2.5 flex items-center gap-3 text-left cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
                 >
                   <PlatformBadge platform={d.platform} size="sm" />
                   <span className="min-w-0 flex-1 truncate text-sm text-[var(--text-secondary)]">
@@ -546,7 +575,19 @@ export default function ClusterDetailPage() {
                       View live ↗
                     </a>
                   )}
-                </button>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeletingDraft(d);
+                    }}
+                    title="Delete this posted record (the live post stays up)"
+                    aria-label="Delete this posted record"
+                    className="shrink-0 p-1 rounded text-[var(--text-faint)] hover:text-[#fb7185] hover:bg-[rgba(244,63,94,0.10)] transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ))}
           </div>
         </div>
@@ -610,6 +651,13 @@ export default function ClusterDetailPage() {
           </div>
         </div>,
         document.body
+      )}
+      {deletingDraft && (
+        <DeletePostedDialog
+          draft={deletingDraft}
+          onConfirm={confirmDeletePosted}
+          onClose={() => setDeletingDraft(null)}
+        />
       )}
     </div>
   );

@@ -36,6 +36,8 @@ import {
   type PillarCandidate,
 } from "@/lib/api";
 import { BriefPanel } from "@/components/content/cluster/BriefPanel";
+import { MarkdownContent } from "@/components/content/MarkdownContent";
+import { bodyWithoutDuplicateH1, splitOwnedSiteDraft } from "@/lib/ownedSiteDraft";
 import { DeletePostedDialog } from "@/components/content/cluster/DeletePostedDialog";
 import { OwnedSiteCard } from "@/components/content/cluster/OwnedSiteCard";
 import { PieceCard } from "@/components/content/cluster/PieceCard";
@@ -638,8 +640,19 @@ export default function ClusterDetailPage() {
             {viewingDraft.title && viewingDraft.title !== "(untitled)" && (
               <h3 className="text-lg font-bold text-[var(--text-primary)] mb-3">{viewingDraft.title}</h3>
             )}
-            <div className="flex-1 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--text-secondary)] leading-relaxed pr-2">
-              {viewingDraft.content_text}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-2">
+              {viewingDraft.platform === "owned_site" ? (
+                <MarkdownContent
+                  markdown={bodyWithoutDuplicateH1(
+                    splitOwnedSiteDraft(viewingDraft.content_text).body,
+                    viewingDraft.title
+                  )}
+                />
+              ) : (
+                <div className="whitespace-pre-wrap text-sm text-[var(--text-secondary)] leading-relaxed">
+                  {viewingDraft.content_text}
+                </div>
+              )}
             </div>
             {viewingDraft.posted_url && (
               <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">

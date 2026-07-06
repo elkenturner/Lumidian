@@ -8,7 +8,9 @@ import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
 import { deleteDraft, getPlatformGuidelines, regenerateClusterPiece, updateDraft, type ContentDraft, type PlatformGuidelines } from "@/lib/api";
 import { translateFailureReason } from "@/lib/clusterStatus";
+import { bodyWithoutDuplicateH1, splitOwnedSiteDraft } from "@/lib/ownedSiteDraft";
 import { parseUTCISO } from "@/lib/utils/formatting";
+import { MarkdownContent } from "@/components/content/MarkdownContent";
 import { CitationsSubpanel } from "./CitationsSubpanel";
 import { DeletePostedDialog } from "./DeletePostedDialog";
 import { MarkPostedDialog } from "./MarkPostedDialog";
@@ -225,10 +227,18 @@ function HowToPost({ platform, draft }: { platform: string; draft: ContentDraft 
 export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, onUpdated, onDeleted, footerExtra }: Props) {
   const [regenerating, setRegenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [schemaCopied, setSchemaCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [confirmingPost, setConfirmingPost] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  // Owned-site drafts are real markdown with a JSON-LD schema block appended;
+  // the UI splits the schema out (own section + copy button) and drops the
+  // leading H1 when it duplicates the displayed title.
+  const isOwnedSite = platform === "owned_site";
+  const ownedParts = isOwnedSite && draft ? splitOwnedSiteDraft(draft.content_text) : null;
+  const ownedBody = ownedParts ? bodyWithoutDuplicateH1(ownedParts.body, draft?.title) : null;
 
   async function confirmDelete() {
     if (!draft) return;
@@ -271,13 +281,29 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
 
   async function copy() {
     if (!draft) return;
-    const text = draft.title
+    // Owned-site: copy the page body only (it already opens with its H1);
+    // the JSON-LD schema has its own copy button — it goes in <head>, not
+    // the page body, and dragging 40 lines of JSON along was a papercut.
+    const text = ownedParts
+      ? ownedParts.body
+      : draft.title
       ? `${draft.title}\n\n${draft.content_text}`
       : draft.content_text;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Best-effort
+    }
+  }
+
+  async function copySchema() {
+    if (!ownedParts?.jsonld) return;
+    try {
+      await navigator.clipboard.writeText(ownedParts.jsonld);
+      setSchemaCopied(true);
+      setTimeout(() => setSchemaCopied(false), 1500);
     } catch {
       // Best-effort
     }
@@ -358,7 +384,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 </h4>
               )}
               <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-[10] whitespace-pre-wrap">
-                {draft.content_text}
+                {ownedBody ?? draft.content_text}
               </p>
             </div>
           )
@@ -533,26 +559,73 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               </Button>
             </div>
 
-            {draft.title && draft.title !== "(untitled)" && (
-              <h3 className="text-lg font-bold text-[var(--text-primary)] mb-3">
-                {draft.title}
-              </h3>
-            )}
+            {/* One scroll region for the whole body: post text, schema,
+                sources, and posting guidance scroll together. Fixed sections
+                below the text used to eat most of the modal's height — a
+                draft with 8-10 citations squeezed the post into a sliver. */}
+            <div className="flex-1 min-h-0 overflow-y-auto pr-2">
+              {draft.title && draft.title !== "(untitled)" && (
+                <h3 className="text-lg font-bold text-[var(--text-primary)] mb-3">
+                  {draft.title}
+                </h3>
+              )}
 
-            <div className="flex-1 overflow-y-auto whitespace-pre-wrap text-sm text-[var(--text-secondary)] leading-relaxed pr-2">
-              {draft.content_text}
-            </div>
-
-            {(draft.citations?.length ?? 0) > 0 && (
-              <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
-                <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-2">
-                  Sources cited in this post
+              {ownedBody !== null ? (
+                <MarkdownContent markdown={ownedBody} />
+              ) : (
+                <div className="whitespace-pre-wrap text-sm text-[var(--text-secondary)] leading-relaxed">
+                  {draft.content_text}
                 </div>
-                <CitationsSubpanel citations={draft.citations ?? []} />
-              </div>
-            )}
+              )}
 
-            {draft.status !== "posted" && <HowToPost platform={platform} draft={draft} />}
+              {ownedParts?.jsonld && (
+                <details className="mt-4 pt-4 border-t border-[var(--border-subtle)] group">
+                  <summary className="cursor-pointer list-none flex items-center justify-between gap-2">
+                    <span className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
+                      Schema markup (JSON-LD)
+                      <span className="ml-2 normal-case tracking-normal font-normal">
+                        paste inside the page&apos;s &lt;head&gt; — click to expand
+                      </span>
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="!px-2 shrink-0"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        copySchema();
+                      }}
+                    >
+                      {schemaCopied ? (
+                        <>
+                          <Check className="h-3 w-3 text-[#4ade80]" />
+                          Copied
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3" />
+                          Copy schema
+                        </>
+                      )}
+                    </Button>
+                  </summary>
+                  <pre className="mt-2 rounded-md border border-[var(--border-subtle)] bg-[rgba(148,163,184,0.06)] p-3 text-xs text-[var(--text-secondary)] overflow-x-auto">
+                    {ownedParts.jsonld}
+                  </pre>
+                </details>
+              )}
+
+              {(draft.citations?.length ?? 0) > 0 && (
+                <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+                  <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-2">
+                    Sources cited in this post
+                  </div>
+                  <CitationsSubpanel citations={draft.citations ?? []} />
+                </div>
+              )}
+
+              {draft.status !== "posted" && <HowToPost platform={platform} draft={draft} />}
+            </div>
 
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
               {draft.status === "posted" && onDeleted && (
@@ -575,7 +648,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 ) : (
                   <>
                     <Copy className="h-3.5 w-3.5" />
-                    Copy text
+                    {isOwnedSite ? "Copy page" : "Copy text"}
                   </>
                 )}
               </Button>

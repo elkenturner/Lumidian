@@ -62,7 +62,9 @@ export function OpportunitiesPanel({ brandId }: Props) {
     // already-drafted thread as a dead-end "Drafted" chip with no way to
     // read, copy, or post the reply. Best-effort — the panel still works
     // without it for new threads.
-    getDrafts(brandId, undefined, undefined, 200)
+    // page_size is server-capped at 100 — 200 got a 422 and this hydration
+    // silently never ran.
+    getDrafts(brandId, undefined, undefined, 100)
       .then((rows) => {
         if (cancelled) return;
         const byOpp: Record<number, ContentDraft> = {};

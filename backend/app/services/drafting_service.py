@@ -1077,7 +1077,9 @@ async def generate_gap_draft(
         )
         body_with_schema = (
             owned.body
-            + "\n\n---\nSchema markup (JSON-LD — paste inside the page's <head>):\n\n```json\n"
+            # No em dash in this label: it's appended AFTER the anti-AI gate,
+            # so it was the one AI-tell dash every owned-site draft carried.
+            + "\n\n---\nSchema markup (JSON-LD, paste inside the page's <head>):\n\n```json\n"
             + json.dumps(owned.jsonld, indent=2)
             + "\n```\n"
         )

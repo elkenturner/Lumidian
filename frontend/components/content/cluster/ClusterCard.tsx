@@ -139,7 +139,7 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
           href={`/content/${brandId}/cluster/${cluster.id}`}
           className="inline-flex items-center gap-1 text-sm font-medium text-[var(--accent-foreground)] hover:text-[var(--text-primary)]"
         >
-          {isShell ? "Generate posts" : "View posts"}{" "}
+          {isShell ? "Generate posts" : livePlatformCount > 0 ? "View posts" : "View drafts"}{" "}
           <ArrowUpRight className="h-3.5 w-3.5" />
         </Link>
         {isFullyLive && (

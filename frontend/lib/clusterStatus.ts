@@ -15,7 +15,7 @@ interface ClusterLike {
   status: string;
   version?: number;
   posted_count?: number;
-  pieces?: { platform: string }[];
+  pieces?: { platform: string; status?: string }[];
 }
 
 /**
@@ -55,8 +55,16 @@ export function clusterHasContent(c: ClusterLike): boolean {
 
 /** A short, plain-language status chip for a cluster. */
 export function clusterChip(c: ClusterLike): ClusterChip {
-  const enabled = c.pieces?.length ?? 0;
-  const posted = c.posted_count ?? 0;
+  // Count platforms, not draft rows — a platform can carry both a posted
+  // piece and its fresh replacement draft after a regeneration, so raw row
+  // counts overstate ("5/11 posted" for a 6-platform cluster).
+  const enabled = new Set((c.pieces ?? []).map((p) => p.platform)).size;
+  const withStatuses = (c.pieces ?? []).some((p) => p.status !== undefined);
+  const posted = withStatuses
+    ? new Set(
+        (c.pieces ?? []).filter((p) => p.status === "posted").map((p) => p.platform),
+      ).size
+    : Math.min(c.posted_count ?? 0, enabled);
   switch (c.status) {
     case "pending":
       return { label: "Not started", tone: "idle" };

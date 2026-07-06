@@ -199,7 +199,7 @@ export default function ClusterDetailPage() {
     : deltaRounded === 0
     ? "No lift yet"
     : `${deltaRounded > 0 ? "+" : ""}${deltaRounded.toFixed(1)} pts`;
-  const statusChip = clusterChip({ status: effectiveStatus, version: cluster.version, posted_count: cluster.posted_count, pieces: cluster.drafts.map((d) => ({ platform: d.platform })) });
+  const statusChip = clusterChip({ status: effectiveStatus, version: cluster.version, posted_count: cluster.posted_count, pieces: cluster.drafts.map((d) => ({ platform: d.platform, status: d.status })) });
 
   function updateDraft(updated: ContentDraft) {
     setCluster((prev) => {

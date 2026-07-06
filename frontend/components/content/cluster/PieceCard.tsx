@@ -299,7 +299,11 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
 
         {draft ? (
           draft.status === "posted" ? (
-            <div className="flex-1 flex flex-col justify-center gap-1.5 py-2">
+            <div
+              className="flex-1 flex flex-col justify-center gap-1.5 py-2 cursor-pointer"
+              onClick={() => setExpanded(true)}
+              title="Read the full post"
+            >
               {draft.title && draft.title !== "(untitled)" && (
                 <h4 className="text-sm font-semibold text-[var(--text-primary)] leading-snug line-clamp-2">
                   {draft.title}
@@ -318,6 +322,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[var(--accent-foreground)] hover:underline"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       View live post ↗
                     </a>
@@ -326,16 +331,20 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               </p>
             </div>
           ) : (
-            <>
+            <div
+              className="flex-1 min-h-0 cursor-pointer"
+              onClick={() => setExpanded(true)}
+              title="Read the full post"
+            >
               {draft.title && (
                 <h4 className="font-semibold text-[var(--text-primary)] leading-snug line-clamp-2 mb-1.5">
                   {draft.title}
                 </h4>
               )}
-              <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-[10] flex-1 whitespace-pre-wrap">
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed line-clamp-[10] whitespace-pre-wrap">
                 {draft.content_text}
               </p>
-            </>
+            </div>
           )
         ) : (
           <p className="text-sm text-[var(--text-faint)] italic flex-1">
@@ -381,7 +390,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
 
         <div className="mt-3 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2">
           <div className="flex items-center gap-1">
-            {draft && draft.status !== "posted" && (
+            {draft && (
               <>
                 <Button
                   variant="ghost"

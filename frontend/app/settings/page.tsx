@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { fadeIn, slideIn } from '@/lib/motion';
 import { useEffect, useState, useRef, forwardRef, useImperativeHandle, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { logError } from '@/lib/utils/errors';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -1933,6 +1934,29 @@ export default function SettingsPage() {
             <div className="mt-6 px-3 py-2.5 rounded-lg border border-[var(--danger)]/30 bg-[var(--danger)]/10">
               <p className="text-xs text-[var(--danger)] whitespace-pre-line leading-relaxed">{profileSaveError}</p>
             </div>
+          )}
+
+          {/* The profile form is long (Market scope etc. sit several sections
+              above the footer) — surface the save action wherever the user is
+              editing, not just at the very bottom of the page. Portaled to
+              <body>: the animated tab wrapper is a transformed ancestor, which
+              silently turns position:fixed into position:absolute. */}
+          {!profileSaved && hasUnsavedProfileChanges && typeof document !== 'undefined' && createPortal(
+            <div className="fixed bottom-5 right-6 z-40 flex items-center gap-3 rounded-full border border-[var(--border-default)] bg-[rgba(10,14,24,0.95)] px-4 py-2 shadow-2xl backdrop-blur-sm">
+              <span className="text-xs text-[var(--warning)] flex items-center gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--warning)]" />
+                Unsaved changes
+              </span>
+              <button
+                onClick={handleProfileSave}
+                disabled={profileSaving || Boolean(profileLoadError)}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[var(--accent-muted)] border border-[var(--accent-muted)] text-[var(--accent-foreground)] hover:text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save size={13} />
+                {profileSaving ? 'Saving…' : 'Save Profile'}
+              </button>
+            </div>,
+            document.body
           )}
 
           <div className="mt-4 flex items-center justify-end gap-3">

@@ -16,22 +16,24 @@ interface Props {
 export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Props) {
   // Derived: 1 card per prompt always — pending shells get a Generate CTA
   const isShell = cluster.status === "pending" && cluster.pieces.length === 0;
-  const enabledPlatformCount = cluster.pieces.length;
-  const postedCount = cluster.posted_count;
+  // Count PLATFORMS, not draft rows: after a regeneration a platform can carry
+  // both its live posted piece and a fresh replacement draft, so counting rows
+  // produced nonsense like "5 of 11 posts live" (5 posted + 6 new = 11 rows).
+  const platformCount = new Set(cluster.pieces.map((p) => p.platform)).size;
+  const livePlatformCount = new Set(
+    cluster.pieces.filter((p) => p.status === "posted").map((p) => p.platform),
+  ).size;
+  const draftsToReview = cluster.pieces.filter((p) => p.status !== "posted").length;
   // Failed pieces are excluded from board piece counts, so a briefing_failed
   // (or a generation_partial that somehow lost every piece) card would render
-  // a nonsense "0 of 0 posts live" row. Show the plain-language failure reason
-  // in that slot instead — never a hidden-platform-count row with nothing to count.
+  // a nonsense "0 of 0 platforms live" row. Show the plain-language failure
+  // reason in that slot instead — never a count row with nothing to count.
   const isBriefingFailed = cluster.status === "briefing_failed";
   const failureLine = translateFailureReason(cluster.failure_reason);
-  const showFailureLine = !isShell && (isBriefingFailed || enabledPlatformCount === 0) && !!failureLine;
+  const showFailureLine = !isShell && (isBriefingFailed || platformCount === 0) && !!failureLine;
   const showProgressRow = !isShell && !showFailureLine;
-  // Clamp green dots to the number of visible pieces. No-op when nothing is
-  // hidden; prevents rendering more "posted" dots than pieces once the list
-  // view filters a platform out.
-  const postedDots = Math.min(postedCount, enabledPlatformCount);
-  const isFullyLive = enabledPlatformCount > 0 && postedCount >= enabledPlatformCount;
-  const isPartial = postedCount > 0 && postedCount < enabledPlatformCount;
+  const isFullyLive = platformCount > 0 && livePlatformCount >= platformCount && draftsToReview === 0;
+  const isPartial = livePlatformCount > 0 && livePlatformCount < platformCount;
   const delta = cluster.cluster_delta;
   const hasDelta = delta !== null && delta !== undefined;
   // Round first so a 0.04 delta doesn't render as a green "+0.0 pts".
@@ -95,28 +97,32 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
         </p>
       )}
 
-      {/* Composed progress bar */}
+      {/* Composed progress bar — one dot per platform */}
       {showProgressRow && (
         <div className="flex items-center gap-3 text-xs">
           <div className="flex items-center gap-1 text-[var(--text-secondary)]">
-            {Array.from({ length: enabledPlatformCount }).map((_, i) => (
+            {Array.from({ length: platformCount }).map((_, i) => (
               <span
                 key={i}
                 className={`inline-block h-2 w-2 rounded-full ${
-                  i < postedDots
+                  i < livePlatformCount
                     ? "bg-[#4ade80]"
                     : "border border-[var(--border-subtle)]"
                 }`}
               />
             ))}
             <span className="ml-1 text-[var(--text-faint)]">
-              {postedCount} of {enabledPlatformCount} post{enabledPlatformCount !== 1 ? 's' : ''} live
+              Live on {livePlatformCount} of {platformCount} platform{platformCount !== 1 ? 's' : ''}
             </span>
           </div>
-          <span className="text-[var(--text-faint)]">·</span>
-          <span className="text-[var(--text-secondary)]">
-            {cluster.pieces.length - postedCount} draft{cluster.pieces.length - postedCount !== 1 ? 's' : ''} to review
-          </span>
+          {draftsToReview > 0 && (
+            <>
+              <span className="text-[var(--text-faint)]">·</span>
+              <span className="text-[var(--text-secondary)]">
+                {draftsToReview} draft{draftsToReview !== 1 ? 's' : ''} to review
+              </span>
+            </>
+          )}
         </div>
       )}
 

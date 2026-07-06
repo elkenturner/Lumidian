@@ -104,7 +104,7 @@ export default function DashboardHeader({
             <button
               onClick={isAtRunLimit ? onUpgradeClick : onRunReport}
               disabled={isDisabled}
-              title={isAtRunLimit ? 'Daily run limit reached — resets at midnight UTC' : undefined}
+              title={isAtRunLimit ? 'Daily run limit reached. Resets at midnight UTC' : undefined}
               className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold transition-[background-color,box-shadow] duration-200 ${isMobile ? 'w-full justify-center' : ''} ${
                 isAtRunLimit
                   ? 'bg-[var(--accent-muted)] border border-[var(--accent-border)] text-[var(--text-faint)] cursor-default'
@@ -133,7 +133,7 @@ export default function DashboardHeader({
               ) : (
                 <>
                   <Play size={14} />
-                  Run Report Now
+                  Run Visibility Check
                 </>
               )}
             </button>

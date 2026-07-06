@@ -136,7 +136,7 @@ export default function VisibilityChart({
         <p className="text-[11px] text-[var(--text-faint)] mt-2">
           {[
             sinceLastRun ? `Updated ${sinceLastRun}` : null,
-            nextReportHours !== null ? `${sinceLastRun ? 'next' : 'Next'} report in ~${nextReportHours}h` : null,
+            nextReportHours !== null ? `${sinceLastRun ? 'next' : 'Next'} check in ~${nextReportHours}h` : null,
           ].filter(Boolean).join(' · ')}
         </p>
       )}

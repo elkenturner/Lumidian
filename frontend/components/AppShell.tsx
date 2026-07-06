@@ -84,10 +84,10 @@ function ReportRunningBanner({ modelScores, isMobile, promptCount }: { modelScor
         {/* Text */}
         <div style={{ minWidth: 0, flex: 1 }}>
           <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600 }}>
-            Report in progress
+            Visibility check in progress:
           </span>
           <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>
-            — querying AI models with your prompts
+            querying AI models with your prompts
           </span>
           {promptCount > 0 && (
             <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 6 }}>
@@ -221,10 +221,10 @@ function DraftsGeneratingBanner({ isMobile, isPaid }: { isMobile: boolean; isPai
         {/* Text */}
         <div style={{ minWidth: 0, flex: 1 }}>
           <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600 }}>
-            Drafts generating
+            Drafts generating:
           </span>
           <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>
-            — writing new content for your top visibility gaps
+            writing new content for your top visibility gaps
           </span>
         </div>
 
@@ -336,10 +336,10 @@ function ScanningBanner({ isMobile, isPaid }: { isMobile: boolean; isPaid: boole
         {/* Text */}
         <div style={{ minWidth: 0, flex: 1 }}>
           <span style={{ fontSize: 12.5, color: 'var(--text-primary)', fontWeight: 600 }}>
-            Scanning live opportunities
+            Scanning live opportunities:
           </span>
           <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>
-            — finding relevant discussions across platforms
+            finding relevant discussions across platforms
           </span>
         </div>
 

@@ -150,7 +150,7 @@ export default function DashboardPage() {
   // AbortController ref to cancel in-flight brand-specific fetches on brand switch
   const loadAbortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => { document.title = 'Dashboard — Lumidian'; }, []);
+  useEffect(() => { document.title = 'Dashboard · Lumidian'; }, []);
 
   // Fetch billing status and usage on mount (non-admin only)
   useEffect(() => {
@@ -296,9 +296,9 @@ export default function DashboardPage() {
           setActiveRunId(null);
           if (pollRef.current) clearInterval(pollRef.current);
           if (run.status === 'completed') {
-            setToast({ message: 'Report complete! Data refreshed.', type: 'success' });
+            setToast({ message: 'Visibility check complete! Data refreshed.', type: 'success' });
           } else if (run.status === 'failed') {
-            setToast({ message: 'Report run failed. Check API keys in Settings.', type: 'info' });
+            setToast({ message: 'Visibility check failed. Check API keys in Settings.', type: 'info' });
           }
           if (selectedBrandId) {
             loadData(selectedBrandId);
@@ -383,7 +383,7 @@ export default function DashboardPage() {
       const httpStatus = e?.response?.status;
       const detail = parseApiError(err);
       if (httpStatus === 409) {
-        setToast({ message: 'A report is already running. Please wait for it to finish.', type: 'info' });
+        setToast({ message: 'A visibility check is already running. Please wait for it to finish.', type: 'info' });
       } else if (httpStatus === 429 || httpStatus === 402) {
         setUpgradeModalReason(detail);
         setUpgradeModalOpen(true);
@@ -593,17 +593,17 @@ export default function DashboardPage() {
           <div>
             {newBrandStep === 'drafting' && (
               <>
-                <p className="text-sm font-medium text-[var(--text-primary)]">Report complete! Generating content drafts&hellip;</p>
+                <p className="text-sm font-medium text-[var(--text-primary)]">Visibility check complete! Generating content drafts&hellip;</p>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">Creating drafts for your top visibility gaps.</p>
               </>
             )}
             {newBrandStep === 'done' && (
               <>
-                <p className="text-sm font-medium text-[var(--success)]">All set! Your report and drafts are ready.</p>
+                <p className="text-sm font-medium text-[var(--success)]">All set! Your visibility results and drafts are ready.</p>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                  Your first content drafts are waiting &mdash;{' '}
+                  Your first content drafts are waiting.{' '}
                   <Link href="/content" className="text-[var(--accent)] hover:text-[var(--accent)] underline">
-                    check the Content Hub
+                    Check the Content Hub
                   </Link>
                   .
                 </p>
@@ -627,7 +627,7 @@ export default function DashboardPage() {
         onRefresh={() => selectedBrandId && loadData(selectedBrandId)}
         onRunReport={handleRunReport}
         onCancelRun={handleCancelRun}
-        onUpgradeClick={() => { setUpgradeModalReason("You've used your 1 daily report run. Upgrade to run reports any time."); setUpgradeModalOpen(true); }}
+        onUpgradeClick={() => { setUpgradeModalReason("You've used your 1 daily visibility check. Upgrade to run checks any time."); setUpgradeModalOpen(true); }}
       />
 
       {loadingBrands ? (
@@ -643,12 +643,12 @@ export default function DashboardPage() {
           </div>
           <h3 className="text-xl font-bold text-[var(--text-primary)] mb-2">Track your first brand</h3>
           <p className="text-sm text-[var(--text-muted)] mb-8 max-w-sm leading-relaxed">
-            Add your brand, define the prompts you want AI models to mention you for, and we&apos;ll run an instant visibility report and generate content drafts automatically.
+            Add your brand, define the prompts you want AI models to mention you for, and we&apos;ll run an instant visibility check and generate content drafts automatically.
           </p>
           <div className="flex flex-col sm:flex-row items-start gap-3 mb-8 text-left w-full">
             {[
               { n: '1', title: 'Add your brand', body: 'Name, website, and the prompts you want to rank for.' },
-              { n: '2', title: 'Auto-run report', body: 'We instantly query ChatGPT, Claude, Perplexity, and Gemini.' },
+              { n: '2', title: 'Auto-run AI check', body: 'We instantly query ChatGPT, Claude, Perplexity, and Gemini.' },
               { n: '3', title: 'Get content drafts', body: 'AI-generated posts targeting your top visibility gaps.' },
             ].map(({ n, title, body }) => (
               <div key={n} className="flex-1 card p-4">
@@ -676,7 +676,7 @@ export default function DashboardPage() {
               </div>
               <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">No data yet</h3>
               <p className="text-sm text-[var(--text-muted)] mb-6 leading-relaxed">
-                Run your first AI visibility report to see how often your brand appears across ChatGPT, Claude, Perplexity, and Gemini.
+                Run your first AI visibility check to see how often your brand appears across ChatGPT, Claude, Perplexity, and Gemini.
               </p>
               {isSubscriptionPaused ? (
                 <Link
@@ -684,7 +684,7 @@ export default function DashboardPage() {
                   className="flex items-center gap-2 bg-[#7f1d1d]/20 border border-[#991b1b]/40 text-[var(--danger-text)] hover:bg-[#7f1d1d]/30 rounded-lg px-6 py-3 text-sm font-semibold transition-colors"
                 >
                   <PauseCircle size={14} />
-                  Upgrade to Run Reports
+                  Upgrade to Run Visibility Checks
                 </Link>
               ) : (
                 <button
@@ -693,7 +693,7 @@ export default function DashboardPage() {
                   className="flex items-center gap-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white rounded-lg px-6 py-3 text-sm font-semibold transition-colors shadow-lg shadow-[var(--accent)]/25"
                 >
                   {triggering || isRunning ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                  {isRunning ? 'Running...' : 'Run First Report'}
+                  {isRunning ? 'Running...' : 'Run First Check'}
                 </button>
               )}
             </div>
@@ -705,7 +705,7 @@ export default function DashboardPage() {
               <div className="w-16 h-16 bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-2xl flex items-center justify-center mb-5">
                 <Loader2 size={28} className="text-[var(--accent)] animate-spin" />
               </div>
-              <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">Running your first AI visibility report...</h3>
+              <h3 className="text-lg font-bold text-[var(--text-primary)] mb-2">Running your first AI visibility check...</h3>
               <p className="text-sm text-[var(--text-muted)] leading-relaxed">
                 This takes 1-2 minutes. We&apos;ll auto-generate content drafts when it&apos;s done.
               </p>
@@ -729,7 +729,7 @@ export default function DashboardPage() {
                 <div className="flex items-start gap-2.5 bg-[rgba(120,53,15,0.18)] border border-[rgba(146,64,14,0.35)] rounded-lg px-4 py-3 mb-4">
                   <AlertTriangle size={15} className="text-[var(--warning)] flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-[var(--warning)] leading-relaxed">
-                    Your last report was degraded — {latestRun.failed_queries} of{' '}
+                    Your last visibility check was degraded: {latestRun.failed_queries} of{' '}
                     {(latestRun.failed_queries ?? 0) + (latestRun.total_queries ?? 0)} queries failed
                     (provider errors or timeouts). The score and analytics below reflect only the{' '}
                     {latestRun.total_queries ?? 0} responses that succeeded.
@@ -765,7 +765,7 @@ export default function DashboardPage() {
                     </div>
                     <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Competitive landscape</h3>
                     <p className="text-xs text-[var(--text-muted)] leading-relaxed mb-4">
-                      Track the brands AI recommends instead of you — unlock your visibility gap and share of voice.
+                      Track the brands AI recommends instead of you to unlock your visibility gap and share of voice.
                     </p>
                     <button
                       onClick={() => setCompetitorModalOpen(true)}
@@ -800,7 +800,7 @@ export default function DashboardPage() {
                     <div className="flex items-start justify-between mb-2">
                       <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
                         Sentiment
-                        <HelpTooltip text="How positively AI models describe your brand when they mention it, measured across your recent reports." />
+                        <HelpTooltip text="How positively AI models describe your brand when they mention it, measured across your recent checks." />
                       </p>
                       <div className="w-8 h-8 rounded-lg bg-[var(--bg-tinted)] flex items-center justify-center text-[var(--accent)] flex-shrink-0">
                         <TrendingUp size={15} />
@@ -827,7 +827,7 @@ export default function DashboardPage() {
                         <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">&mdash;</p>
                         <p className="text-xs text-[var(--text-faint)] mt-1">
                           {sentLowSample
-                            ? `Only ${sentSamples} mention${sentSamples !== 1 ? 's' : ''} so far — not enough to gauge sentiment`
+                            ? `Only ${sentSamples} mention${sentSamples !== 1 ? 's' : ''} so far, not enough to gauge sentiment`
                             : (sentData?.unclassified_mentions ?? 0) > 0
                             ? 'Sentiment unavailable for this run'
                             : 'No mentions to analyze'}
@@ -932,7 +932,7 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
                       Avg Position
-                      <HelpTooltip text="Where in the AI response your brand typically appears when mentioned, across your recent reports. Earlier is better." />
+                      <HelpTooltip text="Where in the AI response your brand typically appears when mentioned, across your recent checks. Earlier is better." />
                     </p>
                     <div className="w-8 h-8 rounded-lg bg-[var(--bg-tinted)] flex items-center justify-center text-[var(--accent)]">
                       <Building2 size={15} />
@@ -967,7 +967,7 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between mb-3">
                     <p className="text-sm font-medium text-[var(--text-secondary)] flex items-center">
                       Top Cited Domains
-                      <HelpTooltip text="Websites that AI models cite most often across all tracked prompts — regardless of whether your brand was mentioned." />
+                      <HelpTooltip text="Websites that AI models cite most often across all tracked prompts, regardless of whether your brand was mentioned." />
                     </p>
                     <Globe size={14} className="text-[var(--text-faint)]" />
                   </div>

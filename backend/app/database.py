@@ -896,6 +896,15 @@ async def run_migrations():
             await conn.execute(text("ALTER TABLE content_clusters ADD COLUMN angle VARCHAR(16) NOT NULL DEFAULT 'auto'"))
             logger.info("Migration applied: content_clusters.angle column")
 
+    # RVI peer pool: competitors can be excluded from the Relative Visibility
+    # Index denominator (out-of-weight-class incumbents) while staying tracked.
+    async with engine.begin() as conn:
+        result = await conn.execute(text("PRAGMA table_info(competitors)"))
+        cols = {row[1] for row in result.fetchall()}
+        if "in_peer_pool" not in cols:
+            await conn.execute(text("ALTER TABLE competitors ADD COLUMN in_peer_pool BOOLEAN NOT NULL DEFAULT 1"))
+            logger.info("Migration applied: competitors.in_peer_pool column")
+
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):
     """On startup, resolve tracking runs stuck in pending/running.

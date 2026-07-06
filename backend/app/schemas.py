@@ -493,9 +493,14 @@ class CompetitorResponse(BaseModel):
     id: int
     brand_id: int
     name: str
+    in_peer_pool: bool = True
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class CompetitorPeerPoolUpdate(BaseModel):
+    in_peer_pool: bool
 
 
 # ── Competitor analysis schemas ───────────────────────────────────────────────
@@ -617,46 +622,62 @@ class DashboardAnalytics(BaseModel):
     active_models: int = 0  # number of models with successful responses
 
 
-# ── Competitive Gap ──────────────────────────────────────────────────────────
+# ── RVI (Relative Visibility Index) ──────────────────────────────────────────
+# RVI = brand visibility ÷ mean(peer-pool visibility), over contested prompts.
+# Spec: docs/superpowers/specs/2026-07-05-rvi-design.md
 
 
-class CompetitiveGapTrendPoint(BaseModel):
-    """Per-day point on the brand-level (aggregate) trend chart."""
-    date: str  # ISO YYYY-MM-DD (UTC day)
-    gap_pp: float
-    brand_pct: float
-    comp_avg_pct: float
+class RVITrendPoint(BaseModel):
+    date: str    # ISO YYYY-MM-DD (UTC day)
+    rvi: float
 
 
-class CompetitorTrendPoint(BaseModel):
-    """Per-day point on a single competitor's trend (drives the table sparkline)."""
-    date: str
-    gap_pp: float  # brand_pct − competitor_pct that day
-
-
-class CompetitorGapStat(BaseModel):
+class RVIPeerStat(BaseModel):
     competitor_id: int
     name: str
-    competitor_pct: float        # window-aggregate
-    gap_pp: float                # window-aggregate brand_pct − competitor_pct
-    delta_pp: float | None       # gap now vs prior window of same length
-    trend: list[CompetitorTrendPoint]
-    has_data: bool               # false if competitor.created_at > window_end
+    in_peer_pool: bool
+    pct: float | None    # visibility over the contested set (None if no contested data)
+    prompt_hits: int     # contested prompts where this peer registered
 
 
-class CompetitiveGapResponse(BaseModel):
+class RVIExcludedCompetitor(BaseModel):
+    competitor_id: int
+    name: str
+
+
+class RVIOwnedPrompt(BaseModel):
+    prompt_id: int
+    text: str
+    brand_pct: float
+
+
+class RVIContestedPrompt(BaseModel):
+    prompt_id: int
+    text: str
+    brand_pct: float
+    peer_avg_pct: float
+    rvi: float
+
+
+class RVIResponse(BaseModel):
     brand_id: int
     window: str                  # "7d" | "30d" | "90d"
-    has_competitors: bool
-    has_data: bool               # at least one completed run in current window
-    headline_gap_pp: float | None
-    headline_delta_pp: float | None
-    brand_visibility_pct: float | None
-    competitor_avg_pct: float | None
-    trend: list[CompetitiveGapTrendPoint]
-    competitors: list[CompetitorGapStat]
-    sample_count: int
+    has_peers: bool              # ≥1 competitor with in_peer_pool=True
+    has_data: bool               # ≥1 error-free result in current window
+    rvi: float | None            # null when no contested prompts
+    rvi_delta: float | None      # vs prior window of same length
+    brand_pct: float | None      # over contested set
+    peer_avg_pct: float | None   # over contested set
+    contested_prompt_count: int
+    owned_prompt_count: int
+    unclaimed_prompt_count: int
+    sample_count: int            # contested rows only
     confidence: str              # "low" | "medium" | "high"
+    trend: list[RVITrendPoint]
+    peers: list[RVIPeerStat]
+    excluded: list[RVIExcludedCompetitor]
+    owned_prompts: list[RVIOwnedPrompt]
+    contested_prompts: list[RVIContestedPrompt]
 
 
 # ── Brand Profile schemas ─────────────────────────────────────────────────────

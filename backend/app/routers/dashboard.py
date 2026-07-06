@@ -23,10 +23,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import CurrentUser, get_brand_for_user
 from app.models import CitationSource, Competitor, Prompt, QueryResult, RunModelScore, TrackingRun
-from app.services.competitive_gap import _mention_matches
+from app.services.rvi import _mention_matches
 from app.schemas import (
     CitationGap,
-    CompetitiveGapResponse,
+    RVIResponse,
     CompetitorStat,
     ConversationItem,
     DashboardAnalytics,
@@ -549,17 +549,17 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
     )
 
 
-@router.get("/{brand_id}/competitive-gap", response_model=CompetitiveGapResponse)
-async def get_competitive_gap(
+@router.get("/{brand_id}/rvi", response_model=RVIResponse)
+async def get_rvi(
     brand_id: int,
     db: DbDep,
     user: CurrentUser,
     window: Literal["7d", "30d", "90d"] = "7d",
-) -> CompetitiveGapResponse:
-    """Brand's competitive gap (visibility delta vs competitor avg) over the requested window.
-    Drives the dashboard's Competitive Gap card + drawer.
-    Spec: docs/superpowers/specs/2026-05-12-competitive-gap-design.md
+) -> RVIResponse:
+    """Relative Visibility Index: brand visibility ÷ peer-pool average, over
+    contested prompts. Drives the dashboard's RVI card + drawer.
+    Spec: docs/superpowers/specs/2026-07-05-rvi-design.md
     """
     await get_brand_for_user(brand_id, db, user)  # 404 on miss, matches existing dashboard endpoints
-    from app.services.competitive_gap import compute_competitive_gap
-    return await compute_competitive_gap(brand_id=brand_id, window=window, db=db)
+    from app.services.rvi import compute_rvi
+    return await compute_rvi(brand_id=brand_id, window=window, db=db)

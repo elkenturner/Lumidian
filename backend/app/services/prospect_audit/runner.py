@@ -16,7 +16,7 @@ from sqlalchemy import select
 
 from app.database import AsyncSessionLocal
 from app.models import ProspectAudit
-from app.services.competitive_gap import _mention_matches
+from app.services.rvi import _mention_matches
 from app.services.jina_service import fetch_website_context
 from app.services.prospect_audit.competitor_detect import DetectedCompetitor, detect_competitors
 from app.services.prospect_audit.logo_fetch import fetch_prospect_logo

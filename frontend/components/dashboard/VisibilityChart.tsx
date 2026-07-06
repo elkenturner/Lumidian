@@ -8,11 +8,13 @@ import {
   Area,
   Tooltip,
   ResponsiveContainer,
+  YAxis,
 } from 'recharts';
 import { TrendPoint } from '@/lib/api';
 import { useCountUp } from '@/lib/motion';
 import HelpTooltip from './HelpTooltip';
 import SparklineTooltip from './SparklineTooltip';
+import { EndpointDot } from './rviDisplay';
 import { AskCoachButton } from '@/components/coach/AskCoachButton';
 
 interface VisibilityChartProps {
@@ -97,18 +99,34 @@ export default function VisibilityChart({
         </div>
       </div>
       {sparkData.length > 1 ? (
-        <ResponsiveContainer width="100%" height={56}>
-          <AreaChart data={sparkData} margin={{ top: 4, right: 4, left: 4, bottom: 6 }}>
-            <defs>
-              <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Tooltip content={<SparklineTooltip />} />
-            <Area type="monotone" dataKey="score" stroke="var(--accent)" strokeWidth={2.5} fill="url(#sparkGrad)" dot={false} isAnimationActive={true} animationDuration={800} animationEasing="ease-out" />
-          </AreaChart>
-        </ResponsiveContainer>
+        <div className="border-b border-[rgba(255,255,255,0.07)]" style={{ height: 56 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={sparkData} margin={{ top: 6, right: 6, left: 4, bottom: 0 }}>
+              <defs>
+                <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.22} />
+                  <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              {/* Pad the top so the line never kisses the card edge; floor the max
+                  so tiny scores don't render as dramatic mountains. */}
+              <YAxis hide domain={[0, (dataMax: number) => Math.max(dataMax * 1.25, 5)]} />
+              <Tooltip content={<SparklineTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.15)', strokeWidth: 1 }} />
+              <Area
+                type="monotone"
+                dataKey="score"
+                stroke="var(--accent)"
+                strokeWidth={2}
+                fill="url(#sparkGrad)"
+                dot={<EndpointDot lastIndex={sparkData.length - 1} />}
+                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--bg-card)' }}
+                isAnimationActive={true}
+                animationDuration={800}
+                animationEasing="ease-out"
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
       ) : (
         <p className="text-xs text-[var(--text-faint)] mt-2">
           {sparkData.length === 1 ? '1 run recorded' : 'No trend data yet'}

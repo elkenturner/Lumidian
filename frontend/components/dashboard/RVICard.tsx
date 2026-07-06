@@ -1,9 +1,10 @@
 'use client';
 
-import { ResponsiveContainer, Line, LineChart, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, Area, AreaChart, Tooltip, YAxis } from 'recharts';
 import { ArrowRight, ShieldCheck, Users } from 'lucide-react';
 import type { RVIResponse, RVIWindow } from '@/lib/api';
 import HelpTooltip from './HelpTooltip';
+import { fmtPeerPct, peerPctColor, rviTrendToPct, PeerRateTooltip, EndpointDot } from './rviDisplay';
 
 interface Props {
   data: RVIResponse | null;
@@ -17,22 +18,9 @@ interface Props {
 const WINDOWS: RVIWindow[] = ['7d', '30d', '90d'];
 
 const HELP_TEXT =
-  'Relative Visibility Index: how often AI cites you vs the average of your peer pool, ' +
-  'on prompts where at least one peer shows up. 1.0× = cited at the peer rate. ' +
-  'A ratio, so category-wide citation shifts cancel out.';
-
-function rviColor(rvi: number | null): string {
-  if (rvi === null) return 'var(--text-faint)';
-  return rvi >= 1 ? 'var(--success-text)' : 'var(--danger-text)';
-}
-
-/** The plain-English sentence is the product; the × index is the compact form. */
-function rviSentence(rvi: number): string {
-  if (rvi >= 1) {
-    return `Cited ${rvi.toFixed(1)}× as often as your typical peer on contested prompts`;
-  }
-  return `Cited at ${Math.round(rvi * 100)}% of your peers' rate on contested prompts`;
-}
+  'How often AI cites you compared to the average of your competitors, on prompts ' +
+  'where at least one of them shows up. 100% = cited as often as a typical peer. ' +
+  "It's a share of their rate, so market-wide citation shifts don't distort it.";
 
 function poolFootnote(data: RVIResponse): string {
   const names = data.peers.map((p) => p.name);
@@ -42,6 +30,16 @@ function poolFootnote(data: RVIResponse): string {
     ? ` · ${data.excluded.map((e) => e.name).join(', ')} excluded`
     : '';
   return `Peers: ${shown}${more}${excluded}`;
+}
+
+/** "Up from 4% in the prior 7d" — the delta as a plain sentence. */
+function deltaSentence(data: RVIResponse, window: RVIWindow): string | null {
+  if (data.rvi === null || data.rvi_delta === null) return null;
+  if (data.rvi_delta === 0) return `No change vs the prior ${window}`;
+  const prior = Math.round((data.rvi - data.rvi_delta) * 100);
+  return data.rvi_delta > 0
+    ? `Up from ${prior}% in the prior ${window}`
+    : `Down from ${prior}% in the prior ${window}`;
 }
 
 export function RVICard({
@@ -107,7 +105,7 @@ export function RVICard({
     );
   }
 
-  // ── Full owned territory: no contested prompts, so no ratio to show
+  // ── Full owned territory: no competitor registers anywhere
   if (data.rvi === null) {
     return (
       <div
@@ -124,7 +122,7 @@ export function RVICard({
           <p className="text-lg font-bold text-[var(--text-primary)]">Territory owned</p>
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-1.5 leading-relaxed">
-          No peer registers on any prompt you track — you hold{' '}
+          No competitor appears on any prompt you track — you hold{' '}
           {data.owned_prompt_count} prompt{data.owned_prompt_count !== 1 ? 's' : ''} uncontested.
         </p>
         <p className="text-[10px] text-[var(--text-faint)] mt-auto pt-3">{poolFootnote(data)}</p>
@@ -132,7 +130,8 @@ export function RVICard({
     );
   }
 
-  const showSparkline = data.trend.length >= 2;
+  const trendPct = rviTrendToPct(data.trend);
+  const delta = deltaSentence(data, window);
 
   return (
     // Not a <button>: it contains the window-toggle buttons, and a button
@@ -152,40 +151,49 @@ export function RVICard({
       <CardHeader window={window} onWindowChange={onWindowChange} />
 
       <div className="mt-2">
-        <p className="text-3xl font-bold tabular-nums" style={{ color: rviColor(data.rvi) }}>
-          {data.rvi.toFixed(2)}
-          <span className="text-xl font-semibold">×</span>
+        <p className="text-3xl font-bold" style={{ color: peerPctColor(data.rvi) }}>
+          {fmtPeerPct(data.rvi)}
         </p>
         <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
-          {rviSentence(data.rvi)}
+          of your peers&apos; citation rate on prompts you&apos;re competing for
         </p>
       </div>
 
-      {showSparkline && (
-        <div className="mt-3" style={{ height: 36 }}>
+      {trendPct.length >= 2 && (
+        <div className="mt-3 border-b border-[rgba(255,255,255,0.07)]" style={{ height: 44 }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data.trend}>
-              <ReferenceLine y={1} stroke="rgba(255,255,255,0.12)" strokeDasharray="2 2" />
-              <Line
+            <AreaChart data={trendPct} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="rviSparkGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--accent)" stopOpacity={0.22} />
+                  <stop offset="95%" stopColor="var(--accent)" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <YAxis hide domain={[0, (dataMax: number) => Math.max(dataMax * 1.25, 10)]} />
+              <Tooltip content={<PeerRateTooltip />} cursor={{ stroke: 'rgba(255,255,255,0.15)', strokeWidth: 1 }} />
+              <Area
                 type="monotone"
-                dataKey="rvi"
-                stroke={rviColor(data.rvi)}
-                strokeWidth={1.5}
-                dot={false}
+                dataKey="pct"
+                stroke="var(--accent)"
+                strokeWidth={2}
+                fill="url(#rviSparkGrad)"
+                dot={<EndpointDot lastIndex={trendPct.length - 1} />}
+                activeDot={{ r: 4, strokeWidth: 2, stroke: 'var(--bg-card)' }}
+                isAnimationActive={false}
               />
-            </LineChart>
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       )}
 
-      {data.rvi_delta !== null && (
-        <p className="text-xs text-[var(--text-muted)] mt-2 tabular-nums">
-          <span style={{ color: data.rvi_delta === 0 ? 'var(--text-faint)' : data.rvi_delta > 0 ? 'var(--success-text)' : 'var(--danger-text)' }}>
-            {data.rvi_delta === 0
-              ? 'No change'
-              : `${data.rvi_delta > 0 ? '↑' : '↓'}${Math.abs(data.rvi_delta).toFixed(2)}`}
-          </span>{' '}
-          vs prior {window}
+      {delta && (
+        <p className="text-xs mt-2" style={{
+          color: data.rvi_delta === 0 || data.rvi_delta === null
+            ? 'var(--text-faint)'
+            : data.rvi_delta > 0 ? 'var(--success-text)' : 'var(--danger-text)',
+        }}>
+          {data.rvi_delta !== null && data.rvi_delta !== 0 && (data.rvi_delta > 0 ? '↑ ' : '↓ ')}
+          {delta}
         </p>
       )}
 
@@ -193,7 +201,7 @@ export function RVICard({
         <p className="text-xs mt-2 flex items-center gap-1.5">
           <ShieldCheck size={12} className="text-[var(--success)] flex-shrink-0" />
           <span className="text-[var(--text-muted)]">
-            Owns {data.owned_prompt_count} prompt{data.owned_prompt_count !== 1 ? 's' : ''} — no peer registers
+            Owns {data.owned_prompt_count} prompt{data.owned_prompt_count !== 1 ? 's' : ''} uncontested
           </span>
         </p>
       )}

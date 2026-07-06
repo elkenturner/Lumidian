@@ -15,7 +15,7 @@ interface Props {
 const SCHEMA_INFO: Record<string, { label: string; what: string }> = {
   Organization: {
     label: 'Organization',
-    what: 'The entity anchor for your brand. AI uses this to disambiguate mentions of "Rhythm" from any other Rhythm.',
+    what: 'The entity anchor for your brand. AI uses this to disambiguate mentions of your brand name from unrelated things with the same name.',
   },
   WebSite: {
     label: 'WebSite',

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
 import { getPlatformGuidelines, regenerateClusterPiece, updateDraft, type ContentDraft, type PlatformGuidelines } from "@/lib/api";
 import { translateFailureReason } from "@/lib/clusterStatus";
+import { parseUTCISO } from "@/lib/utils/formatting";
 import { CitationsSubpanel } from "./CitationsSubpanel";
 import { MarkPostedDialog } from "./MarkPostedDialog";
 
@@ -312,7 +313,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
                 Posted on{" "}
                 {draft.posted_at
-                  ? new Date(draft.posted_at).toLocaleDateString()
+                  ? parseUTCISO(draft.posted_at).toLocaleDateString()
                   : "—"}
                 {draft.posted_url && (
                   <>

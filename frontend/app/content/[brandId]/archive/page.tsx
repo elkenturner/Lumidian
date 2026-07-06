@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { getDrafts, type ContentDraft } from "@/lib/api";
+import { PLATFORM_DISPLAY } from "@/components/content/helpers";
+import { parseUTCISO } from "@/lib/utils/formatting";
 
 const STATUS_PILL: Record<string, string> = {
   posted: "border-sky-500/30 bg-sky-500/10 text-sky-200",
@@ -68,14 +70,14 @@ export default function ContentArchivePage() {
         className="inline-flex items-center gap-1.5 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to clusters
+        Back to content
       </button>
 
       <header>
         <h1 className="text-xl font-bold text-[var(--text-primary)]">Earlier drafts</h1>
         <p className="mt-1.5 text-sm text-[var(--text-secondary)]">
-          Drafts created during onboarding or before the cluster redesign. Read-only — they aren&apos;t
-          attached to any question.
+          Drafts from onboarding or older versions of the app. Read-only — they aren&apos;t
+          attached to a tracked question.
         </p>
       </header>
 
@@ -89,7 +91,7 @@ export default function ContentArchivePage() {
             <li key={d.id} className="py-4">
               <div className="flex items-center gap-3 text-sm">
                 <span className="uppercase text-[10px] text-[var(--text-faint)] font-semibold tracking-wide">
-                  {d.platform}
+                  {PLATFORM_DISPLAY[d.platform] ?? d.platform.replace(/_/g, " ")}
                 </span>
                 <span
                   className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-medium capitalize ${STATUS_PILL[d.status] ?? STATUS_PILL.draft}`}
@@ -101,17 +103,31 @@ export default function ContentArchivePage() {
                 </span>
                 {d.posted_at && (
                   <span className="text-xs text-[var(--text-faint)] ml-auto shrink-0">
-                    Posted {new Date(d.posted_at).toLocaleDateString()}
+                    Posted {parseUTCISO(d.posted_at).toLocaleDateString()}
                   </span>
                 )}
               </div>
-              <div className="mt-1.5 text-xs text-[var(--text-secondary)] line-clamp-3 whitespace-pre-wrap">
-                {d.content_text}
-              </div>
+              <ExpandableText text={d.content_text} />
             </li>
           ))}
         </ul>
       )}
     </div>
+  );
+}
+
+/** Click-to-expand body text — an archived draft's full text was previously
+ *  unreadable (line-clamped with no affordance on a read-only page). */
+function ExpandableText({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => setExpanded((e) => !e)}
+      title={expanded ? "Collapse" : "Read the full draft"}
+      className={`mt-1.5 block w-full text-left text-xs text-[var(--text-secondary)] whitespace-pre-wrap cursor-pointer ${expanded ? "" : "line-clamp-3"}`}
+    >
+      {text}
+    </button>
   );
 }

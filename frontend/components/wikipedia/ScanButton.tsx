@@ -1,5 +1,6 @@
 'use client';
 
+import { parseUTCISO } from '@/lib/utils/formatting';
 import { useEffect, useState } from 'react';
 import { Loader2, RefreshCw } from 'lucide-react';
 import { getLatestWikipediaScan, scanWikipedia, type WikipediaScan } from '@/lib/api';
@@ -79,7 +80,7 @@ export function ScanButton({ brandId, onScanCompleted }: Props) {
           <>
             Last scan {formatTime(scan.completed_at)} ·{' '}
             <span className="text-[var(--text-muted)]">
-              {scan.candidates_persisted} candidates
+              {scan.candidates_persisted} candidate{scan.candidates_persisted !== 1 ? 's' : ''}
             </span>
           </>
         )}
@@ -97,7 +98,7 @@ export function ScanButton({ brandId, onScanCompleted }: Props) {
 }
 
 function formatTime(iso: string): string {
-  const d = new Date(iso);
+  const d = parseUTCISO(iso);
   const now = new Date();
   const diffMs = now.getTime() - d.getTime();
   const diffMin = Math.floor(diffMs / 60000);

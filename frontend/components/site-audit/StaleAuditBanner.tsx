@@ -35,9 +35,11 @@ export function StaleAuditBanner({ brandId, startedAt, onTriggered }: Props) {
     try {
       await siteAudit.trigger(brandId);
       onTriggered();
+      // Only dismiss on success — a failed trigger must not make the banner
+      // vanish exactly like a successful one.
+      setDismissed(true);
     } finally {
       setBusy(false);
-      setDismissed(true);
     }
   }
 

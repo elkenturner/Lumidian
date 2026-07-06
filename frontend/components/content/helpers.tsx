@@ -13,7 +13,8 @@ import { formatDistanceToNow, parseISO } from 'date-fns';
 // ── Constants ────────────────────────────────────────────────────────────────
 
 export const PLATFORM_DISPLAY: Record<string, string> = {
-  reddit: 'Reddit', quora: 'Quora', medium: 'Medium', wikipedia: 'Wikipedia',
+  reddit: 'Reddit', reddit_comment: 'Reddit', quora: 'Quora', medium: 'Medium',
+  wikipedia: 'Wikipedia', owned_site: 'Your site',
   linkedin: 'LinkedIn', linkedin_article: 'LinkedIn', linkedin_post: 'LinkedIn', linkedin_reply: 'LinkedIn',
   x: 'X', x_thread: 'X', x_post: 'X', x_reply: 'X',
 };

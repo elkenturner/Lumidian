@@ -20,6 +20,7 @@ interface Props {
 export function SuggestedEditPanel({ brandId, candidate, onUpdated, onRegenerate, regenerating }: Props) {
   const [copied, setCopied] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
 
   if (!candidate.suggested_wikitext) return null;
 
@@ -32,9 +33,12 @@ export function SuggestedEditPanel({ brandId, candidate, onUpdated, onRegenerate
 
   async function updateStatus(status: WikipediaCandidateStatusUpdate) {
     setUpdating(true);
+    setStatusError(null);
     try {
       const updated = await updateWikipediaCandidateStatus(brandId, candidate.id, status);
       onUpdated(updated);
+    } catch {
+      setStatusError("Couldn't update the status — try again.");
     } finally {
       setUpdating(false);
     }
@@ -120,6 +124,10 @@ export function SuggestedEditPanel({ brandId, candidate, onUpdated, onRegenerate
           )}
         </div>
       </div>
+
+      {statusError && (
+        <p className="text-xs text-[var(--danger-text)]">{statusError}</p>
+      )}
 
       {/* COI note */}
       <p className="border-t border-[var(--border-subtle)] pt-3 text-xs leading-relaxed text-[var(--text-faint)]">

@@ -91,7 +91,7 @@ function ReportRunningBanner({ modelScores, isMobile, promptCount }: { modelScor
           </span>
           {promptCount > 0 && (
             <span style={{ fontSize: 11, color: 'var(--text-faint)', marginLeft: 6 }}>
-              (~{Math.ceil((promptCount * 5 * 3) / 60 + 0.5)} min est. for {promptCount} prompts)
+              (~{Math.ceil((promptCount * 5 * 3) / 60 + 0.5)} min est. for {promptCount} prompt{promptCount !== 1 ? 's' : ''})
             </span>
           )}
         </div>

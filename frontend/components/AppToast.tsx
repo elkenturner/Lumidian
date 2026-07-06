@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 import { useIsMobile } from '@/hooks/useIsMobile';
 
@@ -52,7 +53,11 @@ export function AppToast({ message, type, onDismiss }: AppToastProps) {
     phase === 'visible' ? 'toast-visible' :
     'toast-exit';
 
-  return (
+  // Portaled to <body>: toasts mount inside per-page motion.div wrappers, and
+  // any wrapper with a transform silently turns position:fixed into
+  // position:absolute (the classic trap — currently the roots animate opacity
+  // only, but one variants swap away from breaking every toast).
+  return createPortal(
     <div
       role="alert"
       aria-live="assertive"
@@ -65,6 +70,7 @@ export function AppToast({ message, type, onDismiss }: AppToastProps) {
       <button onClick={handleDismiss} aria-label="Dismiss" className="ml-1 opacity-50 hover:opacity-100 transition-opacity">
         <X size={13} />
       </button>
-    </div>
+    </div>,
+    document.body
   );
 }

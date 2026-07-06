@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown, ChevronRight, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { editClusterBrief, type ContentBrief } from "@/lib/api";
+import { parseUTCISO } from "@/lib/utils/formatting";
 import { BriefVersionHistory } from "./BriefVersionHistory";
 
 interface Props {
@@ -100,12 +101,12 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
           ) : (
             <ChevronRight className="h-4 w-4 text-[var(--text-secondary)]" />
           )}
-          Brief
+          Strategy
           <span className="text-xs font-medium text-[var(--text-faint)]">v{brief.version}</span>
         </button>
         <div className="flex items-center gap-3">
           <span className="text-xs text-[var(--text-faint)] hidden sm:inline">
-            Generated {new Date(brief.created_at).toLocaleString()}
+            Generated {parseUTCISO(brief.created_at).toLocaleString()}
           </span>
           <button
             type="button"
@@ -123,16 +124,16 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
       {expanded && (
         <div className="border-t border-[var(--border-subtle)] p-5 space-y-5 text-sm">
           <p className="text-xs text-[var(--text-faint)]">
-            The shared strategy behind every post in this cluster. Edit it and regenerate to change all posts at once.
+            The shared strategy behind every post for this question. Edit it and regenerate to change all posts at once.
           </p>
           {draftDirty && (
             <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
-              You have unsaved brief changes. Click <strong>Save</strong> below to persist.
+              You have unsaved strategy changes. Click <strong>Save</strong> below to persist.
             </div>
           )}
           {draftVersion > effectiveCurrentVersion && (
             <div className="rounded-md border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-200">
-              Brief is at v{draftVersion}; pieces below were generated from v{effectiveCurrentVersion}.
+              Strategy is at v{draftVersion}; posts below were generated from v{effectiveCurrentVersion}.
               Click <strong>Rewrite all posts</strong> above to apply the new strategy.
             </div>
           )}

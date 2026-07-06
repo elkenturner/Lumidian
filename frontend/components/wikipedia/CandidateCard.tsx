@@ -53,8 +53,11 @@ export function CandidateCard({ brandId, candidate, expanded, onToggleExpand, on
       onUpdated(updated);
       onToggleExpand(true);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Failed to generate draft';
-      setError(msg);
+      // API detail strings are user-appropriate (caps, gating); raw
+      // Error.message from axios ("Request failed with status code 500") is not.
+      const e = err as { response?: { data?: { detail?: string } } };
+      const detail = e?.response?.data?.detail;
+      setError(typeof detail === 'string' ? detail : "Couldn't generate the draft — try again.");
     } finally {
       setDrafting(false);
     }
@@ -85,8 +88,8 @@ export function CandidateCard({ brandId, candidate, expanded, onToggleExpand, on
             <ArrowUpRight className="h-3.5 w-3.5 shrink-0 self-center text-[var(--text-faint)] transition-colors group-hover:text-[var(--accent-foreground)]" />
           </a>
         </h3>
-        <Badge variant={scoreVariant(score)} className="shrink-0 tabular-nums" title="Legitimacy score">
-          {score}
+        <Badge variant={scoreVariant(score)} className="shrink-0 tabular-nums" title="How legitimately this brand could be cited in this article (0-100)">
+          {score} legitimacy
         </Badge>
       </div>
 

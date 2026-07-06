@@ -78,6 +78,7 @@ export default function DashboardHeader({
         <button
           onClick={onOpenPromptModal}
           disabled={!selectedBrandId}
+          title={!selectedBrandId ? 'Select a brand first' : undefined}
           className={`flex items-center gap-2 bg-[var(--accent-muted)] hover:bg-[var(--accent-muted)] border border-[var(--accent-border)] hover:border-[rgba(255,255,255,0.14)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg px-3 py-2 text-xs transition-[color,border-color] duration-150 ${isMobile ? 'flex-1 justify-center min-h-[44px]' : ''}`}
         >
           <MessageSquare size={14} />
@@ -100,6 +101,26 @@ export default function DashboardHeader({
               <PauseCircle size={14} />
               Tracking Paused
             </Link>
+          ) : triggering || isRunning ? (
+            /* Not a <button>: the old markup nested the cancel button inside a
+               disabled button — invalid DOM, and the disabled parent could
+               swallow the cancel click entirely. */
+            <div
+              className={`flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold bg-[var(--accent)] opacity-90 text-white shadow-lg shadow-[var(--accent)]/25 ${isMobile ? 'w-full justify-center' : ''}`}
+            >
+              <Loader2 size={14} className="animate-spin" />
+              {isRunning ? 'Running...' : 'Starting...'}
+              {isRunning && onCancelRun && (
+                <button
+                  onClick={onCancelRun}
+                  title="Cancel run"
+                  aria-label="Cancel run"
+                  className="ml-1 p-0.5 rounded hover:bg-white/20 transition-colors"
+                >
+                  <XCircle size={14} />
+                </button>
+              )}
+            </div>
           ) : (
             <button
               onClick={isAtRunLimit ? onUpgradeClick : onRunReport}
@@ -111,21 +132,7 @@ export default function DashboardHeader({
                   : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-white shadow-lg shadow-[var(--accent)]/25 hover:shadow-[var(--accent)]/40 hover:shadow-xl'
               }`}
             >
-              {triggering || isRunning ? (
-                <>
-                  <Loader2 size={14} className="animate-spin" />
-                  {isRunning ? 'Running...' : 'Starting...'}
-                  {isRunning && onCancelRun && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); onCancelRun(); }}
-                      title="Cancel run"
-                      className="ml-1 p-0.5 rounded hover:bg-white/20 transition-colors"
-                    >
-                      <XCircle size={14} />
-                    </button>
-                  )}
-                </>
-              ) : isAtRunLimit ? (
+              {isAtRunLimit ? (
                 <>
                   <Zap size={14} className="text-[var(--accent)]/60" />
                   1 run / day

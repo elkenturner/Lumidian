@@ -54,7 +54,7 @@ export default function ClientPortalHome() {
           <div className="mt-1 text-4xl font-semibold text-neutral-900">
             {dashboard.overall_score?.toFixed(1) ?? '—'}
           </div>
-          <div className="mt-1 text-xs text-neutral-500">{dashboard.total_runs} runs total</div>
+          <div className="mt-1 text-xs text-neutral-500">{dashboard.total_runs} run{dashboard.total_runs !== 1 ? 's' : ''} total</div>
         </section>
       )}
 

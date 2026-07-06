@@ -133,7 +133,7 @@ export default function BillingPage() {
       setStatus(updated);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { detail?: string } } };
-      alert(e?.response?.data?.detail || 'Could not cancel the downgrade.');
+      setToast({ message: e?.response?.data?.detail || 'Could not cancel the downgrade.', type: 'error' });
     } finally {
       setUpgrading(null);
     }

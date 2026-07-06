@@ -84,7 +84,7 @@ export default function BestPromptCard({ responses, loading }: BestPromptCardPro
         </div>
       ) : best ? (
         <>
-          <p className="text-sm text-[var(--text-primary)] leading-relaxed line-clamp-2 flex-1">
+          <p className="text-sm text-[var(--text-primary)] leading-relaxed line-clamp-2 flex-1" title={best.text}>
             &ldquo;{best.text}&rdquo;
           </p>
           <div className="flex items-end justify-between mt-3">

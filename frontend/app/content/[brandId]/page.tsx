@@ -63,9 +63,11 @@ const SORT_LABEL: Record<SortKey, string> = {
  * low its visibility — it sinks below questions you can still act on.
  */
 function hasRemainingWork(c: ContentClusterSummary): boolean {
-  const enabled = c.pieces?.length ?? 0;
-  if (enabled === 0) return true; // nothing generated yet — all upside ahead
-  return (c.posted_count ?? 0) < enabled;
+  const pieces = c.pieces ?? [];
+  if (pieces.length === 0) return true; // nothing generated yet — all upside ahead
+  // Any unposted draft = work left. (posted_count is prompt-wide and can
+  // include legacy posts outside this cluster — don't compare against rows.)
+  return pieces.some((p) => p.status !== "posted");
 }
 
 const FILTER_LABEL: Record<FilterKey, string> = {
@@ -172,9 +174,9 @@ function sweepMessage(s: SweepSummary): string {
     return `${troubled} question${troubled === 1 ? "" : "s"} failed last time.`;
   }
   if (s.failed === 0 && s.partial === 0 && s.pending === 0) {
-    return `All ${s.total} questions have posts.`;
+    return `All ${s.total} question${s.total !== 1 ? "s" : ""} have posts.`;
   }
-  let msg = `${s.gotPosts} of ${s.total} questions got posts.`;
+  let msg = `${s.gotPosts} of ${s.total} question${s.total !== 1 ? "s" : ""} got posts.`;
   if (s.failed > 0) {
     msg += ` ${s.failed} couldn't be written${s.dominantReason ? ` — most because ${s.dominantReason}` : ""}.`;
   }

@@ -10,7 +10,16 @@ import {
   type BrandSource,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { logError } from "@/lib/utils/errors";
+import { parseUTCISO } from "@/lib/utils/formatting";
 
 const SOURCE_LIMIT = 10;
 
@@ -52,6 +61,7 @@ export default function ContentSourcesPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!Number.isFinite(brandId)) return;
@@ -104,7 +114,7 @@ export default function ContentSourcesPage() {
   }
 
   async function handleDelete(sourceId: number) {
-    if (!window.confirm("Remove this source? Posts will no longer use it for credibility.")) return;
+    setConfirmDeleteId(null);
     setDeletingId(sourceId);
     setDeleteError(null);
     try {
@@ -188,7 +198,7 @@ export default function ContentSourcesPage() {
                       </a>
                     </div>
                     <div className="mt-1 text-xs text-[var(--text-faint)]">
-                      {domainOf(s.url)} · added {new Date(s.added_at).toLocaleDateString()}
+                      {domainOf(s.url)} · added {parseUTCISO(s.added_at).toLocaleDateString()}
                     </div>
                     {s.snippet && (
                       <p className="mt-1.5 text-xs text-[var(--text-secondary)] line-clamp-2 whitespace-pre-wrap">
@@ -198,7 +208,7 @@ export default function ContentSourcesPage() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleDelete(s.id)}
+                    onClick={() => setConfirmDeleteId(s.id)}
                     disabled={deletingId === s.id}
                     className="shrink-0 text-[var(--text-faint)] hover:text-[#fb7185] transition-colors p-1 disabled:opacity-40"
                     aria-label="Remove source"
@@ -275,6 +285,29 @@ export default function ContentSourcesPage() {
               </Button>
             </div>
           </div>
+
+          <Dialog open={confirmDeleteId !== null} onOpenChange={(open) => !open && setConfirmDeleteId(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Remove this source?</DialogTitle>
+                <DialogDescription>
+                  Posts will no longer use it for credibility. Already-written posts keep their citations.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button variant="ghost" size="sm" onClick={() => setConfirmDeleteId(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => confirmDeleteId !== null && handleDelete(confirmDeleteId)}
+                >
+                  Remove source
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </div>

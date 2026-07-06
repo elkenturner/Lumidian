@@ -292,8 +292,8 @@ export default function ReportsPage() {
   // Derive from the UNFILTERED groups — deriving from the search-filtered list
   // made every non-matching tracked prompt show up as "Not yet tracked".
   const trackedPromptIds = new Set(allPromptGroups.map((g) => g.promptId));
-  const untrackedPrompts: Prompt[] = (brandDetail?.prompts ?? [])
-    .filter((p) => !trackedPromptIds.has(p.id))
+  const allUntracked = (brandDetail?.prompts ?? []).filter((p) => !trackedPromptIds.has(p.id));
+  const untrackedPrompts: Prompt[] = allUntracked
     .filter((p) => !searchQuery || p.text.toLowerCase().includes(searchQuery.toLowerCase()));
 
   return (
@@ -459,7 +459,7 @@ export default function ReportsPage() {
               {!loading && (promptGroups.length + untrackedPrompts.length) > 0 && (
                 <span className="text-xs text-[var(--text-muted)]">
                   {searchQuery
-                    ? `${promptGroups.length} of ${allPromptGroups.length} prompt${allPromptGroups.length !== 1 ? 's' : ''}`
+                    ? `${promptGroups.length + untrackedPrompts.length} of ${allPromptGroups.length + allUntracked.length} prompt${(allPromptGroups.length + allUntracked.length) !== 1 ? 's' : ''}`
                     : `${promptGroups.length + untrackedPrompts.length} prompt${(promptGroups.length + untrackedPrompts.length) !== 1 ? 's' : ''}`}
                 </span>
               )}
@@ -724,7 +724,7 @@ export default function ReportsPage() {
                       return (
                         <tr key={row.prompt_id} className="hover:bg-[rgba(255,255,255,0.03)] transition-colors">
                           <td className="px-5 py-3 text-[var(--text-secondary)] leading-snug">
-                            <p className="line-clamp-2">{row.prompt_text}</p>
+                            <p className="line-clamp-2" title={row.prompt_text}>{row.prompt_text}</p>
                           </td>
                           <td className="px-3 py-3 text-center">
                             <span

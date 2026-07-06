@@ -1045,7 +1045,9 @@ export default function SettingsPage() {
     try {
       await removeTeamMember(id);
       setTeamMembers((prev) => prev.filter((m) => m.id !== id));
-    } catch {}
+    } catch {
+      setToast({ message: "Couldn't remove the team member — try again.", type: 'error' });
+    }
     setRemovingMemberId(null);
   }
 
@@ -1179,7 +1181,20 @@ export default function SettingsPage() {
         const filtered = prev.prompts.filter((p) => p.text !== text || p.id !== Date.now());
         return { ...prev, prompts: [...filtered, newPrompt] };
       });
-    } catch { /* ignore */ }
+    } catch {
+      // Roll back the optimistic insert — leaving a phantom prompt that was
+      // never persisted is worse than the suggestion reappearing.
+      setBrand((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          prompts: prev.prompts.filter((p) => p.text !== text || p.has_history),
+          prompt_count: Math.max(0, prev.prompt_count - 1),
+        };
+      });
+      setSuggestions((prev) => (prev.includes(text) ? prev : [text, ...prev]));
+      setToast({ message: "Couldn't add that prompt — try again.", type: 'error' });
+    }
   }
 
   async function handleAddCompetitor() {

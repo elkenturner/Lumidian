@@ -103,7 +103,7 @@ export function FixCard({ rec, onStatusChange, compact = false }: Props) {
       setExiting(true);
       setTimeout(() => onStatusChange?.(s), 220);
     } catch {
-      // Fall through silently — re-attempt allowed.
+      setErrorMsg(`Couldn't mark this as ${s} — try again.`);
     }
   }
 
@@ -380,7 +380,7 @@ function WhereBlock({
         Where it goes
       </p>
       {targetUrl ? (
-        <p className="font-mono text-[var(--text-primary)] truncate">
+        <p className="font-mono text-[var(--text-primary)] truncate" title={targetUrl}>
           {urlPath(targetUrl)}
         </p>
       ) : (

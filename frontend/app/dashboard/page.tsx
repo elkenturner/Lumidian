@@ -832,7 +832,7 @@ export default function DashboardPage() {
                         <p className="text-xs text-[var(--text-faint)] mt-1.5">
                           {sentCountFirst
                             ? `${sentData.neutral_count} neutral · ${sentData.negative_count} negative · last 30 days`
-                            : `${Math.round(sentData.neutral_pct)}% neutral · ${Math.round(sentData.negative_pct)}% negative · ${sentSamples} mentions in 30 days`}
+                            : `${Math.round(sentData.neutral_pct)}% neutral · ${Math.round(sentData.negative_pct)}% negative · ${sentSamples} mention${sentSamples !== 1 ? 's' : ''} in 30 days`}
                         </p>
                         {sentBridge && (
                           <p className="text-[10px] text-[var(--text-faint)] mt-1 leading-relaxed">

@@ -113,7 +113,7 @@ export default function BrandTable({
                   onClick={() => setExpandedConvId(expandedConvId === conv.id ? null : conv.id)}
                 >
                   <div className="flex items-start justify-between gap-3 mb-1.5">
-                    <span className="text-xs font-medium text-[var(--text-secondary)] leading-relaxed flex-1 min-w-0">
+                    <span className="text-xs font-medium text-[var(--text-secondary)] leading-relaxed flex-1 min-w-0" title={conv.prompt_text}>
                       {conv.prompt_text.length > 80 ? conv.prompt_text.slice(0, 80) + '\u2026' : conv.prompt_text}
                     </span>
                     <div className="flex items-center gap-1.5 flex-shrink-0">

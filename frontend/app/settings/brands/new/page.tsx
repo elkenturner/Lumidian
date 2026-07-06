@@ -30,9 +30,12 @@ const STEP_LABELS: Record<Step, string> = {
   profile: 'Profile',
 };
 
+// Mirrors the backend's per-brand-type prompt_limit (billing.py sets pro=30,
+// standard=25, pitch=10) — the old pro=100 here disagreed with both the type
+// card ("Up to 30 prompts") and what the backend actually enforces.
 const PROMPT_LIMITS: Record<BrandChoice, number> = {
   starter: 25,
-  pro: 100,
+  pro: 30,
   pitch: 10,
 };
 

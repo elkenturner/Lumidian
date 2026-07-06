@@ -42,6 +42,7 @@ import { useClusterStatus } from "@/hooks/useClusterStatus";
 import { CLUSTER_PLATFORMS } from "@/lib/clusterPlatforms";
 import { useHiddenPlatforms } from "@/lib/useHiddenPlatforms";
 import { CHIP_CLASSES, clusterChip, translateFailureReason } from "@/lib/clusterStatus";
+import { parseUTCISO } from "@/lib/utils/formatting";
 
 // Display order. Actual set of platforms shown is derived at runtime from
 // the cluster's live status + drafts, then filtered by the user's hidden-
@@ -179,11 +180,14 @@ export default function ClusterDetailPage() {
     : PLATFORM_ORDER;
 
   // Failed shells are placeholders, not posts — count only drafts that
-  // actually produced content so the header doesn't read e.g. "5 of 5 posts"
-  // for a cluster with 3 failed pieces.
-  const completedDraftsCount = Array.from(draftsByPlatform.values()).filter(
-    (d) => d.generation_state !== "failed",
-  ).length;
+  // actually produced content. Counted over the VISIBLE platforms so the
+  // header agrees with the number of cards rendered below when the user has
+  // hidden platforms via the view filter.
+  const visiblePlatforms = platforms.filter((p) => isVisible(p));
+  const completedDraftsCount = visiblePlatforms.filter((p) => {
+    const d = draftsByPlatform.get(p);
+    return d && d.generation_state !== "failed";
+  }).length;
 
   const delta = cluster.cluster_delta;
   const hasDelta = delta !== null && delta !== undefined;
@@ -267,13 +271,13 @@ export default function ClusterDetailPage() {
             </span>
             <span>·</span>
             <span>
-              {completedDraftsCount} of {platforms.length} post{platforms.length !== 1 ? 's' : ''}
+              {completedDraftsCount} of {visiblePlatforms.length} post{visiblePlatforms.length !== 1 ? 's' : ''} written
             </span>
             {cluster.last_generated_at && (
               <>
                 <span>·</span>
                 <span>
-                  Updated {new Date(cluster.last_generated_at).toLocaleDateString()}
+                  Updated {parseUTCISO(cluster.last_generated_at).toLocaleDateString()}
                 </span>
               </>
             )}
@@ -474,7 +478,7 @@ export default function ClusterDetailPage() {
           Posts
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {platforms.filter((p) => isVisible(p)).map((platform) =>
+          {visiblePlatforms.map((platform) =>
             platform === "owned_site" ? (
               <OwnedSiteCard
                 key={platform}
@@ -521,7 +525,7 @@ export default function ClusterDetailPage() {
                     {d.title && d.title !== "(untitled)" ? d.title : (d.content_text || "").slice(0, 90)}
                   </span>
                   <span className="shrink-0 text-xs text-[var(--text-faint)]">
-                    {d.posted_at ? new Date(d.posted_at).toLocaleDateString() : "—"}
+                    {d.posted_at ? parseUTCISO(d.posted_at).toLocaleDateString() : "—"}
                   </span>
                   {d.attribution_delta != null && (() => {
                     const r = Math.round(d.attribution_delta * 10) / 10;
@@ -582,8 +586,8 @@ export default function ClusterDetailPage() {
               <div className="flex items-center gap-2 min-w-0 flex-wrap">
                 <PlatformBadge platform={viewingDraft.platform} />
                 <span className="text-xs text-[var(--text-faint)]">
-                  Posted {viewingDraft.posted_at ? new Date(viewingDraft.posted_at).toLocaleDateString() : "—"}
-                  {viewingDraft.brief_version != null ? ` · brief v${viewingDraft.brief_version}` : ""}
+                  Posted {viewingDraft.posted_at ? parseUTCISO(viewingDraft.posted_at).toLocaleDateString() : "—"}
+                  {viewingDraft.brief_version != null ? ` · strategy v${viewingDraft.brief_version}` : ""}
                 </span>
               </div>
               <Button variant="ghost" size="sm" onClick={() => setViewingDraft(null)} className="!px-1.5" aria-label="Close">

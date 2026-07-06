@@ -321,18 +321,30 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         has_competitors=len(competitors) > 0,
     )
 
-    # 6. Sentiment — read stored values from DB (set by sentiment_service at run time)
+    # 6. Sentiment — exact SQL aggregate over the WHOLE window, not the capped
+    # row sample above. Sentiment is a stored label (set by sentiment_service
+    # at run time), so no response text is needed and the aggregate is cheap.
+    # Computing it from the capped rows made "last 30 days" silently mean
+    # "last ~1.3 runs" for large brands (e.g. "100% positive · 3 mentions"
+    # when the real window held 13 mentions).
     sentiment_counts: dict[str, int] = {"positive": 0, "neutral": 0, "negative": 0}
     unclassified_mentions = 0
-    for qr, _ in rows:
-        if not qr.mentioned:
-            continue
-        if qr.sentiment in sentiment_counts:
-            sentiment_counts[qr.sentiment] += 1
+    sent_agg = await db.execute(
+        select(QueryResult.sentiment, sqlfunc.count())
+        .where(
+            QueryResult.tracking_run_id.in_(run_ids),
+            QueryResult.mentioned.is_(True),
+            QueryResult.error.is_(None),
+        )
+        .group_by(QueryResult.sentiment)
+    )
+    for label, count in sent_agg.all():
+        if label in sentiment_counts:
+            sentiment_counts[label] += int(count)
         else:
             # Mentioned but never classified (classifier failed/skipped) — the
             # UI must not read this as "no mentions to analyze".
-            unclassified_mentions += 1
+            unclassified_mentions += int(count)
 
     sent_total = sum(sentiment_counts.values())
     if sent_total > 0:
@@ -350,6 +362,9 @@ async def get_analytics(brand_id: int, db: DbDep, user: CurrentUser):
         has_data=has_data,
         unclassified_mentions=unclassified_mentions,
         classified_mentions=sent_total,
+        positive_count=sentiment_counts["positive"],
+        neutral_count=sentiment_counts["neutral"],
+        negative_count=sentiment_counts["negative"],
     )
 
     # 7. Average position

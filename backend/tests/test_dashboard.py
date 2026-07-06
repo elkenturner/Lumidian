@@ -138,6 +138,81 @@ async def test_analytics_sentiment_classified_has_no_unclassified(client: httpx.
     assert sent["has_data"] is True
     assert sent["positive_pct"] == 100.0
     assert sent["unclassified_mentions"] == 0
+    assert sent["classified_mentions"] == 1
+    assert sent["positive_count"] == 1
+    assert sent["neutral_count"] == 0
+    assert sent["negative_count"] == 0
+
+
+async def test_analytics_sentiment_counts_full_window_beyond_row_cap(client: httpx.AsyncClient):
+    """Sentiment must be an exact aggregate over the whole 30-day window, not
+    computed from the capped per-model row sample. Regression: a brand with
+    300 queries/day saw '100% positive · 3 mentions' because the newest ~100
+    rows/model happened to contain only 3 of the window's 13 mentions."""
+    from datetime import timedelta
+
+    await register_and_login(client, email="dash_sent_cap@example.com")
+    brand = await create_brand(
+        client, name="Sent Cap Brand", prompts=["Best AI visibility tools?"]
+    )
+    prompt_id = brand["prompts"][0]["id"]
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    async with AsyncSessionLocal() as db:
+        run = TrackingRun(
+            brand_id=brand["id"],
+            status="completed",
+            run_type="manual",
+            overall_score=0.0,
+            total_queries=105,
+            total_mentions=5,
+            has_content_influence=False,
+            created_at=now,
+            completed_at=now,
+        )
+        db.add(run)
+        await db.flush()
+        # 100 newest rows: no mentions — these fill the per-model row cap.
+        for i in range(100):
+            db.add(QueryResult(
+                tracking_run_id=run.id,
+                prompt_id=prompt_id,
+                model="chatgpt",
+                run_number=1,
+                response_text="No brand here.",
+                mentioned=False,
+                sentiment=None,
+                created_at=now - timedelta(seconds=i),
+            ))
+        # 5 older rows: the actual mentions (3 positive, 2 neutral) — a
+        # newest-first cap of 100 rows would miss every one of them.
+        for i, s in enumerate(["positive", "positive", "positive", "neutral", "neutral"]):
+            db.add(QueryResult(
+                tracking_run_id=run.id,
+                prompt_id=prompt_id,
+                model="chatgpt",
+                run_number=1,
+                response_text="Sent Cap Brand appears.",
+                mentioned=True,
+                sentiment=s,
+                created_at=now - timedelta(hours=1, seconds=i),
+            ))
+        db.add(RunModelScore(
+            tracking_run_id=run.id, model="chatgpt",
+            total_queries=105, total_mentions=5, score=4.8,
+        ))
+        await db.commit()
+
+    resp = await client.get(f"/api/dashboard/{brand['id']}/analytics")
+    assert resp.status_code == 200
+    sent = resp.json()["sentiment"]
+    assert sent["has_data"] is True
+    assert sent["classified_mentions"] == 5
+    assert sent["positive_count"] == 3
+    assert sent["neutral_count"] == 2
+    assert sent["negative_count"] == 0
+    assert sent["positive_pct"] == 60.0
+    assert sent["unclassified_mentions"] == 0
 
 
 # ── Top cited domains ─────────────────────────────────────────────────────────

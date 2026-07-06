@@ -550,6 +550,11 @@ class SentimentBreakdown(BaseModel):
     # How many classified mentions the percentages are based on, so the UI
     # can suppress confident-looking headlines built from 1-2 data points.
     classified_mentions: int = 0
+    # Raw counts so the UI can show "9 of 13 mentions positive" at small
+    # sample sizes instead of a confident-looking percentage.
+    positive_count: int = 0
+    neutral_count: int = 0
+    negative_count: int = 0
 
 
 class PositionData(BaseModel):

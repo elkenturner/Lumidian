@@ -200,10 +200,9 @@ export function SiteAuditView({ brandId }: Props) {
         <RenderModeBanner isJsRendered brandUrl={brand?.website_url ?? null} />
       )}
 
-      {/* Stale audit banner — most recs missing target_url OR >14 days old */}
+      {/* Stale audit banner — audit older than 14 days */}
       {audit.status === 'completed' && (audit.total_pages ?? 0) > 0 && (
         <StaleAuditBanner
-          auditId={audit.id}
           brandId={brandId}
           startedAt={audit.started_at}
           onTriggered={loadLatest}

@@ -1,47 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, RefreshCw } from 'lucide-react';
 import { easings } from '@/lib/motion';
 import { siteAudit } from '@/lib/api';
 
 interface Props {
-  auditId: number;
   brandId: number;
   startedAt: string;
   onTriggered: () => void;
 }
 
+const STALE_AFTER_DAYS = 14;
+
 /**
- * Shows when the current audit's data is stale — specifically when most recs
- * lack target_url (caused by a known auditor bug fixed mid-May 2026) or the
- * audit is more than 14 days old. Surfaces a one-click re-run.
+ * Shown when the audit is old enough that scores/recommendations may have
+ * drifted. Purely age-based: the old ">50% of recs lack target_url" heuristic
+ * (for a mid-May 2026 auditor bug) fired forever on small sites, because
+ * schema and bot-access recommendations are site-wide by design and never
+ * carry a page URL — no re-run can change that.
  */
-export function StaleAuditBanner({ auditId, brandId, startedAt, onTriggered }: Props) {
-  const [show, setShow] = useState(false);
+export function StaleAuditBanner({ brandId, startedAt, onTriggered }: Props) {
+  const [dismissed, setDismissed] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const recs = await siteAudit.recommendations(auditId);
-      if (cancelled) return;
-      if (recs.length === 0) {
-        setShow(false);
-        return;
-      }
-      const nullTargetPct = recs.filter((r) => !r.target_url).length / recs.length;
-      const auditAgeDays = (Date.now() - new Date(startedAt).getTime()) / (1000 * 60 * 60 * 24);
-      // Show if >50% of recs lack target_url OR the audit is >14 days old.
-      setShow(nullTargetPct > 0.5 || auditAgeDays > 14);
-    })().catch(() => setShow(false));
-    return () => {
-      cancelled = true;
-    };
-  }, [auditId, startedAt]);
-
-  if (!show) return null;
+  const ageDays = Math.floor(
+    (Date.now() - new Date(startedAt).getTime()) / (1000 * 60 * 60 * 24)
+  );
+  if (dismissed || ageDays <= STALE_AFTER_DAYS) return null;
 
   async function handleRun() {
     setBusy(true);
@@ -50,7 +37,7 @@ export function StaleAuditBanner({ auditId, brandId, startedAt, onTriggered }: P
       onTriggered();
     } finally {
       setBusy(false);
-      setShow(false);
+      setDismissed(true);
     }
   }
 
@@ -68,11 +55,11 @@ export function StaleAuditBanner({ auditId, brandId, startedAt, onTriggered }: P
       <Clock size={18} className="shrink-0 mt-0.5" style={{ color: 'var(--warning-text)' }} />
       <div className="flex-1 text-sm">
         <p className="font-semibold" style={{ color: 'var(--warning-text)' }}>
-          This audit is missing data
+          This audit is {ageDays} days old
         </p>
         <p className="text-[var(--text-secondary)] mt-1 leading-relaxed">
-          Most recommendations don't have specific page URLs attached. Re-running the audit will
-          give you precise "where it goes" guidance on every fix card.
+          Your site and the AI engines reading it have likely changed since. Re-run the audit to
+          refresh your scores and recommendations.
         </p>
         <button
           type="button"

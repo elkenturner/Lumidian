@@ -10,6 +10,7 @@ import {
   X,
   AlertCircle,
   CornerDownRight,
+  Globe,
   ShieldCheck,
   Target,
 } from 'lucide-react';
@@ -378,9 +379,14 @@ function WhereBlock({
         <MapPin size={11} />
         Where it goes
       </p>
-      {targetUrl && (
+      {targetUrl ? (
         <p className="font-mono text-[var(--text-primary)] truncate">
           {urlPath(targetUrl)}
+        </p>
+      ) : (
+        <p className="text-[var(--text-primary)] flex items-center gap-1.5">
+          <Globe size={11} className="shrink-0 text-[var(--text-muted)]" />
+          Site-wide — applies to your whole site
         </p>
       )}
       {hint && (
@@ -418,12 +424,14 @@ function InsertionHintRow({
           className="mt-0.5 shrink-0 text-[var(--text-muted)]"
         />
         <span>
-          {targetUrl && (
+          {targetUrl ? (
             <span className="font-mono text-[var(--text-primary)]">
               {urlPath(targetUrl)}
             </span>
+          ) : (
+            <span className="text-[var(--text-primary)]">Site-wide</span>
           )}
-          {targetUrl && ' — '}
+          {' — '}
           {hint.where}
         </span>
       </p>

@@ -204,6 +204,21 @@ No Alembic. Migrations are embedded in `database.py:run_migrations()` and applie
 
 ---
 
+## Frontend UI Conventions & Known Traps
+
+Recurring defect classes that have each shipped to production more than once. Check every frontend change against this list before calling it done.
+
+1. **`position:fixed` dies inside transformed ancestors.** Most page/tab wrappers are framer-motion elements; a transform silently converts `fixed` to `absolute`, dumping modals/bars at the wrong scroll position. Any `fixed` overlay (modal, floating bar, drawer) MUST be portaled: `createPortal(..., document.body)`. Bitten twice: PieceCard read modal (Jul 4), settings save bar (Jul 5).
+2. **Count platforms/entities, never draft rows.** After regeneration a platform carries both its posted piece and a fresh replacement draft, and prompt-keyed posted counts include legacy/Wikipedia drafts outside the cluster. Any "X of Y" must have numerator and denominator from the SAME source, deduped by platform (`new Set(pieces.map(p => p.platform))`). Bitten: "5 of 11 posts live" (Jul 5).
+3. **Save/feedback must be visible from the field being edited.** On long forms, the submit button and dirty indicator at the page bottom read as "this field can't be edited". Use the floating unsaved-changes pill pattern (settings profile) for any form taller than a viewport.
+4. **Every piece of content the user can see truncated must be openable.** No state (posted, failed, archived) may remove the only way to read the full text. Card bodies should open the same modal as the Read button.
+5. **Tooltips never carry must-know information alone.** `title=` is invisible on touch and undiscoverable. The meaning of a number, unit ("pts" = percentage points), or destructive-action consequence needs visible text; tooltips only add detail.
+6. **No `window.confirm` / `window.prompt` / `window.alert`.** Use `components/ui/dialog.tsx` (Radix) or a purpose-built dialog (e.g. `MarkPostedDialog`).
+7. **Sample caps must not masquerade as totals.** If a stat is computed from a capped row load (`_MAX_QUERY_ROWS`) but labeled with a time window, either aggregate exactly in SQL or label the actual sample. Bitten: "100% positive · 3 mentions" from a 100-row cap posing as a 30-day window (Jul 5).
+8. **Copy hygiene:** conditional plurals on every count (`{n !== 1 && 's'}`), one unit app-wide ("pts"), no internal jargon in UI copy ("cluster"/"brief"/"T1" → "tracked question"/"strategy"/"major press"), parse DB timestamps with `parseUTCISO` before formatting.
+
+---
+
 ## Key Patterns
 
 ### Async-first

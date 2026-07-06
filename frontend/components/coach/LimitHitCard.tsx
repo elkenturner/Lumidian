@@ -10,23 +10,23 @@ export function LimitHitCard({ usage, tierKey }: { usage: CoachUsage; tierKey: s
   });
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 text-center">
-      <div className="text-base font-semibold text-slate-900">
+    <div className="rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4 text-center">
+      <div className="text-sm font-semibold text-[var(--text-primary)]">
         You&apos;ve used all {usage.limit} messages today.
       </div>
-      <div className="mt-1 text-sm text-slate-500">
+      <div className="mt-1 text-xs text-[var(--text-muted)]">
         Resets at midnight UTC ({localResets} your time).
       </div>
       {!isPro ? (
         <Link
           href="/settings/billing"
-          className="mt-3 inline-flex items-center rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
+          className="mt-3 inline-flex items-center rounded-[var(--radius-md)] bg-[var(--accent)] px-3.5 py-1.5 text-sm font-medium text-[var(--text-on-accent)] hover:bg-[var(--accent-hover)]"
         >
           Upgrade for more messages
         </Link>
       ) : (
-        <div className="mt-3 text-sm text-slate-500">
-          This cap exists to prevent runaway clients. Email support if you need it raised.
+        <div className="mt-3 text-xs text-[var(--text-muted)]">
+          Need a higher cap? Email support and we&apos;ll raise it.
         </div>
       )}
     </div>

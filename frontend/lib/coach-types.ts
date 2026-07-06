@@ -14,6 +14,8 @@ export interface CoachMessage {
   toolStatuses?: CoachToolStatus[];
   // True while the assistant is still streaming
   inProgress?: boolean;
+  // Set when the turn failed — rendered as an error state in the thread
+  error?: string;
 }
 
 export interface CoachUsage {

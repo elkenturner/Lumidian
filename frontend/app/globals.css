@@ -591,3 +591,36 @@ body {
     animation: slideDownSheet 0.2s var(--ease-out) forwards;
   }
 }
+
+/* ── Lumi coach drawer ─────────────────────────────────────────────────────── */
+@keyframes coachOverlayIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes coachOverlayOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes coachDrawerIn   { from { transform: translateX(100%); } to { transform: translateX(0); } }
+@keyframes coachDrawerOut  { from { transform: translateX(0); } to { transform: translateX(100%); } }
+
+.coach-overlay[data-state="open"]   { animation: coachOverlayIn 0.25s ease forwards; }
+.coach-overlay[data-state="closed"] { animation: coachOverlayOut 0.2s ease forwards; }
+.coach-drawer[data-state="open"]    { animation: coachDrawerIn 0.35s var(--ease-drawer) forwards; }
+.coach-drawer[data-state="closed"]  { animation: coachDrawerOut 0.25s var(--ease-drawer) forwards; }
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-overlay[data-state="open"], .coach-overlay[data-state="closed"],
+  .coach-drawer[data-state="open"], .coach-drawer[data-state="closed"] {
+    animation-duration: 0.01ms;
+  }
+}
+
+/* Typing indicator — three staggered dots */
+.coach-typing span {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--text-muted);
+  animation: coachTypingDot 1.2s ease-in-out infinite;
+}
+.coach-typing span:nth-child(2) { animation-delay: 0.15s; }
+.coach-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes coachTypingDot {
+  0%, 60%, 100% { opacity: 0.35; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-2px); }
+}

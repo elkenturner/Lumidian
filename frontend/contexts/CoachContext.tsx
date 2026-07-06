@@ -22,6 +22,7 @@ type Action =
   | { type: "start_assistant" }
   | { type: "append_text"; text: string }
   | { type: "append_tool_status"; name: string; label: string }
+  | { type: "set_error"; message: string }
   | { type: "finish_assistant" }
   | { type: "set_usage"; usage: CoachUsage }
   | { type: "set_limit_hit"; hit: boolean }
@@ -56,9 +57,21 @@ function reducer(state: State, action: Action): State {
       const updated = { ...last, toolStatuses: [...(last.toolStatuses ?? []), { name: action.name, label: action.label }] };
       return { ...state, messages: [...state.messages.slice(0, -1), updated] };
     }
+    case "set_error": {
+      const last = state.messages[state.messages.length - 1];
+      if (!last || last.role !== "assistant") return state;
+      const updated = { ...last, error: action.message, inProgress: false };
+      return { ...state, messages: [...state.messages.slice(0, -1), updated] };
+    }
     case "finish_assistant": {
       const last = state.messages[state.messages.length - 1];
       if (!last || last.role !== "assistant") return state;
+      // A turn that produced nothing (rate-limited, aborted before first token)
+      // leaves an empty bubble behind — and an empty assistant message would
+      // fail the backend's min_length validation on the next send. Drop it.
+      if (!last.text.trim() && !last.error) {
+        return { ...state, messages: state.messages.slice(0, -1) };
+      }
       return { ...state, messages: [...state.messages.slice(0, -1), { ...last, inProgress: false }] };
     }
     case "set_usage":
@@ -80,6 +93,7 @@ type CoachAPI = {
   close: () => void;
   openWith: (opts: { brandId: number; question: string; autoSubmit?: boolean }) => void;
   send: (text: string) => Promise<void>;
+  stop: () => void;
   refreshUsage: () => Promise<void>;
 };
 
@@ -111,10 +125,14 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
     const trimmed = text.trim();
     if (!trimmed) return;
 
+    // Empty messages fail backend validation (min_length=1); the backend also
+    // caps history at 40 messages, so keep the most recent turns.
     const conversation = [
-      ...state.messages.map((m) => ({ role: m.role, content: m.text })),
+      ...state.messages
+        .filter((m) => m.text.trim().length > 0)
+        .map((m) => ({ role: m.role, content: m.text })),
       { role: "user", content: trimmed },
-    ];
+    ].slice(-30);
 
     dispatch({ type: "append_user", text: trimmed });
     dispatch({ type: "start_assistant" });
@@ -133,8 +151,17 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
           dispatch({ type: "append_text", text: ev.data.text });
         } else if (ev.type === "tool_status") {
           dispatch({ type: "append_tool_status", name: ev.data.name, label: ev.data.label });
-        } else if (ev.type === "error" && ev.data.message === "rate_limited") {
-          dispatch({ type: "set_limit_hit", hit: true });
+        } else if (ev.type === "error") {
+          if (ev.data.message === "rate_limited") {
+            dispatch({ type: "set_limit_hit", hit: true });
+          } else if (ev.data.message === "network") {
+            dispatch({ type: "set_error", message: "Couldn't reach Lumi — check your connection and try again." });
+          } else if (ev.data.message === "request_failed" || ev.data.message === "stream_interrupted") {
+            dispatch({ type: "set_error", message: "Something went wrong on Lumi's end. Try again in a moment." });
+          } else {
+            // Backend errors arrive as full sentences — show them as-is.
+            dispatch({ type: "set_error", message: ev.data.message });
+          }
         }
       },
       onClose: () => {
@@ -158,6 +185,11 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
 
   const close = useCallback(() => dispatch({ type: "close" }), []);
 
+  // Abort the in-flight stream; partial text is kept, an empty bubble is dropped.
+  const stop = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
   const openWith = useCallback((opts: { brandId: number; question: string; autoSubmit?: boolean }) => {
     dispatch({ type: "open", brandId: opts.brandId });
     void refreshUsage();
@@ -174,8 +206,8 @@ export function CoachProvider({ children }: { children: React.ReactNode }) {
     }
   }, [pendingQuestion, state.brandId, state.sending, send]);
 
-  const value = useMemo<CoachAPI>(() => ({ state, open, close, openWith, send, refreshUsage }),
-    [state, open, close, openWith, send, refreshUsage]);
+  const value = useMemo<CoachAPI>(() => ({ state, open, close, openWith, send, stop, refreshUsage }),
+    [state, open, close, openWith, send, stop, refreshUsage]);
 
   return <CoachContext.Provider value={value}>{children}</CoachContext.Provider>;
 }

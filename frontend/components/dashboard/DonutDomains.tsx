@@ -41,7 +41,7 @@ export default function DonutDomains({ domains }: DonutDomainsProps) {
             data={data}
             cx={55}
             cy={55}
-            innerRadius={32}
+            innerRadius={37}
             outerRadius={50}
             cornerRadius={4}
             paddingAngle={4}
@@ -66,7 +66,7 @@ export default function DonutDomains({ domains }: DonutDomainsProps) {
         {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <span className="text-lg font-bold text-[var(--text-primary)] leading-none">{data.length}</span>
-          <span className="text-[9px] text-[var(--text-faint)] mt-0.5 uppercase tracking-wider">top sources</span>
+          <span className="text-[8px] text-[var(--text-faint)] mt-0.5 uppercase tracking-[0.08em]">sources</span>
         </div>
       </div>
 

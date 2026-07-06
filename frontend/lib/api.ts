@@ -724,6 +724,10 @@ export interface SentimentBreakdown {
   unclassified_mentions: number;
   /** How many classified mentions the percentages are based on. */
   classified_mentions: number;
+  /** Raw counts, for count-first copy at small sample sizes. */
+  positive_count: number;
+  neutral_count: number;
+  negative_count: number;
 }
 
 export interface PositionData {

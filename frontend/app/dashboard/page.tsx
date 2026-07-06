@@ -424,16 +424,22 @@ export default function DashboardPage() {
 
   const sentData = analytics?.sentiment;
   const sentSamples = sentData?.classified_mentions ?? 0;
-  // Percentages built from 1-2 mentions read as false confidence ("100%
-  // Positive" next to a 0% visibility score) — require 3 before showing them.
-  const sentLowSample = !!sentData?.has_data && sentSamples < 3;
+  // Below ~10 samples a percentage reads as false confidence ("100% Positive"
+  // from 3 mentions) — lead with plain counts instead of a percentage.
+  const sentCountFirst = !!sentData?.has_data && sentSamples < 10;
   // Lead with whichever sentiment actually dominates — previously any positive
   // share won the headline, so 10% positive / 90% negative read "10% Positive".
   const sentDominant = sentData?.has_data
     ? (sentData.positive_pct >= sentData.negative_pct ? 'positive' : 'negative')
     : null;
   const sentHeadline = sentData?.has_data
-    ? sentDominant === 'positive'
+    ? sentCountFirst
+      ? sentDominant === 'negative'
+        ? `${sentData.negative_count} of ${sentSamples} negative`
+        : sentData.positive_count > 0
+        ? `${sentData.positive_count} of ${sentSamples} positive`
+        : `${sentData.neutral_count} of ${sentSamples} neutral`
+      : sentDominant === 'positive'
       ? (sentData.positive_pct > 0 ? `${Math.round(sentData.positive_pct)}% Positive` : 'Neutral')
       : `${Math.round(sentData.negative_pct)}% Negative`
     : null;
@@ -442,6 +448,11 @@ export default function DashboardPage() {
       ? (sentData.positive_pct > 0 ? 'var(--success)' : 'var(--warning)')
       : 'var(--danger)'
     : 'var(--text-faint)';
+  // The headline score is the LATEST report; sentiment is the trailing 30-day
+  // window. When those disagree (0% now, mentions recently) say so explicitly.
+  const sentBridge = score === 0 && sentSamples > 0
+    ? `You didn't appear in the latest report, but appeared ${sentSamples} time${sentSamples !== 1 ? 's' : ''} in the last 30 days.`
+    : null;
 
   const promptGroups = useMemo(() => buildPromptGroups(responses).sort((a, b) => {
     const aMentioned = a.mentioned > 0 ? 1 : 0;
@@ -797,7 +808,7 @@ export default function DashboardPage() {
                     </div>
                     {loadingAnalytics ? (
                       <div className="h-8 w-16 bg-[var(--bg-tinted)] rounded animate-pulse mt-1" />
-                    ) : sentData?.has_data && sentHeadline && !sentLowSample ? (
+                    ) : sentData?.has_data && sentHeadline ? (
                       <>
                         <p className="text-2xl font-bold mt-1" style={{ color: sentColor }}>
                           {sentHeadline}
@@ -808,20 +819,25 @@ export default function DashboardPage() {
                           <div style={{ width: `${sentData.negative_pct}%`, background: 'var(--danger)' }} />
                         </div>
                         <p className="text-xs text-[var(--text-faint)] mt-1.5">
-                          {Math.round(sentData.neutral_pct)}% neutral &middot; {Math.round(sentData.negative_pct)}% negative &middot; {sentSamples} mentions
+                          {sentCountFirst
+                            ? `${sentData.neutral_count} neutral · ${sentData.negative_count} negative · last 30 days`
+                            : `${Math.round(sentData.neutral_pct)}% neutral · ${Math.round(sentData.negative_pct)}% negative · ${sentSamples} mentions in 30 days`}
                         </p>
+                        {sentBridge && (
+                          <p className="text-[10px] text-[var(--text-faint)] mt-1 leading-relaxed">
+                            {sentBridge}
+                          </p>
+                        )}
                       </>
                     ) : (
                       <>
                         <p className="text-3xl font-bold text-[var(--text-primary)] mt-1">&mdash;</p>
                         <p className="text-xs text-[var(--text-faint)] mt-1">
-                          {sentLowSample
-                            ? `Only ${sentSamples} mention${sentSamples !== 1 ? 's' : ''} so far — not enough to gauge sentiment`
-                            : (sentData?.unclassified_mentions ?? 0) > 0
+                          {(sentData?.unclassified_mentions ?? 0) > 0
                             ? 'Sentiment unavailable for this run'
                             : 'No mentions to analyze'}
                         </p>
-                        {!sentLowSample && (sentData?.unclassified_mentions ?? 0) > 0 && (
+                        {(sentData?.unclassified_mentions ?? 0) > 0 && (
                           <p className="text-[10px] text-[var(--text-faint)] mt-0.5">
                             {`${sentData!.unclassified_mentions} mention${sentData!.unclassified_mentions !== 1 ? 's' : ''} found, but classification didn't complete.`}
                           </p>

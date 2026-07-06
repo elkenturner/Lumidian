@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { mentionRegex } from '@/lib/textMatch';
 
 // --- Markdown stripping ---
 
@@ -54,25 +55,20 @@ interface Term {
   type: 'brand' | 'competitor';
 }
 
-function escapeRegex(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 function buildSegments(text: string, terms: Term[]): Segment[] {
   if (terms.length === 0) {
     return [{ text, type: 'plain' }];
   }
 
-  // Sort terms longest-first to avoid partial matches
-  const sorted = [...terms].sort((a, b) => b.name.length - a.name.length);
-
-  // Build a single case-insensitive regex matching all terms
-  const pattern = sorted.map((t) => escapeRegex(t.name)).join('|');
-  const regex = new RegExp(`(${pattern})`, 'gi');
+  // Word-boundary matching (lib/textMatch) so a short brand name never
+  // matches inside a word — competitor "DAT" was highlighting the "dat" in
+  // "data"/"update"/"mandate" across every transcript. Mirrors the backend's
+  // word-boundary _mention_matches fix ("Raft" inside "draft").
+  const regex = mentionRegex(terms.map((t) => t.name));
 
   // Build a lookup map (lowercase name → type)
   const typeMap = new Map<string, SegmentType>();
-  for (const t of sorted) {
+  for (const t of terms) {
     typeMap.set(t.name.toLowerCase(), t.type);
   }
 

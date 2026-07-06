@@ -45,6 +45,7 @@ import { MODEL_ORDER, MODEL_CONFIG as MODEL_CONFIG_SHARED, getModelConfig } from
 import { parseUTCISO } from '@/lib/utils/formatting';
 import { useIsMobile } from '@/hooks/useIsMobile';
 import ResponseText from '@/components/ui/ResponseText';
+import { containsMention } from '@/lib/textMatch';
 
 const MODEL_CONFIG: Record<string, { label: string; bg: string; text: string }> = Object.fromEntries(
   Object.entries(MODEL_CONFIG_SHARED).map(([k, v]) => [k, { label: v.label, bg: v.mutedBg, text: v.color }])
@@ -90,10 +91,11 @@ function extractGapMentions(group: PromptGroup, competitorNames: string[]): stri
 
   const counts = new Map<string, number>();
   for (const name of competitorNames) {
-    const nameLower = name.toLowerCase();
     let count = 0;
     for (const r of nonMentioned) {
-      if (r.response_text!.toLowerCase().includes(nameLower)) count++;
+      // Whole-word match — substring .includes() counted "DAT" inside
+      // "data"/"update", crediting competitors on nearly every transcript.
+      if (containsMention(r.response_text!, name)) count++;
     }
     if (count > 0) counts.set(name, count);
   }

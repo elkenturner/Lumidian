@@ -74,8 +74,12 @@ export function clusterChip(c: ClusterLike): ClusterChip {
       if (enabled > 0 && posted >= enabled) return { label: "All posted", tone: "ready" };
       if (posted > 0) return { label: `${posted}/${enabled} posted`, tone: "ready" };
       return { label: "Ready to post", tone: "ready" };
-    default:
-      return { label: c.status.replace(/_/g, " "), tone: "idle" };
+    default: {
+      // Unknown status — humanize rather than leaking raw snake_case.
+      const words = c.status.replace(/_/g, " ").trim();
+      const label = words ? words.charAt(0).toUpperCase() + words.slice(1) : "Processing";
+      return { label, tone: "idle" };
+    }
   }
 }
 

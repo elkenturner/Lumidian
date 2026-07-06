@@ -59,6 +59,11 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
         <div className="min-w-0 flex-1">
           <span
             className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${CHIP_CLASSES[chip.tone]}`}
+            title={
+              chip.tone === "thin"
+                ? "These posts are usable but built on fewer credible sources than we'd like — add sources you trust, then rewrite to strengthen them"
+                : undefined
+            }
           >
             {chip.label}
           </span>
@@ -137,10 +142,10 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
             disabled={regenerating}
             onClick={() => onRegenerate(cluster.id)}
             className="inline-flex items-center gap-1.5 text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] disabled:opacity-40 disabled:cursor-not-allowed"
-            title="Generate a fresh round of drafts (v2). Old posts stay live and keep their lift attribution."
+            title="Write a fresh round of drafts. Posted pieces stay live and keep their lift attribution."
           >
             <RefreshCw className={`h-3 w-3 ${regenerating ? "animate-spin" : ""}`} />
-            {regenerating ? "Drafting v2…" : "Push v2"}
+            {regenerating ? "Writing…" : "Write next round"}
           </button>
         )}
         {!isFullyLive && !isShell && (
@@ -166,7 +171,7 @@ function ClusterCardKebab({
     <div className="relative">
       <button
         type="button"
-        aria-label="Cluster actions"
+        aria-label="Post actions"
         onClick={() => setOpen((o) => !o)}
         className="p-1.5 rounded-md text-[var(--text-faint)] hover:text-[var(--text-secondary)] hover:bg-[var(--bg-base)]"
       >
@@ -187,7 +192,7 @@ function ClusterCardKebab({
             className="w-full text-left px-3 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-base)] disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${regenerating ? "animate-spin" : ""}`} />
-            {regenerating ? "Regenerating…" : "Regenerate all pieces"}
+            {regenerating ? "Rewriting…" : "Rewrite all posts"}
           </button>
         </div>
       )}

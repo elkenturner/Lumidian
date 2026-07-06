@@ -14,6 +14,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   getCluster,
   getContentGaps,
   proposeClusterPillar,
@@ -33,7 +41,7 @@ import PlatformBadge from "@/components/PlatformBadge";
 import { useClusterStatus } from "@/hooks/useClusterStatus";
 import { CLUSTER_PLATFORMS } from "@/lib/clusterPlatforms";
 import { useHiddenPlatforms } from "@/lib/useHiddenPlatforms";
-import { clusterChip, translateFailureReason } from "@/lib/clusterStatus";
+import { CHIP_CLASSES, clusterChip, translateFailureReason } from "@/lib/clusterStatus";
 
 // Display order. Actual set of platforms shown is derived at runtime from
 // the cluster's live status + drafts, then filtered by the user's hidden-
@@ -63,6 +71,8 @@ export default function ClusterDetailPage() {
   // Posted-history rows open the archived text in a read-only modal.
   const [viewingDraft, setViewingDraft] = useState<ContentDraft | null>(null);
   const [savingAngle, setSavingAngle] = useState(false);
+  // Which regeneration is awaiting confirmation (only asked once content exists).
+  const [confirmRegen, setConfirmRegen] = useState<null | "pieces" | "rebuild">(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -189,7 +199,7 @@ export default function ClusterDetailPage() {
     : deltaRounded === 0
     ? "No lift yet"
     : `${deltaRounded > 0 ? "+" : ""}${deltaRounded.toFixed(1)} pts`;
-  const statusLabel = clusterChip({ status: effectiveStatus, version: cluster.version, posted_count: cluster.posted_count, pieces: cluster.drafts.map((d) => ({ platform: d.platform })) }).label;
+  const statusChip = clusterChip({ status: effectiveStatus, version: cluster.version, posted_count: cluster.posted_count, pieces: cluster.drafts.map((d) => ({ platform: d.platform })) });
 
   function updateDraft(updated: ContentDraft) {
     setCluster((prev) => {
@@ -202,12 +212,7 @@ export default function ClusterDetailPage() {
   }
 
   async function onRegeneratePieces() {
-    if (
-      hasContent &&
-      !window.confirm("This replaces the current posts with fresh versions. Continue?")
-    ) {
-      return;
-    }
+    setConfirmRegen(null);
     setRegenAction("pieces");
     try {
       const updated = await regenerateClusterPieces(brandId, clusterId);
@@ -218,14 +223,7 @@ export default function ClusterDetailPage() {
   }
 
   async function onRebuild() {
-    if (
-      hasContent &&
-      !window.confirm(
-        "Start fresh rebuilds the strategy and sources, then replaces every post. Continue?",
-      )
-    ) {
-      return;
-    }
+    setConfirmRegen(null);
     setRegenAction("rebuild");
     try {
       const updated = await rebuildCluster(brandId, clusterId);
@@ -258,15 +256,14 @@ export default function ClusterDetailPage() {
       <header className="flex items-start justify-between gap-6">
         <div className="min-w-0 flex-1">
           <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-1.5">
-            Cluster
+            Tracked question
           </div>
           <h1 className="text-2xl font-display text-[var(--text-primary)] leading-tight">
             {cluster.prompt_text}
           </h1>
           <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--text-faint)]">
-            <span>
-              <span className="text-[var(--text-muted)]">Status</span>{" "}
-              <span className="text-[var(--text-secondary)] font-medium">{statusLabel}</span>
+            <span className={`text-[11px] px-2 py-0.5 rounded-md ${CHIP_CLASSES[statusChip.tone]}`}>
+              {statusChip.label}
             </span>
             <span>·</span>
             <span>
@@ -299,7 +296,7 @@ export default function ClusterDetailPage() {
               <>
                 <Button
                   size="sm"
-                  onClick={onRegeneratePieces}
+                  onClick={() => setConfirmRegen("pieces")}
                   disabled={isActive || regenAction !== null}
                   className="gap-1.5"
                   title="Keep the same strategy and sources; rewrite all posts"
@@ -314,7 +311,7 @@ export default function ClusterDetailPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={onRebuild}
+                  onClick={() => setConfirmRegen("rebuild")}
                   disabled={isActive || regenAction !== null}
                   className="gap-1.5"
                   title="Start over: rebuild the strategy and sources from scratch, then rewrite all posts"
@@ -370,11 +367,11 @@ export default function ClusterDetailPage() {
               ))}
             </div>
           </div>
-          {hasContent && cluster.angle !== "auto" && (
-            <div className="mt-1.5 text-xs text-[var(--text-faint)]">
-              Applies when you rewrite the posts.
-            </div>
-          )}
+          {/* The voice choice decides which account the user should post from,
+              so its meaning can't live in hover tooltips alone. */}
+          <div className="mt-1.5 text-xs text-[var(--text-faint)]">
+            {ANGLES.find((a) => a.key === cluster.angle)?.tip}. Takes effect when posts are written or rewritten.
+          </div>
         </div>
         {/* Lift only appears once a post has gone live and been measured —
             otherwise it reads "—" forever. Mirrors the cluster card. */}
@@ -389,9 +386,38 @@ export default function ClusterDetailPage() {
             <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold">
               AI visibility lift
             </div>
+            <div className="text-[10px] text-[var(--text-faint)]">
+              percentage points, since posting
+            </div>
           </div>
         )}
       </header>
+
+      <Dialog open={confirmRegen !== null} onOpenChange={(open) => !open && setConfirmRegen(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {confirmRegen === "rebuild" ? "Start fresh?" : "Rewrite all posts?"}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmRegen === "rebuild"
+                ? "This re-researches sources and strategy from scratch, then replaces every unposted draft. Use it after adding new sources or if the current posts miss the mark entirely. Posted pieces stay live."
+                : "This keeps the current strategy and sources and writes fresh versions of every unposted draft. Posted pieces stay live and keep their measured lift."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmRegen(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={confirmRegen === "rebuild" ? onRebuild : onRegeneratePieces}
+            >
+              {confirmRegen === "rebuild" ? "Start fresh" : "Rewrite all posts"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {isFailed && (
         <div

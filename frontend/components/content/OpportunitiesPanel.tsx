@@ -267,8 +267,11 @@ function OpportunityRow({
         {opp.subreddit && (
           <span className="text-xs text-[var(--text-faint)]">r/{opp.subreddit}</span>
         )}
-        <span className="text-xs text-[var(--text-faint)]">
-          {Math.round(opp.relevance_score)}% match
+        <span
+          className="text-xs text-[var(--text-faint)]"
+          title="How closely this live thread matches the question you're tracking — higher means replying there is more likely to surface you in AI answers"
+        >
+          {Math.round(opp.relevance_score)}% match to your question
         </span>
 
         <div className="ml-auto flex items-center gap-1">

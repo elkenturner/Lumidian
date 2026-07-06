@@ -496,17 +496,17 @@ export default function ContentBrandPage() {
       {/* Platform visibility — view only, hides pieces inside cards */}
       <DropdownMenu>
         <DropdownMenuTrigger className={TOOLBAR_TRIGGER}>
-          <span className="text-[var(--text-faint)]">Platforms</span>
+          <span className="text-[var(--text-faint)]">Showing</span>
           <span className="font-medium text-[var(--text-primary)]">
             {platformsVisible === CLUSTER_PLATFORMS.length
-              ? "All"
-              : `${platformsVisible}/${CLUSTER_PLATFORMS.length}`}
+              ? "All platforms"
+              : `${platformsVisible}/${CLUSTER_PLATFORMS.length} platforms`}
           </span>
           <ChevronDown className="h-3.5 w-3.5 text-[var(--text-faint)]" aria-hidden />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="min-w-[10rem]">
           <DropdownMenuLabel className="text-[10px] font-normal uppercase tracking-wider text-[var(--text-faint)]">
-            Show in cards
+            Show in view — doesn&apos;t change what gets written
           </DropdownMenuLabel>
           {CLUSTER_PLATFORMS.map((p) => (
             <DropdownMenuCheckboxItem

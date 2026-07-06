@@ -17,6 +17,29 @@ from app.dependencies import (
 
 DbDep = Annotated[AsyncSession, Depends(get_db)]
 
+import re as _re
+
+from app.services.drafting.angle import effective_angle
+from app.services.drafting.platforms import classify_subreddit
+
+
+def _draft_effective_angle(platform: str, cluster_angle: str, content_brief: str | None) -> str | None:
+    """Resolve the voice a draft was (or will be) written in, mirroring the
+    generation-time resolution so the UI can tell the user which account to
+    post from. Reddit needs the subreddit, recovered from the routing brief
+    (either 'r/name' or a thread URL)."""
+    sub_cls: str | None = None
+    if platform.startswith("reddit"):
+        brief = content_brief or ""
+        if brief.startswith("r/"):
+            sub = brief[2:].split("/")[0]
+        else:
+            m = _re.search(r"reddit\.com/r/([^/]+)", brief)
+            sub = m.group(1) if m else None
+        if sub:
+            sub_cls = classify_subreddit(sub)
+    return effective_angle(platform, cluster_angle, sub_cls)
+
 from app.models import (
     Brand,
     ContentBrief,
@@ -252,6 +275,7 @@ async def get_cluster(brand_id: int, cluster_id: int, db: DbDep, user: CurrentUs
             # Routing destination: URL in content_brief, human label in target_title
             "content_brief": d.content_brief,
             "target_title": d.target_title,
+            "effective_angle": _draft_effective_angle(d.platform, cluster.angle, d.content_brief),
         })
 
     # Lift + posted count keyed on prompt_id so legacy + Wikipedia

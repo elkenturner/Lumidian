@@ -1407,6 +1407,10 @@ class ContentClusterDraft(BaseModel):
     # Routing destination (WS2): URL in content_brief, human label in target_title
     content_brief: str | None = None
     target_title: str | None = None
+    # Resolved voice for this piece (insider / neutral / None for own surfaces)
+    # so the UI can say which account to post from. Computed at read time with
+    # the same resolution used at generation (drafting/angle.py).
+    effective_angle: str | None = None
 
     @field_validator("low_evidence", mode="before")
     @classmethod

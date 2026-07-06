@@ -227,3 +227,61 @@ async def test_detail_survives_attribution_with_null_score(client):
     r = await client.get(f"/api/clusters/{brand['id']}/{cluster_id}")
     assert r.status_code == 200, r.text
     assert r.json()["cluster_delta"] is None
+
+
+@pytest.mark.asyncio
+async def test_detail_exposes_effective_angle_per_draft(client):
+    """Each draft carries the resolved voice (effective_angle) so the UI can
+    tell the user which account to post from — insider defaults on
+    LinkedIn/Medium/X, neutral on Quora, None for owned_site, and reddit
+    resolved via the same subreddit classifier used at generation."""
+    from app.models import ContentDraft
+    from app.services.drafting.angle import effective_angle
+    from app.services.drafting.platforms import classify_subreddit
+
+    await register_and_login(client, "ea@x.com")
+    brand = await create_brand(client, "EABrand")
+    r = await client.get(f"/api/brands/{brand['id']}")
+    prompt_id = r.json()["prompts"][0]["id"]
+    async with AsyncSessionLocal() as db:
+        cluster = (await db.execute(
+            select(ContentCluster).where(ContentCluster.prompt_id == prompt_id)
+        )).scalar_one()
+        cluster.status = "ready"
+        for platform, brief in [
+            ("linkedin_article", None),
+            ("quora", "https://www.quora.com/Some-question"),
+            ("owned_site", None),
+            ("reddit_comment", "https://www.reddit.com/r/smallbusiness/comments/abc/thread/"),
+            ("reddit", "r/entrepreneur"),
+        ]:
+            db.add(ContentDraft(
+                brand_id=brand["id"], prompt_id=prompt_id, cluster_id=cluster.id,
+                platform=platform, status="draft", content_text="x",
+                source="cluster", content_brief=brief,
+            ))
+        await db.commit()
+        cluster_id = cluster.id
+
+    r = await client.get(f"/api/clusters/{brand['id']}/{cluster_id}")
+    assert r.status_code == 200, r.text
+    by_platform = {d["platform"]: d for d in r.json()["drafts"]}
+    assert by_platform["linkedin_article"]["effective_angle"] == "insider"
+    assert by_platform["quora"]["effective_angle"] == "neutral"
+    assert by_platform["owned_site"]["effective_angle"] is None
+    assert by_platform["reddit_comment"]["effective_angle"] == effective_angle(
+        "reddit_comment", "auto", classify_subreddit("smallbusiness")
+    )
+    assert by_platform["reddit"]["effective_angle"] == effective_angle(
+        "reddit", "auto", classify_subreddit("entrepreneur")
+    )
+
+    # An explicit cluster angle overrides the auto defaults.
+    r = await client.patch(
+        f"/api/clusters/{brand['id']}/{cluster_id}", json={"angle": "neutral"}
+    )
+    assert r.status_code == 200, r.text
+    r = await client.get(f"/api/clusters/{brand['id']}/{cluster_id}")
+    by_platform = {d["platform"]: d for d in r.json()["drafts"]}
+    assert by_platform["linkedin_article"]["effective_angle"] == "neutral"
+    assert by_platform["owned_site"]["effective_angle"] is None

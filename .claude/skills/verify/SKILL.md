@@ -60,6 +60,8 @@ sqlite3 $SCRATCH/verify.db "UPDATE users SET password_hash='$HASH', email_verifi
   this recipe).
 - `frontend/next-env.d.ts` gets rewritten by the dev server
   (`.next/dev/types/...`) — `git checkout` it before finishing.
+- If you ran `npm run build` earlier in the session, `next dev` on the same
+  `.next` dir 404s every route. `rm -rf frontend/.next` before starting dev.
 - Playwright MCP screenshots land in the **worktree root** — move them to
   the scratchpad when done.
 - Console will show HMR-websocket + prod-tab noise (lumidian.ai CSP/Sentry

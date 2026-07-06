@@ -48,14 +48,25 @@ const READINESS_WARNING_LINK: Record<string, { href: (brandId: number) => string
   no_tracking_run: { href: () => "/dashboard", label: "Run tracking" },
 };
 
-type SortKey = "visibility" | "updated" | "version";
+type SortKey = "gain" | "updated" | "version";
 type FilterKey = "all" | "not_started" | "needs_attention" | "ready" | "in_progress" | "failed";
 
 const SORT_LABEL: Record<SortKey, string> = {
-  visibility: "Lowest visibility",
+  gain: "Most to gain",
   updated: "Last updated",
   version: "Latest version",
 };
+
+/**
+ * "Most to gain" = low visibility AND something left to ship. A question
+ * where every piece is already posted has no remaining upside no matter how
+ * low its visibility — it sinks below questions you can still act on.
+ */
+function hasRemainingWork(c: ContentClusterSummary): boolean {
+  const enabled = c.pieces?.length ?? 0;
+  if (enabled === 0) return true; // nothing generated yet — all upside ahead
+  return (c.posted_count ?? 0) < enabled;
+}
 
 const FILTER_LABEL: Record<FilterKey, string> = {
   all: "All",
@@ -199,7 +210,7 @@ export default function ContentBrandPage() {
   const [brand, setBrand] = useState<BrandDetail | null>(null);
   const [clusters, setClusters] = useState<ContentClusterSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sortBy, setSortBy] = useState<SortKey>("visibility");
+  const [sortBy, setSortBy] = useState<SortKey>("gain");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [regeneratingPromptId, setRegeneratingPromptId] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
@@ -308,8 +319,13 @@ export default function ContentBrandPage() {
 
   const visible = useMemo(() => {
     const arr = clusters.filter((c) => filterPredicate(c, started ? filter : "all"));
-    if (sortBy === "visibility") {
-      arr.sort((a, b) => a.visibility_pct - b.visibility_pct);
+    if (sortBy === "gain") {
+      arr.sort((a, b) => {
+        const workA = hasRemainingWork(a) ? 0 : 1;
+        const workB = hasRemainingWork(b) ? 0 : 1;
+        if (workA !== workB) return workA - workB;
+        return a.visibility_pct - b.visibility_pct;
+      });
     } else if (sortBy === "updated") {
       arr.sort((a, b) => {
         const at = a.last_generated_at ? new Date(a.last_generated_at).getTime() : 0;

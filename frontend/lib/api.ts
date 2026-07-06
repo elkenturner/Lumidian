@@ -650,7 +650,21 @@ export interface Competitor {
   id: number;
   brand_id: number;
   name: string;
+  in_peer_pool: boolean;
   created_at: string;
+}
+
+export async function setCompetitorPeerPool(
+  brandId: number,
+  competitorId: number,
+  inPeerPool: boolean,
+): Promise<Competitor> {
+  const res = await api.patch<Competitor>(
+    `/brands/${brandId}/competitors/${competitorId}`,
+    { in_peer_pool: inPeerPool },
+  );
+  invalidateCache(`/brands/${brandId}/competitors`);
+  return res.data;
 }
 
 export async function getCompetitors(brandId: number): Promise<Competitor[]> {
@@ -817,53 +831,70 @@ export async function getDashboardAnalytics(brandId: number): Promise<DashboardA
   return dedupedGet<DashboardAnalytics>(`/dashboard/${brandId}/analytics`);
 }
 
-// ── Competitive Gap ───────────────────────────────────────────────────────────
+// ── RVI (Relative Visibility Index) ──────────────────────────────────────────
+// RVI = brand visibility ÷ mean(peer-pool visibility), over contested prompts.
 
-export type CompetitiveGapWindow = '7d' | '30d' | '90d';
+export type RVIWindow = '7d' | '30d' | '90d';
 
-export interface CompetitiveGapTrendPoint {
+export interface RVITrendPoint {
   date: string;
-  gap_pp: number;
-  brand_pct: number;
-  comp_avg_pct: number;
+  rvi: number;
 }
 
-export interface CompetitorTrendPoint {
-  date: string;
-  gap_pp: number;
-}
-
-export interface CompetitorGapStat {
+export interface RVIPeerStat {
   competitor_id: number;
   name: string;
-  competitor_pct: number;
-  gap_pp: number;
-  delta_pp: number | null;
-  trend: CompetitorTrendPoint[];
-  has_data: boolean;
+  in_peer_pool: boolean;
+  pct: number | null;
+  prompt_hits: number;
 }
 
-export interface CompetitiveGapResponse {
+export interface RVIExcludedCompetitor {
+  competitor_id: number;
+  name: string;
+}
+
+export interface RVIOwnedPrompt {
+  prompt_id: number;
+  text: string;
+  brand_pct: number;
+}
+
+export interface RVIContestedPrompt {
+  prompt_id: number;
+  text: string;
+  brand_pct: number;
+  peer_avg_pct: number;
+  rvi: number;
+}
+
+export interface RVIResponse {
   brand_id: number;
-  window: CompetitiveGapWindow;
-  has_competitors: boolean;
+  window: RVIWindow;
+  has_peers: boolean;
   has_data: boolean;
-  headline_gap_pp: number | null;
-  headline_delta_pp: number | null;
-  brand_visibility_pct: number | null;
-  competitor_avg_pct: number | null;
-  trend: CompetitiveGapTrendPoint[];
-  competitors: CompetitorGapStat[];
+  rvi: number | null;
+  rvi_delta: number | null;
+  brand_pct: number | null;
+  peer_avg_pct: number | null;
+  contested_prompt_count: number;
+  owned_prompt_count: number;
+  unclaimed_prompt_count: number;
   sample_count: number;
   confidence: 'low' | 'medium' | 'high';
+  trend: RVITrendPoint[];
+  peers: RVIPeerStat[];
+  excluded: RVIExcludedCompetitor[];
+  owned_prompts: RVIOwnedPrompt[];
+  contested_prompts: RVIContestedPrompt[];
 }
 
-export async function getCompetitiveGap(
+export async function getRVI(
   brandId: number,
-  window: CompetitiveGapWindow = '7d',
-): Promise<CompetitiveGapResponse> {
-  const res = await api.get<CompetitiveGapResponse>(
-    `/dashboard/${brandId}/competitive-gap`,
+  window: RVIWindow = '7d',
+): Promise<RVIResponse> {
+  const res = await api.get<RVIResponse>(
+    `/dashboard/${brandId}/rvi`,
     { params: { window } },
   );
   return res.data;

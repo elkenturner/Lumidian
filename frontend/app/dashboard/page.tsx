@@ -33,7 +33,7 @@ import {
   getBrandProfile,
   getBillingStatus,
   getBillingUsage,
-  getCompetitiveGap,
+  getRVI,
   BrandDetail,
   OverviewData,
   TrendPoint,
@@ -47,8 +47,8 @@ import {
   BillingUsage,
   ModelStat,
   parseApiError,
-  CompetitiveGapResponse,
-  CompetitiveGapWindow,
+  RVIResponse,
+  RVIWindow,
 } from '@/lib/api';
 import { AppToast, ToastData } from '@/components/AppToast';
 import SubscriptionBanner from '@/components/SubscriptionBanner';
@@ -79,12 +79,12 @@ import {
 const chartFallback = <div className="card min-h-[240px] animate-pulse" />;
 const VisibilityChart = dynamic(() => import('@/components/dashboard/VisibilityChart'), { ssr: false, loading: () => chartFallback });
 const DonutDomains = dynamic(() => import('@/components/dashboard/DonutDomains'), { ssr: false });
-const CompetitiveGapCard = dynamic(
-  () => import('@/components/dashboard/CompetitiveGapCard').then((m) => m.CompetitiveGapCard),
+const RVICard = dynamic(
+  () => import('@/components/dashboard/RVICard').then((m) => m.RVICard),
   { ssr: false, loading: () => chartFallback },
 );
-const CompetitiveGapDrawer = dynamic(
-  () => import('@/components/dashboard/CompetitiveGapDrawer').then((m) => m.CompetitiveGapDrawer),
+const RVIDrawer = dynamic(
+  () => import('@/components/dashboard/RVIDrawer').then((m) => m.RVIDrawer),
   { ssr: false },
 );
 import { AskCoachButton } from '@/components/coach/AskCoachButton';
@@ -124,8 +124,8 @@ export default function DashboardPage() {
   const [competitorModalOpen, setCompetitorModalOpen] = useState(false);
 
   // Competitive gap
-  const [competitiveGap, setCompetitiveGap] = useState<CompetitiveGapResponse | null>(null);
-  const [gapWindow, setGapWindow] = useState<CompetitiveGapWindow>('7d');
+  const [rviData, setRviData] = useState<RVIResponse | null>(null);
+  const [gapWindow, setGapWindow] = useState<RVIWindow>('7d');
   const [gapLoading, setGapLoading] = useState(false);
   const [gapDrawerOpen, setGapDrawerOpen] = useState(false);
 
@@ -227,14 +227,25 @@ export default function DashboardPage() {
     return () => controller.abort();
   }, [selectedBrandId, loadData]);
 
-  // Re-fetch only competitive gap data when window toggle changes (or brand changes)
+  // Re-fetch only RVI data when window toggle changes (or brand changes)
   useEffect(() => {
     if (!selectedBrandId) return;
     setGapLoading(true);
-    getCompetitiveGap(selectedBrandId, gapWindow)
-      .then((res) => setCompetitiveGap(res))
-      .catch((err) => logError(err, 'Dashboard: refetch competitive gap'))
+    getRVI(selectedBrandId, gapWindow)
+      .then((res) => setRviData(res))
+      .catch((err) => logError(err, 'Dashboard: refetch RVI'))
       .finally(() => setGapLoading(false));
+  }, [selectedBrandId, gapWindow]);
+
+  // After a peer-pool toggle in the drawer: refetch RVI + competitor list
+  const handlePoolChanged = useCallback(() => {
+    if (!selectedBrandId) return;
+    getRVI(selectedBrandId, gapWindow)
+      .then((res) => setRviData(res))
+      .catch((err) => logError(err, 'Dashboard: refetch RVI after pool change'));
+    getCompetitors(selectedBrandId)
+      .then((res) => setCompetitors(res))
+      .catch((err) => logError(err, 'Dashboard: refetch competitors after pool change'));
   }, [selectedBrandId, gapWindow]);
 
   const handlePullRefresh = useCallback(async () => {
@@ -754,7 +765,7 @@ export default function DashboardPage() {
                 />
                 </div>
 
-                {/* Competitive Gap card — or, with no competitors yet, the single
+                {/* RVI card — or, with no competitors yet, the single
                     combined CTA (this used to be two near-identical "Add
                     competitors" cards: gap + share of voice). */}
                 <div className="lg:col-span-2">
@@ -776,8 +787,8 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 ) : (
-                  <CompetitiveGapCard
-                    data={competitiveGap}
+                  <RVICard
+                    data={rviData}
                     loading={gapLoading || loadingAnalytics}
                     window={gapWindow}
                     onWindowChange={setGapWindow}
@@ -1072,14 +1083,15 @@ export default function DashboardPage() {
         />
       )}
 
-      <CompetitiveGapDrawer
+      <RVIDrawer
         open={gapDrawerOpen}
         onClose={() => setGapDrawerOpen(false)}
         brandId={selectedBrandId}
         brandName={selectedBrand?.name ?? ''}
-        data={competitiveGap}
+        data={rviData}
         window={gapWindow}
         onWindowChange={setGapWindow}
+        onPoolChanged={handlePoolChanged}
       />
 
       {toast && <AppToast {...toast} onDismiss={() => setToast(null)} />}

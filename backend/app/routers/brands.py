@@ -48,6 +48,7 @@ from app.schemas import (
     CompetitorAnalysisResponse,
     CompetitorByModel,
     CompetitorCreate,
+    CompetitorPeerPoolUpdate,
     CompetitorPromptResult,
     CompetitorResponse,
     FetchWebsiteContextRequest,
@@ -722,6 +723,38 @@ async def add_competitor(brand_id: int, payload: CompetitorCreate, db: DbDep, us
 
     competitor = Competitor(brand_id=brand_id, name=payload.name)
     db.add(competitor)
+    await db.commit()
+    await db.refresh(competitor)
+    return CompetitorResponse.model_validate(competitor)
+
+
+# ── Toggle peer-pool membership (RVI denominator) ────────────────────────────
+
+@router.patch(
+    "/{brand_id}/competitors/{competitor_id}",
+    response_model=CompetitorResponse,
+)
+async def update_competitor_peer_pool(
+    brand_id: int,
+    competitor_id: int,
+    payload: CompetitorPeerPoolUpdate,
+    db: DbDep,
+    user: CurrentUser,
+):
+    await get_brand_for_user(brand_id, db, user)
+    result = await db.execute(
+        select(Competitor).where(
+            Competitor.id == competitor_id,
+            Competitor.brand_id == brand_id,
+        )
+    )
+    competitor = result.scalar_one_or_none()
+    if competitor is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Competitor {competitor_id} not found for brand {brand_id}",
+        )
+    competitor.in_peer_pool = payload.in_peer_pool
     await db.commit()
     await db.refresh(competitor)
     return CompetitorResponse.model_validate(competitor)

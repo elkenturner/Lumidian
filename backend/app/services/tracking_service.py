@@ -536,7 +536,7 @@ async def run_tracking(
             if competitors:
                 # Word-boundary matching (same matcher as SOV/gap analytics) —
                 # raw substring inflated short names, e.g. "Raft" inside "draft".
-                from app.services.competitive_gap import _mention_matches
+                from app.services.rvi import _mention_matches
 
                 comp_mention_rows = []
                 for qr in query_results:

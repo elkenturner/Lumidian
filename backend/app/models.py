@@ -257,6 +257,9 @@ class Competitor(Base):
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     website_url: Mapped[str | None] = mapped_column(String(2000), nullable=True)
+    # False = tracked but excluded from the RVI peer-pool denominator
+    # (out-of-weight-class incumbents, e.g. the "GRAIL exclusion").
+    in_peer_pool: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     brand: Mapped["Brand"] = relationship("Brand", back_populates="competitors")

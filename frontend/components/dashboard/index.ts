@@ -8,6 +8,5 @@ export { default as HelpTooltip } from './HelpTooltip';
 export { default as SparklineTooltip } from './SparklineTooltip';
 export { buildPromptGroups } from './BestPromptCard';
 export type { PromptGroup } from './BestPromptCard';
-export { CompetitiveGapCard } from './CompetitiveGapCard';
-export { CompetitiveGapDrawer } from './CompetitiveGapDrawer';
-export { CompetitiveGapTrendChart } from './CompetitiveGapTrendChart';
+export { RVICard } from './RVICard';
+export { RVIDrawer } from './RVIDrawer';

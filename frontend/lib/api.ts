@@ -263,6 +263,9 @@ export interface ContentDraft {
   low_evidence?: boolean;
   posted_url?: string | null;
   brief_version?: number | null;
+  /** Resolved voice for this piece (insider / neutral / null for own
+   *  surfaces) — drives the "which account do I post from" guidance. */
+  effective_angle?: 'insider' | 'neutral' | null;
 }
 
 export interface ContentOpportunity {
@@ -462,6 +465,23 @@ export async function getResponses(
 }
 
 // ── Content functions ────────────────────────────────────────────────────────
+
+const _guidelinesCache = new Map<string, PlatformGuidelines | null>();
+
+/** Platform posting guidelines (tone/rules/disclaimer). Cached per platform —
+ *  the copy is static server-side. Returns null on 404 (unknown platform). */
+export async function getPlatformGuidelines(platform: string): Promise<PlatformGuidelines | null> {
+  const cached = _guidelinesCache.get(platform);
+  if (cached !== undefined) return cached;
+  try {
+    const res = await api.get<PlatformGuidelines>(`/content/guidelines/${platform}`);
+    _guidelinesCache.set(platform, res.data);
+    return res.data;
+  } catch {
+    _guidelinesCache.set(platform, null);
+    return null;
+  }
+}
 
 export async function getDrafts(
   brandId: number,

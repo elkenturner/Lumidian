@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, Sparkles, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, Check, CheckCircle2, Copy, Loader2, Maximize2, MapPin, RefreshCw, Send, Sparkles, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
-import { regenerateClusterPiece, updateDraft, type ContentDraft } from "@/lib/api";
+import { getPlatformGuidelines, regenerateClusterPiece, updateDraft, type ContentDraft, type PlatformGuidelines } from "@/lib/api";
 import { translateFailureReason } from "@/lib/clusterStatus";
 import { CitationsSubpanel } from "./CitationsSubpanel";
 
@@ -111,6 +111,106 @@ function LowEvidenceBadge({ brandId }: { brandId: number }) {
         <ArrowUpRight className="h-2.5 w-2.5" />
       </Link>
     </span>
+  );
+}
+
+/** Guidelines are keyed by base platform; drafts carry variants like
+ *  linkedin_article / reddit_comment / x_thread. */
+function basePlatform(platform: string): string {
+  if (platform.startsWith("linkedin")) return "linkedin";
+  if (platform.startsWith("reddit")) return "reddit";
+  if (platform.startsWith("x")) return "x";
+  return platform;
+}
+
+/** Plain-language "which account do I post this from" line, driven by the
+ *  voice the piece was actually written in. */
+function accountLine(effectiveAngle: string | null | undefined, platform: string): string | null {
+  if (platform === "owned_site") {
+    return "Publish this on your own website — it speaks as your company.";
+  }
+  if (effectiveAngle === "insider") {
+    return "Post from your own account, under your real name — it's written as someone at your company. If it recommends your product, it includes a casual disclosure line; keep that line in.";
+  }
+  if (effectiveAngle === "neutral") {
+    return "Post from a personal account — it's written as a neutral practitioner surveying the space. Don't add endorsements of your product, and don't claim to be unaffiliated.";
+  }
+  return null;
+}
+
+/** Where the piece physically goes, complementing the routing pin. */
+function whereLine(platform: string, draft: ContentDraft): string | null {
+  if (platform.startsWith("reddit")) {
+    const brief = draft.content_brief;
+    if (brief && !brief.startsWith("r/")) return "Reply as a top-level comment in the linked thread.";
+    if (brief) return `Post as a new thread in ${brief}.`;
+    return "Post as a new thread in a subreddit where your audience asks this question.";
+  }
+  if (platform === "quora") {
+    return draft.target_title
+      ? "Post as an answer to the linked Quora question."
+      : "Find the matching question on Quora and post this as your answer.";
+  }
+  if (platform === "linkedin_article") return "Publish as an article from your LinkedIn profile (write an article, not a post).";
+  if (platform.startsWith("linkedin")) return "Share as a post from your LinkedIn profile.";
+  if (platform === "medium") return "Publish as a story from your Medium account.";
+  if (platform.startsWith("x")) return "Post from your X account (threads go out as a connected series).";
+  if (platform === "owned_site") return "Add it as a page or blog post on your site, then mark it posted with the live URL.";
+  return null;
+}
+
+/** "How to post this" — account, destination, and disclosure guidance shown
+ *  at the moment of copy. The FTC/disclosure copy lives server-side in
+ *  PLATFORM_GUIDELINES (previously defined but never rendered anywhere). */
+function HowToPost({ platform, draft }: { platform: string; draft: ContentDraft }) {
+  const [guidelines, setGuidelines] = useState<PlatformGuidelines | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getPlatformGuidelines(basePlatform(platform)).then((g) => {
+      if (!cancelled) setGuidelines(g);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [platform]);
+
+  const account = accountLine(draft.effective_angle, platform);
+  const where = whereLine(platform, draft);
+  // Disclosure matters when the piece is written in an affiliated voice, or
+  // on the platforms whose norms/rules call for it regardless.
+  const showDisclaimer =
+    !!guidelines?.disclaimer &&
+    (draft.effective_angle === "insider" || ["reddit", "quora", "wikipedia"].includes(basePlatform(platform)));
+
+  if (!account && !where && !showDisclaimer) return null;
+
+  return (
+    <div className="mt-4 pt-4 border-t border-[var(--border-subtle)]">
+      <div className="text-[11px] uppercase tracking-wider text-[var(--text-faint)] font-semibold mb-2">
+        How to post this
+      </div>
+      <div className="space-y-1.5 text-xs text-[var(--text-secondary)] leading-relaxed">
+        {account && (
+          <p className="flex gap-1.5">
+            <UserRound className="h-3.5 w-3.5 shrink-0 mt-px text-[var(--text-muted)]" />
+            <span>{account}</span>
+          </p>
+        )}
+        {where && (
+          <p className="flex gap-1.5">
+            <MapPin className="h-3.5 w-3.5 shrink-0 mt-px text-[var(--text-muted)]" />
+            <span>{where}</span>
+          </p>
+        )}
+        {showDisclaimer && (
+          <p className="flex gap-1.5 text-[#fbbf24]">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-px" />
+            <span>{guidelines!.disclaimer}</span>
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -415,6 +515,8 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
                 <CitationsSubpanel citations={draft.citations ?? []} />
               </div>
             )}
+
+            {draft.status !== "posted" && <HowToPost platform={platform} draft={draft} />}
 
             <div className="mt-4 pt-4 border-t border-[var(--border-subtle)] flex items-center justify-end gap-2">
               <Button variant="outline" size="sm" onClick={copy}>

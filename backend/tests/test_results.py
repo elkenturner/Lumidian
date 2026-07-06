@@ -331,11 +331,14 @@ async def test_export_pdf_includes_rvi_section(client: httpx.AsyncClient):
     assert resp.content[:4] == b"%PDF"
     text = _pdf_text(resp.content)
     assert b"Relative Visibility" in text
-    # brand 50% vs Profound 100% -> RVI 0.50
-    assert b"0.50" in text
+    # brand 50% vs Profound 100% -> 50% of the peer citation rate
+    assert b"50%" in text
+    assert b"of your peers' citation rate" in text
     assert b"Profound" in text
-    # delta vs the prior-window RVI of 1.00 renders with an ASCII sign
-    assert b"-0.50 vs prior 30 days" in text
+    # delta vs the prior window (100% of peer rate) reads as a plain sentence
+    # (asserted in fragments — line wrapping can split it across PDF text ops)
+    assert b"Down from" in text
+    assert b"prior 30 days" in text
 
 
 async def test_export_pdf_survives_rvi_failure(client: httpx.AsyncClient, monkeypatch):

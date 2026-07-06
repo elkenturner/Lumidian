@@ -315,24 +315,22 @@ def _build_pdf(
         story.append(Paragraph("Relative Visibility (RVI)", S_H2))
 
         if rvi.rvi is not None:
+            # Displayed as "% of the peer citation rate" (100% = even with peers) —
+            # same language as the dashboard card; the raw ratio never surfaces.
+            pct_of_peers = round(rvi.rvi * 100)
             rvi_col = COL_GREEN if rvi.rvi >= 1 else COL_RED
-            if rvi.rvi >= 1:
-                sentence = (f"Cited {rvi.rvi:.1f}× as often as your typical peer "
-                            f"on contested prompts.")
-            else:
-                sentence = (f"Cited at {round(rvi.rvi * 100)}% of your peers' rate "
-                            f"on contested prompts.")
+            sentence = "of your peers' citation rate on prompts you're competing for."
             delta_str = ""
             if rvi.rvi_delta is not None and rvi.rvi_delta != 0:
-                # ASCII sign, not ▲/▼ — base-14 Helvetica (WinAnsi) lacks those glyphs
-                sign = "+" if rvi.rvi_delta > 0 else "-"
-                delta_str = f"  ·  {sign}{abs(rvi.rvi_delta):.2f} vs prior 30 days"
-            sub = (f"You {rvi.brand_pct:.1f}%  ·  Peer average {rvi.peer_avg_pct:.1f}%  ·  "
-                   f"{rvi.contested_prompt_count} contested prompt"
+                prior_pct = round((rvi.rvi - rvi.rvi_delta) * 100)
+                verb = "Up" if rvi.rvi_delta > 0 else "Down"
+                delta_str = f"  ·  {verb} from {prior_pct}% in the prior 30 days"
+            sub = (f"AI mentions you in {rvi.brand_pct:.0f}% of answers; peers average "
+                   f"{rvi.peer_avg_pct:.0f}%  ·  {rvi.contested_prompt_count} prompt"
                    f"{'s' if rvi.contested_prompt_count != 1 else ''}"
                    f"  ·  last 30 days{delta_str}")
             rvi_row = [[
-                Paragraph(f"{rvi.rvi:.2f}×", ParagraphStyle(
+                Paragraph(f"{pct_of_peers}%", ParagraphStyle(
                     "RviBig", fontSize=26, textColor=rvi_col, fontName="Helvetica-Bold",
                     leading=32, alignment=TA_CENTER)),
                 Paragraph(f"<b>{sentence}</b><br/><font size='8' color='#94a3b8'>{sub}</font>",
@@ -353,7 +351,7 @@ def _build_pdf(
         else:
             # No contested prompts — full owned territory, no ratio to report
             story.append(Paragraph(
-                f"<b>Territory owned.</b> No peer registers on any prompt you track — "
+                f"<b>Territory owned.</b> No competitor appears on any prompt you track — "
                 f"{rvi.owned_prompt_count} prompt{'s' if rvi.owned_prompt_count != 1 else ''} "
                 f"held uncontested over the last 30 days.",
                 ParagraphStyle("RviOwn", fontSize=10, textColor=COL_GREEN,
@@ -396,7 +394,8 @@ def _build_pdf(
         notes = []
         if rvi.rvi is not None and rvi.owned_prompt_count > 0:
             notes.append(f"Owns {rvi.owned_prompt_count} prompt"
-                         f"{'s' if rvi.owned_prompt_count != 1 else ''} where no peer registers.")
+                         f"{'s' if rvi.owned_prompt_count != 1 else ''} uncontested — "
+                         f"no competitor appears there.")
         pool_names = ", ".join(p.name for p in rvi.peers)
         footnote = f"Peer pool: {pool_names}"
         if rvi.excluded:

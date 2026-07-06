@@ -15,7 +15,7 @@ export function AskCoachButton({ brandId, question, autoSubmit = true, children,
     <button
       type="button"
       onClick={() => openWith({ brandId, question, autoSubmit })}
-      className={className ?? "inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-900"}
+      className={className ?? "inline-flex items-center gap-1 text-xs font-medium text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"}
     >
       {children ?? "Ask Lumi"}
     </button>

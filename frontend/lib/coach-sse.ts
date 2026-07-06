@@ -28,20 +28,23 @@ export async function streamCoach({
       signal,
     });
   } catch (err) {
-    onError?.(err as Error);
+    if ((err as Error).name !== "AbortError") {
+      onEvent({ type: "error", data: { message: "network" } });
+      onError?.(err as Error);
+    }
     onClose?.();
     return;
   }
 
   if (response.status === 429) {
-    const body = await response.json().catch(() => ({}));
+    await response.json().catch(() => ({}));
     onEvent({ type: "error", data: { message: "rate_limited" } });
-    onError?.(new Error(JSON.stringify(body?.detail ?? body)));
     onClose?.();
     return;
   }
 
   if (!response.ok || !response.body) {
+    onEvent({ type: "error", data: { message: "request_failed" } });
     onError?.(new Error(`Coach request failed (${response.status})`));
     onClose?.();
     return;
@@ -66,7 +69,10 @@ export async function streamCoach({
       }
     }
   } catch (err) {
-    onError?.(err as Error);
+    if ((err as Error).name !== "AbortError") {
+      onEvent({ type: "error", data: { message: "stream_interrupted" } });
+      onError?.(err as Error);
+    }
   } finally {
     onClose?.();
   }

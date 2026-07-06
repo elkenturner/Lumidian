@@ -23,7 +23,6 @@ export function OverviewHero({ auditId, onSeeAll }: Props) {
 
   const load = useCallback(async () => {
     const all = await siteAudit.recommendations(auditId);
-    setAllCount(all.length);
     const pending = all.filter((r) => (r.status ?? 'pending') === 'pending');
     // Group by (title + category), then take top 5 groups by max priority_score.
     const byKey = new Map<string, WebsiteAuditRecommendationOut[]>();
@@ -38,6 +37,9 @@ export function OverviewHero({ auditId, onSeeAll }: Props) {
         Math.max(...b.map((x) => x.priority_score ?? 0))
         - Math.max(...a.map((x) => x.priority_score ?? 0)),
     );
+    // "See all N" must count the same population the hero shows — pending
+    // fix groups — not every raw recommendation row incl. applied/dismissed.
+    setAllCount(ordered.length);
     setGroups(ordered.slice(0, 5));
   }, [auditId]);
 
@@ -86,7 +88,7 @@ export function OverviewHero({ auditId, onSeeAll }: Props) {
         <h2 className="text-lg font-semibold text-[var(--text-primary)]">
           Next {groups.length} fix{groups.length === 1 ? '' : 'es'}
         </h2>
-        {allCount > groups.reduce((s, g) => s + g.length, 0) && (
+        {allCount > groups.length && (
           <button
             type="button"
             onClick={onSeeAll}

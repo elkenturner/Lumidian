@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import PlatformBadge from "@/components/PlatformBadge";
 import {
   getOpportunities,
+  getDrafts,
   draftOpportunity,
   dismissOpportunity,
   updateDraft,
@@ -56,6 +57,21 @@ export function OpportunitiesPanel({ brandId }: Props) {
       .catch(() => {
         if (!cancelled) setLoadError(true);
       });
+    // Hydrate the drafts cache from persisted drafts (linked by
+    // opportunity_id). Without this, a fresh page load rendered an
+    // already-drafted thread as a dead-end "Drafted" chip with no way to
+    // read, copy, or post the reply. Best-effort — the panel still works
+    // without it for new threads.
+    getDrafts(brandId, undefined, undefined, 200)
+      .then((rows) => {
+        if (cancelled) return;
+        const byOpp: Record<number, ContentDraft> = {};
+        for (const d of rows) {
+          if (d.opportunity_id != null) byOpp[d.opportunity_id] = d;
+        }
+        setDrafts((prev) => ({ ...byOpp, ...prev }));
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -295,7 +311,7 @@ function OpportunityRow({
               Draft reply
             </Button>
           ) : null}
-          {!draft && (
+          {draft?.status !== "posted" && (
             <Button
               variant="ghost"
               size="sm"

@@ -10,7 +10,6 @@ interface DonutDomainsProps {
 
 export default function DonutDomains({ domains }: DonutDomainsProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
-  const total = domains.reduce((s, d) => s + d.count, 0);
   const data = domains.map((d) => ({ ...d, value: d.count }));
 
   const getDomainUrl = (domain: string) => {
@@ -67,14 +66,17 @@ export default function DonutDomains({ domains }: DonutDomainsProps) {
         {/* Center text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
           <span className="text-lg font-bold text-[var(--text-primary)] leading-none">{data.length}</span>
-          <span className="text-[9px] text-[var(--text-faint)] mt-0.5 uppercase tracking-wider">sources</span>
+          <span className="text-[9px] text-[var(--text-faint)] mt-0.5 uppercase tracking-wider">top sources</span>
         </div>
       </div>
 
       {/* Legend */}
       <div className="flex-1 min-w-0 space-y-0.5">
         {data.map((d, i) => {
-          const pct = total > 0 ? (d.count / total) * 100 : 0;
+          // d.pct is the domain's TRUE share of all citations (computed
+          // server-side). Re-dividing by the top-6 sum renormalized to ~100%
+          // and overstated every slice.
+          const pct = d.pct;
           const { color, glow } = DOMAIN_COLORS[i % DOMAIN_COLORS.length];
           const isActive = activeIndex === i;
           const displayDomain = d.domain.replace(/^www\./, '');

@@ -11,6 +11,8 @@ interface Props {
   llmsTxtPresent: boolean | null;
   llmsTxtValid: boolean | null;
   robotsTxtRaw: string | null;
+  /** Derived from audit findings (absence of agents_md_missing); null while loading. */
+  agentsMdPresent: boolean | null;
 }
 
 interface FileSpec {
@@ -25,6 +27,7 @@ export function FilesStatusRow({
   llmsTxtPresent,
   llmsTxtValid,
   robotsTxtRaw,
+  agentsMdPresent,
 }: Props) {
   const files: FileSpec[] = [
     {
@@ -57,7 +60,9 @@ export function FilesStatusRow({
       name: 'agents.md',
       description:
         'Companion to llms.txt aimed at agent-style crawlers (browsers that act on your behalf).',
-      status: 'missing',
+      // Real audit result — this was hardcoded 'missing', which made "all
+      // files present" unreachable no matter what the site actually served.
+      status: agentsMdPresent ? 'good' : 'missing',
     },
   ];
 

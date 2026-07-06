@@ -143,14 +143,23 @@ export default function BrandTable({
                     </div>
                   )}
                 </button>
-                {expandedConvId === conv.id && conv.response_text && (
+                {expandedConvId === conv.id && (
                   <div className="px-5 pb-4 pt-3 border-t border-[var(--accent-border)] bg-[var(--accent-muted)]">
-                    <ResponseText
-                      text={conv.response_text}
-                      brandName={analytics?.brand_name ?? ''}
-                      competitors={analytics?.competitor_comparison.map((c) => c.name) ?? []}
-                      className="text-xs sm:text-sm text-[var(--text-muted)]"
-                    />
+                    {conv.response_text ? (
+                      <ResponseText
+                        text={conv.response_text}
+                        brandName={analytics?.brand_name ?? ''}
+                        competitors={analytics?.competitor_comparison.map((c) => c.name) ?? []}
+                        className="text-xs sm:text-sm text-[var(--text-muted)]"
+                      />
+                    ) : (
+                      /* Previously the row expanded to NOTHING when only a
+                         preview was stored — a chevron that reveals nothing
+                         reads as broken. */
+                      <p className="text-xs text-[var(--text-faint)]">
+                        The full response text wasn&apos;t stored for this query — only the preview above.
+                      </p>
+                    )}
                   </div>
                 )}
               </div>

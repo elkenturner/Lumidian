@@ -887,16 +887,23 @@ export default function SettingsPage() {
     return false;
   }, [profile, companyDescription, toneOfVoice, targetAudience, marketScope, geography, keyStats, whatNotToSay, approvedLanguage, publications]);
 
-  // Warn before navigating away with unsaved profile changes
+  // General-tab dirty state (Brand Name / Company Website). Without it,
+  // switching tabs or navigating away silently discarded these edits.
+  const generalDirty = Boolean(
+    brand &&
+    (editName.trim() !== (brand.name ?? '') || editWebsiteUrl.trim() !== (brand.website_url ?? '')),
+  );
+
+  // Warn before navigating away with unsaved changes (profile or general tab)
   useEffect(() => {
-    if (!hasUnsavedProfileChanges) return;
+    if (!hasUnsavedProfileChanges && !generalDirty) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = '';
     };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, [hasUnsavedProfileChanges]);
+  }, [hasUnsavedProfileChanges, generalDirty]);
 
   // Account tab state
   const [displayName, setDisplayName] = useState('');
@@ -1517,6 +1524,12 @@ export default function SettingsPage() {
               </button>
               {saveError && (
                 <p className="text-xs text-[var(--danger)]">{saveError}</p>
+              )}
+              {!saveError && !saving && !saveSuccess && generalDirty && (
+                <span className="text-xs text-[var(--warning)] flex items-center gap-1.5">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-[var(--warning)]" />
+                  Unsaved changes
+                </span>
               )}
             </div>
           </div>

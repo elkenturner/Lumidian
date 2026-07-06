@@ -228,7 +228,7 @@ export function SiteAuditView({ brandId }: Props) {
           {tab === 'fixes' && <FixGrid auditId={audit.id} />}
           {tab === 'pages' && (
             selectedPageId === null ? (
-              <PageTable auditId={audit.id} onSelect={setSelectedPageId} />
+              <PageTable auditId={audit.id} auditTotalPages={audit.total_pages} onSelect={setSelectedPageId} />
             ) : (
               <PageDetail
                 auditId={audit.id}

@@ -38,9 +38,13 @@ export function SchemaAndBotsTab({
   onJumpToFixes,
 }: Props) {
   const [botStatus, setBotStatus] = useState<Record<string, 'allowed' | 'blocked'>>({});
+  // null until findings load — the old hardcoded 'missing' made "All three
+  // files present" unreachable even for sites that actually serve /agents.md.
+  const [agentsMdPresent, setAgentsMdPresent] = useState<boolean | null>(null);
 
   useEffect(() => {
     siteAudit.findings(auditId).then((all: WebsiteAuditFindingOut[]) => {
+      setAgentsMdPresent(!all.some((f) => f.check_id === 'agents_md_missing'));
       const blocked = new Set<string>();
       for (const f of all) {
         if (f.check_id.startsWith('blocked_')) {
@@ -77,6 +81,7 @@ export function SchemaAndBotsTab({
         llmsTxtPresent={llmsTxtPresent}
         llmsTxtValid={llmsTxtValid}
         robotsTxtRaw={robotsTxtRaw}
+        agentsMdPresent={agentsMdPresent}
       />
     </div>
   );

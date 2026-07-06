@@ -9,6 +9,9 @@ import { staggerContainer, staggerChild } from '@/lib/motion';
 
 interface Props {
   auditId: number;
+  /** The audit's true crawled-page count — the fetch below caps at 250 rows,
+   *  and presenting the capped count as the total silently understates. */
+  auditTotalPages?: number | null;
   onSelect: (pageId: number) => void;
 }
 
@@ -28,7 +31,7 @@ function TypeIcon({ pageType }: { pageType: string }) {
 
 const PER_PAGE = 50;
 
-export function PageTable({ auditId, onSelect }: Props) {
+export function PageTable({ auditId, auditTotalPages, onSelect }: Props) {
   const [pages, setPages] = useState<WebsiteAuditPageOut[] | null>(null);
   const [pageNum, setPageNum] = useState(1);
 
@@ -121,6 +124,7 @@ export function PageTable({ auditId, onSelect }: Props) {
         <div className="flex items-center justify-between text-xs text-[var(--text-muted)] px-1">
           <span className="tabular-nums">
             {start + 1}–{Math.min(start + PER_PAGE, pages.length)} of {pages.length} pages
+            {(auditTotalPages ?? 0) > pages.length && ` (top ${pages.length} of ${auditTotalPages} crawled)`}
           </span>
           <div className="flex items-center gap-1">
             <button

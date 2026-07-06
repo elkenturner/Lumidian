@@ -106,7 +106,8 @@ export function SchemaCoverageList({ auditId, onJumpToFix }: Props) {
       <div className="mb-4">
         <h3 className="text-base font-semibold text-[var(--text-primary)]">Schema coverage</h3>
         <p className="text-sm text-[var(--text-secondary)] mt-1 leading-relaxed">
-          You have <strong className="text-[var(--text-primary)] tabular-nums">{haveCount} of {totalRelevant}</strong> schema types fully covered.{' '}
+          You have <strong className="text-[var(--text-primary)] tabular-nums">{haveCount} of {totalRelevant}</strong> schema types fully covered
+          {pages.length >= 250 && ' (based on the first 250 crawled pages)'}.{' '}
           {biggestGap && (
             <span>
               Biggest gap: <strong className="text-[var(--warning-text)]">

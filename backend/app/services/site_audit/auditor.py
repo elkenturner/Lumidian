@@ -81,6 +81,53 @@ async def _mark_failed(audit_id: int, msg: str) -> None:
             await db.commit()
 
 
+# Markers that identify an anti-bot challenge interstitial rather than real
+# site content (Cloudflare managed challenge / Turnstile page).
+_CF_CHALLENGE_MARKERS = (
+    "just a moment",
+    "challenges.cloudflare.com",
+    "cf-chl",
+    "checking your browser",
+)
+
+
+def _assess_crawl_block(pages) -> str | None:
+    """Return an actionable failure message when the crawl produced zero usable
+    pages because the site's bot protection rejected every request.
+
+    A usable page is HTTP 200 with a body. Without this check a fully-blocked
+    crawl scores the challenge/error page as if it were the site (MSC prod
+    audits 8 + 12: "completed", total_pages=1, the one page a Cloudflare 403).
+    """
+    if not pages:
+        return None  # unreachable-host path; handled elsewhere
+    if any(p.status == 200 and p.html for p in pages):
+        return None
+    blocked = [p for p in pages if p.status in (401, 403, 429, 503)]
+    if not blocked:
+        return None
+    remedy = (
+        "Ask the site administrator to allowlist the user agent "
+        "'LumidianAuditBot' (https://lumidian.ai/bot) in their firewall or bot "
+        "protection settings, then re-run the audit."
+    )
+    if any(
+        marker in (p.html or "").lower()
+        for p in blocked
+        for marker in _CF_CHALLENGE_MARKERS
+    ):
+        return (
+            "The site's bot protection (Cloudflare) blocked our crawler — every "
+            f"page request ({len(pages)} attempted) returned an anti-bot challenge "
+            f"instead of content. {remedy}"
+        )
+    return (
+        "The site blocked our crawler — every page request "
+        f"({len(pages)} attempted) was rejected "
+        f"(HTTP {blocked[0].status}). {remedy}"
+    )
+
+
 async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None:
     async with AsyncSessionLocal() as db:
         brand = await db.get(Brand, brand_id)
@@ -92,6 +139,12 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
     sitemap_urls, sitemap_src = await discover_sitemap_urls(root)
     seed_urls = sitemap_urls[:max_pages] if sitemap_urls else None
     pages_crawled = await crawl_site(root, max_pages=max_pages, max_depth=3, seed_urls=seed_urls)
+
+    block_msg = _assess_crawl_block(pages_crawled)
+    if block_msg is not None:
+        logger.warning("site_audit %d: crawl blocked — %s", audit_id, block_msg)
+        await _mark_failed(audit_id, block_msg)
+        return
 
     # robots.txt + llms.txt + agents.md
     robots_res = await fetch_raw(urljoin(root, "robots.txt"))

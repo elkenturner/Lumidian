@@ -51,7 +51,9 @@ def _extract_content_excerpt(html: str, max_chars: int = 1500) -> str:
     return text[:max_chars]
 
 
-async def discover_sitemap_urls(root_url: str) -> tuple[list[str], str | None]:
+async def discover_sitemap_urls(
+    root_url: str, fetcher=fetch_raw
+) -> tuple[list[str], str | None]:
     root_url = root_url.rstrip("/") + "/"
     candidates = [
         urljoin(root_url, "sitemap.xml"),
@@ -59,22 +61,22 @@ async def discover_sitemap_urls(root_url: str) -> tuple[list[str], str | None]:
         urljoin(root_url, "sitemap-index.xml"),
     ]
     for sm_url in candidates:
-        res = await fetch_raw(sm_url, timeout_s=PER_PAGE_TIMEOUT_S)
+        res = await fetcher(sm_url, timeout_s=PER_PAGE_TIMEOUT_S)
         if res.status == 200 and res.html.strip():
-            urls = await _expand(res.html)
+            urls = await _expand(res.html, fetcher)
             if urls:
                 return urls, sm_url
     return [], None
 
 
-async def _expand(body: str) -> list[str]:
+async def _expand(body: str, fetcher=fetch_raw) -> list[str]:
     locs = [m.strip() for m in _LOC_RE.findall(body)]
     if not locs:
         return []
     if "<sitemapindex" in body.lower():
         all_urls: list[str] = []
         for child in locs[:50]:
-            res = await fetch_raw(child)
+            res = await fetcher(child)
             if res.status == 200 and res.html.strip():
                 all_urls.extend(m.strip() for m in _LOC_RE.findall(res.html))
         return all_urls
@@ -120,8 +122,14 @@ async def crawl_site(
     max_depth: int = 3,
     seed_urls: list[str] | None = None,
     cancel_event: asyncio.Event | None = None,
+    fetcher=fetch_raw,
 ) -> list[CrawlPage]:
-    """BFS internal-only crawl. Returns CrawlPage list (one per fetched URL)."""
+    """BFS internal-only crawl. Returns CrawlPage list (one per fetched URL).
+
+    ``fetcher`` is any async ``(url) -> FetchResult`` — the default honest bot
+    fetch, a browser-profile variant, or a rendered-browser session fetch
+    (blocked-crawl escalation).
+    """
     root = normalise_url(root_url)
     host = urlparse(root).netloc
 
@@ -158,7 +166,7 @@ async def crawl_site(
                     return
                 async with sem:
                     await limiter.wait(host)
-                    res = await fetch_raw(url)
+                    res = await fetcher(url)
                 pages.append(CrawlPage(
                     url=url, depth=depth, status=res.status, html=res.html,
                     fetch_ms=res.fetch_ms, error=res.error,

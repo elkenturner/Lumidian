@@ -1,14 +1,21 @@
 """Raw HTML (httpx) and rendered HTML (Playwright) fetchers + render-mode classifier."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from time import perf_counter
 
 import httpx
 
-from app.services.site_audit.constants import AUDIT_USER_AGENT, PER_PAGE_TIMEOUT_S
+from app.services.site_audit.constants import (
+    AUDIT_USER_AGENT,
+    BROWSER_FALLBACK_HEADERS,
+    PER_PAGE_TIMEOUT_S,
+    RENDERED_CHALLENGE_WAIT_MS,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -27,14 +34,28 @@ class FetchResult:
     error: str | None = None
 
 
-async def fetch_raw(url: str, timeout_s: float = PER_PAGE_TIMEOUT_S) -> FetchResult:
-    """Fetch raw HTML via httpx. No JS execution. Never raises."""
+async def fetch_raw(
+    url: str,
+    timeout_s: float = PER_PAGE_TIMEOUT_S,
+    *,
+    browser_profile: bool = False,
+) -> FetchResult:
+    """Fetch raw HTML via httpx. No JS execution. Never raises.
+
+    ``browser_profile=True`` sends realistic browser headers instead of the
+    audit-bot UA — used only as a blocked-crawl fallback (see constants).
+    """
     started = perf_counter()
+    headers = (
+        dict(BROWSER_FALLBACK_HEADERS)
+        if browser_profile
+        else {"User-Agent": AUDIT_USER_AGENT, "Accept": "text/html,*/*"}
+    )
     try:
         async with httpx.AsyncClient(
             timeout=timeout_s,
             follow_redirects=True,
-            headers={"User-Agent": AUDIT_USER_AGENT, "Accept": "text/html,*/*"},
+            headers=headers,
         ) as client:
             resp = await client.get(url)
             ms = int((perf_counter() - started) * 1000)
@@ -80,6 +101,66 @@ async def fetch_rendered(url: str, timeout_s: float = PER_PAGE_TIMEOUT_S) -> Fet
     except Exception as exc:  # noqa: BLE001
         logger.warning("fetch_rendered unexpected error for %s: %s", url, exc)
         return FetchResult(url=url, status=None, html="", fetch_ms=None, error=f"render_error: {exc}")
+
+
+@asynccontextmanager
+async def rendered_fetch_session(concurrency: int = 2):
+    """Yield a ``fetch(url) -> FetchResult`` backed by ONE shared headless
+    Chromium — for crawling many pages without a browser launch per page.
+
+    Used by the blocked-crawl rendered fallback. On a 401/403/429/503 the page
+    gets a short grace period (managed anti-bot challenges auto-solve in a real
+    browser) and one re-navigation before we take the answer as final. The
+    yielded fetch never raises.
+    """
+    try:
+        from playwright.async_api import TimeoutError as PWTimeout
+        from playwright.async_api import async_playwright
+    except ImportError as exc:
+        err = f"playwright_missing: {exc}"
+
+        async def _unavailable(url: str, timeout_s: float = PER_PAGE_TIMEOUT_S) -> FetchResult:
+            return FetchResult(url=url, status=None, html="", fetch_ms=None, error=err)
+
+        yield _unavailable
+        return
+
+    sem = asyncio.Semaphore(concurrency)
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        try:
+
+            async def _fetch(url: str, timeout_s: float = PER_PAGE_TIMEOUT_S) -> FetchResult:
+                started = perf_counter()
+                try:
+                    async with sem:
+                        page = await browser.new_page()
+                        try:
+                            resp = await page.goto(
+                                url, wait_until="domcontentloaded", timeout=timeout_s * 1000
+                            )
+                            status = resp.status if resp else None
+                            if status in (401, 403, 429, 503):
+                                await page.wait_for_timeout(RENDERED_CHALLENGE_WAIT_MS)
+                                resp = await page.goto(
+                                    url, wait_until="domcontentloaded", timeout=timeout_s * 1000
+                                )
+                                if resp:
+                                    status = resp.status
+                            html = await page.content()
+                            ms = int((perf_counter() - started) * 1000)
+                            return FetchResult(url=url, status=status, html=html, fetch_ms=ms)
+                        finally:
+                            await page.close()
+                except PWTimeout:
+                    return FetchResult(url=url, status=None, html="", fetch_ms=None, error="render_timeout")
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("rendered_fetch_session error for %s: %s", url, exc)
+                    return FetchResult(url=url, status=None, html="", fetch_ms=None, error=f"render_error: {exc}")
+
+            yield _fetch
+        finally:
+            await browser.close()
 
 
 def _visible_text_length(html: str) -> int:

@@ -35,6 +35,21 @@ TIER_AUDIT_LIMITS: dict[str, dict] = {
 # Crawler config
 AUDIT_USER_AGENT = "LumidianAuditBot/1.0 (+https://lumidian.ai/bot)"
 PER_PAGE_TIMEOUT_S = 10
+
+# Blocked-crawl escalation. When the honest bot UA is rejected on every page we
+# retry with a realistic browser profile (defeats UA-keyed WAF rules), then with
+# a real rendered browser (passes auto-solving JS challenges). The site owner
+# requested the audit of their own site, so escalating the fetch is authorized.
+BROWSER_FALLBACK_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+    ),
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+RENDERED_CRAWL_MAX_PAGES = 20  # rendered fallback is expensive; cap the crawl
+RENDERED_CHALLENGE_WAIT_MS = 3500  # grace for a managed challenge to auto-solve
 PER_AUDIT_BUDGET_S = 300
 PER_AUDIT_CONCURRENCY = 4
 MAX_CONCURRENT_AUDITS = 3

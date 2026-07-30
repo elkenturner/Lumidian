@@ -14,11 +14,11 @@ from app.models import (
     WebsiteAuditPage, WebsiteAuditRecommendation, utcnow,
 )
 from app.services.site_audit.constants import (
-    PER_AUDIT_BUDGET_S, RENDER_SAMPLE_SIZE, normalise_url,
+    PER_AUDIT_BUDGET_S, RENDER_SAMPLE_SIZE, RENDERED_CRAWL_MAX_PAGES, normalise_url,
 )
 from app.services.site_audit.crawler import crawl_site, discover_sitemap_urls
 from app.services.site_audit.fetcher import (
-    classify_render_mode, fetch_raw, fetch_rendered,
+    classify_render_mode, fetch_raw, fetch_rendered, rendered_fetch_session,
 )
 from app.services.site_audit.page_classifier import classify_page
 from app.services.site_audit.page_prompt_link import (
@@ -140,7 +140,37 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
     seed_urls = sitemap_urls[:max_pages] if sitemap_urls else None
     pages_crawled = await crawl_site(root, max_pages=max_pages, max_depth=3, seed_urls=seed_urls)
 
+    # Blocked-crawl escalation: bot UA → browser headers → rendered browser.
+    # Only kicks in when the standard crawl produced zero usable pages, so an
+    # unprotected site never pays for it.
+    crawl_mode = "bot"
     block_msg = _assess_crawl_block(pages_crawled)
+    if block_msg is not None:
+        logger.info("site_audit %d: bot crawl blocked, retrying with browser headers", audit_id)
+        from functools import partial
+
+        browser_fetch = partial(fetch_raw, browser_profile=True)
+        sm_urls, sm_src = await discover_sitemap_urls(root, fetcher=browser_fetch)
+        retry_seeds = sm_urls[:max_pages] if sm_urls else None
+        retry = await crawl_site(
+            root, max_pages=max_pages, max_depth=3, seed_urls=retry_seeds, fetcher=browser_fetch
+        )
+        if _assess_crawl_block(retry) is None:
+            pages_crawled, crawl_mode, block_msg = retry, "browser_headers", None
+            if sm_src:
+                sitemap_src = sm_src
+    if block_msg is not None:
+        logger.info("site_audit %d: browser-header crawl blocked, retrying rendered", audit_id)
+        async with rendered_fetch_session() as rendered_fetch:
+            rendered = await crawl_site(
+                root,
+                max_pages=min(max_pages, RENDERED_CRAWL_MAX_PAGES),
+                max_depth=3,
+                seed_urls=None,
+                fetcher=rendered_fetch,
+            )
+        if _assess_crawl_block(rendered) is None:
+            pages_crawled, crawl_mode, block_msg = rendered, "rendered", None
     if block_msg is not None:
         logger.warning("site_audit %d: crawl blocked — %s", audit_id, block_msg)
         await _mark_failed(audit_id, block_msg)
@@ -154,8 +184,12 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
     agents_res = await fetch_raw(urljoin(root, "agents.md"))
     agents_content = agents_res.html if agents_res.status == 200 else None
 
-    # Render-mode detection on a sample
-    sample_indexes = _sample_indexes(len(pages_crawled), RENDER_SAMPLE_SIZE)
+    # Render-mode detection on a sample. Skipped when the crawl itself was
+    # rendered (raw fetches are blocked, so there is no raw/rendered pair to
+    # compare) — site_render_mode stays "unknown".
+    sample_indexes = (
+        [] if crawl_mode == "rendered" else _sample_indexes(len(pages_crawled), RENDER_SAMPLE_SIZE)
+    )
     rendered_modes: list[str] = []
     is_js_rendered_by_url: dict[str, bool] = {}
     for i in sample_indexes:
@@ -182,6 +216,18 @@ async def _run_audit_inner(audit_id: int, brand_id: int, max_pages: int) -> None
     await _set_status(audit_id, "analyzing")
 
     site_findings: list[Finding] = []
+    if crawl_mode != "bot":
+        fallback_label = (
+            "realistic browser headers" if crawl_mode == "browser_headers" else "a full rendered browser"
+        )
+        site_findings.append(Finding(
+            "bot_protection_challenge", "medium", "bot_access",
+            f"The site's bot protection blocked our standard crawler; this audit used {fallback_label} "
+            "as a fallback. Unverified bots are being challenged — verify that AI crawlers "
+            "(GPTBot, ClaudeBot, PerplexityBot, Google-Extended) are permitted in your bot protection "
+            "settings, or they may not be able to read your content.",
+            evidence={"crawl_mode": crawl_mode},
+        ))
     robots_out = parse_robots(robots_content, root)
     site_findings.extend(robots_out.findings)
     bot_status = robots_out.measurements.get("bot_status", {})

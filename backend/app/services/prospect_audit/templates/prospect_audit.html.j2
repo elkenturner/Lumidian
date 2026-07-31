@@ -657,7 +657,7 @@ Status conventions (no colored side-borders — small inline marks only):
     <div class="chart">
       <div class="chart-label">
         <span>Share of relevant AI searches</span>
-        <span class="right">90 queries · 3 models · 3 runs</span>
+        <span class="right">{{ scorecard|length * 9 }} queries · 3 models · 3 runs</span>
       </div>
 
       <div class="chart-row is-you{% if overall_visibility_pct|round|int == 0 %} is-zero{% endif %}">
@@ -721,7 +721,7 @@ Status conventions (no colored side-borders — small inline marks only):
       <div class="section-head">
         <div class="section-num">02</div>
         <div class="section-title">Per-prompt Breakdown</div>
-        <div class="section-tagline">All 10 prompts, sorted by what needs attention</div>
+        <div class="section-tagline">All {{ scorecard|length }} prompts, sorted by what needs attention</div>
       </div>
 
       <table class="prompt-table">
@@ -782,7 +782,7 @@ Status conventions (no colored side-borders — small inline marks only):
           <p class="q">{{ w.prompt_text }}</p>
           <p class="lede">
             {%- if w.kind == 'loss' and w.top_competitor_name -%}
-              <strong>{{ w.top_competitor_name }}</strong> dominates this question with <span class="accent">{{ w.top_competitor_visibility_pct|round|int }}%</span> visibility — you're at <span class="accent">{{ w.own_visibility_pct|round|int }}%</span>. <span class="quiet">AI models are pulling from competitor content; closing the gap means publishing on the same surfaces being cited — LinkedIn, Medium, Reddit, Quora.</span>
+              <strong>{{ w.top_competitor_name }}</strong> dominates this question with <span class="accent">{{ w.top_competitor_visibility_pct|round|int }}%</span> visibility — you're at <span class="accent">{{ w.own_visibility_pct|round|int }}%</span>. <span class="quiet">AI models are pulling from content they can actually read and cite; closing the gap means publishing an authoritative answer on your own site, backed by the community surfaces models pull from.</span>
             {%- elif w.kind == 'loss' -%}
               Competitors collectively appear in <span class="accent">{{ w.peer_avg_visibility_pct|round|int }}%</span> of responses — you're at <span class="accent">{{ w.own_visibility_pct|round|int }}%</span>. <span class="quiet">Same playbook: match where competitors are being cited from, not just on your own domain.</span>
             {%- elif w.kind == 'untapped' -%}
@@ -838,9 +838,8 @@ Status conventions (no colored side-borders — small inline marks only):
         <div class="recs-static">
           <p>Lumidian closes AI visibility gaps with a recurring monthly playbook:</p>
           <ul>
-            <li><strong>12+ AI-optimized articles every month</strong> — distributed across LinkedIn, Medium, Reddit, Quora, and X as coordinated content clusters.</li>
-            <li><strong>YouTube video AI-readability optimization</strong> — we restructure descriptions, captions, and chapters so models can extract from your videos.</li>
-            <li><strong>Website AI-readability audit</strong> — a one-time engagement to diagnose schema, structure, and citation surfaces.</li>
+            <li><strong>Coordinated content clusters</strong> — an authoritative, AI-readable page on your own website, backed by presence on the community surfaces AI models read, each cluster targeting a query you're losing.</li>
+            <li><strong>Your site, fixed for AI</strong> — an AI-readability audit plus the implemented fixes: schema, structure, and citation surfaces.</li>
             <li><strong>Live tracking dashboard</strong> across ChatGPT, Claude, Perplexity, and Gemini.</li>
             <li><strong>Competitor monitoring</strong> — flagged within days when a peer publishes AI-citable content in your category.</li>
           </ul>
@@ -872,30 +871,30 @@ Status conventions (no colored side-borders — small inline marks only):
       <span class="accent">{{ missing_pct|round|int }}% gap?</span>
     </p>
     <p class="cta-intro">
-      Lumidian is the AI visibility platform — a tracking dashboard, a content-cluster engine, and a site auditor in one. <strong>Run it yourself, or have our team run it for you.</strong> Either way, you turn audits like this one into measurable visibility lift across ChatGPT, Perplexity, and Gemini.
+      Lumidian is a done-for-you AI visibility service. <strong>Our team builds the content, fixes your site, and tracks the results — you watch it move on a live dashboard.</strong> Audits like this one become measurable visibility lift across ChatGPT, Perplexity, and Gemini.
     </p>
 
     <div class="cta-two">
       <div class="cta-col">
-        <h3>How the platform works</h3>
+        <h3>How it works</h3>
         <dl>
           <dt>Live dashboard, not monthly emails.</dt>
-          <dd>Article moves a query, you see it the same week. Competitor publishes, you see it within days.</dd>
+          <dd>Content moves a query, you see it the same week. Competitor publishes, you see it within days.</dd>
           <dt>Content engineered from your audit data.</dt>
           <dd>Each piece is briefed from the prompts you're losing and the sources AI models actually cite.</dd>
           <dt>Coordinated clusters, not one-offs.</dt>
-          <dd>One topic, five surfaces (LinkedIn, Medium, Reddit, Quora, X) — same brief, reinforcing citations.</dd>
+          <dd>One query, one authoritative page on your site, reinforced on the community surfaces AI models read — same brief, reinforcing citations.</dd>
         </dl>
       </div>
       <div class="cta-col">
         <h3>What you'd get</h3>
         <dl>
-          <dt>12+ AI-optimized articles a month.</dt>
-          <dd>Coordinated as clusters around your highest-priority queries.</dd>
-          <dt>YouTube video optimization.</dt>
-          <dd>Your existing videos restructured so AI models can extract from them.</dd>
-          <dt>Website AI-readability audit.</dt>
-          <dd>One-time engagement covering the highest-impact technical wins on your domain.</dd>
+          <dt>Monthly content clusters.</dt>
+          <dd>Written, published-ready, and coordinated around your highest-priority queries.</dd>
+          <dt>Your site, fixed for AI.</dt>
+          <dd>An AI-readability audit plus the implemented fixes — schema, structure, citation surfaces.</dd>
+          <dt>Weekly visibility reports.</dt>
+          <dd>Your numbers, your competitors, what moved — every week.</dd>
           <dt>Tracking + competitor alerts.</dt>
           <dd>Across ChatGPT, Claude, Perplexity, and Gemini.</dd>
         </dl>
@@ -903,7 +902,7 @@ Status conventions (no colored side-borders — small inline marks only):
     </div>
 
     <div class="cta-action">
-      <p class="ask">Reply to this email to set up a 20-minute call — <strong>or start a self-serve trial below.</strong></p>
+      <p class="ask">Reply to this email to set up a <strong>20-minute walkthrough of your numbers.</strong></p>
       <div class="cta-links">
         {% if cta_url %}
           <span class="label">Platform</span>
@@ -918,7 +917,7 @@ Status conventions (no colored side-borders — small inline marks only):
   </div>
 
   <div class="footer">
-    <span class="who">Lumidian · AI visibility platform + done-for-you service</span>
+    <span class="who">Lumidian · Done-for-you AI visibility</span>
     <span>{{ generated_label }}</span>
   </div>
 </div>

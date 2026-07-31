@@ -274,7 +274,7 @@ async def render_prospect_pdf(
 
     recommendations_html = _md.markdown(recommendations_md) if recommendations_md else None
 
-    cta_url = os.getenv("PROSPECT_AUDIT_CTA_URL", "https://lumidian.io")
+    cta_url = os.getenv("PROSPECT_AUDIT_CTA_URL", "https://lumidian.ai")
     cta_email = os.getenv("PROSPECT_AUDIT_CTA_EMAIL") or os.getenv("SUPPORT_EMAIL") or ""
 
     html = template.render(

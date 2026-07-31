@@ -252,6 +252,7 @@ async def _run_audit_inner(audit_id: int, cancel_event: asyncio.Event) -> None:
         aggregate_rvi=agg_rvi,
         rvi_band=rvi_band,
         worst_prompts=insights,
+        prompt_count=len(prompts),
     )
     recommendations_md = await draft_recommendations(summary)
 

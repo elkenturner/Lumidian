@@ -1,159 +1,173 @@
-# Lumidian Agency Go-To-Market Plan
+# Lumidian Agency Go-To-Market Plan — Local Businesses
 
-**Date:** 2026-07-30
-**Status:** Draft for Ken's review
-**Decision context:** Ken has chosen to pursue the agency route as the primary revenue motion ("I wanna sell this stuff"). This resolves the long-standing open question in `CURRENT_STATE.md` ("Which track gets attention first?"). The SaaS stays alive as a self-serve surface (Pro-only flattening already spec'd), but active selling effort goes to agency retainers. This document contains (1) a business-readiness audit and (2) the sales plan.
+**Date:** 2026-07-30 (rev. 2, same day — ICP changed to local businesses per Ken)
+**Status:** Approved direction, execution pending
+**Ken's decisions locked in this revision:**
+- **Market: local businesses — any local business.** We have the capability to service any of them; we don't turn anyone away.
+- **Price: $1,000/mo.** Raise later, once proven.
+- **SaaS: kept for select accounts (MSC and similar), not actively sold.** Agency selling is the only sales motion.
 
 ---
 
 ## Part 1 — Business-readiness audit (as of 2026-07-30)
 
-### 1.1 What you actually have (assets)
+### 1.1 What we have
 
-**Product surface — genuinely strong for an agency cockpit:**
-- Multi-model AI visibility tracking (ChatGPT + web search, Claude + web search, Perplexity sonar-pro, Gemini grounding), 3 runs/prompt/model, RVI competitive metric, citation extraction, sentiment.
-- Content engine rebuilt on research-grounded strategy (Layer A/B): owned-site anchor + cluster model, evidence packs with full-text enrichment, anti-AI gate, voice directives, FTC-aligned disclosure logic, Reddit thread routing. This is the differentiator — no competitor connects tracking → content production this tightly.
-- Site AIO audit module with paste-ready fix artifacts (llms.txt, robots.txt, JSON-LD), page↔prompt linking.
-- Wikipedia surface (candidate discovery + legitimacy gate + constrained drafting).
-- **Agency cockpit** (`/agency/*`): client playbook (milestones: kickoff → SOW → audit → strategy), 7 Typst-typeset PDF document kinds (SOW, kickoff, initial audit, weekly report, monthly report, wikipedia plan, site plan), weekly auto-report sweep, per-client staff assignment.
-- **Prospect audit** — the sales wedge — committed on main: staff pick prompts, editorial research-report PDF designed specifically for cold email (credibility-guarded, RVI reframed, positions both software and done-for-you).
-- Read-only token-gated client portal (built, on branch — see blockers).
+**Product surface:**
+- Multi-model AI visibility tracking (ChatGPT + web search, Claude + web search, Perplexity sonar-pro, Gemini grounding), 3 runs/prompt/model, RVI competitive metric, citation extraction, sentiment. Prompts are free text, so location-qualified prompts ("best invisalign dentist in Scottsdale") work today with zero changes.
+- Rebuilt content engine: owned-site anchor + cluster model, evidence packs, anti-AI gate, voice directives, FTC-aligned disclosure, Reddit thread routing. For local, the relevant subset is owned-site + Reddit + Quora.
+- Site AIO audit with paste-ready fix artifacts (JSON-LD, llms.txt, robots.txt) — local business websites are typically in terrible shape, so this module produces dramatic, visible wins.
+- Agency cockpit: client playbook (kickoff → SOW → audit → strategy → weekly execution), 7 Typst PDF document kinds, weekly auto-reports, per-client staff assignment.
+- **Prospect audit PDF** (committed on main, designed for cold email) — the sales wedge. For a local owner it is devastating in the best way: their real numbers, their named competitors, "you're invisible when customers ask ChatGPT."
+- Read-only client portal (built, unmerged — decision pending).
 
-**Proof / traction:**
-- 1 paying client: Manhattan Street Capital ($300/mo, managed via Afzal Iqbal of "try agi"). SEC-adjacent content, drafts reviewed by Ken before posting. This is agency-shaped delivery already happening — just underpriced by ~10x.
-- RoxStart: comped Pro demo account (logistics/freight vertical), full remediation done — 25 clusters, 125 drafts, 22 trusted sources, competitor SOV narrative built for their demo.
-- Methodology page with peer-reviewed citations — a real credibility asset for sales calls.
+**Proof / revenue:**
+- MRR ~$300: Manhattan Street Capital (Growth tier, via Afzal Iqbal / try agi). Stays on SaaS-select track — grandfathered, not part of the local motion, but proves the delivery loop end to end.
+- RoxStart comped demo (logistics) — proves the engine adapts to a new vertical (source tiers, competitor narrative) in days.
+- Methodology page with peer-reviewed citations — credibility asset.
 
-### 1.2 What's working commercially
+### 1.2 Why local is the right market for where we are
 
-- **MRR: ~$300** (MSC only, after the July brand purge). That's the honest number. Everything else is product.
-- The MSC relationship proves the delivery loop: track → report → content → client review → post. It also surfaced the exact confusions prospects will have (mention vs. citation).
+1. **The concept explains itself.** Our hardest problem is that AI visibility is difficult to explain — and we are unproven. With a local owner the pitch is a 30-second live demo: *"Ask ChatGPT 'best [what you do] in [your city].' You're not there. Your competitor is."* No methodology education, no GEO jargon.
+2. **Greenfield competition.** The funded GEO tools (Peec, Otterly, AthenaHQ, etc.) are all B2B-focused. Nobody is systematically selling AI visibility to local businesses yet. In B2B we'd be the 9th pitch in their inbox; locally we're the 1st.
+3. **Fastest visible results.** Local-intent prompts are low-competition. A well-structured service page, clean LocalBusiness schema, and a few real Reddit/Quora mentions can plausibly flip an AI answer in weeks — impossible against entrenched B2B incumbents. Fast before/afters are exactly what an unproven agency needs to mint case studies.
+4. **Volume + standardization.** Local businesses are a dense, listable market, and one playbook (local prompt set → audit → fix artifacts → owned-site Q&A content → weekly report) reuses across every client with light per-client customization. That's what a solo operator can actually scale.
 
-### 1.3 What blocks selling (ranked by revenue impact)
+### 1.3 What we're honest about (mechanism + risks)
+
+- **Two kinds of local queries, two different levers.** Pure "near me" discovery answers draw heavily on review infrastructure (Google Business Profile, Yelp, listicles, Reddit threads). *Question/comparison/cost queries* ("does Invisalign fix an overbite," "how much does a roof replacement cost in Denver," "best coffee roaster in Austin reddit") are answered from content — which is exactly what we produce. Our reports should track both, and our content targets the second while our site-audit fixes (schema, structure) plus Reddit/Quora presence support the first. We do NOT do review management or GBP optimization — say so plainly; it keeps us out of commodity-local-SEO comparisons.
+- **Owners judge on "did the phone ring."** Set expectations in the SOW: we measure and grow AI visibility; we report it weekly with their competitors named. The kickoff doc states what success looks like at 30/60/90 days.
+- **Budget reality varies wildly across "any local business."** A dental practice pays $1–3K/mo to agencies routinely; a coffee shop's whole marketing budget may be $500/mo. We serve anyone who says yes at $1K — but we aim *outreach* where budgets and ticket sizes make yes likely (see Part 3).
+- **Attribution is unproven.** Founding clients are the experiment; case-study rights are part of the founding deal.
+
+### 1.4 What blocks selling (ranked)
 
 **P0 — blocks the sales motion itself:**
-1. **Site-audit crawler bug: MSC audits only ever crawl 1 page** (score 45.6 both runs, untriaged). The initial audit is a core deliverable and part of the pitch; a 1-page crawl produces garbage. Must fix before running audits for prospects.
-2. **Prospect-audit end-to-end verification.** The staff-picked-prompts flow shipped but its pytest run was blocked at build time (Python 3.14 sandbox). Run the suite + one real end-to-end audit against a real prospect before sending any PDF to a stranger.
-3. **Repo/deploy hygiene:** `feat/cluster-detail-overhaul` is ahead-4 unpushed with ~74 uncommitted working-tree files across parallel sessions. Anything demo-critical that only exists locally is at risk. Triage → commit → merge → deploy, then treat main-on-prod as the only reality.
+1. **Site-audit crawler bug (only 1 page ever crawled).** The audit is both a paid deliverable and the sales demo. Must fix first.
+2. **Prospect-audit end-to-end verification** — run the pytest suite in the real 3.11 venv + one live audit on a real local business; eyeball the PDF.
+3. **Repo/deploy hygiene** — `feat/cluster-detail-overhaul` ahead-4 unpushed, ~74 uncommitted files. Land it, deploy, make prod the only reality.
 
-**P1 — blocks delivering credibly to paying clients:**
-4. **Pro-only tiering flattening: spec'd, not implemented.** MSC is promised full Pro (Claude tracking, Opus writer, unlimited wiki scans) at $300. Until implemented, the tier system keeps silently degrading the one paying client (the exact breakage that triggered the spec).
-5. **"Cited as source" dashboard metric — promised to Afzal in email, not built.** A paying client was told this is coming. Small scope (citation_sources data already exists), big trust cost if it never lands.
-6. **Manual tracking runs skip citation extraction** (known bug). Agency runs are largely manual; citations feed the audit and reports.
-7. **Client portal v1 is unmerged** (`agency-strays-extended`) with `test_client_portal` red. Decide: fix + merge (clients get a live link — strong retention) or explicitly park it and deliver via PDF + email only. Don't leave it ambiguous.
-8. **Typst PDF Phase 6 visual review** — eyeball all 7 document kinds against real client data once, before they go to clients.
+**P1 — blocks delivering credibly:**
+4. **Local adaptation pack** (new since rev. 1 — see Part 2.2): local prompt templates, local platform preset, LocalBusiness JSON-LD, local source tiers.
+5. **Pro-only tiering flattening** (spec committed) — owed to MSC on the SaaS-select track.
+6. **Cited-as-source metric** — promised to Afzal by email; small scope, big trust cost.
+7. **Manual runs skip citation extraction** (known bug) — agency runs are manual.
+8. **Client portal: fix+merge or park** — decide, don't drift. A live link is strong retention for local clients ("open this anytime, see where you rank in AI").
+9. **Typst PDF Phase 6 visual review** — one pass over the 7 doc kinds before client eyes.
 
-**P2 — noise to stop paying attention to (feature freeze):**
-- ~20 stale local branches; three "recovery" branches from session-mixing; dead 2FA half-feature; accent-token migration; og-image. None of it earns revenue. Freeze all product work not on the P0/P1 list until 3 paying clients exist.
-
-### 1.4 Honest strategic risks (carry into positioning, don't hide)
-
-- **The core tension (documented in Layer A):** we sell visibility improvement; the mechanism with real evidence is owned-site content + Wikipedia + trade press, not social posting. The offer below is built around that — owned-site-first — so the deliverable matches the evidence.
-- **Attribution is unproven.** No controlled publish-and-measure result yet showing Lumidian content lifts mention rate. Sell the process and the measurement, not a guaranteed lift; the founding clients ARE the experiment (case-study rights in exchange for founding pricing).
-- **Solo capacity.** Weekly reports are automated, but content review, client comms, and posting support are not. Cap at ~5 retainer clients before hiring a contractor.
+**P2 — frozen.** Everything else (stale branches, 2FA, tokens, og-image) waits until 5 paying local clients exist.
 
 ---
 
 ## Part 2 — The offer
 
-One retainer, sold at two levels. Everything is delivered through the cockpit; no bespoke work outside it.
+### 2.1 One plan, one price
 
-**Lumidian AI Visibility Retainer**
+**Lumidian AI Visibility — $1,000/mo** (founding pricing; rises once proven)
 
-| | **Core — $2,500/mo** | **Plus — $4,500/mo** |
+What every client gets, monthly:
+- **Tracked AI visibility** on up to 10 local prompts across ChatGPT, Claude, Perplexity, and Gemini, with named local competitors (RVI).
+- **Weekly visibility report** (auto-generated PDF) + monthly summary.
+- **Site fixed for AI**: initial AIO audit + implemented fix artifacts (LocalBusiness/service schema, structure, llms.txt/robots.txt), refreshed quarterly.
+- **2 content pieces/mo** built to win question-and-comparison queries: owned-site Q&A/service pages (anchor) + supporting Reddit/Quora presence where authentic.
+- **Live client link** (portal, if merged) or emailed reports.
+
+Terms: 3-month minimum, case-study rights for founding clients, cancel anytime after. Optional $500 one-time setup only if closes come easily without friction — drop it otherwise.
+
+**Explicitly not included:** review management, Google Business Profile optimization, paid ads, guaranteed rankings, social-media community management. One sentence in the SOW: "We make AI assistants recommend you; your existing marketing keeps doing the rest."
+
+**SaaS-select track (separate, passive):** MSC stays at $300 grandfathered until Pro flattening + cited-as-source ship; then a value conversation with Afzal, no pressure. New SaaS signups remain possible but get zero sales effort. Afzal remains a referral channel for any business he brings (10–15% recurring).
+
+### 2.2 Product adaptation for local (the "local pack" — ~1 week of work)
+
+1. **Local prompt templates** — suggested-prompt generation tuned for local: "best [service] in [city]", "[service] cost in [city]", "is [procedure/service] worth it", "[brand] reviews", "[service] near [neighborhood]". Curation layer only; tracking already handles free text.
+2. **Local platform preset** — per-client platform defaults (the already-scoped B2 Phase 6 config): owned_site + reddit + quora ON; wikipedia, medium, linkedin, x OFF by default for local clients.
+3. **LocalBusiness JSON-LD** (+ subtypes: Dentist, Restaurant, HomeAndConstructionBusiness, etc.) in the site-audit artifact generators alongside existing Organization/Article/FAQPage.
+4. **Local source tiers** for the evidence gate — consumer/health/home/city sources instead of trade press (same adaptation already done once for logistics).
+5. **Caveat check:** mention detection is substring-based — flag generic business names ("The Coffee Shop") at onboarding and use distinctive name variants in prompts.
+
+---
+
+## Part 3 — Market and targeting
+
+**We serve any local business.** Nobody who says yes at $1K is turned away — the playbook is standardized enough to deliver for a bakery or a law firm alike.
+
+**We aim outreach where a yes is most likely.** Effort-weighting, not exclusion:
+
+| Outreach priority | Segments | Why |
 |---|---|---|
-| Tracked prompts | up to 15 | up to 30 |
-| Weekly visibility report (auto, PDF) | ✓ | ✓ |
-| Monthly strategy report + call | ✓ | ✓ |
-| Content clusters/mo (owned-site anchor + supporting pieces) | 2 | 5 |
-| Site AIO audit + fix artifacts | initial + quarterly | initial + monthly |
-| Wikipedia plan + drafting | plan only | active drafting |
-| Competitor/RVI tracking | ✓ | ✓ |
+| **Tier 1 — chase** | Dentists, med spas, cosmetic/elective health, PI & immigration law, vets, HVAC/roofing/plumbing (big-ticket), fertility/chiro/physio | Already pay agencies $1–3K/mo; one new customer worth $1K–$20K; heavy question/cost/comparison query surface (our engine's sweet spot) |
+| **Tier 2 — opportunistic** | Restaurants, gyms, salons/barbers, auto repair, real-estate agents, wedding vendors | Real budgets exist but smaller; "near me"-dominant queries; close when warm (referral, inbound, local network) |
+| **Tier 3 — serve inbound only** | Coffee shops, retail boutiques, low-ticket food | Deliverable works, but $1K strains their budget — take the yes, don't spend outreach hours |
 
-- **Founding-client deal (first 3 only): $1,500/mo for Core**, 3-month minimum, in exchange for case-study rights and a testimonial. This validates pricing with real money without anchoring low forever.
-- **MSC:** grandfather at $300 through September while the Pro flattening ships, then a re-price conversation with Afzal ($1,500 founding rate) backed by the new cited-as-source metric and full Pro entitlements. Worst case they stay at $300 — they're still the reference client.
-- Client onboarding = the existing cockpit playbook: kickoff → SOW (Typst PDF) → initial audit → strategy locked → weekly execution. It's already built; use it verbatim.
+**Geography:** start with one metro (Ken's own or an adjacent one) — "I'm local too" converts, referrals compound inside a metro, and city-level Reddit/source knowledge reuses across clients. Expand metro #2 only when metro #1 has 3+ clients.
 
-**What's explicitly NOT in the offer:** earned media/PR outreach (out of scope per Layer A), guaranteed rankings/visibility numbers, auto-posting (doesn't exist — posting is manual/assisted).
+**Positioning line:** *"Your next customer is asking ChatGPT who to call. We track exactly what AI says about you and your competitors — and we build the content and site fixes that get you recommended. $1,000/mo, see your numbers weekly."*
 
 ---
 
-## Part 3 — ICP and positioning
+## Part 4 — Sales motion: the prospect-audit wedge, local flavor
 
-**Beachhead verticals (pick from proof, not theory):**
-1. **Capital-raising / fintech platforms** (Reg A+/CF portals, investor marketplaces) — MSC is the case study; the compliance-aware content process (drafts reviewed before posting) is a differentiator here that generic agencies can't match.
-2. **Logistics/freight SaaS** — RoxStart demo built the whole narrative (DAT at 28% SOV vs. them at 0.9%); the vertical trade-press source library already exists in the product.
+1. **List** 25 businesses/week in the chosen metro, Tier-1 weighted (Google Maps + "best X in [city]" AI answers themselves — whoever ISN'T in the answer is the list).
+2. **Audit** ~10/week: staff-picked local prompts, prospect-audit PDF. Only send when there's a story (named competitor winning the AI answers they're absent from).
+3. **Reach the owner** — email with PDF attached, subject "What ChatGPT says when people search for a [dentist] in [city]". For local, layer channels B2B doesn't have: a phone call to the owner ("I ran a free report on your practice, can I send it?"), walk-ins for storefront businesses, chamber-of-commerce / BNI / local business groups, and local Facebook groups. The live demo on their own phone is the close.
+4. **20-min teardown** → founding offer at $1K → SOW PDF from cockpit same day.
+5. **Follow-up:** bump day 4, breakup day 10.
+6. **Referral engine from day one:** every client, at first visible win, gets asked "which two business owners do you know who'd want this?" Local businesses refer constantly — this becomes the primary channel by month 3 if it works.
 
-**Company shape:** B2B, $2M–$50M revenue, has a marketing lead or founder who owns growth, sells a considered purchase where buyers ask ChatGPT/Perplexity for recommendations. Big enough that $1.5–2.5K/mo is a line item, small enough that Semrush-tier enterprise tools ignore them.
+**LinkedIn/content flywheel:** 2 posts/week of anonymized local findings ("We checked 20 [metro] med spas in ChatGPT — 17 are invisible. The 3 that show up all do this…"). Doubles as SaaS-passive lead capture.
 
-**Positioning line:** "When buyers ask ChatGPT who to use, you're invisible. We measure exactly where you're losing, and we build the content that AI models actually cite — then prove it week over week." Backed by: the prospect-audit PDF (their real numbers), the methodology page (peer-reviewed citations), and the MSC/RoxStart narratives.
-
----
-
-## Part 4 — Sales motion: the prospect-audit wedge
-
-The motion is already productized — the prospect-audit PDF was literally redesigned for cold email. The loop:
-
-1. **List** 25 companies in one beachhead vertical (LinkedIn Sales Nav / trade-press advertiser lists / competitor-of-MSC style lookalikes).
-2. **Audit**: run a prospect audit per company (staff-picked prompts, ~15 min each including prompt curation). Only send audits with a real story (visible gap vs. named competitors).
-3. **Send**: short cold email to the founder/CMO — 3 sentences + the PDF attached. Subject shaped like "How [Company] shows up when buyers ask ChatGPT about [category]". No pitch in email #1; the artifact is the pitch.
-4. **Call**: 20-min teardown of their audit → propose founding retainer → SOW PDF from the cockpit same day.
-5. **Follow-up**: one bump at day 4, one breakup at day 10. Done.
-
-**Pipeline math (conservative):** 10 audits/week → ~15–20% reply (personalized artifact, real data) → 1–2 calls/week → close 1 founding client per 3–4 weeks. That's 3 founding clients (~$4.5K MRR + MSC) by roughly week 10–12.
-
-**Parallel channels (cheap, secondary):**
-- **Afzal / try agi referral deal:** he already manages MSC's account and emails questions — offer 10–15% recurring referral on clients he brings. He is effectively a distribution partner for the fintech vertical.
-- **LinkedIn**: 2 posts/week from anonymized audit findings ("We audited 10 freight-tech companies; 8 are invisible in ChatGPT. Here's the pattern."). Feeds inbound while cold motion runs.
+**Pipeline math at $1K:** 10 audits/wk → local reply rates run higher than B2B cold (personal, their own numbers, small pond) — assume 20–30% response, 2–3 conversations/wk → first close inside 3 weeks, then ~1–2/mo compounding with referrals. **Capacity: ~8 local clients solo** (local delivery is lighter than MSC-style compliance review) → $8K MRR ceiling before the first contractor hire.
 
 ---
 
 ## Part 5 — Six-week execution plan
 
-**Week 1 — Stabilize (engineering, feature-frozen to this list):**
-- Fix the site-audit 1-page crawl bug (P0.1).
-- Verify prospect audit end-to-end: pytest suite in the real 3.11 venv + one live audit on a real company, PDF eyeballed (P0.2).
-- Repo triage: commit/land the 74-file working tree, merge `feat/cluster-detail-overhaul`, push, confirm Railway deploy green (P0.3).
-- Implement Pro-only flattening from the committed spec (P1.4) — it's a migration + price-ID mapping, already designed.
+**Week 1 — Stabilize + localize (feature-frozen to this list):**
+- Fix the site-audit crawler bug (P0.1).
+- Verify prospect audit end-to-end; run one live audit on a real Tier-1 local business in the target metro (P0.2).
+- Land/merge/deploy the working tree and branch (P0.3).
+- Start the local pack (Part 2.2): prompt templates + platform preset first.
 
-**Week 2 — Package + first pipeline:**
-- Ship the cited-as-source metric (P1.5) and email Afzal that it's live (promise kept → opens the re-price conversation).
-- PDF Phase 6 visual pass on the 7 doc kinds against MSC data (P1.8).
-- Build the first 25-company list (pick ONE vertical: recommend fintech/capital-raising, since MSC is referenceable).
-- Write the 3-sentence cold email + the founding-client one-pager. Decide client-portal fate (P1.7): recommend fix+merge only if it's <2 days, else park.
+**Week 2 — Finish local pack + package:**
+- LocalBusiness JSON-LD + local source tiers.
+- Pro flattening implementation + cited-as-source metric (SaaS-select promises to MSC — timeboxed to ~2 days combined; slip to week 3 if the local pack needs the time).
+- Pick metro; build the first 25-business Tier-1 list; write the cold email + one-page founding offer; decide client-portal fix-vs-park.
+- Run 3 practice audits; eyeball PDFs against the "would an owner understand this in 60 seconds?" bar.
 
 **Weeks 3–4 — Outreach sprint 1:**
-- 10 audits + 10 sends/week. Track in a simple sheet (company, sent, replied, call, outcome).
-- 2 LinkedIn posts/week from findings.
-- Take every call; propose founding deal on the call; SOW PDF same day.
+- 10 audits + 10 sends/week, phone-follow every send within 48h. Track in a sheet: business, segment, sent, replied, call, outcome, objection verbatim.
+- 2 LinkedIn posts/week from findings. Attend 1 local business group meeting.
+- Close on the call at $1K founding; SOW same day; kickoff within a week.
 
-**Weeks 5–6 — Iterate or double down:**
-- If replies <10%: the artifact or the list is wrong — rework email/audit story before adding volume.
-- If calls happen but no closes: pricing/offer objection — capture verbatim objections, adjust.
-- Start vertical #2 (logistics) list only if vertical #1 is producing calls.
-- MSC re-price conversation once Pro entitlements + cited-as-source are live.
+**Weeks 5–6 — Read the data and adjust:**
+- Replies <10%: artifact or list problem — rework the email/audit story before adding volume.
+- Calls but no closes: capture objections; test $750 founding vs. adding a concrete deliverable, don't silently discount.
+- 1+ close: onboard through the cockpit playbook verbatim; ask for 2 referrals at first visible win; start metro list #2 only if #1 is producing.
 
-**Standing rule for the 6 weeks:** no product work outside the P0/P1 list and client-fulfillment bugs. Every session starts from this plan, not from the backlog.
+**Standing rule:** no product work outside P0/P1 + client-fulfillment bugs until 5 paying clients. Every session starts from this doc.
 
 ---
 
 ## Part 6 — Targets and review gates
 
-| Date | Gate | Bail/adjust signal |
+| Date | Gate | Adjust signal |
 |---|---|---|
-| Aug 7 | P0 list done, prod stable, first list built | — |
-| Aug 21 | ≥20 audits sent, reply rate known | <5% replies → rework artifact/email before continuing |
-| Sep 15 | ≥2 founding clients signed (~$3K+ MRR incl. MSC) | 0 closes after 8+ calls → offer/pricing rethink |
-| Oct 15 | 3 founding clients, delivery loop running weekly | Capacity check: hire contractor at client #4 |
+| Aug 7 | P0 done, prod stable, local pack started, metro picked | — |
+| Aug 21 | ≥20 audits sent, reply rate known | <10% replies → rework artifact/email |
+| Sep 15 | ≥2 founding clients (~$2K local MRR + MSC) | 0 closes after 10+ conversations → offer/price rethink |
+| Oct 15 | 4–5 clients, weekly delivery loop humming, first before/after case study drafted | Hire contractor at client #6–8 |
 
-**The one metric:** signed retainer MRR. Not features shipped, not audit scores.
+**The one metric: signed local retainer MRR.** Secondary: time-to-first-visible-AI-answer-change per client (the case-study clock).
 
 ---
 
-## Part 7 — Open items for Ken
+## Part 7 — Decisions log + remaining opens
 
-1. Approve founding price ($1,500/mo) and the two-tier card ($2,500 / $4,500) — or set different numbers.
-2. Pick the first vertical (recommendation: capital-raising/fintech).
-3. Approve the MSC plan (grandfather → re-price after entitlements ship).
-4. Client portal: fix+merge or park?
-5. Greenlight Week 1 engineering list so it can start immediately.
+**Decided (Ken, 2026-07-30):** local businesses — any local business — as the market; $1,000/mo; SaaS kept for select accounts (MSC) with no sales focus.
+
+**Still open:**
+1. Which metro first?
+2. Client portal: fix+merge (~estimate first) or park?
+3. Setup fee: $500 or zero-friction?
+4. Greenlight Week 1 engineering (crawler bug first).

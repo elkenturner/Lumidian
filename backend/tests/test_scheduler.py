@@ -115,3 +115,30 @@ async def test_stale_run_cleanup_tick_leaves_fresh_runs_alone():
     async with AsyncSessionLocal() as db:
         refreshed = await db.get(TrackingRun, run_id)
         assert refreshed.status == "running"
+
+
+def test_morning_sweep_runs_weekly_on_monday(monkeypatch):
+    """Scheduled tracking is weekly — Monday 08:00 UTC, not daily.
+
+    Pro-only tiering spec (2026-07-29) §3: daily runs mostly re-measure
+    unchanged visibility and burn API budget; manual runs cover on-demand needs.
+
+    Captures triggers at registration instead of starting the module-level
+    scheduler — AsyncIOScheduler binds the first event loop it starts on, so a
+    real start/stop here breaks any later test that starts the scheduler again.
+    """
+    from app import scheduler as sched_mod
+
+    triggers = {}
+    monkeypatch.setattr(
+        sched_mod.scheduler, "add_job",
+        lambda func, trigger=None, **kw: triggers.__setitem__(kw.get("id"), trigger),
+    )
+    monkeypatch.setattr(sched_mod.scheduler, "start", lambda: None)
+
+    sched_mod.start_scheduler()
+
+    fields = {f.name: str(f) for f in triggers["morning_sweep"].fields}
+    assert fields["day_of_week"] == "mon"
+    assert fields["hour"] == "8"
+    assert fields["minute"] == "0"

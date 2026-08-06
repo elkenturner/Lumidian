@@ -5,7 +5,7 @@ Jobs:
   • 02:00 UTC        — SQLite backup (daily)
   • 04:00 UTC, day 1 — Monthly website context refresh via Jina Reader
   • 06:00 UTC        — Pitch brand expiry: warn users 24 h before expiry, delete expired brands
-  • 08:00 UTC        — Morning tracking sweep (once daily)
+  • 08:00 UTC Mon    — Weekly tracking sweep (standard/pro brands)
   • 21:00 UTC        — Visibility drop alerts (email if score drops ≥ 15 pts vs previous run)
   • every 5 min      — Auto-fail stale tracking runs (tracking_stale_run_cleanup)
 
@@ -644,12 +644,12 @@ def start_scheduler() -> None:
     """Register jobs and start the scheduler. Called from FastAPI lifespan."""
     scheduler.add_job(
         _run_all_brands,
-        trigger=CronTrigger(hour=8, minute=0, timezone="UTC"),
+        trigger=CronTrigger(day_of_week="mon", hour=8, minute=0, timezone="UTC"),
         args=["morning"],
         id="morning_sweep",
-        name="Morning tracking sweep (08:00 UTC)",
+        name="Weekly tracking sweep (Monday 08:00 UTC)",
         replace_existing=True,
-        misfire_grace_time=300,
+        misfire_grace_time=3600,
     )
 
     scheduler.add_job(

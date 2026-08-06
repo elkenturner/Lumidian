@@ -337,7 +337,7 @@ Dedicated `/wiki/[brandId]` surface for discovering existing Wikipedia articles 
 | 02:00 | Daily | SQLite backup |
 | 04:00 | Monthly (1st) | Website context refresh via Jina |
 | 06:00 | Daily | Pitch expiry warnings & cleanup |
-| 08:00 | Daily | Morning visibility tracking sweep |
+| 08:00 | Weekly (Mon) | Visibility tracking sweep (standard/pro brands) |
 | 21:00 | Daily | Visibility drop alerts (email if ≥15pp drop) |
 
 Scheduler can be paused via `SystemSetting` key `"scheduler_paused"`.

@@ -389,7 +389,7 @@ export default function ReportsPage() {
             {latestRun?.status === 'completed' && latestRun.completed_at
               ? `Data below is from the report completed ${format(parseUTCISO(latestRun.completed_at), 'MMM d, yyyy')}. `
               : ''}
-            Reports update automatically once daily at 8:00 AM UTC.
+            Reports update automatically every Monday at 8:00 AM UTC. Run a report any time for a fresh number.
           </p>
 
           {/* Degraded-run warning */}

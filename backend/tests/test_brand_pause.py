@@ -90,3 +90,54 @@ async def test_lapsed_subscription_blocks_run(client: AsyncClient):
     run_resp = await client.post(f"/api/tracking/run/{brand_id}")
     assert run_resp.status_code in (402, 403)
     assert run_resp.status_code != 202, "Run should be blocked for a canceled subscription"
+
+
+@pytest.mark.asyncio
+async def test_tracking_paused_brand_still_allows_manual_runs(client: AsyncClient):
+    """tracking_paused excludes a brand from sweeps only — manual runs still work."""
+    await register_and_login(client, "trackpause@test.com", "Password123", subscription_tier="pro")
+
+    brand_resp = await client.post(
+        "/api/brands",
+        json={"name": "TrackPausedBrand", "tier": "premium", "brand_type": "pro",
+              "prompts": ["test prompt"], "website_url": "https://trackpaused.example.com"},
+    )
+    assert brand_resp.status_code == 201
+    brand_id = brand_resp.json()["id"]
+
+    from app.database import AsyncSessionLocal
+    from app.models import Brand
+    async with AsyncSessionLocal() as db:
+        brand = await db.get(Brand, brand_id)
+        brand.tracking_paused = True
+        await db.commit()
+
+    run_resp = await client.post(f"/api/tracking/run/{brand_id}")
+    assert run_resp.status_code == 202
+
+
+@pytest.mark.asyncio
+async def test_admin_can_set_tracking_paused(client: AsyncClient):
+    """PATCH /api/admin/brands/{id} can toggle tracking_paused."""
+    from tests.test_admin import make_admin
+
+    await register_and_login(client, "trackpauseowner@test.com", "Password123", subscription_tier="pro")
+    brand_resp = await client.post(
+        "/api/brands",
+        json={"name": "AdminPauseBrand", "tier": "premium", "brand_type": "pro",
+              "prompts": ["test prompt"], "website_url": "https://adminpause.example.com"},
+    )
+    assert brand_resp.status_code == 201
+    brand_id = brand_resp.json()["id"]
+
+    await make_admin(client)
+    patch_resp = await client.patch(
+        f"/api/admin/brands/{brand_id}", json={"tracking_paused": True}
+    )
+    assert patch_resp.status_code == 200
+
+    from app.database import AsyncSessionLocal
+    from app.models import Brand
+    async with AsyncSessionLocal() as db:
+        brand = await db.get(Brand, brand_id)
+        assert brand.tracking_paused is True

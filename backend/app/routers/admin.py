@@ -632,6 +632,7 @@ class AdminEditBrand(BaseModel):
     tier: str | None = None
     brand_type: str | None = None
     website_url: str | None = None
+    tracking_paused: bool | None = None
 
 
 @router.patch("/brands/{brand_id}")

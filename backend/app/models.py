@@ -116,6 +116,8 @@ class Brand(Base):
     brand_type: Mapped[str] = mapped_column(String(20), nullable=False, default="standard")
     pitch_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     prompt_limit: Mapped[int] = mapped_column(Integer, default=25)
+    # Excluded from scheduled sweeps (and their owner emails); manual runs unaffected
+    tracking_paused: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     last_manual_draft_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     agency_client_id: Mapped[int | None] = mapped_column(
         Integer, ForeignKey("agency_clients.id", ondelete="SET NULL"), nullable=True, index=True

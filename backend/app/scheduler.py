@@ -56,6 +56,9 @@ def _is_brand_paused(brand, paused_user_ids: set[int]) -> bool:
         user-deletion path that forgets to cascade; otherwise the scheduler
         would burn LLM quota on brands no one can ever see
       - Brand owner has is_paused=True (admin-paused account)
+      - Brand has tracking_paused=True (per-brand sweep opt-out; manual runs
+        still work — used e.g. for prospect trial brands that must never
+        receive automated report emails)
     """
     from datetime import datetime
 
@@ -71,6 +74,10 @@ def _is_brand_paused(brand, paused_user_ids: set[int]) -> bool:
 
     # Skip brands whose owner is paused
     if brand.user_id in paused_user_ids:
+        return True
+
+    # Skip brands with per-brand scheduled tracking paused
+    if getattr(brand, "tracking_paused", False):
         return True
 
     return False

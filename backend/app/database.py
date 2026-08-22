@@ -905,6 +905,17 @@ async def run_migrations():
             await conn.execute(text("ALTER TABLE competitors ADD COLUMN in_peer_pool BOOLEAN NOT NULL DEFAULT 1"))
             logger.info("Migration applied: competitors.in_peer_pool column")
 
+    # --- Migration: brands.tracking_paused (2026-08-21) ---
+    # Per-brand opt-out from scheduled sweeps (and the owner emails they send).
+    # Manual runs are unaffected. Used for prospect trial brands that must
+    # never receive automated report-ready emails.
+    async with engine.begin() as conn:
+        result = await conn.execute(text("PRAGMA table_info(brands)"))
+        cols = {row[1] for row in result.fetchall()}
+        if "tracking_paused" not in cols:
+            await conn.execute(text("ALTER TABLE brands ADD COLUMN tracking_paused BOOLEAN NOT NULL DEFAULT 0"))
+            logger.info("Migration applied: brands.tracking_paused column")
+
 
 async def cleanup_stale_runs(max_age_minutes: int = 15):
     """On startup, resolve tracking runs stuck in pending/running.

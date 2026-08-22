@@ -142,3 +142,35 @@ def test_morning_sweep_runs_weekly_on_monday(monkeypatch):
     assert fields["day_of_week"] == "mon"
     assert fields["hour"] == "8"
     assert fields["minute"] == "0"
+
+
+@pytest.mark.asyncio
+async def test_tracking_paused_brand_is_skipped_by_sweeps():
+    """A brand with tracking_paused=True is excluded from scheduled sweeps.
+
+    Prospect trial brands must never trigger automated owner emails; the
+    scheduled-run path is the only one that sends them (manual runs don't),
+    so excluding the brand from sweeps is sufficient.
+    """
+    from app.database import AsyncSessionLocal
+    from app.models import Brand, User
+    from app.scheduler import _is_brand_paused
+
+    async with AsyncSessionLocal() as db:
+        user = User(email="sweep_paused@example.com", password_hash="x", name="t")
+        db.add(user)
+        await db.flush()
+        paused = Brand(
+            user_id=user.id, name="Sweep Paused Brand", slug="sweep-paused-brand",
+            tracking_paused=True,
+        )
+        normal = Brand(
+            user_id=user.id, name="Sweep Normal Brand", slug="sweep-normal-brand",
+        )
+        db.add_all([paused, normal])
+        await db.commit()
+
+        assert _is_brand_paused(paused, set()) is True
+        # Default is False — ordinary brands keep their scheduled runs
+        assert normal.tracking_paused is False
+        assert _is_brand_paused(normal, set()) is False

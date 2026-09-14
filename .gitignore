@@ -34,6 +34,7 @@ Thumbs.db
 .playwright-mcp/
 backend/logs/
 *.png
+!frontend/public/*.png
 frontend/tsconfig.tsbuildinfo
 .github/workflows/
 .superpowers/

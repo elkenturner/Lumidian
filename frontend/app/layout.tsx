@@ -33,23 +33,23 @@ const BASE_URL = 'https://lumidian.ai';
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: 'Lumidian — Know when AI mentions your brand',
-    template: '%s — Lumidian',
+    default: 'Lumidian | AI visibility, done for you',
+    template: '%s | Lumidian',
   },
-  description: 'Track how ChatGPT, Claude, Perplexity, and Gemini mention your brand. Get a daily visibility score, per-model breakdown, and a shareable pitch deck.',
+  description: 'We track what ChatGPT, Claude, Perplexity, and Gemini say about your business, then build the content and site fixes that get you recommended. One plan, $1,000 a month.',
   keywords: ['AI visibility', 'brand tracking', 'ChatGPT mentions', 'LLM brand monitoring', 'AI search optimization', 'Lumidian'],
   openGraph: {
     type: 'website',
     url: BASE_URL,
     siteName: 'Lumidian',
-    title: 'Lumidian — Know when AI mentions your brand',
-    description: 'Track how ChatGPT, Claude, Perplexity, and Gemini mention your brand. Daily visibility scores, trend charts, and a shareable pitch deck.',
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Lumidian — Brand Visibility Tracker' }],
+    title: 'Lumidian | AI visibility, done for you',
+    description: 'We track what ChatGPT, Claude, Perplexity, and Gemini say about your business, then build the content and site fixes that get you recommended.',
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Lumidian' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Lumidian — Know when AI mentions your brand',
-    description: 'Track how ChatGPT, Claude, Perplexity, and Gemini mention your brand.',
+    title: 'Lumidian | AI visibility, done for you',
+    description: 'We track what AI assistants say about your business, then fix it.',
     images: ['/og-image.png'],
   },
   icons: {

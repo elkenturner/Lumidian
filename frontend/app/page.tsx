@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   BarChart2,
@@ -13,21 +13,24 @@ import {
   MessageSquare,
   Settings2,
   ChevronDown,
-  Play,
   Menu,
   X,
   Users,
   Activity,
+  Mail,
+  Repeat,
+  ShieldCheck,
+  Ban,
+  Layers,
 } from 'lucide-react';
 import LumidianLogo from '@/components/LumidianLogo';
-import { TIER_DISPLAY_NAMES, TIER_PRICES } from '@/lib/tiers';
 import { useInView, FadeUp, ScaleIn } from '@/lib/motion';
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ANIMATION HOOKS
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Local useCountUp — returns { ref, value: number } shape used by DashboardMockup.
+// Local useCountUp returns the { ref, value: number } shape used by DashboardMockup.
 // The canonical useCountUp in lib/motion returns a plain string; signatures differ.
 function useCountUp(target: number, duration = 1200) {
   const [value, setValue] = useState(0);
@@ -56,46 +59,58 @@ function useCountUp(target: number, duration = 1200) {
 // DATA
 // ═══════════════════════════════════════════════════════════════════════════════
 
+const CONTACT_EMAIL = 'ken@lumidian.ai';
+
+const AUDIT_MAILTO =
+  `mailto:${CONTACT_EMAIL}?subject=` +
+  encodeURIComponent('Free AI visibility audit') +
+  '&body=' +
+  encodeURIComponent(
+    'Business name:\nWebsite:\nCity:\nOne or two questions customers ask before they call you:\n',
+  );
+
+const MONTHLY_PRICE = '$1,000';
+
 const FEATURES = [
   {
     icon: BarChart2,
-    title: 'Track AI Visibility',
-    desc: 'Monitor how often your brand appears in ChatGPT, Claude, Perplexity, and Gemini responses.',
+    title: 'Visibility tracking',
+    desc: 'How often your business appears when ChatGPT, Claude, Perplexity, and Gemini answer the questions your customers ask.',
   },
   {
     icon: Target,
-    title: 'Identify Gaps',
-    desc: 'See exactly which prompts miss your brand, which competitors appear instead, and where to focus.',
+    title: 'Gap finding',
+    desc: 'Which questions miss you, which competitors get named instead, and where the next piece of work should go.',
   },
   {
     icon: Sparkles,
-    title: 'Auto-Draft Content',
-    desc: 'Platform-specific drafts generated for every gap — Reddit posts, Quora answers, LinkedIn articles, X threads, Medium articles, and Wikipedia edits.',
+    title: 'Content built for retrieval',
+    desc: 'Pages on your own site first, backed by Reddit and Quora answers where a real thread exists. Written to be found by AI search, not to chase likes.',
   },
   {
     icon: TrendingUp,
-    title: 'Monitor Trends',
-    desc: 'Track visibility changes over time with trend charts, shareable PDF reports, and email alerts when your score drops.',
+    title: 'Weekly reporting',
+    desc: 'A PDF every week with the score, the per-model breakdown, and what moved. A monthly summary on top.',
   },
   {
     icon: MessageSquare,
-    title: 'Visibility Opportunities',
-    desc: 'Surface live threads and discussions across Reddit, Quora, LinkedIn, and X where your brand can contribute — scored by relevance.',
+    title: 'Live thread monitoring',
+    desc: 'Reddit and Quora discussions where your business could honestly contribute, scored by relevance to your tracked questions.',
   },
   {
     icon: Settings2,
-    title: 'Brand Voice Control',
-    desc: 'Define your tone and guidelines so every draft matches your brand exactly.',
+    title: 'Site fixes for AI',
+    desc: 'An audit of how AI crawlers read your site, then the fixes: schema, structure, llms.txt, robots.txt. Refreshed quarterly.',
   },
   {
     icon: Users,
-    title: 'Competitor Intelligence',
-    desc: 'Track how often competitors appear alongside your brand. Compare mention rates, share of voice, and see who\'s winning each prompt.',
+    title: 'Competitor tracking',
+    desc: 'Named local competitors tracked on the same questions, so you can see share of voice and who wins each one.',
   },
   {
     icon: Activity,
-    title: 'Sentiment & Position',
-    desc: 'Know whether AI models describe your brand positively, neutrally, or negatively — and where you appear in the response.',
+    title: 'Sentiment and position',
+    desc: 'Whether the models describe you positively, neutrally, or negatively, and where in the answer you appear.',
   },
 ];
 
@@ -109,65 +124,92 @@ const AI_MODELS = [
 const HOW_STEPS = [
   {
     n: '1',
-    title: 'Track Your Visibility',
-    desc: 'Connect your brand and set prompts. We query all four AI models daily and score how often you appear.',
+    title: 'We measure',
+    desc: 'We pick up to 10 questions your customers actually ask, then run each one three times on every model, every week. You get a score you can trust and a breakdown by model.',
   },
   {
     n: '2',
-    title: 'Identify the Gaps',
-    desc: 'See exactly which prompts miss your brand and what competitors get mentioned instead.',
+    title: 'We find the gaps',
+    desc: 'The questions where you are missing, the competitors the models name instead, and the sources those answers are built from.',
   },
   {
     n: '3',
-    title: 'Close the Gaps',
-    desc: 'We generate targeted drafts for Reddit, Quora, LinkedIn, X, Medium, and Wikipedia — each one aimed at prompts where your brand is missing. Review, edit, and post.',
+    title: 'We build the fixes',
+    desc: 'Two content pieces a month aimed at those gaps, plus the site changes AI crawlers need. You approve everything before it goes out under your name.',
   },
 ];
 
-const COMPARISON_FEATURES = [
-  { label: 'Brands', free: '1 (30-day)', basic: '1', starter: '1', pro: '2' },
-  { label: 'Prompts per brand', free: '10', basic: '10', starter: '25', pro: '30' },
-  { label: 'Manual runs per day', free: '1', basic: '2', starter: '3', pro: 'Unlimited' },
-  { label: 'AI models monitored', free: '3', basic: '4 (enhanced search)', starter: '4 (enhanced search)', pro: '4 (enhanced search)' },
-  { label: 'Daily tracking', free: true, basic: true, starter: true, pro: true },
-  { label: 'Visibility score & report', free: true, basic: true, starter: true, pro: true },
-  { label: 'Content Hub & drafting', free: true, basic: true, starter: true, pro: true },
-  { label: 'Content drafts', free: '5', basic: '10', starter: 'Unlimited', pro: 'Unlimited' },
-  { label: 'LinkedIn & X drafts', free: false, basic: true, starter: true, pro: true },
-  { label: 'Gap analysis', free: true, basic: true, starter: true, pro: true },
-  { label: 'Brand profile & voice', free: true, basic: true, starter: true, pro: true },
-  { label: 'Opportunity scanner', free: false, basic: '5/week', starter: '10/week', pro: '25/week' },
-  { label: 'Trend charts', free: true, basic: true, starter: true, pro: true },
-  { label: 'Email alerts', free: true, basic: true, starter: true, pro: true },
-  { label: 'Competitors per brand', free: '3', basic: '3', starter: '5', pro: '15' },
-  { label: 'Team members', free: '—', basic: '—', starter: '1', pro: '3' },
-  { label: 'Support', free: 'Community', basic: 'Email', starter: 'Email', pro: 'Priority' },
+const METHOD_POINTS = [
+  {
+    icon: Repeat,
+    title: 'Three passes per question, per model',
+    desc: 'The same question gets a different answer on the next ask. One response is an anecdote. We score the rate across repeated runs.',
+  },
+  {
+    icon: Layers,
+    title: 'Four surfaces, because they disagree',
+    desc: 'In our own 900-run study, any two AI surfaces agreed on the top answer to the same question 20 to 23 percent of the time. A score from one model tells you about one model.',
+  },
+  {
+    icon: Ban,
+    title: 'No "AI ranking position"',
+    desc: 'Exact answer lists rarely repeat, so a position number is noise. Mention rate over repeated questions is stable, and that is what we report.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'Failed queries do not count against you',
+    desc: 'A timeout or an API error is left out of the denominator. The score only reflects answers we actually received and read.',
+  },
+];
+
+const INCLUDED = [
+  'Up to 10 tracked questions across ChatGPT, Claude, Perplexity, and Gemini, with named competitors',
+  'Three runs per question per model, every week',
+  'Weekly visibility report (PDF) and a monthly summary',
+  'Site audit for AI crawlers, with the fixes implemented and refreshed quarterly',
+  'Two content pieces a month, built to win the questions you are losing',
+  'A login to the live dashboard, so you can check the numbers any time',
+];
+
+const NOT_INCLUDED = [
+  'Review management or Google Business Profile work',
+  'Paid ads',
+  'Social media community management',
+  'Guaranteed rankings. Nobody can promise what an AI model will say.',
 ];
 
 const FAQ_ITEMS = [
   {
-    q: 'How does Lumidian track AI visibility?',
-    a: 'Lumidian runs your tracked prompts across ChatGPT, Claude, Perplexity, and Gemini daily, analyzing each response to detect whether your brand is mentioned. Results are scored and stored so you can track changes over time.',
+    q: 'How do you measure AI visibility?',
+    a: 'We send each of your tracked questions to ChatGPT, Claude, Perplexity, and Gemini through their APIs, with web search on, three times per model every week. Each answer is checked for your business name. Your score is the share of answers that mention you. The methodology page explains every step and cites the research behind it.',
   },
   {
-    q: 'What kind of content does Lumidian draft?',
-    a: 'Lumidian generates Reddit posts, Quora answers, LinkedIn articles, X threads, Medium articles, and Wikipedia edits — all targeted at prompts where your brand has low visibility. Every draft follows your brand voice guidelines.',
+    q: 'What do you actually build?',
+    a: 'Pages on your own site first, because that is where AI search looks for a definitive answer. Then Reddit and Quora answers where a real thread exists and a plain, disclosed reply would help. Two pieces a month, each aimed at a question you are currently losing.',
   },
   {
-    q: 'Is the content AI-generated or human-written?',
-    a: 'Drafts are AI-generated but always require your approval before posting. You can edit any draft before approving it. Nothing is posted automatically.',
+    q: 'Is the content AI-generated?',
+    a: 'Drafts start in our system and get edited by a person before you see them. Nothing is published, and nothing appears under your name, until you approve it.',
   },
   {
-    q: 'How long does it take to see results?',
-    a: 'Most brands see measurable visibility improvements within 4 to 8 weeks of consistent content posting. AI models update their responses as new authoritative content appears across the web.',
+    q: 'How long until the score moves?',
+    a: 'We do not promise a timeline. AI answers change as new sources appear on the web, and the models do not update on a schedule we control. What we can promise is honest measurement: enough repeated runs to tell a real change from noise, reported every week, whether it moved or not. The three-month minimum exists because one month is not enough time to see anything.',
   },
   {
-    q: 'Is my brand data private?',
-    a: 'Yes. Your brand profile, prompts, and tracking data are only visible to your account. We never share individual client data.',
+    q: 'Why one price?',
+    a: 'Because the work is the same for a dentist and a law firm: measure, find the gaps, build the fixes. A tiered menu would only make you guess which features you need. Founding pricing is $1,000 a month and will rise once the results are proven.',
   },
   {
-    q: 'What makes Lumidian different from SEO tools?',
-    a: "Traditional SEO tools track Google rankings. Lumidian tracks what AI models say about your brand — a fundamentally different signal that SEO tools don't measure.",
+    q: 'Can I just use the software?',
+    a: 'The platform is available to a small number of accounts by arrangement, not as a self-serve trial. If that is what you want, email us and say so.',
+  },
+  {
+    q: 'Is my data private?',
+    a: 'Yes. Your questions, competitors, and tracking data are visible only to your account and to us. We never share individual client data.',
+  },
+  {
+    q: 'How is this different from SEO?',
+    a: 'SEO tools track Google rankings. We track what AI assistants say when someone asks them who to call, which is a different signal that those tools do not measure. The two are related: the sources AI models cite are web pages, so good SEO helps. It just is not the same thing.',
   },
 ];
 
@@ -179,13 +221,21 @@ const DEMO_MODELS = [
 ];
 
 const DEMO_GAPS = [
-  { prompt: 'best tools for [your industry]', score: 12 },
-  { prompt: 'top solutions in [your category]', score: 18 },
-  { prompt: 'recommended [your product type]', score: 21 },
+  { prompt: 'best [service] in [your city]', score: 12 },
+  { prompt: 'how much does [service] cost in [your city]', score: 18 },
+  { prompt: 'is [procedure] worth it', score: 21 },
+];
+
+const NAV_LINKS = [
+  { href: '#features', label: 'What you get' },
+  { href: '#how', label: 'How it works' },
+  { href: '/methodology', label: 'Methodology' },
+  { href: '#pricing', label: 'Pricing' },
+  { href: '#faq', label: 'FAQ' },
 ];
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SECTION COMPONENTS (placeholders - will be implemented in subsequent tasks)
+// SECTION COMPONENTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 function Header({ scrolled }: { scrolled: boolean }) {
@@ -208,18 +258,17 @@ function Header({ scrolled }: { scrolled: boolean }) {
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">
-              Features
-            </a>
-            <Link href="/methodology" className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">
-              Methodology
-            </Link>
-            <a href="#pricing" className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">
-              Pricing
-            </a>
-            <a href="#faq" className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">
-              FAQ
-            </a>
+            {NAV_LINKS.map((l) =>
+              l.href.startsWith('#') ? (
+                <a key={l.href} href={l.href} className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">
+                  {l.label}
+                </a>
+              ) : (
+                <Link key={l.href} href={l.href} className="text-sm font-medium text-[var(--text-secondary)] hover:text-white transition-colors">
+                  {l.label}
+                </Link>
+              ),
+            )}
           </nav>
 
           {/* Desktop CTAs */}
@@ -230,18 +279,19 @@ function Header({ scrolled }: { scrolled: boolean }) {
             >
               Log in
             </Link>
-            <Link
-              href="/register"
+            <a
+              href={AUDIT_MAILTO}
               className="text-sm font-semibold text-white px-5 py-2.5 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-lg"
             >
-              Get Started
-            </Link>
+              Request an audit
+            </a>
           </div>
 
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 text-[var(--text-secondary)] hover:text-white"
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
           >
             {mobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
@@ -251,17 +301,20 @@ function Header({ scrolled }: { scrolled: boolean }) {
         {mobileMenuOpen && (
           <div className="md:hidden py-4 border-t border-[var(--border-subtle)]">
             <nav className="flex flex-col gap-1">
-              <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[var(--text-secondary)] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">Features</a>
-              <Link href="/methodology" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[var(--text-secondary)] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">Methodology</Link>
-              <a href="#pricing" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[var(--text-secondary)] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">Pricing</a>
-              <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[var(--text-secondary)] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">FAQ</a>
+              {NAV_LINKS.map((l) =>
+                l.href.startsWith('#') ? (
+                  <a key={l.href} href={l.href} onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[var(--text-secondary)] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">{l.label}</a>
+                ) : (
+                  <Link key={l.href} href={l.href} onClick={() => setMobileMenuOpen(false)} className="text-base font-medium text-[var(--text-secondary)] hover:text-white py-3 px-2 rounded-lg hover:bg-[rgba(255,255,255,0.05)] transition-colors">{l.label}</Link>
+                ),
+              )}
               <div className="flex flex-col gap-3 pt-4 mt-2 border-t border-[var(--border-subtle)]">
                 <Link href="/login" className="text-base font-medium text-white text-center py-3 rounded-full border border-[rgba(255,255,255,0.2)]">
                   Log in
                 </Link>
-                <Link href="/register" className="text-base font-semibold text-white text-center py-3.5 rounded-full bg-[var(--accent)]">
-                  Get Started
-                </Link>
+                <a href={AUDIT_MAILTO} className="text-base font-semibold text-white text-center py-3.5 rounded-full bg-[var(--accent)]">
+                  Request an audit
+                </a>
               </div>
             </nav>
           </div>
@@ -282,56 +335,58 @@ function HeroSection() {
         }}
       />
 
-
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
         {/* Badge */}
         <FadeUp>
           <div className="inline-flex items-center gap-2 bg-[var(--bg-raised)] border border-[rgba(95,126,166,0.3)] rounded-full px-4 py-1.5 mb-8">
             <span className="w-2 h-2 rounded-full bg-[#22c55e] animate-pulse" />
-            <span className="text-sm text-[var(--text-secondary)]">Now tracking 4 AI models</span>
+            <span className="text-sm text-[var(--text-secondary)]">AI visibility, done for you</span>
           </div>
         </FadeUp>
 
         {/* Headline */}
         <FadeUp delay={100}>
           <h1
-            className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-extrabold tracking-tight"
+            className="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight"
             style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif', letterSpacing: '-0.03em', lineHeight: 1.05 }}
           >
-            Track Your Brand&apos;s
+            Know what AI says about you.
             <br />
-            <span className="text-[var(--accent)]">
-              Visibility in AI
-            </span>
-            {' — Then Fix It'}
+            <span className="text-[var(--accent)]">Then change it.</span>
           </h1>
         </FadeUp>
 
         {/* Subhead */}
         <FadeUp delay={200}>
           <p className="mt-6 text-lg sm:text-xl text-[var(--text-secondary)] max-w-2xl mx-auto leading-relaxed">
-            Monitor how ChatGPT, Claude, Perplexity, and Gemini talk about your brand.
-            Find where you&apos;re missing — then fix it with targeted, AI-drafted content.
+            Your next customer is asking ChatGPT who to call. We track what
+            ChatGPT, Claude, Perplexity, and Gemini say about you and your
+            competitors, then build the content and site fixes that get you
+            recommended. One plan, {MONTHLY_PRICE} a month, numbers every week.
           </p>
         </FadeUp>
 
         {/* CTAs */}
         <FadeUp delay={300}>
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/register"
+            <a
+              href={AUDIT_MAILTO}
               className="flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-[background-color,box-shadow] shadow-lg hover:shadow-xl"
             >
-              <Play size={18} fill="white" />
-              Start Free
-            </Link>
+              <Mail size={18} />
+              Request a free visibility audit
+            </a>
             <Link
-              href="/login"
-              className="text-lg font-medium text-white px-6 py-4 rounded-full border border-[rgba(255,255,255,0.25)] hover:border-white hover:bg-[rgba(255,255,255,0.05)] transition-[border-color,background-color]"
+              href="/methodology"
+              className="flex items-center gap-2 text-lg font-medium text-white px-6 py-4 rounded-full border border-[rgba(255,255,255,0.25)] hover:border-white hover:bg-[rgba(255,255,255,0.05)] transition-[border-color,background-color]"
             >
-              Log in
+              How we measure it
+              <ArrowRight size={16} />
             </Link>
           </div>
+          <p className="mt-4 text-sm text-[var(--text-muted)]">
+            No sign-up. We run your questions and send you the numbers, whether or not you hire us.
+          </p>
         </FadeUp>
 
         {/* Dashboard mockup */}
@@ -348,16 +403,13 @@ function ModelsBar() {
     <section className="py-12 border-y border-[var(--border-subtle)]">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeUp>
-          <p className="text-center text-sm text-[var(--text-muted)] mb-6">Tracking visibility across</p>
+          <p className="text-center text-sm text-[var(--text-muted)] mb-6">Measured on all four, every week</p>
         </FadeUp>
         <div className="flex flex-wrap justify-center gap-3">
           {AI_MODELS.map((model, i) => (
             <FadeUp key={model.name} delay={i * 60}>
               <div
-                className="flex items-center gap-2 bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-full px-4 py-2 transition-[border-color] hover:border-opacity-100"
-                style={{
-                  ['--model-color' as string]: model.color,
-                }}
+                className="flex items-center gap-2 bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-full px-4 py-2 transition-[border-color]"
                 onMouseEnter={(e) => {
                   e.currentTarget.style.borderColor = model.color;
                 }}
@@ -388,12 +440,12 @@ function FeaturesSection() {
             className="text-3xl sm:text-4xl font-bold text-center text-[var(--text-primary)] mb-4"
             style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
           >
-            Everything you need to dominate AI visibility
+            What you get every month
           </h2>
         </FadeUp>
         <FadeUp delay={100}>
           <p className="text-center text-[var(--text-secondary)] mb-16 max-w-2xl mx-auto">
-            Track, analyze, and improve how AI models talk about your brand.
+            We run the platform. You get a login, a weekly report, and the work done.
           </p>
         </FadeUp>
 
@@ -427,7 +479,7 @@ function FeaturesSection() {
 
 function HowItWorksSection() {
   return (
-    <section className="py-16 border-y border-[var(--border-subtle)]">
+    <section id="how" className="py-16 border-y border-[var(--border-subtle)] scroll-mt-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeUp>
           <h2
@@ -470,6 +522,65 @@ function HowItWorksSection() {
             </FadeUp>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function MethodologySection() {
+  return (
+    <section id="methodology" className="py-16 scroll-mt-20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <FadeUp>
+          <h2
+            className="text-3xl sm:text-4xl font-bold text-center text-[var(--text-primary)] mb-4"
+            style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+          >
+            Measured, not guessed
+          </h2>
+        </FadeUp>
+        <FadeUp delay={100}>
+          <p className="text-center text-[var(--text-secondary)] mb-12 max-w-2xl mx-auto">
+            AI answers are not fixed. A score that ignores that is a number, not a measurement.
+            Here is how ours is built.
+          </p>
+        </FadeUp>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {METHOD_POINTS.map((point, i) => {
+            const Icon = point.icon;
+            return (
+              <FadeUp key={point.title} delay={i * 80}>
+                <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-2xl p-6 md:p-7 h-full flex gap-5">
+                  <div className="w-11 h-11 flex-shrink-0 rounded-xl bg-[rgba(95,126,166,0.15)] flex items-center justify-center">
+                    <Icon size={20} className="text-[var(--accent)]" />
+                  </div>
+                  <div>
+                    <h3
+                      className="text-lg font-semibold text-[var(--text-primary)] mb-2"
+                      style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
+                    >
+                      {point.title}
+                    </h3>
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">{point.desc}</p>
+                  </div>
+                </div>
+              </FadeUp>
+            );
+          })}
+        </div>
+
+        <FadeUp delay={300}>
+          <div className="mt-10 text-center">
+            <Link
+              href="/methodology"
+              className="inline-flex items-center gap-2 text-base font-semibold text-white px-7 py-3 rounded-full border border-[rgba(255,255,255,0.25)] hover:border-white hover:bg-[rgba(255,255,255,0.05)] transition-[border-color,background-color]"
+            >
+              Read the full methodology, with sources
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+        </FadeUp>
       </div>
     </section>
   );
@@ -524,7 +635,7 @@ function DashboardMockup() {
           <span className="w-3 h-3 rounded-full bg-[#fbbf24]" />
           <span className="w-3 h-3 rounded-full bg-[#22c55e]" />
           <div className="flex-1 ml-3 bg-[var(--bg-raised)] rounded-md px-3 py-1.5">
-            <span className="text-xs text-[var(--text-muted)]">app.lumidian.ai/dashboard</span>
+            <span className="text-xs text-[var(--text-muted)]">lumidian.ai/dashboard</span>
             <span className="text-[10px] text-[var(--text-secondary)] ml-2 opacity-60">Example</span>
           </div>
         </div>
@@ -546,13 +657,13 @@ function DashboardMockup() {
             </p>
             <div className="flex items-center gap-1 mt-2 text-xs opacity-80">
               <TrendingUp size={12} />
-              <span>+14% vs last run</span>
+              <span>+14 pts vs last week</span>
             </div>
           </div>
 
           {/* Sparkline card */}
           <div className="bg-[var(--bg-card)] border border-[var(--border-subtle)] rounded-2xl p-4">
-            <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">30-Day Trend</p>
+            <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">90-Day Trend</p>
             <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="h-12">
               <defs>
                 <linearGradient id="mockupSparkGrad" x1="0" y1="0" x2="0" y2="1">
@@ -608,7 +719,7 @@ function DashboardMockup() {
             {/* Blurb */}
             <div className="pt-3 border-t border-[rgba(51,65,85,0.4)]">
               <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
-                Lumidian queries each AI assistant — ChatGPT, Claude, Perplexity, and Gemini — with live web search enabled, so your scores reflect how your brand actually appears in real answers today.
+                Every model is queried with live web search on, so the score reflects how your business appears in real answers this week.
               </p>
               <Link
                 href="/methodology"
@@ -643,11 +754,11 @@ function DashboardMockup() {
             </div>
           </div>
 
-          {/* Citation gaps */}
+          {/* Gaps */}
           <div className="col-span-2 bg-[rgba(251,146,60,0.1)] border border-[rgba(251,146,60,0.2)] rounded-2xl p-4">
             <div className="flex items-center gap-2 mb-3">
               <TrendingDown size={14} className="text-[#fbbf24]" />
-              <p className="text-xs font-semibold text-[#fbbf24] uppercase tracking-wider">Top Citation Gaps</p>
+              <p className="text-xs font-semibold text-[#fbbf24] uppercase tracking-wider">Questions you are losing</p>
             </div>
             <div className="space-y-2">
               {DEMO_GAPS.map((g) => (
@@ -666,7 +777,7 @@ function DashboardMockup() {
             <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider mb-3">vs Competitors</p>
             <div className="space-y-2.5">
               <div className="flex items-center gap-3">
-                <span className="text-xs font-medium text-[var(--text-secondary)] w-24 flex-shrink-0">Your Brand</span>
+                <span className="text-xs font-medium text-[var(--text-secondary)] w-24 flex-shrink-0">Your business</span>
                 <div className="flex-1 h-2 bg-[var(--border-faint)] rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-[width] duration-700"
@@ -693,149 +804,108 @@ function DashboardMockup() {
   );
 }
 
-function PricingCell({ value }: { value: string | boolean }) {
-  if (value === true) return <span className="text-[#22c55e] font-bold text-base">&#10003;</span>;
-  if (value === false) return <span className="text-[var(--text-muted)]">—</span>;
-  return <span className="text-sm text-[var(--text-secondary)]">{value}</span>;
-}
-
 function PricingSection() {
-  const [mobileTier, setMobileTier] = useState<'free' | 'basic' | 'starter' | 'pro'>('pro');
-
-  const tierMeta: Record<string, { name: string; price: string }> = {
-    free: { name: 'Free Plan', price: '$0' },
-    basic: { name: `${TIER_DISPLAY_NAMES.basic} Plan`, price: `${TIER_PRICES.basic}/mo` },
-    starter: { name: `${TIER_DISPLAY_NAMES.starter} Plan`, price: `${TIER_PRICES.starter}/mo` },
-    pro: { name: `${TIER_DISPLAY_NAMES.pro} Plan`, price: `${TIER_PRICES.pro}/mo` },
-  };
-
   return (
-    <section id="pricing" className="py-16 scroll-mt-20">
+    <section id="pricing" className="py-16 border-t border-[var(--border-subtle)] scroll-mt-20">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeUp>
           <h2
             className="text-3xl sm:text-4xl font-bold text-center text-[var(--text-primary)] mb-4"
             style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
           >
-            Simple, transparent pricing
+            One plan, one price
           </h2>
         </FadeUp>
         <FadeUp delay={100}>
-          <p className="text-center text-[var(--text-secondary)] mb-12">
-            Start free. Upgrade when you need more.
+          <p className="text-center text-[var(--text-secondary)] mb-12 max-w-xl mx-auto">
+            The work is the same for every client: measure, find the gaps, build the fixes.
+            So there is one plan.
           </p>
         </FadeUp>
 
-        {/* Desktop table */}
         <FadeUp delay={200}>
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full border-collapse" style={{ minWidth: 500 }}>
-              <thead>
-                <tr className="bg-[var(--bg-card)]">
-                  <th className="text-left text-sm font-semibold text-[var(--text-primary)] p-3 md:p-4 rounded-tl-xl sticky left-0 bg-[var(--bg-card)] z-10">Feature</th>
-                  <th className="text-center text-sm font-semibold text-[var(--text-primary)] p-4">Free</th>
-                  <th className="text-center text-sm font-semibold text-[var(--text-primary)] p-4">Starter</th>
-                  <th className="text-center text-sm font-semibold text-[var(--text-primary)] p-4">Growth</th>
-                  <th className="text-center text-sm font-semibold text-[var(--text-primary)] p-4 rounded-tr-xl bg-[rgba(95,126,166,0.2)] border-b-2 border-[var(--accent)]">
-                    Pro
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {COMPARISON_FEATURES.map((row, i) => (
-                  <tr
-                    key={row.label}
-                    className={`${i % 2 === 0 ? 'bg-[var(--bg-raised)]' : 'bg-[var(--bg-base)]'} hover:bg-[rgba(95,126,166,0.05)] transition-colors`}
+          <div className="bg-[var(--bg-raised)] border border-[rgba(95,126,166,0.3)] rounded-3xl overflow-hidden shadow-[0_0_48px_rgba(95,126,166,0.12)]">
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_1.4fr]">
+              {/* Price column */}
+              <div className="p-8 md:p-10 border-b md:border-b-0 md:border-r border-[var(--border-subtle)] flex flex-col">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--accent)] mb-3">
+                  AI visibility, done for you
+                </p>
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className="text-5xl sm:text-6xl font-extrabold text-[var(--text-primary)]"
+                    style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif', letterSpacing: '-0.02em' }}
                   >
-                    <td className="text-sm text-[var(--text-primary)] p-3 md:p-4 sticky left-0 z-10" style={{ background: i % 2 === 0 ? 'var(--bg-raised)' : 'var(--bg-base)' }}>{row.label}</td>
-                    <td className="text-center p-4"><PricingCell value={row.free} /></td>
-                    <td className="text-center p-4"><PricingCell value={row.basic} /></td>
-                    <td className="text-center p-4"><PricingCell value={row.starter} /></td>
-                    <td className="text-center p-4 bg-[rgba(95,126,166,0.05)] border-l border-r border-[rgba(95,126,166,0.2)]">
-                      <PricingCell value={row.pro} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </FadeUp>
+                    {MONTHLY_PRICE}
+                  </span>
+                  <span className="text-lg text-[var(--text-muted)]">/ month</span>
+                </div>
+                <p className="mt-3 text-sm text-[var(--text-muted)] leading-relaxed">
+                  Founding pricing. Three-month minimum, then cancel any time.
+                  No setup fee.
+                </p>
 
-        {/* Mobile tab switcher */}
-        <FadeUp delay={200}>
-          <div className="md:hidden">
-            {/* Tabs */}
-            <div className="flex gap-2 mb-6 bg-[var(--bg-raised)] rounded-full p-1 border border-[var(--border-subtle)]">
-              {(['free', 'basic', 'starter', 'pro'] as const).map((tier) => (
-                <button
-                  key={tier}
-                  onClick={() => setMobileTier(tier)}
-                  className={`flex-1 py-2.5 text-sm font-semibold rounded-full transition-[background-color,color,box-shadow] ${
-                    mobileTier === tier
-                      ? 'bg-[var(--accent)] text-white shadow-[0_0_12px_rgba(95,126,166,0.4)]'
-                      : 'text-[var(--text-secondary)] hover:text-white'
-                  }`}
+                <a
+                  href={AUDIT_MAILTO}
+                  className="mt-8 inline-flex items-center justify-center gap-2 text-base font-semibold text-white px-6 py-3.5 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-[0_0_24px_rgba(95,126,166,0.4)]"
                 >
-                  {tierMeta[tier].name.replace(' Plan', '')}
-                </button>
-              ))}
-            </div>
+                  <Mail size={16} />
+                  Start with a free audit
+                </a>
+                <p className="mt-3 text-xs text-[var(--text-muted)]">
+                  We run your questions first. You decide after you see the numbers.
+                </p>
 
-            {/* Card */}
-            <div className="bg-[var(--bg-raised)] border border-[var(--border-subtle)] rounded-2xl p-6">
-              <p
-                className="text-lg font-bold text-[var(--text-primary)] mb-1"
-                style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
-              >
-                {tierMeta[mobileTier].name}
-              </p>
-              <p className="text-3xl font-extrabold text-[var(--text-primary)] mb-6" style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}>
-                {tierMeta[mobileTier].price}
-              </p>
-
-              <div className="space-y-3">
-                {COMPARISON_FEATURES.map((row) => {
-                  const val = row[mobileTier as keyof typeof row];
-                  const isTrue = val === true;
-                  const isFalse = val === false || val === '—';
-                  return (
-                    <div key={row.label} className="flex items-center gap-3">
-                      {isTrue ? (
-                        <Check size={16} className="text-[#22c55e] flex-shrink-0" />
-                      ) : isFalse ? (
-                        <X size={16} className="text-[#475569] flex-shrink-0" />
-                      ) : (
-                        <Check size={16} className="text-[#22c55e] flex-shrink-0" />
-                      )}
-                      <span className={`text-sm ${isFalse ? 'text-[#475569]' : 'text-[var(--text-secondary)]'}`}>
-                        {typeof val === 'string' && val !== '—' ? `${val} — ${row.label}` : row.label}
-                      </span>
-                    </div>
-                  );
-                })}
+                <div className="mt-auto pt-8">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-3">
+                    Not included
+                  </p>
+                  <ul className="space-y-2">
+                    {NOT_INCLUDED.map((item) => (
+                      <li key={item} className="flex items-start gap-2.5 text-sm text-[var(--text-muted)]">
+                        <X size={14} className="text-[#475569] flex-shrink-0 mt-[3px]" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
 
-              <Link
-                href="/register"
-                className="mt-6 w-full inline-flex items-center justify-center gap-2 text-base font-semibold text-white py-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-[0_0_24px_rgba(95,126,166,0.4)]"
-              >
-                Get started free
-                <ArrowRight size={16} />
-              </Link>
+              {/* Included column */}
+              <div className="p-8 md:p-10">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] mb-5">
+                  Every month
+                </p>
+                <ul className="space-y-4">
+                  {INCLUDED.map((item) => (
+                    <li key={item} className="flex items-start gap-3 text-[15px] text-[var(--text-secondary)] leading-relaxed">
+                      <span className="w-5 h-5 flex-shrink-0 rounded-full bg-[rgba(34,197,94,0.12)] flex items-center justify-center mt-[2px]">
+                        <Check size={12} className="text-[#22c55e]" strokeWidth={3} />
+                      </span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="mt-8 pt-6 border-t border-[var(--border-subtle)]">
+                  <p className="text-sm text-[var(--text-muted)] leading-relaxed">
+                    One sentence in the contract: we make AI assistants recommend you;
+                    your existing marketing keeps doing the rest.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </FadeUp>
 
         <FadeUp delay={300}>
-          <div className="mt-8 text-center hidden md:block">
-            <Link
-              href="/register"
-              className="inline-flex items-center gap-2 text-base font-semibold text-white px-8 py-3 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-colors shadow-[0_0_24px_rgba(95,126,166,0.4)]"
-            >
-              Get started free
-              <ArrowRight size={16} />
-            </Link>
-          </div>
+          <p className="mt-8 text-center text-sm text-[var(--text-muted)]">
+            Software-only access is available to a small number of accounts by arrangement.{' '}
+            <a href={`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Software access')}`} className="text-[var(--accent)] hover:underline">
+              Email us
+            </a>{' '}
+            if that is what you need.
+          </p>
         </FadeUp>
       </div>
     </section>
@@ -861,6 +931,7 @@ function FAQItem({
         <button
           onClick={onToggle}
           className="w-full py-5 flex items-center justify-between text-left hover:bg-[rgba(255,255,255,0.02)] transition-colors rounded min-h-[48px]"
+          aria-expanded={isOpen}
         >
           <span className="text-base font-medium text-[var(--text-primary)] pr-4">{item.q}</span>
           <ChevronDown
@@ -889,7 +960,7 @@ function FAQSection() {
             className="text-3xl sm:text-4xl font-bold text-center text-[var(--text-primary)] mb-12"
             style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
           >
-            Frequently asked questions
+            Questions we get asked
           </h2>
         </FadeUp>
 
@@ -938,22 +1009,29 @@ function CTASection() {
             className="text-3xl sm:text-4xl font-bold text-[var(--text-primary)] mb-4"
             style={{ fontFamily: 'var(--font-syne), system-ui, sans-serif' }}
           >
-            Start tracking your AI visibility
+            Find out what AI says about you this week
           </h2>
         </FadeUp>
         <FadeUp delay={100}>
           <p className="text-[var(--text-secondary)] mb-8">
-            Free to start. No credit card required.
+            Send us your business name and website. We run your questions across
+            four AI assistants and send you the numbers. No sign-up, no dashboard to set up.
           </p>
         </FadeUp>
         <FadeUp delay={200}>
-          <Link
-            href="/register"
+          <a
+            href={AUDIT_MAILTO}
             className="inline-flex items-center gap-2 text-lg font-semibold text-white px-8 py-4 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] transition-[background-color,box-shadow] shadow-lg hover:shadow-xl"
           >
-            Get Started Free
-            <ArrowRight size={18} />
-          </Link>
+            <Mail size={18} />
+            Request a free audit
+          </a>
+          <p className="mt-4 text-sm text-[var(--text-muted)]">
+            Or write to{' '}
+            <a href={`mailto:${CONTACT_EMAIL}`} className="text-[var(--text-secondary)] hover:text-white underline underline-offset-4">
+              {CONTACT_EMAIL}
+            </a>
+          </p>
         </FadeUp>
       </div>
     </section>
@@ -969,15 +1047,16 @@ function Footer() {
           <div className="col-span-2 md:col-span-1">
             <LumidianLogo size={28} withWordmark variant="dark" />
             <p className="text-sm text-[var(--text-muted)] mt-3">
-              AI visibility tracking for modern brands.
+              We track what AI says about your business, then fix it.
             </p>
           </div>
 
-          {/* Product */}
+          {/* Site */}
           <div>
-            <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Product</h4>
+            <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Site</h4>
             <nav className="space-y-3">
-              <a href="#features" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Features</a>
+              <a href="#features" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">What you get</a>
+              <a href="#how" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">How it works</a>
               <Link href="/methodology" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Methodology</Link>
               <a href="#pricing" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Pricing</a>
               <a href="#faq" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">FAQ</a>
@@ -993,12 +1072,13 @@ function Footer() {
             </nav>
           </div>
 
-          {/* Get Started */}
+          {/* Contact */}
           <div>
-            <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Get Started</h4>
+            <h4 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Contact</h4>
             <nav className="space-y-3">
-              <Link href="/register" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Sign up</Link>
-              <Link href="/login" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Log in</Link>
+              <a href={AUDIT_MAILTO} className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Request an audit</a>
+              <a href={`mailto:${CONTACT_EMAIL}`} className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">{CONTACT_EMAIL}</a>
+              <Link href="/login" className="block text-sm text-[var(--text-secondary)] hover:text-white transition-colors">Client log in</Link>
             </nav>
           </div>
         </div>
@@ -1035,13 +1115,14 @@ export default function LandingPage() {
         <ModelsBar />
         <FeaturesSection />
         <HowItWorksSection />
+        <MethodologySection />
         <PricingSection />
         <FAQSection />
         <CTASection />
       </main>
       <Footer />
 
-      {/* Dot grid — spans Hero + ModelsBar + Features, fades out at edges */}
+      {/* Dot grid spanning Hero + ModelsBar + Features, fading out at the edges */}
       <div
         className="absolute top-0 left-0 right-0 pointer-events-none"
         style={{
@@ -1054,7 +1135,7 @@ export default function LandingPage() {
         }}
       />
 
-      {/* Dot grid — CTA section area, fades in and out */}
+      {/* Dot grid over the CTA section, fading in and out */}
       <div
         className="absolute bottom-0 left-0 right-0 pointer-events-none"
         style={{

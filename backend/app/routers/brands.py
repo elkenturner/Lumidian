@@ -814,11 +814,15 @@ async def suggest_prompts(brand_id: int, db: DbDep, user: CurrentUser):
     if competitors:
         context_parts.append(f"Known competitors: {', '.join(c.name for c in competitors)}")
 
-    # Existing prompts (to avoid duplicates)
+    # Every prompt already tracked. Earlier versions only showed the model the
+    # first five, so each click circled the same ground as the tracked set.
     existing = [p.text for p in brand.prompts]
     if existing:
-        existing_sample = "; ".join(existing[:5])
-        context_parts.append(f"Already tracking (avoid duplicates): {existing_sample}")
+        tracked_block = "\n".join(f"- {t}" for t in existing)
+        context_parts.append(
+            "ALREADY TRACKED (do not suggest these or rephrasings of them):\n"
+            + tracked_block
+        )
 
     scope_block = ""
     if profile and profile.market_scope:
@@ -857,7 +861,12 @@ NEVER generate:
 - Generic awareness questions about the brand itself
 - Any query where the brand name appears in the question
 
-The goal is to find queries where a user is researching a problem or category, and the brand COULD appear in the AI's answer. Write questions a real person would type when they don't yet know which brand to choose."""
+The goal is to find queries where a user is researching a problem or category, and the brand COULD appear in the AI's answer. Write questions a real person would type when they don't yet know which brand to choose.
+
+DIVERSITY RULES:
+- Every suggestion must cover a DIFFERENT angle from the already-tracked prompts and from each other: cost and fees, timelines, eligibility and requirements, step-by-step process, risks and pitfalls, comparisons between options, the buyer's situation (stage, size, industry), what happens after the purchase or raise, and the other side of the transaction (e.g. the investor's or end customer's view).
+- No two suggestions may be rephrasings of the same underlying question.
+- Prefer specific, situational questions ("How much does X cost for a company raising $5M?") over generic ones ("What is X?")."""
 
     api_key = _os.getenv("ANTHROPIC_API_KEY", "")
     if not api_key:
@@ -870,7 +879,7 @@ The goal is to find queries where a user is researching a problem or category, a
         import anthropic
         client = anthropic.AsyncAnthropic(api_key=api_key)
         response = await client.messages.create(
-            model="claude-haiku-4-5-20251001",
+            model="claude-sonnet-5-5",
             max_tokens=1200,
             messages=[{"role": "user", "content": system_prompt}],
         )

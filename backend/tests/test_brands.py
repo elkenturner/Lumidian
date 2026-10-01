@@ -463,6 +463,39 @@ async def test_suggest_prompts_omits_scope_block_when_unset(client: httpx.AsyncC
 
 
 @pytest.mark.asyncio
+async def test_suggest_prompts_lists_every_tracked_prompt_and_asks_for_new_angles(client: httpx.AsyncClient):
+    """Regression: only the first 5 tracked prompts used to be shown to the model,
+    so suggestions kept circling the same ground. Every tracked prompt must be in
+    the context and the model must be told to cover angles not already tracked."""
+    await register_and_login(client, email="alltracked@example.com")
+    tracked = [f"Tracked question number {i}?" for i in range(1, 9)]
+    brand = await create_brand(client, name="AllTracked Brand", prompts=tracked)
+
+    captured: dict = {}
+    msg = MagicMock()
+    msg.content = [MagicMock(text='["Something new?"]')]
+
+    async def fake_create(**kwargs):
+        captured["messages"] = kwargs.get("messages")
+        return msg
+
+    fake_client = AsyncMock()
+    fake_client.messages.create = fake_create
+    with patch("anthropic.AsyncAnthropic", return_value=fake_client), patch.dict(
+        "os.environ", {"ANTHROPIC_API_KEY": "test-key"}
+    ):
+        resp = await client.post(f"/api/brands/{brand['id']}/suggest-prompts")
+
+    assert resp.status_code == 200, resp.text
+    sys_prompt = captured["messages"][0]["content"]
+    for text in tracked:
+        assert text in sys_prompt, f"missing tracked prompt in context: {text}"
+    assert "Tracked question number 8?" in sys_prompt  # beyond the old 5-prompt cutoff
+    assert "ALREADY TRACKED" in sys_prompt
+    assert "different" in sys_prompt.lower()
+
+
+@pytest.mark.asyncio
 async def test_prompt_response_has_history_flag(client: httpx.AsyncClient, db_session):
     await register_and_login(client, email="hashistory@example.com")
     brand = await create_brand(client, name="History Brand", prompts=["What is the best X?"])

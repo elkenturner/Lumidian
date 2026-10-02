@@ -296,8 +296,8 @@ export default function NewBrandPage() {
                         <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                           Up to <span className="text-[var(--text-secondary)] font-medium">25 prompts</span>. Full tracking with visibility reports and content drafts.
                         </p>
-                        {needsUpgrade && <p className="text-[11px] text-[var(--accent-foreground)] mt-1.5">Requires a paid plan — <span className="underline">upgrade</span></p>}
-                        {noSlots && <p className="text-[11px] text-[var(--danger)] mt-1.5">No slots remaining — <span className="underline">upgrade to add more</span></p>}
+                        {needsUpgrade && <p className="text-[11px] text-[var(--accent-foreground)] mt-1.5">Requires a paid plan. <span className="underline">Upgrade</span></p>}
+                        {noSlots && <p className="text-[11px] text-[var(--danger)] mt-1.5">No slots remaining. <span className="underline">Upgrade to add more</span></p>}
                       </div>
                     </div>
                   </button>
@@ -345,8 +345,8 @@ export default function NewBrandPage() {
                         <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                           Up to <span className="text-[var(--text-secondary)] font-medium">30 prompts</span>. Deeper tracking with higher prompt coverage.
                         </p>
-                        {needsUpgrade && <p className="text-[11px] text-[var(--accent-foreground)] mt-1.5">Requires a Pro plan — <span className="underline">upgrade</span></p>}
-                        {noSlots && <p className="text-[11px] text-[var(--danger)] mt-1.5">No slots remaining — <span className="underline">upgrade to add more</span></p>}
+                        {needsUpgrade && <p className="text-[11px] text-[var(--accent-foreground)] mt-1.5">Requires a Pro plan. <span className="underline">Upgrade</span></p>}
+                        {noSlots && <p className="text-[11px] text-[var(--danger)] mt-1.5">No slots remaining. <span className="underline">Upgrade to add more</span></p>}
                       </div>
                     </div>
                   </button>
@@ -415,7 +415,7 @@ export default function NewBrandPage() {
                         <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                           Up to <span className="text-[var(--text-secondary)] font-medium">10 prompts</span>, expires after <span className="text-[var(--text-secondary)] font-medium">30 days</span>. Ideal for one-off snapshots and pitch decks.
                         </p>
-                        {locked && <p className="text-[11px] text-[var(--danger)] mt-1.5">No slots remaining — upgrade to add more.</p>}
+                        {locked && <p className="text-[11px] text-[var(--danger)] mt-1.5">No slots remaining. Upgrade to add more.</p>}
                       </div>
                     </div>
                   </button>
@@ -556,7 +556,7 @@ export default function NewBrandPage() {
         {step === 'profile' && (
           <div>
             <h2 className="text-xl font-bold text-[var(--text-primary)] mb-1">Tell us about the brand</h2>
-            <p className="text-sm text-[var(--text-muted)] mb-6">Optional — helps generate better content drafts. You can update this later.</p>
+            <p className="text-sm text-[var(--text-muted)] mb-6">Optional. Helps generate better content drafts. You can update this later.</p>
             <div className="space-y-4 mb-6">
               <div>
                 <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Company description</label>

@@ -50,7 +50,7 @@ export function DraftCard({ draft, token, onResolved, resolvedStatus, resolvedAt
           fontFamily: 'var(--font-mono), monospace',
         }}
       >
-        {STATUS_LABEL[resolvedStatus]} — {draft.title || 'Untitled'}
+        {STATUS_LABEL[resolvedStatus]}: {draft.title || 'Untitled'}
         {resolvedAt && (
           <span style={{ color: 'var(--ink-faint)', marginLeft: 8 }}>
             {resolvedAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}

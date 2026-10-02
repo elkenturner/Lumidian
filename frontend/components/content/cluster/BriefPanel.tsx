@@ -38,7 +38,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
     return (
       <div className="card border-dashed flex items-center gap-3 text-sm text-[var(--text-secondary)]">
         <FileText className="h-4 w-4 text-[var(--text-faint)] shrink-0" />
-        No strategy yet — generate posts for this question to create one.
+        No strategy yet. Generate posts for this question to create one.
       </div>
     );
   }
@@ -139,7 +139,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
           {!editing ? (
             <>
               <Field label="The angle">{brief.positioning || <Empty />}</Field>
-              <Field label="Core messages (each post rewords these — never verbatim)">
+              <Field label="Core messages (each post rewords these, never verbatim)">
                 {brief.canonical_phrasings.length ? (
                   <ul className="space-y-1 text-[var(--text-secondary)]">
                     {brief.canonical_phrasings.map((p, i) => (
@@ -238,7 +238,7 @@ export function BriefPanel({ brandId, clusterId, brief, currentVersion, onUpdate
                   rows={2}
                 />
               </Field>
-              <Field label="Stats (one per line — label | value | source)">
+              <Field label="Stats (one per line: label | value | source)">
                 <textarea
                   value={stats}
                   onChange={(e) => {

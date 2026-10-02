@@ -46,7 +46,7 @@ export default function SiteAuditIndexPage() {
           Pick a brand to audit
         </h1>
         <p className="mt-1.5 max-w-2xl text-sm text-[var(--text-secondary)]">
-          Each audit crawls the site for AI-search visibility — semantic structure, schema, AI-bot
+          Each audit crawls the site for AI-search visibility: semantic structure, schema, AI-bot
           accessibility, and which competitor pages are winning the prompts you lose on.
         </p>
       </header>

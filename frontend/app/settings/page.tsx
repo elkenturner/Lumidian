@@ -524,7 +524,7 @@ function SourcesSection({ brandId }: { brandId: number }) {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Title (optional — defaults to the URL)"
+            placeholder="Title (optional, defaults to the URL)"
             disabled={atCap || busy}
             maxLength={500}
             className="mobile-input w-full px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50"
@@ -532,7 +532,7 @@ function SourcesSection({ brandId }: { brandId: number }) {
           <textarea
             value={snippet}
             onChange={(e) => setSnippet(e.target.value)}
-            placeholder="Snippet (optional) — the citable claim or quote from this source"
+            placeholder="Snippet (optional): the citable claim or quote from this source"
             disabled={atCap || busy}
             rows={2}
             maxLength={1500}
@@ -569,7 +569,7 @@ function SourcesSection({ brandId }: { brandId: number }) {
           <div className="flex items-center justify-between text-xs text-[var(--text-faint)] pt-1">
             <span>
               {atCap
-                ? `Cap reached — delete one to add more`
+                ? `Cap reached. Delete one to add more`
                 : `${sources.length} of ${SOURCE_CAP}`}
             </span>
           </div>
@@ -723,7 +723,7 @@ function VoiceSamplesSection({ brandId }: { brandId: number }) {
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Title (required) — e.g. 'Launch announcement blog post'"
+            placeholder="Title (required), e.g. 'Launch announcement blog post'"
             disabled={atCap || busy}
             maxLength={VOICE_SAMPLE_TITLE_MAX}
             className="mobile-input w-full px-3 py-2 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] placeholder-[var(--text-faint)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50 disabled:opacity-50"
@@ -746,7 +746,7 @@ function VoiceSamplesSection({ brandId }: { brandId: number }) {
           >
             {trimmedText.length.toLocaleString()} / {VOICE_SAMPLE_MAX_CHARS.toLocaleString()}
             {textTooShort && trimmedText.length > 0 && (
-              <span> — need at least {VOICE_SAMPLE_MIN_CHARS}</span>
+              <span> (need at least {VOICE_SAMPLE_MIN_CHARS})</span>
             )}
           </div>
           <div className="flex gap-2">
@@ -768,7 +768,7 @@ function VoiceSamplesSection({ brandId }: { brandId: number }) {
           <div className="flex items-center justify-between text-xs text-[var(--text-faint)] pt-1">
             <span>
               {atCap
-                ? `Cap reached — delete one to add more`
+                ? `Cap reached. Delete one to add more`
                 : `${samples.length} of ${VOICE_SAMPLE_CAP}`}
             </span>
           </div>
@@ -921,7 +921,7 @@ export default function SettingsPage() {
     return () => clearTimeout(t);
   }, [toast]);
 
-  useEffect(() => { document.title = 'Settings — Lumidian'; }, []);
+  useEffect(() => { document.title = 'Settings · Lumidian'; }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -986,7 +986,7 @@ export default function SettingsPage() {
           // (the previous brand's values on a brand switch) and disable Save
           // via profileLoadError instead, so nothing can be written to the
           // wrong brand while the form is stale.
-          setProfileLoadError("Couldn't load the profile — saving is disabled to protect your data. Retry.");
+          setProfileLoadError("Couldn't load the profile. Saving is disabled to protect your data. Retry.");
         }
       } catch {
         // ignore
@@ -1236,7 +1236,7 @@ export default function SettingsPage() {
       setProfileLoadError(null);
     } catch (err) {
       logError(err, 'Settings: retry brand profile load');
-      setProfileLoadError("Couldn't load the profile — saving is disabled to protect your data. Retry.");
+      setProfileLoadError("Couldn't load the profile. Saving is disabled to protect your data. Retry.");
     } finally {
       setRetryingProfileLoad(false);
     }
@@ -1291,7 +1291,7 @@ export default function SettingsPage() {
       return;
     }
     if (profileLoadError) {
-      setProfileSaveError("Couldn't load the profile — saving is disabled to protect your data. Retry.");
+      setProfileSaveError("Couldn't load the profile. Saving is disabled to protect your data. Retry.");
       return;
     }
     setProfileSaving(true);
@@ -1572,7 +1572,7 @@ export default function SettingsPage() {
             </div>
 
             {brand.prompts.length === 0 ? (
-              <p className="text-sm text-[var(--text-faint)] text-center py-6">No prompts yet — add one above</p>
+              <p className="text-sm text-[var(--text-faint)] text-center py-6">No prompts yet. Add one above</p>
             ) : (
               <div className="space-y-2 max-h-80 overflow-y-auto">
                 {brand.prompts.map((prompt: Prompt) => (
@@ -1604,7 +1604,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-1.5">
                     <Sparkles size={12} className="text-[var(--accent)]" />
-                    <span className="text-xs font-medium text-[var(--text-secondary)]">Suggested — click to add</span>
+                    <span className="text-xs font-medium text-[var(--text-secondary)]">Suggested (click to add)</span>
                   </div>
                   <button
                     onClick={() => { setShowSuggestions(false); setSuggestions([]); }}
@@ -1666,7 +1666,7 @@ export default function SettingsPage() {
               </button>
             </div>
             {competitors.length === 0 ? (
-              <p className="text-sm text-[var(--text-faint)] text-center py-6">No competitors tracked — add one above to unlock Share of Voice</p>
+              <p className="text-sm text-[var(--text-faint)] text-center py-6">No competitors tracked. Add one above to unlock Share of Voice</p>
             ) : (
               <div className="space-y-2">
                 {competitors.map((comp) => (
@@ -1761,7 +1761,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-[var(--text-secondary)]">Profile Completion</span>
                 <span className="text-xs text-[var(--text-muted)]">
-                  {Math.round(completionPct) >= 100 ? 'Complete — ready for drafting' : `${Math.round(100 - completionPct)}% remaining`}
+                  {Math.round(completionPct) >= 100 ? 'Complete and ready for drafting' : `${Math.round(100 - completionPct)}% remaining`}
                 </span>
               </div>
               <CompletionBar pct={completionPct} />
@@ -1805,7 +1805,7 @@ export default function SettingsPage() {
             <SectionCard
               icon={Building2}
               title="Company Description"
-              description="What your brand does — used as context for all content drafts"
+              description="What your brand does. Used as context for all content drafts"
             >
               <AutoTextarea
                 value={companyDescription}
@@ -1833,7 +1833,7 @@ export default function SettingsPage() {
             <SectionCard
               icon={MessageSquare}
               title="Tone of Voice"
-              description="How the brand should sound — guides the style of all drafted content"
+              description="How the brand should sound. Guides the style of all drafted content"
             >
               <AutoTextarea
                 value={toneOfVoice}
@@ -1848,7 +1848,7 @@ export default function SettingsPage() {
             <SectionCard
               icon={AlertTriangle}
               title="What NOT to Say"
-              description="Phrases, claims, or topics to avoid — legal or brand restrictions"
+              description="Phrases, claims, or topics to avoid (legal or brand restrictions)"
             >
               <EditableList
                 ref={whatNotToSayListRef}
@@ -1861,7 +1861,7 @@ export default function SettingsPage() {
 
             <SectionCard
               icon={Users}
-              title="Target audience — who buys from you?"
+              title="Target audience: who buys from you?"
               description="Sharpens AI-fill suggestions and prompt targeting"
             >
               <AutoTextarea
@@ -1877,7 +1877,7 @@ export default function SettingsPage() {
             <SectionCard
               icon={Globe}
               title="Market scope"
-              description="Where this brand actually competes — used to scope AI prompt suggestions"
+              description="Where this brand actually competes. Used to scope AI prompt suggestions"
             >
               <div className="space-y-2">
                 <select
@@ -1886,10 +1886,10 @@ export default function SettingsPage() {
                   className="w-full px-3 py-2.5 bg-[rgba(255,255,255,0.05)] border border-[var(--border-subtle)] rounded-lg text-sm text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/50"
                 >
                   <option value="">Not set</option>
-                  <option value="local">Local — city/region</option>
-                  <option value="national">National — single country</option>
-                  <option value="global">Global — multi-country</option>
-                  <option value="niche">Niche — narrow B2B vertical</option>
+                  <option value="local">Local (city/region)</option>
+                  <option value="national">National (single country)</option>
+                  <option value="global">Global (multi-country)</option>
+                  <option value="niche">Niche (narrow B2B vertical)</option>
                 </select>
                 <input
                   type="text"
@@ -1919,7 +1919,7 @@ export default function SettingsPage() {
             <SectionCard
               icon={BookOpen}
               title="Publications"
-              description="Peer-reviewed papers — used to populate Wikipedia citation refs automatically"
+              description="Peer-reviewed papers. Used to populate Wikipedia citation refs automatically"
             >
               <PublicationsEditor items={publications} onChange={setPublications} />
             </SectionCard>
@@ -1998,7 +1998,7 @@ export default function SettingsPage() {
 
             {inviteLink && (
               <div className="mt-3 p-3 bg-[var(--success)]/10 border border-[var(--success)]/20 rounded-lg">
-                <p className="text-xs text-[var(--success)] mb-1 font-medium">Invite link generated — share this with your team member:</p>
+                <p className="text-xs text-[var(--success)] mb-1 font-medium">Invite link generated. Share this with your team member:</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-xs text-[var(--text-secondary)] break-all bg-[rgba(0,0,0,0.2)] px-2 py-1.5 rounded">{inviteLink}</code>
                   <button

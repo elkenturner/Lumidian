@@ -19,7 +19,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { register } = useAuth();
 
-  useEffect(() => { document.title = 'Create Account — Lumidian'; }, []);
+  useEffect(() => { document.title = 'Create Account · Lumidian'; }, []);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');

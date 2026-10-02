@@ -165,7 +165,7 @@ function sweepMessage(s: SweepSummary): string {
   }
   let msg = `${s.gotPosts} of ${s.total} questions got posts.`;
   if (s.failed > 0) {
-    msg += ` ${s.failed} couldn't be written${s.dominantReason ? ` — most because ${s.dominantReason}` : ""}.`;
+    msg += ` ${s.failed} couldn't be written${s.dominantReason ? `, most because ${s.dominantReason}` : ""}.`;
   }
   if (s.pending > 0) {
     msg += ` ${s.pending} still queued.`;
@@ -538,7 +538,7 @@ export default function ContentBrandPage() {
           {brand?.name ?? "Brand"}
         </h1>
         <p className="mt-1.5 text-sm text-[var(--text-secondary)]">
-          Posts that get {brand?.name ?? "your brand"} mentioned in AI answers — one set per
+          Posts that get {brand?.name ?? "your brand"} mentioned in AI answers: one set per
           tracked question, across LinkedIn, Medium, Reddit, Quora, and X.
         </p>
       </header>
@@ -610,8 +610,8 @@ export default function ContentBrandPage() {
               Create your first posts
             </h2>
             <p className="mt-1 text-sm text-[var(--text-secondary)] max-w-2xl">
-              For each tracked question we&apos;ll write a coordinated set of posts — LinkedIn,
-              Medium, Reddit, Quora, and X — designed to get{" "}
+              For each tracked question we&apos;ll write a coordinated set of posts (LinkedIn,
+              Medium, Reddit, Quora, and X) designed to get{" "}
               {brand?.name ?? "your brand"} mentioned when people ask AI tools about your space.
             </p>
           </div>

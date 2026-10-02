@@ -50,7 +50,7 @@ export function SourceSpinePanel({ brandId, clusterId }: Props) {
   if (!data || data.sources.length === 0) {
     return (
       <div className="text-sm text-slate-400">
-        No sources yet — generate posts for this question to gather them.
+        No sources yet. Generate posts for this question to gather them.
       </div>
     );
   }

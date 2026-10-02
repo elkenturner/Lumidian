@@ -49,7 +49,7 @@ export default function ClientProposalForm({
             type="text"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
-            placeholder="Week of May 22 — 5 pieces"
+            placeholder="Week of May 22, 5 pieces"
             className="mt-1 block w-full rounded-md border border-neutral-300 px-3 py-1.5 text-sm"
           />
         </label>

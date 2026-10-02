@@ -82,7 +82,7 @@ export function ProspectResultsPanel({ audit }: Props) {
       </div>
 
       <p className="text-xs text-[var(--text-muted)]">
-        Detailed per-prompt scores, competitor breakdown, and recommendations are in the PDF — designed for the cold email.
+        Detailed per-prompt scores, competitor breakdown, and recommendations are in the PDF, designed for the cold email.
       </p>
     </div>
   );

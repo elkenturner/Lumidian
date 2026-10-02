@@ -104,7 +104,7 @@ export default function AdminPage() {
     }
   }, []);
 
-  useEffect(() => { document.title = 'Admin — Lumidian'; }, []);
+  useEffect(() => { document.title = 'Admin · Lumidian'; }, []);
 
   useEffect(() => {
     if (authLoading) return;
@@ -205,7 +205,7 @@ export default function AdminPage() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-[var(--text-primary)]">Admin Dashboard</h1>
-              <p className="text-xs text-[var(--text-muted)]">System overview — visible to admins only</p>
+              <p className="text-xs text-[var(--text-muted)]">System overview, visible to admins only</p>
             </div>
           </div>
           <button

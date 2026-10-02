@@ -52,7 +52,7 @@ export function ClusterCard({ cluster, brandId, onRegenerate, regenerating }: Pr
   return (
     <div
       className="card card-hover flex flex-col gap-4"
-      aria-label={`${cluster.prompt_text} — ${chip.label}`}
+      aria-label={`${cluster.prompt_text}: ${chip.label}`}
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-4">

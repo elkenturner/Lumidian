@@ -60,7 +60,7 @@ function PieceStatusChip({
       return (
         <span
           className="text-[11px] px-2 py-0.5 rounded-md border border-[rgba(56,189,248,0.22)] bg-[rgba(56,189,248,0.10)] text-[#7dd3fc]"
-          title="Published — its effect on AI visibility is still being measured (needs a tracking run after posting)"
+          title="Published. Its effect on AI visibility is still being measured (needs a tracking run after posting)"
         >
           Posted · measuring
         </span>
@@ -99,7 +99,7 @@ function LowEvidenceBadge({ brandId }: { brandId: number }) {
   return (
     <span
       className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] px-2 py-0.5 rounded-md border border-[rgba(251,191,36,0.22)] bg-[rgba(251,191,36,0.10)] text-[#fbbf24]"
-      title="Thin sourcing — the writer couldn't ground this post in verified sources. Add sources you trust, or rewrite to try again."
+      title="Thin sourcing: the writer couldn't ground this post in verified sources. Add sources you trust, or rewrite to try again."
     >
       <AlertTriangle className="h-3 w-3" />
       Thin sourcing
@@ -257,7 +257,7 @@ export function PieceCard({ brandId, clusterId, platform, draft, isPro = false, 
               platform === "reddit"
                 ? draft.content_brief.startsWith("r/")
                   ? "Suggested subreddit for this post"
-                  : "A real thread this comment answers — reply there"
+                  : "A real thread this comment answers. Reply there"
                 : "A real Quora question this answers"
             }
           >

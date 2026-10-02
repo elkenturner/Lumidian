@@ -110,7 +110,7 @@ export function SendDraftsToClientModal({
         <Dialog.Content className="fixed left-1/2 top-1/2 w-[min(90vw,640px)] max-h-[85vh] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-lg border border-[var(--border-default)] bg-[var(--bg-raised)] text-[var(--text-primary)] shadow-lg">
           <div className="flex items-start justify-between border-b border-[var(--border-subtle)] p-5">
             <Dialog.Title className="text-base font-semibold">
-              {stage === 'pick' ? `Send drafts to ${clientName} for review` : 'Drafts sent — now message your client'}
+              {stage === 'pick' ? `Send drafts to ${clientName} for review` : 'Drafts sent. Now message your client'}
             </Dialog.Title>
             <Dialog.Close asChild>
               <button className="rounded-md border border-[var(--border-default)] p-2 hover:bg-[var(--bg-card)]">
@@ -195,7 +195,7 @@ export function SendDraftsToClientModal({
                 {primaryContactEmail && (
                   <a
                     href={`mailto:${encodeURIComponent(primaryContactEmail)}?subject=${encodeURIComponent(
-                      `Drafts ready for review — ${clientName}`,
+                      `Drafts ready for review: ${clientName}`,
                     )}&body=${encodeURIComponent(messageText)}`}
                     className="flex items-center gap-1 rounded-md bg-[var(--bg-elevated)] px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--bg-card)]"
                   >

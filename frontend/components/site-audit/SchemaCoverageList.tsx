@@ -23,7 +23,7 @@ const SCHEMA_INFO: Record<string, { label: string; what: string }> = {
   },
   BreadcrumbList: {
     label: 'BreadcrumbList',
-    what: "Page hierarchy — helps AI place each page in your site's structure.",
+    what: "Page hierarchy. Helps AI place each page in your site's structure.",
   },
   Article: {
     label: 'Article',

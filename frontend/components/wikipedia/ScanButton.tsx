@@ -85,7 +85,7 @@ export function ScanButton({ brandId, onScanCompleted }: Props) {
         )}
         {scan?.status === 'failed' && (
           <span className="text-[var(--danger-text)]">
-            Last scan failed{scan.error_message ? ` — ${scan.error_message}` : ''}
+            Last scan failed{scan.error_message ? `: ${scan.error_message}` : ''}
           </span>
         )}
         {!scan && <>No scans yet</>}

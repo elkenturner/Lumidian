@@ -423,7 +423,7 @@ function InsertionHintRow({
               {urlPath(targetUrl)}
             </span>
           )}
-          {targetUrl && ' — '}
+          {targetUrl && ' · '}
           {hint.where}
         </span>
       </p>

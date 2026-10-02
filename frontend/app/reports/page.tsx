@@ -139,7 +139,7 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<'prompts' | 'competitors'>('prompts');
   const loadAbortRef = useRef<AbortController | null>(null);
 
-  useEffect(() => { document.title = 'Reports — Lumidian'; }, []);
+  useEffect(() => { document.title = 'Reports · Lumidian'; }, []);
 
 
   const loadData = useCallback(async (brandId: number, signal?: AbortSignal) => {
@@ -395,7 +395,7 @@ export default function ReportsPage() {
             <div className="flex items-start gap-2.5 bg-[rgba(120,53,15,0.18)] border border-[rgba(146,64,14,0.35)] rounded-lg px-4 py-3 mb-4">
               <AlertTriangle size={15} className="text-[var(--warning)] flex-shrink-0 mt-0.5" />
               <p className="text-xs text-[var(--warning)] leading-relaxed">
-                This report was degraded — {latestRun.failed_queries} of{' '}
+                This report was degraded: {latestRun.failed_queries} of{' '}
                 {(latestRun.failed_queries ?? 0) + (latestRun.total_queries ?? 0)} queries failed
                 (provider errors or timeouts). Prompt data below reflects only the{' '}
                 {latestRun.total_queries ?? 0} responses that succeeded.

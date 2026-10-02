@@ -81,8 +81,8 @@ export function EmptyCrawlBanner({
                   <code className="font-mono px-1 py-0.5 rounded bg-[var(--bg-base)]">
                     curl -s {safeHost(brandUrl)}
                   </code>
-                )}{' '}
-                — if the main content isn't in the raw HTML, that's the cause.
+                )}
+                . If the main content isn't in the raw HTML, that's the cause.
               </span>
             </li>
             <li className="flex gap-2 items-baseline">

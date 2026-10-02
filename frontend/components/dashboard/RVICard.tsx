@@ -63,7 +63,7 @@ export function RVICard({
         <CardHeader window={window} onWindowChange={onWindowChange} />
         <p className="text-3xl font-bold text-[var(--text-primary)] mt-2">&mdash;</p>
         <p className="text-xs text-[var(--text-faint)] mt-1">
-          Relative visibility couldn&apos;t be loaded — refresh to try again.
+          Relative visibility couldn&apos;t be loaded. Refresh to try again.
         </p>
       </div>
     );
@@ -99,7 +99,7 @@ export function RVICard({
         <CardHeader window={window} onWindowChange={onWindowChange} />
         <p className="text-3xl font-bold text-[var(--text-primary)] mt-2">&mdash;</p>
         <p className="text-xs text-[var(--text-faint)] mt-1">
-          No runs in this window — run a report or try 30d / 90d.
+          No runs in this window. Run a report or try 30d / 90d.
         </p>
       </div>
     );
@@ -121,7 +121,7 @@ export function RVICard({
           <p className="text-lg font-bold text-[var(--text-primary)]">Territory owned</p>
         </div>
         <p className="text-xs text-[var(--text-muted)] mt-1.5 leading-relaxed">
-          No competitor appears on any prompt you track — you hold{' '}
+          No competitor appears on any prompt you track. You hold{' '}
           {data.owned_prompt_count} prompt{data.owned_prompt_count !== 1 ? 's' : ''} uncontested.
         </p>
         <p className="text-[10px] text-[var(--text-faint)] mt-auto pt-3">{poolFootnote(data)}</p>

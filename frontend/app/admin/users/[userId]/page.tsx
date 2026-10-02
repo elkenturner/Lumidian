@@ -453,7 +453,7 @@ export default function AdminUserDetailPage() {
     }
   }, [userId]);
 
-  useEffect(() => { document.title = detail ? `${detail.email} \u2014 Admin` : 'User \u2014 Admin'; }, [detail]);
+  useEffect(() => { document.title = detail ? `${detail.email} \u00b7 Admin` : 'User \u00b7 Admin'; }, [detail]);
 
   useEffect(() => {
     if (authLoading) return;

@@ -26,7 +26,7 @@ const SECTIONS: Array<{
     items: [
       { label: 'To provide the Service', detail: 'We use your brand and prompt data to run visibility queries against third-party AI platforms and generate reports.' },
       { label: 'To operate and improve the product', detail: 'Usage data helps us identify bugs, improve features, and understand how people use Lumidian.' },
-      { label: 'To communicate with you', detail: 'We send transactional emails (account confirmation, report notifications, billing receipts). We may also send product update emails — you can unsubscribe at any time.' },
+      { label: 'To communicate with you', detail: 'We send transactional emails (account confirmation, report notifications, billing receipts). We may also send product update emails; you can unsubscribe at any time.' },
       { label: 'To process payments', detail: 'Billing information is shared with Stripe to process subscription charges.' },
       { label: 'To comply with legal obligations', detail: 'We may retain and disclose data where required by law or to respond to valid legal process.' },
     ],

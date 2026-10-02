@@ -43,7 +43,7 @@ export function RenderModeBanner({ isJsRendered, brandUrl }: Props) {
           AI crawlers (GPTBot, ClaudeBot, PerplexityBot, OAI-SearchBot){' '}
           <strong>do not execute JavaScript</strong>. Vercel's 1B-fetch study found zero JS
           execution. Anything that only appears after JS runs is invisible to all four major
-          LLMs — including the four scores you see below.
+          LLMs, including the four scores you see below.
         </p>
         {brandUrl && (
           <p className="text-xs text-[var(--text-muted)] mt-2 tabular-nums">

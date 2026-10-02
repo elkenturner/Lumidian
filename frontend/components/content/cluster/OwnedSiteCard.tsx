@@ -105,7 +105,7 @@ export function OwnedSiteCard({ brandId, cluster, candidate, draft, onClusterUpd
           onClick={writeDeepVersion}
           disabled={deepGenerating}
           className="!px-2 text-[var(--text-secondary)]"
-          title="Longer FAQ-rich page (1,800+ words) built for AI citation — takes a bit longer"
+          title="Longer FAQ-rich page (1,800+ words) built for AI citation. Takes a bit longer"
         >
           {deepGenerating ? (
             <Loader2 className="h-3 w-3 animate-spin" />

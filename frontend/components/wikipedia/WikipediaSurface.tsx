@@ -86,7 +86,7 @@ export function WikipediaSurface({ brandId }: Props) {
           </h1>
           <p className="mt-1.5 max-w-2xl text-sm text-[var(--text-secondary)]">
             Existing articles where your brand can be cited authoritatively. We surface candidates
-            and draft the edit — you decide what gets submitted.
+            and draft the edit. You decide what gets submitted.
           </p>
         </div>
         <div className="shrink-0">

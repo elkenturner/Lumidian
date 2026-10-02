@@ -100,7 +100,7 @@ export default class ErrorBoundary extends React.Component<Props, State> {
             marginBottom: '32px',
           }}>
             An unexpected error occurred. Our team has been notified.
-            Try reloading the page — if the problem persists, contact support.
+            Try reloading the page. If the problem persists, contact support.
           </p>
 
           <button

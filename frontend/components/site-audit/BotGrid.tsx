@@ -22,7 +22,7 @@ const BOTS: Bot[] = [
     name: 'GPTBot',
     family: 'openai',
     tier: 'critical',
-    consequence: 'OpenAI training crawler — content here can be learned into ChatGPT model weights.',
+    consequence: 'OpenAI training crawler. Content here can be learned into ChatGPT model weights.',
   },
   {
     name: 'ClaudeBot',
@@ -34,7 +34,7 @@ const BOTS: Bot[] = [
     name: 'Google-Extended',
     family: 'google',
     tier: 'critical',
-    consequence: 'Gemini + Google AI Overviews. Separate from Googlebot — block this and you lose Google AI without affecting regular Search.',
+    consequence: 'Gemini + Google AI Overviews. Separate from Googlebot: block this and you lose Google AI without affecting regular Search.',
   },
   {
     name: 'PerplexityBot',

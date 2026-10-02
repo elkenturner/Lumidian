@@ -30,7 +30,7 @@ export function FilesStatusRow({
     {
       name: 'robots.txt',
       description:
-        'Per-bot allow/disallow rules. AI crawlers obey it — if you block them here, you exit AI search.',
+        'Per-bot allow/disallow rules. AI crawlers obey it. If you block them here, you exit AI search.',
       status: robotsTxtRaw ? 'good' : 'missing',
       cta: {
         label: 'Generate AI-bot snippet',

@@ -94,33 +94,45 @@ def _get_client_ip(request: Request) -> str:
 
 async def _rate_check_db(key: str, endpoint: str, limit: int, db) -> None:
     """DB-backed rate check. Counts recent entries in the rate_limits table.
-    Falls back to in-memory check if the table doesn't exist (e.g. in tests)."""
+    Falls back to in-memory check if the table doesn't exist (e.g. in tests).
+
+    Uses its own short-lived session and commits the attempt immediately, so
+    the record survives even when the request transaction is later rolled back.
+    That rollback happens on every non-2xx response (see get_db) — including a
+    failed login (401), which is exactly the case brute-force protection must
+    count. Sharing the request session (and only flushing) meant failed attempts
+    were silently discarded and endpoints like /login were never rate-limited.
+    """
     now = time.time()
     cutoff = now - _RATE_WINDOW
 
     try:
-        result = await db.execute(
-            text("SELECT COUNT(*) FROM rate_limits WHERE key = :key AND endpoint = :ep AND created_at > :cutoff"),
-            {"key": key, "ep": endpoint, "cutoff": cutoff},
-        )
-        count = result.scalar()
-        if count >= limit:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many requests — please try again later.",
+        from app.database import AsyncSessionLocal
+        async with AsyncSessionLocal() as rl_db:
+            result = await rl_db.execute(
+                text("SELECT COUNT(*) FROM rate_limits WHERE key = :key AND endpoint = :ep AND created_at > :cutoff"),
+                {"key": key, "ep": endpoint, "cutoff": cutoff},
             )
-        await db.execute(
-            text("INSERT INTO rate_limits (key, endpoint, created_at) VALUES (:key, :ep, :now)"),
-            {"key": key, "ep": endpoint, "now": now},
-        )
-        # Prune old entries periodically (~1% of requests)
-        import random
-        if random.random() < 0.01:
-            await db.execute(
-                text("DELETE FROM rate_limits WHERE created_at < :cutoff"),
-                {"cutoff": cutoff},
+            count = result.scalar()
+            if count >= limit:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many requests — please try again later.",
+                )
+            await rl_db.execute(
+                text("INSERT INTO rate_limits (key, endpoint, created_at) VALUES (:key, :ep, :now)"),
+                {"key": key, "ep": endpoint, "now": now},
             )
-        await db.flush()
+            # Prune old entries periodically (~1% of requests)
+            import random
+            if random.random() < 0.01:
+                await rl_db.execute(
+                    text("DELETE FROM rate_limits WHERE created_at < :cutoff"),
+                    {"cutoff": cutoff},
+                )
+            await rl_db.commit()
+    except HTTPException:
+        raise
     except Exception as e:
         if "no such table" in str(e):
             # Fallback to in-memory (tests or pre-migration)

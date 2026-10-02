@@ -120,11 +120,11 @@ export function FixGroup({ recs, onStatusChange }: Props) {
             </p>
           ) : isSiteWide(lead.artifact_type) ? (
             <p className="text-[var(--text-secondary)]">
-              Applies globally — add once to your site-wide template.
+              Applies globally. Add once to your site-wide template.
             </p>
           ) : (
             <p className="text-[var(--text-faint)] italic">
-              Per-page URLs unavailable on this audit — re-run to refresh.
+              Per-page URLs unavailable on this audit. Re-run to refresh.
             </p>
           )}
         </div>

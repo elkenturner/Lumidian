@@ -46,3 +46,13 @@ pdf-samples/
 # Local DB backups (large; never commit)
 backups/
 backend/backups/
+
+# Local-only: Claude Code state, DB snapshots, customer exports, scratch
+.claude/
+*.db.pre-*
+*-shm
+*-wal
+backend/data/
+spotitearly_pilot_export/
+msc-urls.txt
+cgpt-*.yml

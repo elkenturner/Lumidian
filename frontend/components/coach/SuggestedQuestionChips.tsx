@@ -19,7 +19,7 @@ export function SuggestedQuestionChips() {
         >
           <Sparkles size={16} className="text-[var(--text-on-accent)]" />
         </div>
-        <div className="text-sm font-medium text-[var(--text-primary)]">Hi — I&apos;m Lumi.</div>
+        <div className="text-sm font-medium text-[var(--text-primary)]">Hi, I&apos;m Lumi.</div>
         <div className="mt-1 text-sm leading-relaxed text-[var(--text-secondary)]">
           I can read your runs, scores, competitors, and content gaps, and help you
           decide what to do next.

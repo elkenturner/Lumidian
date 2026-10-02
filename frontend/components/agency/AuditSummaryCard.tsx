@@ -59,7 +59,7 @@ export function AuditSummaryCard({ clientId, brandId }: Props) {
           <span>No site audit yet</span>
         </div>
         <p className="mb-3">
-          Run an audit to surface AI-visibility blockers on the client&apos;s site — bot access,
+          Run an audit to surface AI-visibility blockers on the client&apos;s site: bot access,
           schema gaps, content density, render mode.
         </p>
         <Link

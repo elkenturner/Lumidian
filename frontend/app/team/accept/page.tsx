@@ -18,7 +18,7 @@ export default function TeamAcceptPage() {
     const token = new URLSearchParams(window.location.search).get('token');
     if (!token) {
       setStatus('error');
-      setMessage('Invalid invite link — no token found.');
+      setMessage('Invalid invite link: no token found.');
       return;
     }
 

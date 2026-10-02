@@ -96,7 +96,7 @@ export function SiteAuditView({ brandId }: Props) {
         </header>
         <div className="card-elevated max-w-2xl">
           <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-            Audit your site for AI-search visibility — semantic structure, schema markup,
+            Audit your site for AI-search visibility: semantic structure, schema markup,
             AI-bot accessibility, and which competitor pages are winning the prompts you lose
             on. Each finding turns into a draftable, paste-ready artifact you can apply in
             minutes.

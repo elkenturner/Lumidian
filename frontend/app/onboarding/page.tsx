@@ -260,7 +260,7 @@ export default function OnboardingPage() {
                   onClick={handleSkipFetch}
                   className="w-full text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] py-2 transition-colors"
                 >
-                  Skip — continue without website data
+                  Skip and continue without website data
                 </button>
               )}
             </div>
@@ -335,7 +335,7 @@ export default function OnboardingPage() {
         {step === 3 && (
           <div>
             <h2 className="text-xl font-bold text-[var(--text-primary)] mb-1">Tell us about your brand</h2>
-            <p className="text-sm text-[var(--text-muted)] mb-6">Optional — helps generate better content drafts. You can update this later.</p>
+            <p className="text-sm text-[var(--text-muted)] mb-6">Optional. Helps generate better content drafts, and you can update this later.</p>
             <div className="space-y-4 mb-6">
               <div>
                 <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">Company description</label>

@@ -32,7 +32,7 @@ export default function PromptDetailPage() {
   const brandName = brands.find((b) => b.id === brandId)?.name ?? '';
 
   useEffect(() => {
-    document.title = 'Prompt Detail — Lumidian';
+    document.title = 'Prompt Detail · Lumidian';
   }, []);
 
   const loadData = useCallback(async () => {
@@ -152,7 +152,7 @@ export default function PromptDetailPage() {
           Insights
         </h3>
         {data.insights.length === 0 ? (
-          <p className="text-xs text-[var(--text-faint)]">No insights yet — more data needed</p>
+          <p className="text-xs text-[var(--text-faint)]">No insights yet. More data needed.</p>
         ) : (
           <div className="flex flex-col gap-2">
             {data.insights.map((insight) => (

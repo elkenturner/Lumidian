@@ -245,7 +245,7 @@ export function runQualityChecks(
         label: `Appropriate length (50–300 words, currently ${wordCount})`,
         passed: inLengthRange,
         detail: !inLengthRange
-          ? wordCount < 50 ? 'Too short for a meaningful Wikipedia addition' : 'May be too long — consider splitting'
+          ? wordCount < 50 ? 'Too short for a meaningful Wikipedia addition' : 'May be too long; consider splitting'
           : undefined,
       },
       {
@@ -264,8 +264,8 @@ export function runQualityChecks(
       passed: inRange ? true : 'warning',
       detail: !inRange
         ? wordCount < 250
-          ? 'Too short — aim for at least 250 words for a useful Quora answer'
-          : 'Getting long — consider trimming below 550 words'
+          ? 'Too short. Aim for at least 250 words for a useful Quora answer'
+          : 'Getting long; consider trimming below 550 words'
         : undefined,
     });
 
@@ -281,7 +281,7 @@ export function runQualityChecks(
       label: 'Direct opening sentence',
       passed: fillerFound ? false : true,
       detail: fillerFound
-        ? `Starts with filler: "${fillerFound}" — first sentence must state the direct answer`
+        ? `Starts with filler ("${fillerFound}"). The first sentence must state the direct answer`
         : undefined,
     });
 
@@ -292,7 +292,7 @@ export function runQualityChecks(
         label: 'Brand mention',
         passed: occurrences > 3 ? 'warning' : true,
         detail: occurrences > 3
-          ? `Mentioned ${occurrences}× — keep it to 1–2 natural mentions`
+          ? `Mentioned ${occurrences}×. Keep it to 1–2 natural mentions`
           : occurrences === 0 ? undefined : undefined,
       });
     }

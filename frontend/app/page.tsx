@@ -70,7 +70,7 @@ const FEATURES = [
   {
     icon: Sparkles,
     title: 'Auto-Draft Content',
-    desc: 'Platform-specific drafts generated for every gap — Reddit posts, Quora answers, LinkedIn articles, X threads, Medium articles, and Wikipedia edits.',
+    desc: 'Platform-specific drafts generated for every gap: Reddit posts, Quora answers, LinkedIn articles, X threads, Medium articles, and Wikipedia edits.',
   },
   {
     icon: TrendingUp,
@@ -80,7 +80,7 @@ const FEATURES = [
   {
     icon: MessageSquare,
     title: 'Visibility Opportunities',
-    desc: 'Surface live threads and discussions across Reddit, Quora, LinkedIn, and X where your brand can contribute — scored by relevance.',
+    desc: 'Surface live threads and discussions across Reddit, Quora, LinkedIn, and X where your brand can contribute, scored by relevance.',
   },
   {
     icon: Settings2,
@@ -95,7 +95,7 @@ const FEATURES = [
   {
     icon: Activity,
     title: 'Sentiment & Position',
-    desc: 'Know whether AI models describe your brand positively, neutrally, or negatively — and where you appear in the response.',
+    desc: 'Know whether AI models describe your brand positively, neutrally, or negatively, and where you appear in the response.',
   },
 ];
 
@@ -120,7 +120,7 @@ const HOW_STEPS = [
   {
     n: '3',
     title: 'Close the Gaps',
-    desc: 'We generate targeted drafts for Reddit, Quora, LinkedIn, X, Medium, and Wikipedia — each one aimed at prompts where your brand is missing. Review, edit, and post.',
+    desc: 'We generate targeted drafts for Reddit, Quora, LinkedIn, X, Medium, and Wikipedia, each one aimed at prompts where your brand is missing. Review, edit, and post.',
   },
 ];
 
@@ -151,7 +151,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'What kind of content does Lumidian draft?',
-    a: 'Lumidian generates Reddit posts, Quora answers, LinkedIn articles, X threads, Medium articles, and Wikipedia edits — all targeted at prompts where your brand has low visibility. Every draft follows your brand voice guidelines.',
+    a: 'Lumidian generates Reddit posts, Quora answers, LinkedIn articles, X threads, Medium articles, and Wikipedia edits, all targeted at prompts where your brand has low visibility. Every draft follows your brand voice guidelines.',
   },
   {
     q: 'Is the content AI-generated or human-written?',
@@ -167,7 +167,7 @@ const FAQ_ITEMS = [
   },
   {
     q: 'What makes Lumidian different from SEO tools?',
-    a: "Traditional SEO tools track Google rankings. Lumidian tracks what AI models say about your brand — a fundamentally different signal that SEO tools don't measure.",
+    a: "Traditional SEO tools track Google rankings. Lumidian tracks what AI models say about your brand: a fundamentally different signal that SEO tools don't measure.",
   },
 ];
 
@@ -303,7 +303,7 @@ function HeroSection() {
             <span className="text-[var(--accent)]">
               Visibility in AI
             </span>
-            {' — Then Fix It'}
+            {'. Then Fix It'}
           </h1>
         </FadeUp>
 
@@ -311,7 +311,7 @@ function HeroSection() {
         <FadeUp delay={200}>
           <p className="mt-6 text-lg sm:text-xl text-[var(--text-secondary)] max-w-2xl mx-auto leading-relaxed">
             Monitor how ChatGPT, Claude, Perplexity, and Gemini talk about your brand.
-            Find where you&apos;re missing — then fix it with targeted, AI-drafted content.
+            Find where you&apos;re missing, then fix it with targeted, AI-drafted content.
           </p>
         </FadeUp>
 
@@ -608,7 +608,7 @@ function DashboardMockup() {
             {/* Blurb */}
             <div className="pt-3 border-t border-[rgba(51,65,85,0.4)]">
               <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
-                Lumidian queries each AI assistant — ChatGPT, Claude, Perplexity, and Gemini — with live web search enabled, so your scores reflect how your brand actually appears in real answers today.
+                Lumidian queries each AI assistant (ChatGPT, Claude, Perplexity, and Gemini) with live web search enabled, so your scores reflect how your brand actually appears in real answers today.
               </p>
               <Link
                 href="/methodology"
@@ -808,7 +808,7 @@ function PricingSection() {
                         <Check size={16} className="text-[#22c55e] flex-shrink-0" />
                       )}
                       <span className={`text-sm ${isFalse ? 'text-[#475569]' : 'text-[var(--text-secondary)]'}`}>
-                        {typeof val === 'string' && val !== '—' ? `${val} — ${row.label}` : row.label}
+                        {typeof val === 'string' && val !== '—' ? `${row.label}: ${val}` : row.label}
                       </span>
                     </div>
                   );

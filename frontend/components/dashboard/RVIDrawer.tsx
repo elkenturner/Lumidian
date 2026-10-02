@@ -88,7 +88,7 @@ export function RVIDrawer({
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between gap-4">
-            <span>Relative Visibility — {brandName}</span>
+            <span>Relative Visibility: {brandName}</span>
             <div className="flex gap-1">
               {WINDOWS.map((w) => (
                 <button
@@ -110,7 +110,7 @@ export function RVIDrawer({
 
         {data.confidence === 'low' && data.has_data && data.rvi !== null && (
           <div className="bg-[rgba(245,158,11,0.1)] border border-[rgba(245,158,11,0.3)] rounded-lg px-3 py-2 text-xs text-[var(--warning)]">
-            Based on {data.sample_count} answers so far — this number steadies as more reports run.
+            Based on {data.sample_count} answers so far. This number steadies as more reports run.
           </div>
         )}
 
@@ -127,7 +127,7 @@ export function RVIDrawer({
             </div>
             <p className="text-xs text-[var(--text-faint)] mt-1">
               On the {data.contested_prompt_count} prompt{data.contested_prompt_count !== 1 ? 's' : ''} where
-              a competitor shows up, AI mentions you in {data.brand_pct?.toFixed(0)}% of answers — your
+              a competitor shows up, AI mentions you in {data.brand_pct?.toFixed(0)}% of answers; your
               peers average {data.peer_avg_pct?.toFixed(0)}%.
             </p>
             <div className="mt-3 space-y-2">
@@ -137,7 +137,7 @@ export function RVIDrawer({
           </div>
         ) : (
           <p className="text-xs text-[var(--text-muted)]">
-            No competitor appears on any prompt you track in this window — there is nothing to compare against yet.
+            No competitor appears on any prompt you track in this window, so there is nothing to compare against yet.
           </p>
         )}
 
@@ -205,7 +205,7 @@ export function RVIDrawer({
               Prompts you&apos;re competing for
             </p>
             <p className="text-[10px] text-[var(--text-faint)] mb-3">
-              Biggest gaps first — these are where content work moves the number.
+              Biggest gaps first. These are where content work moves the number.
             </p>
             <div className="space-y-4">
               {data.contested_prompts.map((p) => {
@@ -242,7 +242,7 @@ export function RVIDrawer({
               ))}
             </div>
             <p className="text-[10px] text-[var(--text-faint)] mt-2">
-              These stay out of the comparison — no competitor registers, so it&apos;s yours to defend.
+              These stay out of the comparison: no competitor registers, so it&apos;s yours to defend.
             </p>
           </div>
         )}
@@ -311,8 +311,8 @@ export function RVIDrawer({
             ))}
           </div>
           <p className="text-[10px] text-[var(--text-faint)] mt-2 leading-relaxed">
-            Excluded competitors stay tracked but don&apos;t count toward the comparison —
-            useful for giants that aren&apos;t really your weight class.
+            Excluded competitors stay tracked but don&apos;t count toward the comparison.
+            Useful for giants that aren&apos;t really your weight class.
           </p>
         </div>
       </DialogContent>

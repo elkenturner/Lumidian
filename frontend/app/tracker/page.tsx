@@ -32,19 +32,19 @@ const TIER_OPTIONS = [
     value: 'basic',
     label: 'Starter',
     runs: '10 prompts per brand',
-    description: '$100/mo — 1 standard brand',
+    description: '$100/mo, 1 standard brand',
   },
   {
     value: 'starter',
     label: 'Growth',
     runs: '25 prompts per brand',
-    description: '$300/mo — 1 standard brand',
+    description: '$300/mo, 1 standard brand',
   },
   {
     value: 'pro',
     label: 'Pro',
     runs: '30 prompts per brand',
-    description: '$500/mo — 2 pro brands',
+    description: '$500/mo, 2 pro brands',
   },
 ];
 
@@ -377,7 +377,7 @@ export default function TrackerPage() {
                 )}
                 <p className="text-xs text-[var(--text-faint)] mt-1.5">
                   {formPrompts.length} prompt{formPrompts.length !== 1 ? 's' : ''} added
-                  {formPrompts.length === 0 && ' — at least 1 required'}
+                  {formPrompts.length === 0 && ' (at least 1 required)'}
                 </p>
               </div>
 

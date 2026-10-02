@@ -171,7 +171,7 @@ export function OpportunitiesPanel({ brandId }: Props) {
           )}
         </span>
         <span className="text-xs text-[var(--text-faint)] hidden sm:block">
-          Real conversations matching your tracked questions — reply there to build presence AI engines retrieve.
+          Real conversations matching your tracked questions. Reply there to build presence AI engines retrieve.
         </span>
       </div>
 
@@ -299,7 +299,7 @@ function OpportunityRow({
               onClick={onDismiss}
               disabled={dismissing || drafting}
               className="!px-2 text-[var(--text-faint)]"
-              title="Not a fit — hide this thread"
+              title="Not a fit? Hide this thread"
             >
               <X className="h-3 w-3" />
               Dismiss

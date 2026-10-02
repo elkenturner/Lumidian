@@ -33,8 +33,8 @@ const BASE_URL = 'https://lumidian.ai';
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
   title: {
-    default: 'Lumidian — Know when AI mentions your brand',
-    template: '%s — Lumidian',
+    default: 'Lumidian · Know when AI mentions your brand',
+    template: '%s · Lumidian',
   },
   description: 'Track how ChatGPT, Claude, Perplexity, and Gemini mention your brand. Get a daily visibility score, per-model breakdown, and a shareable pitch deck.',
   keywords: ['AI visibility', 'brand tracking', 'ChatGPT mentions', 'LLM brand monitoring', 'AI search optimization', 'Lumidian'],
@@ -42,13 +42,13 @@ export const metadata: Metadata = {
     type: 'website',
     url: BASE_URL,
     siteName: 'Lumidian',
-    title: 'Lumidian — Know when AI mentions your brand',
+    title: 'Lumidian · Know when AI mentions your brand',
     description: 'Track how ChatGPT, Claude, Perplexity, and Gemini mention your brand. Daily visibility scores, trend charts, and a shareable pitch deck.',
-    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Lumidian — Brand Visibility Tracker' }],
+    images: [{ url: '/og-image.png', width: 1200, height: 630, alt: 'Lumidian · Brand Visibility Tracker' }],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Lumidian — Know when AI mentions your brand',
+    title: 'Lumidian · Know when AI mentions your brand',
     description: 'Track how ChatGPT, Claude, Perplexity, and Gemini mention your brand.',
     images: ['/og-image.png'],
   },

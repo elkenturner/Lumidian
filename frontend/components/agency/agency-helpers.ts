@@ -41,7 +41,7 @@ I've got ${draftCount} new ${plural} for your review. Take a look and approve, r
 
 ${reviewLinkUrl}
 
-Quick turnaround appreciated — happy to iterate.`;
+Quick turnaround appreciated. Happy to iterate.`;
 }
 
 /**
@@ -51,6 +51,6 @@ export function nudgeMessageText(
   contactName: string | null,
   reviewLinkUrl: string,
 ): string {
-  const greeting = contactName ? `Hey ${contactName},` : 'Quick ping —';
+  const greeting = contactName ? `Hey ${contactName},` : 'Quick ping:';
   return `${greeting} the drafts at ${reviewLinkUrl} are still waiting on your review. Let me know if you need anything from me to help wrap them up.`;
 }

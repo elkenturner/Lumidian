@@ -14,7 +14,7 @@ import httpx
 import pytest
 
 from app.dependencies import _rate_store, check_rate_limit
-from tests.conftest import create_brand, register_and_login
+from tests.conftest import create_brand, register_and_login, register_user
 
 pytestmark = pytest.mark.asyncio
 
@@ -35,6 +35,31 @@ async def _complete_pending_runs(db, brand_id: int):
         .values(status="completed")
     )
     await db.commit()
+
+
+async def test_failed_logins_are_rate_limited(client: httpx.AsyncClient):
+    """Repeated failed logins (wrong password) must count toward the login
+    rate limit and eventually return 429 — this is the core brute-force
+    protection. Regression: the DB rate-check used to only flush() its INSERT
+    on the request session, which get_db rolled back on every 401, so failed
+    attempts were never recorded and /login was never rate-limited.
+    """
+    from app.routers.auth import _MAX_LOGIN
+
+    await register_user(client, email="bruteforce@example.com", password="CorrectPass123")
+
+    statuses = []
+    for _ in range(_MAX_LOGIN + 2):
+        resp = await client.post(
+            "/api/auth/login",
+            json={"email": "bruteforce@example.com", "password": "WrongPass999"},
+        )
+        statuses.append(resp.status_code)
+
+    # Every attempt up to the limit is a normal 401; once the limit is hit the
+    # endpoint must start returning 429 instead of accepting more guesses.
+    assert statuses[:_MAX_LOGIN] == [401] * _MAX_LOGIN, statuses
+    assert 429 in statuses[_MAX_LOGIN:], statuses
 
 
 async def test_tracking_rate_limit(client: httpx.AsyncClient, db_session):

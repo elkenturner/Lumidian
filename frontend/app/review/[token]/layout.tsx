@@ -7,7 +7,7 @@ const instrumentSerif = Instrument_Serif({ subsets: ['latin'], variable: '--font
 const ibmPlexMono = IBM_Plex_Mono({ subsets: ['latin'], variable: '--font-mono', weight: ['400', '500'] });
 
 export const metadata: Metadata = {
-  title: 'Lumidian — Client Review',
+  title: 'Lumidian · Client Review',
   robots: 'noindex, nofollow',
 };
 

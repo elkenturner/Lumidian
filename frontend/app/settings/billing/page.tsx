@@ -287,7 +287,7 @@ export default function BillingPage() {
           <CheckCircle2 size={16} className="text-[var(--success)] flex-shrink-0" />
           <p className="text-sm text-[var(--success)] font-medium">
             {currentTier
-              ? `${TIER_DISPLAY_NAMES[currentTier] ?? (currentTier.charAt(0).toUpperCase() + currentTier.slice(1))} plan activated — you now have full access.`
+              ? `${TIER_DISPLAY_NAMES[currentTier] ?? (currentTier.charAt(0).toUpperCase() + currentTier.slice(1))} plan activated. You now have full access.`
               : 'Subscription activated! Your plan has been updated.'}
           </p>
         </div>
@@ -297,7 +297,7 @@ export default function BillingPage() {
       {isAdmin && (
         <div className="flex items-center gap-3 bg-[var(--accent)]/10 border border-[var(--accent)]/20 rounded-xl px-4 py-3 mb-6">
           <Zap size={16} className="text-[var(--accent-foreground)] flex-shrink-0" />
-          <p className="text-sm text-[var(--accent-foreground)]">Admin account — unlimited prompts, all billing checks bypassed.</p>
+          <p className="text-sm text-[var(--accent-foreground)]">Admin account: unlimited prompts, all billing checks bypassed.</p>
         </div>
       )}
 
@@ -361,7 +361,7 @@ export default function BillingPage() {
                   </p>
                 </div>
                 <p className="text-xs text-[var(--text-faint)]">
-                  {currentTier === 'basic' ? '10 prompts per brand' : currentTier === 'starter' ? '25 prompts per brand' : currentTier === 'pro' ? '30 prompts per brand' : '10 prompts on free plan — upgrade for more'}
+                  {currentTier === 'basic' ? '10 prompts per brand' : currentTier === 'starter' ? '25 prompts per brand' : currentTier === 'pro' ? '30 prompts per brand' : '10 prompts on free plan (upgrade for more)'}
                 </p>
               </div>
             )}
@@ -370,7 +370,7 @@ export default function BillingPage() {
             {status?.subscription_status === 'canceling' && (
               <div className="flex items-center gap-2 bg-[var(--warning)]/10 border border-[var(--warning)]/20 rounded-lg px-3 py-2.5 mt-3">
                 <AlertTriangle size={13} className="text-[var(--warning)] flex-shrink-0" />
-                <p className="text-xs text-[var(--warning)]">Subscription canceling — access continues until the end of the billing period.</p>
+                <p className="text-xs text-[var(--warning)]">Subscription canceling. Access continues until the end of the billing period.</p>
               </div>
             )}
 

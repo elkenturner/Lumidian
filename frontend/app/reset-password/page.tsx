@@ -29,7 +29,7 @@ export default function ResetPasswordPage() {
   const passwordValid = passwordChecks.every(Boolean);
 
   useEffect(() => {
-    document.title = 'Set New Password — Lumidian';
+    document.title = 'Set New Password · Lumidian';
   }, []);
 
   useEffect(() => {

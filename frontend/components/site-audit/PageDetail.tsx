@@ -96,7 +96,7 @@ export function PageDetail({ auditId, pageId, onBack }: Props) {
           </h3>
         </div>
         {findings.length === 0 ? (
-          <p className="text-sm text-[var(--text-muted)]">No findings — this page is clean.</p>
+          <p className="text-sm text-[var(--text-muted)]">No findings. This page is clean.</p>
         ) : (
           <ul className="space-y-2">
             {findings.map((f) => (

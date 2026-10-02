@@ -89,7 +89,7 @@ export function UploadZone({ clientId, onUploaded }: Props) {
             Choose file
           </button>
           <p className="mt-3 text-xs text-gray-500">
-            .mp4, .mov, .webm — up to 500 MB
+            .mp4, .mov, .webm · up to 500 MB
           </p>
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
         </>

@@ -74,7 +74,7 @@ export default function ContentArchivePage() {
       <header>
         <h1 className="text-xl font-bold text-[var(--text-primary)]">Earlier drafts</h1>
         <p className="mt-1.5 text-sm text-[var(--text-secondary)]">
-          Drafts created during onboarding or before the cluster redesign. Read-only — they aren&apos;t
+          Drafts created during onboarding or before the cluster redesign. Read-only, since they aren&apos;t
           attached to any question.
         </p>
       </header>

@@ -29,7 +29,7 @@ export default function LoginPage() {
   const rawFrom = searchParams.get('from') || '/dashboard';
   const from = rawFrom.startsWith('/') && !rawFrom.startsWith('//') ? rawFrom : '/dashboard';
 
-  useEffect(() => { document.title = 'Sign In — Lumidian'; }, []);
+  useEffect(() => { document.title = 'Sign In · Lumidian'; }, []);
 
   useEffect(() => {
     const oauthError = searchParams.get('error');

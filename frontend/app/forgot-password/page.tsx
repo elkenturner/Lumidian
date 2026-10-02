@@ -17,7 +17,7 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    document.title = 'Reset Password — Lumidian';
+    document.title = 'Reset Password · Lumidian';
   }, []);
 
   useEffect(() => {

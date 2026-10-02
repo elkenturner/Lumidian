@@ -21,7 +21,7 @@ export default function VerifyEmailPage() {
   const [verified, setVerified] = useState(false);
 
   useEffect(() => {
-    document.title = 'Verify Your Email — Lumidian';
+    document.title = 'Verify Your Email · Lumidian';
   }, []);
 
   // If no email param, send them back to register

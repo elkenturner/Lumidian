@@ -45,8 +45,8 @@ const ACTIVE_STATUSES = new Set(["briefing", "generating"]);
 
 const ANGLES = [
   { key: "auto", label: "Auto", tip: "Insider voice on LinkedIn/Medium/X; neutral on Quora and strict subreddits" },
-  { key: "insider", label: "Insider", tip: "Openly affiliated voice — first-person experience, casual disclosure when endorsing" },
-  { key: "neutral", label: "Neutral", tip: "Independent-practitioner voice — the brand appears as one option among alternatives" },
+  { key: "insider", label: "Insider", tip: "Openly affiliated voice: first-person experience, casual disclosure when endorsing" },
+  { key: "neutral", label: "Neutral", tip: "Independent-practitioner voice: the brand appears as one option among alternatives" },
 ] as const;
 
 export default function ClusterDetailPage() {

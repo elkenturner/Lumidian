@@ -137,7 +137,7 @@ export function ClientPipelineTab({ brandId, reviewLinkUrl, primaryContactName, 
     return (
       <div className="rounded-lg border border-dashed border-[var(--border-subtle)] p-10 text-center text-sm text-[var(--text-muted)]">
         No drafts yet. Use the Lumidian Content section to generate some for this client&apos;s
-        brand — they&apos;ll show up here.
+        brand. They&apos;ll show up here.
       </div>
     );
   }

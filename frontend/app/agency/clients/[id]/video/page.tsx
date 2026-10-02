@@ -39,7 +39,7 @@ export default function VideoTabPage() {
       <h1 className="text-2xl font-semibold text-gray-900">Video</h1>
       <p className="text-sm text-gray-600">
         Upload a finished video. Lumidian transcribes it and generates a paste-ready YouTube package
-        optimized for AI retrieval — title, description, chapters, tags, JSON-LD, plus .srt/.vtt captions.
+        optimized for AI retrieval: title, description, chapters, tags, JSON-LD, plus .srt/.vtt captions.
       </p>
 
       <UploadZone clientId={clientId} onUploaded={(jobId) => { setSelectedId(jobId); refresh(); }} />

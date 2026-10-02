@@ -259,10 +259,10 @@ export function ManagePromptsModal({
                 onChange={(e) => setScopeValue(e.target.value as typeof scopeValue)}
                 className="bg-[rgba(255,255,255,0.05)] border border-[var(--bg-tinted-hover)] text-[var(--text-primary)] rounded-md px-2 py-1.5 text-xs focus:outline-none focus:border-[var(--accent)]"
               >
-                <option value="local">Local — city/region</option>
-                <option value="national">National — single country</option>
-                <option value="global">Global — multi-country</option>
-                <option value="niche">Niche — narrow B2B vertical</option>
+                <option value="local">Local (city/region)</option>
+                <option value="national">National (single country)</option>
+                <option value="global">Global (multi-country)</option>
+                <option value="niche">Niche (narrow B2B vertical)</option>
               </select>
               <input
                 type="text"

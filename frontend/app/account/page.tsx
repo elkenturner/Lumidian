@@ -69,7 +69,7 @@ export default function AccountPage() {
   const [pwSaving, setPwSaving] = useState(false);
   const [pwMsg, setPwMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
-  useEffect(() => { document.title = 'Account \u2014 Lumidian'; }, []);
+  useEffect(() => { document.title = 'Account \u00b7 Lumidian'; }, []);
 
   useEffect(() => {
     getBillingStatus()
@@ -103,8 +103,8 @@ export default function AccountPage() {
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-red-400">
               {subStatus === 'past_due' || subStatus === 'unpaid'
-                ? 'Service paused \u2014 payment required'
-                : 'Subscription ended \u2014 service paused'}
+                ? 'Service paused: payment required'
+                : 'Subscription ended: service paused'}
             </p>
             <p className="text-xs text-red-400/60 mt-1">
               {subStatus === 'past_due' || subStatus === 'unpaid'
@@ -144,14 +144,14 @@ export default function AccountPage() {
 
           <div className="px-5 py-5">
             {billingLoading ? null : isAdmin ? (
-              <p className="text-sm text-[var(--text-faint)] italic">Admin account &mdash; unlimited access.</p>
+              <p className="text-sm text-[var(--text-faint)] italic">Admin account with unlimited access.</p>
             ) : (
               <div>
                 <p className="text-lg font-bold text-[var(--text-primary)]">
                   {currentTierLabel}
                 </p>
                 {subStatus === 'canceling' && (
-                  <p className="text-xs text-amber-400 mt-1.5">Cancels at end of billing period &mdash; access continues until then.</p>
+                  <p className="text-xs text-amber-400 mt-1.5">Cancels at end of billing period. Access continues until then.</p>
                 )}
               </div>
             )}

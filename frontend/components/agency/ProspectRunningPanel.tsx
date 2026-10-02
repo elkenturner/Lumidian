@@ -51,7 +51,7 @@ export function ProspectRunningPanel({ audit }: Props) {
       </div>
 
       <p className="mt-4 text-xs text-[var(--text-muted)]">
-        This typically takes 90–150 seconds. You can leave this page and come back — the audit will keep running.
+        This typically takes 90–150 seconds. You can leave this page and come back. The audit will keep running.
       </p>
 
       <button

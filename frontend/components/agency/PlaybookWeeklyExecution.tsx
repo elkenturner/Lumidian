@@ -84,7 +84,7 @@ export function PlaybookWeeklyExecution({
   if (approved > 0) {
     rows.push(
       <li key="approved" className="flex items-center justify-between gap-3 py-1.5 text-sm">
-        <span>{approved} approved draft{approved === 1 ? '' : 's'} — send to client review</span>
+        <span>{approved} approved draft{approved === 1 ? '' : 's'} to send for client review</span>
         <button
           onClick={onOpenSendModal}
           className="flex items-center gap-1 rounded-md border border-[var(--border-default)] bg-[var(--bg-elevated)] px-2.5 py-1 text-xs text-[var(--text-primary)] hover:bg-[var(--bg-raised)]"
@@ -125,7 +125,7 @@ export function PlaybookWeeklyExecution({
         <h3 className="text-sm font-medium text-[var(--text-primary)]">
           Weekly execution{' '}
           <span className="text-xs text-[var(--text-muted)]">
-            (active — {rows.length === 1 && drafts.length === 0 ? '0' : `${toReview + approved + (trackingStale ? 1 : 0)}`} items)
+            (active: {rows.length === 1 && drafts.length === 0 ? '0' : `${toReview + approved + (trackingStale ? 1 : 0)}`} items)
           </span>
         </h3>
         <GenerateDraftButton clientId={clientId} brandId={brandId} onGenerated={onDraftsChanged} />

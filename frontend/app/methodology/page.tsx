@@ -155,7 +155,7 @@ const REFERENCES: {
     venue: 'arXiv:2606.23057, 2026',
     kind: 'Preprint',
     url: 'https://arxiv.org/abs/2606.23057',
-    note: 'Found only 41.6% agreement between models on the top-recommended brand — a top spot on one model doesn’t carry to another, so tracking a single model gives an incomplete picture.',
+    note: 'Found only 41.6% agreement between models on the top-recommended brand. A top spot on one model doesn’t carry to another, so tracking a single model gives an incomplete picture.',
   },
   {
     authors: 'Song, Y., et al.',
@@ -171,7 +171,7 @@ const REFERENCES: {
     venue: 'Eval4NLP @ ACL 2025',
     kind: 'Peer-reviewed',
     url: 'https://arxiv.org/abs/2408.04667',
-    note: 'Across 5 LLMs, 8 tasks, and 10 runs each, accuracy varied up to 15% between identical runs — even at temperature 0 with fixed seeds, no model produced repeatable outputs.',
+    note: 'Across 5 LLMs, 8 tasks, and 10 runs each, accuracy varied up to 15% between identical runs. Even at temperature 0 with fixed seeds, no model produced repeatable outputs.',
   },
   {
     authors: 'Yuan, J., et al.',
@@ -179,7 +179,7 @@ const REFERENCES: {
     venue: 'NeurIPS 2025 (oral)',
     kind: 'Peer-reviewed',
     url: 'https://arxiv.org/abs/2506.09501',
-    note: 'Traces run-to-run variation to the inference infrastructure itself (floating-point non-associativity, GPU batching) — variation callers of commercial LLM APIs cannot switch off.',
+    note: 'Traces run-to-run variation to the inference infrastructure itself (floating-point non-associativity, GPU batching), variation callers of commercial LLM APIs cannot switch off.',
   },
   {
     authors: 'Angermeir, F., et al.',
@@ -195,7 +195,7 @@ const REFERENCES: {
     venue: 'SparkToro Research, 2026',
     kind: 'Industry study',
     url: 'https://sparktoro.com/blog/new-research-ais-are-highly-inconsistent-when-recommending-brands-or-products-marketers-should-take-care-when-tracking-ai-visibility/',
-    note: 'Across 2,961 runs of 12 prompts, exact brand lists almost never repeated, yet per-brand mention rates stayed stable over many runs — concluding that visibility % across many prompts run multiple times is a sound metric, while "AI ranking position" metrics are not.',
+    note: 'Across 2,961 runs of 12 prompts, exact brand lists almost never repeated, yet per-brand mention rates stayed stable over many runs, concluding that visibility % across many prompts run multiple times is a sound metric, while "AI ranking position" metrics are not.',
   },
   {
     authors: 'Schulte, B., Bleeker, F. & Kaufmann, E.',
@@ -211,7 +211,7 @@ const REFERENCES: {
     venue: 'KDD 2024',
     kind: 'Peer-reviewed',
     url: 'https://arxiv.org/abs/2311.09735',
-    note: 'The foundational generative-engine-optimization study (Princeton/IIT Delhi): targeted content changes — adding citations, quotations, and statistics — boosted source visibility in generative engine responses by up to 40% on a large multi-domain benchmark.',
+    note: 'The foundational generative-engine-optimization study (Princeton/IIT Delhi): targeted content changes (adding citations, quotations, and statistics) boosted source visibility in generative engine responses by up to 40% on a large multi-domain benchmark.',
   },
 ];
 
@@ -236,13 +236,13 @@ export default function MethodologyPage() {
         <div className="mt-8 space-y-4 text-[15px] sm:text-base text-[var(--text-secondary)] leading-[1.7]">
           <p>
             Lumidian queries each AI model directly and measures how often your
-            brand appears in their responses. No scraping, no proxies — the same
+            brand appears in their responses. No scraping, no proxies: the same
             APIs that power ChatGPT, Claude, Perplexity, and Gemini.
           </p>
           <p className="text-[var(--text-muted)]">
             Transparency matters. If you&apos;re going to act on a visibility score, you
             should know exactly how it&apos;s calculated, what it represents, and what
-            can move it. This page explains every part of the process — and the
+            can move it. This page explains every part of the process, and the
             key design decisions are backed by published research, cited inline
             and listed in full in the{' '}
             <a href="#references" className="text-[var(--accent-light)] hover:underline">
@@ -311,7 +311,7 @@ export default function MethodologyPage() {
           Your overall visibility score is the average of the per-model scores
           for whichever models your plan queries. That way a Free brand and a
           Pro brand are always compared like-for-like against the models they
-          actually run — no model sitting at zero drags the average down.
+          actually run, so no model sitting at zero drags the average down.
         </div>
       </section>
 
@@ -347,10 +347,10 @@ export default function MethodologyPage() {
                 Prompts sent to each model
               </p>
               <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
-                Your tracked prompts are sent to each AI model&apos;s API — ChatGPT,
+                Your tracked prompts are sent to each AI model&apos;s API: ChatGPT,
                 Claude, Perplexity, and Gemini. Each prompt is run multiple times
                 per model because LLMs give different answers to the same
-                question — peer-reviewed studies show outputs vary even at
+                question. Peer-reviewed studies show outputs vary even at
                 &quot;deterministic&quot; settings, so a single response is not a
                 reliable measurement.<Ref n={[2, 3, 4]} />
               </p>
@@ -398,7 +398,7 @@ export default function MethodologyPage() {
                 Your visibility score is the percentage of queries where your brand
                 was mentioned. Mention rate over repeated prompts is the measure
                 independent research converges on: exact AI answers almost never
-                repeat, but a brand&apos;s mention rate is stable across runs —
+                repeat, but a brand&apos;s mention rate is stable across runs,
                 which is also why we don&apos;t sell an &quot;AI ranking
                 position&quot; metric.<Ref n={[6, 7]} />
               </p>
@@ -519,7 +519,7 @@ export default function MethodologyPage() {
           Why we query models directly
         </h2>
         <p className="text-[15px] text-[var(--text-secondary)] leading-relaxed mb-6">
-          We query each AI model&apos;s API directly — the same models that power
+          We query each AI model&apos;s API directly, the same models that power
           ChatGPT, Claude, Gemini, and Perplexity.
         </p>
 
@@ -537,10 +537,10 @@ export default function MethodologyPage() {
             </p>
             <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
               Direct API queries eliminate variation from account state, location,
-              cookies, and session history, so every run measures the model —
+              cookies, and session history, so every run measures the model,
               not your browser. The variation that remains is the model&apos;s own
-              response randomness, which no caller can switch off<Ref n={[3, 4]} />{' '}
-              — that&apos;s what the repeated runs are for.
+              response randomness, which no caller can switch off.<Ref n={[3, 4]} />{' '}
+              That&apos;s what the repeated runs are for.
             </p>
           </div>
 
@@ -556,7 +556,7 @@ export default function MethodologyPage() {
               Every answer comes from today&apos;s web
             </p>
             <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
-              Every model we query runs against the live web — ChatGPT&apos;s native
+              Every model we query runs against the live web: ChatGPT&apos;s native
               search, Claude&apos;s web-search tool, Perplexity&apos;s search grounding,
               and Gemini&apos;s Google Search integration. Scores reflect the web as
               it exists today, not a frozen snapshot from a model&apos;s training run.
@@ -595,7 +595,7 @@ export default function MethodologyPage() {
           What moves your score
         </h2>
         <p className="text-[15px] text-[var(--text-muted)] leading-relaxed mb-8">
-          Every model we query is doing the same thing under the hood — searching
+          Every model we query is doing the same thing under the hood: searching
           the web for sources that answer the prompt, then composing an answer
           from what it finds. This is measurable and moveable: the foundational
           peer-reviewed study on generative engine optimization found that
@@ -665,8 +665,8 @@ export default function MethodologyPage() {
               </p>
               <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
                 One mention on one site is easy to pass over. Three independent
-                sources corroborating the same claim is much harder to ignore —
-                that&apos;s when models start treating it as the default answer.
+                sources corroborating the same claim is much harder to ignore.
+                That&apos;s when models start treating it as the default answer.
               </p>
             </div>
           </li>
@@ -710,7 +710,7 @@ export default function MethodologyPage() {
           The sources cited above, in full. We label each one honestly:
           peer-reviewed papers passed independent academic review; preprints and
           industry studies haven&apos;t, but publish their data and methods openly.
-          No study validates our exact run count — the research supports
+          No study validates our exact run count. The research supports
           measuring over repeated runs as a practice, and three runs is where we
           balance statistical stability against querying cost.
         </p>
@@ -753,7 +753,7 @@ export default function MethodologyPage() {
                     </span>
                   </div>
                   <p className="text-[12px] text-[var(--text-faint)] mb-2">
-                    {ref.authors} — {ref.venue}
+                    {ref.authors} · {ref.venue}
                   </p>
                   <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
                     {ref.note}

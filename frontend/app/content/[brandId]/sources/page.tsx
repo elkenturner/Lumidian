@@ -112,7 +112,7 @@ export default function ContentSourcesPage() {
       setSources((prev) => prev.filter((s) => s.id !== sourceId));
     } catch (err) {
       logError(err, "ContentSourcesPage: delete");
-      setDeleteError("Couldn't remove the source — try again.");
+      setDeleteError("Couldn't remove the source. Try again.");
     } finally {
       setDeletingId(null);
     }
@@ -150,7 +150,7 @@ export default function ContentSourcesPage() {
         <h1 className="text-2xl font-display text-[var(--text-primary)] leading-tight">Sources</h1>
         <p className="mt-1.5 text-sm text-[var(--text-secondary)] max-w-2xl">
           Sources you add here count toward the credibility check when we write posts. Add
-          articles, studies, or trade press you trust — the writer cites them when drafting so
+          articles, studies, or trade press you trust. The writer cites them when drafting so
           claims hold up.
         </p>
       </header>
@@ -166,7 +166,7 @@ export default function ContentSourcesPage() {
           {sources.length === 0 ? (
             <div className="card border-dashed text-sm text-[var(--text-secondary)] text-center py-10">
               No sources yet. Sources you add here count toward the credibility check when we
-              write posts — add articles, studies, or trade press you trust.
+              write posts. Add articles, studies, or trade press you trust.
             </div>
           ) : (
             <ul className="divide-y divide-[var(--border-subtle)]">
@@ -263,7 +263,7 @@ export default function ContentSourcesPage() {
 
             <div className="flex items-center justify-between pt-1">
               <span className="text-xs text-[var(--text-faint)]">
-                {atCap ? `Cap reached (${SOURCE_LIMIT}) — delete one to add more` : `${sources.length} of ${SOURCE_LIMIT}`}
+                {atCap ? `Cap reached (${SOURCE_LIMIT}). Delete one to add more` : `${sources.length} of ${SOURCE_LIMIT}`}
               </span>
               <Button onClick={handleAdd} disabled={!canAdd} size="sm" className="gap-1.5">
                 {submitting ? (

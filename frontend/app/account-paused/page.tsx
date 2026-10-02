@@ -19,7 +19,7 @@ export default function AccountPausedPage() {
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
-    document.title = 'Account paused — Lumidian';
+    document.title = 'Account paused · Lumidian';
   }, []);
 
   async function handleLogout() {
